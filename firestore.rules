@@ -1,0 +1,413 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // FONCTIONS UTILITAIRES DE SÉCURITÉ
+    // ========================================
+    
+    // Vérifier si l'utilisateur est authentifié
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Vérifier si l'utilisateur est le propriétaire du document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Vérifier si l'email est vérifié
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+    
+    // Vérifier si l'utilisateur est admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Vérifier si l'utilisateur est un prestataire (lawyer ou expat)
+    function isProvider() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['lawyer', 'expat'];
+    }
+    
+    // Vérifier si l'utilisateur a un rôle spécifique
+    function hasRole(role) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    // Vérifier si l'utilisateur est approuvé
+    function isApproved() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
+    }
+    
+    // Vérifier si l'utilisateur n'est pas banni
+    function isNotBanned() {
+      return isAuthenticated() && 
+             (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
+    }
+    
+    // Validation des champs obligatoires pour les utilisateurs
+    function hasValidUserFields() {
+      return request.resource.data.keys().hasAll(['email', 'role', 'firstName', 'lastName']) &&
+             request.resource.data.email is string &&
+             request.resource.data.role in ['client', 'lawyer', 'expat', 'admin'] &&
+             request.resource.data.firstName is string &&
+             request.resource.data.lastName is string;
+    }
+    
+    // ========================================
+    // COLLECTION USERS
+    // ========================================
+    match /users/{userId} {
+      // Lecture : propriétaire, admin, ou profils publics approuvés
+      allow read: if isOwner(userId) || 
+                    isAdmin() || 
+                    (resource.data.isApproved == true && resource.data.role in ['lawyer', 'expat']);
+      
+      // Création : utilisateur authentifié créant son propre profil
+      allow create: if isOwner(userId) && 
+                      isEmailVerified() &&
+                      hasValidUserFields() &&
+                      request.resource.data.uid == request.auth.uid &&
+                      request.resource.data.email == request.auth.token.email;
+      
+      // Mise à jour : propriétaire (champs limités) ou admin (tous champs)
+      allow update: if isOwner(userId) && 
+                      isEmailVerified() &&
+                      isNotBanned() &&
+                      // Interdire la modification de champs sensibles par l'utilisateur
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isAdmin', 'isApproved', 'isBanned', 'uid', 'email']) ||
+                      // Autoriser tous les champs pour les admins
+                      isAdmin();
+      
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION SOS_PROFILES
+    // ========================================
+    match /sos_profiles/{profileId} {
+      // Validation des champs obligatoires
+      function hasValidProfileFields() {
+        return request.resource.data.keys().hasAll(['uid', 'type', 'fullName']) &&
+               request.resource.data.uid is string &&
+               request.resource.data.type in ['lawyer', 'expat'] &&
+               request.resource.data.fullName is string;
+      }
+      
+      // Lecture : profils publics visibles, propriétaire, ou admin
+      allow read: if resource.data.isVisible == true || 
+                    isOwner(profileId) || 
+                    isAdmin();
+      
+      // Création : propriétaire (prestataire uniquement) ou admin
+      allow create: if (isOwner(profileId) && 
+                        isEmailVerified() &&
+                        isProvider() &&
+                        hasValidProfileFields() &&
+                        request.resource.data.uid == request.auth.uid) ||
+                       isAdmin();
+      
+      // Mise à jour : propriétaire (champs limités) ou admin
+      allow update: if (isOwner(profileId) && 
+                       isEmailVerified() &&
+                       isNotBanned() &&
+                       // Interdire la modification de champs sensibles
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'type', 'isApproved', 'isVerified']) &&
+                       hasValidProfileFields()) ||
+                      isAdmin();
+      
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION CALLS
+    // ========================================
+    match /calls/{callId} {
+      // Lecture : participants à l'appel ou admin
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.clientId || 
+                     request.auth.uid == resource.data.providerId) ||
+                    isAdmin();
+      
+      // Création : client authentifié et vérifié
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() &&
+                      isNotBanned() &&
+                      request.resource.data.clientId == request.auth.uid &&
+                      request.resource.data.keys().hasAll(['clientId', 'providerId', 'serviceType']);
+      
+      // Mise à jour : participants ou admin
+      allow update: if isAuthenticated() && 
+                      isNotBanned() &&
+                      (request.auth.uid == resource.data.clientId || 
+                       request.auth.uid == resource.data.providerId) ||
+                      isAdmin();
+      
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION PAYMENTS
+    // ========================================
+    match /payments/{paymentId} {
+      // Validation des champs de paiement
+      function hasValidPaymentFields() {
+        return request.resource.data.keys().hasAll(['clientId', 'providerId', 'amount', 'status']) &&
+               request.resource.data.amount is number &&
+               request.resource.data.amount > 0 &&
+               request.resource.data.status in ['pending', 'authorized', 'captured', 'failed', 'refunded', 'canceled'];
+      }
+      
+      // Lecture : participants au paiement ou admin
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.clientId || 
+                     request.auth.uid == resource.data.providerId) ||
+                    isAdmin();
+      
+      // Création : client authentifié avec validation
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() &&
+                      isNotBanned() &&
+                      request.resource.data.clientId == request.auth.uid &&
+                      hasValidPaymentFields();
+      
+      // Mise à jour : admin uniquement (sécurité financière)
+      allow update: if isAdmin() && hasValidPaymentFields();
+      
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION REVIEWS
+    // ========================================
+    match /reviews/{reviewId} {
+      // Validation des champs d'avis
+      function hasValidReviewFields() {
+        return request.resource.data.keys().hasAll(['clientId', 'providerId', 'rating', 'comment']) &&
+               request.resource.data.rating is number &&
+               request.resource.data.rating >= 1 &&
+               request.resource.data.rating <= 5 &&
+               request.resource.data.comment is string &&
+               request.resource.data.comment.size() > 0;
+      }
+      
+      // Lecture : avis publics, participants, ou admin
+      allow read: if resource.data.isPublic == true ||
+                    isAuthenticated() && 
+                    (request.auth.uid == resource.data.clientId || 
+                     request.auth.uid == resource.data.providerId) ||
+                    isAdmin();
+      
+      // Création : client authentifié ayant effectué un appel
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() &&
+                      isNotBanned() &&
+                      request.resource.data.clientId == request.auth.uid &&
+                      hasValidReviewFields();
+      
+      // Mise à jour : propriétaire (champs limités) ou admin
+      allow update: if (isOwner(resource.data.clientId) && 
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId', 'providerId', 'isPublic']) &&
+                       hasValidReviewFields()) ||
+                      isAdmin();
+      
+      // Suppression : propriétaire ou admin
+      allow delete: if isOwner(resource.data.clientId) || isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION DOCUMENTS
+    // ========================================
+    match /documents/{documentId} {
+      // Lecture : propriétaire ou admin
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.userId) ||
+                    isAdmin();
+      
+      // Création : utilisateur authentifié pour ses propres documents
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.keys().hasAll(['userId', 'type', 'filename']);
+      
+      // Mise à jour : admin uniquement (validation de documents)
+      allow update: if isAdmin();
+      
+      // Suppression : propriétaire ou admin
+      allow delete: if isAuthenticated() && 
+                      (request.auth.uid == resource.data.userId) ||
+                      isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION NOTIFICATIONS
+    // ========================================
+    match /notifications/{notificationId} {
+      // Lecture : destinataire ou admin
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.userId) ||
+                    isAdmin();
+      
+      // Création : système ou admin
+      allow create: if isAdmin();
+      
+      // Mise à jour : destinataire (marquer comme lu) ou admin
+      allow update: if isAuthenticated() && 
+                      request.auth.uid == resource.data.userId &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) ||
+                      isAdmin();
+      
+      // Suppression : destinataire ou admin
+      allow delete: if isAuthenticated() && 
+                      (request.auth.uid == resource.data.userId) ||
+                      isAdmin();
+    }
+    
+    // ========================================
+    // COLLECTION CALL_SESSIONS
+    // ========================================
+    match /call_sessions/{sessionId} {
+      // Lecture : participants ou admin
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.clientId || 
+                     request.auth.uid == resource.data.providerId) ||
+                    isAdmin();
+      
+      // Création : client authentifié
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() &&
+                      isNotBanned() &&
+                      request.resource.data.clientId == request.auth.uid;
+      
+      // Mise à jour : participants ou admin
+      allow update: if isAuthenticated() && 
+                      isNotBanned() &&
+                      (request.auth.uid == resource.data.clientId || 
+                       request.auth.uid == resource.data.providerId) ||
+                      isAdmin();
+      
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
+    // ========================================
+// COLLECTION INVOICE_RECORDS
+// ========================================
+match /invoice_records/{invoiceId} {
+  // Lecture : client, prestataire ou admin
+  allow read: if isAuthenticated() && 
+                (request.auth.uid == resource.data.clientId || 
+                 request.auth.uid == resource.data.providerId) ||
+                isAdmin();
+
+  // Création : système ou client uniquement
+  allow create: if isAuthenticated() && 
+                  (request.auth.uid == request.resource.data.clientId ||
+                   isAdmin());
+
+  // Mise à jour : admin uniquement
+  allow update: if isAdmin();
+
+  // Suppression : admin uniquement
+  allow delete: if isAdmin();
+}
+
+// ========================================
+// COLLECTION NOTIFICATION_LOGS
+// ========================================
+match /notification_logs/{logId} {
+  // Lecture : concerné ou admin
+  allow read: if isAuthenticated() &&
+                (request.auth.uid == resource.data.recipientId || 
+                 isAdmin());
+
+  // Création : système ou admin
+  allow create: if isAuthenticated() && isNotBanned();
+
+  // Mise à jour : admin uniquement
+  allow update: if isAdmin();
+
+  // Suppression : admin uniquement
+  allow delete: if isAdmin();
+}
+
+    // ========================================
+    // COLLECTIONS ADMINISTRATIVES
+    // ========================================
+    
+    // Logs système - Admin uniquement
+    match /logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Analytics - Admin uniquement
+    match /analytics/{analyticsId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Paramètres application - Admin uniquement
+    match /app_settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Paramètres admin - Admin uniquement
+    match /admin_settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Sauvegardes - Admin uniquement
+    match /backups/{backupId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Messages de contact - Lecture publique pour création, admin pour gestion
+    match /contact_messages/{messageId} {
+      allow read: if isAdmin();
+      allow create: if true; // Permet aux visiteurs de contacter
+      allow update, delete: if isAdmin();
+    }
+    
+    // Documents légaux - Lecture publique, écriture admin
+    match /legal_documents/{docId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Codes promo - Lecture pour validation, écriture admin
+    match /coupons/{couponId} {
+      allow read: if resource.data.active == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Utilisation des codes promo - Lecture propriétaire/admin, création utilisateur
+    match /coupon_usages/{usageId} {
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.userId) ||
+                    isAdmin();
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    
+    // ========================================
+    // RÈGLE PAR DÉFAUT - TOUT REFUSER
+    // ========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

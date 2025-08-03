@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- Exemple de pages d'avocats -->
+  <url>
+    <loc>https://sos-expat.com/avocat/canada/francais/sophie-dubois-1</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/avocat/canada/francais/sophie-dubois-1" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/lawyer/canada/french/sophie-dubois-1" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/avocat/espagne/francais/carlos-rodriguez-3</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/avocat/espagne/francais/carlos-rodriguez-3" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/lawyer/spain/french/carlos-rodriguez-3" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/avocat/allemagne/francais/thomas-mueller-6</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/avocat/allemagne/francais/thomas-mueller-6" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/lawyer/germany/french/thomas-mueller-6" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+</urlset>

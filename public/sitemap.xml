@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://sos-expat.com/</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/" />
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/sos-appel</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/sos-appel" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/emergency-call" />
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/appel-expatrie</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/appel-expatrie" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/expat-call" />
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/tarifs</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/tarifs" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/pricing" />
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/temoignages</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/temoignages" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/testimonials" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/faq</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/faq" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/faq" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/contact</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/contact" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/contact" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/centre-aide</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/centre-aide" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/help-center" />
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/politique-confidentialite</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/politique-confidentialite" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/privacy-policy" />
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/cgu-clients</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/cgu-clients" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/terms-clients" />
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/cgu-avocats</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/cgu-avocats" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/terms-lawyers" />
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/cgu-expatries</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sosexpats.com/cgu-expatries" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sosexpats.com/en/terms-expats" />
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+</urlset>

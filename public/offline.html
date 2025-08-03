@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hors ligne - SOS Expat & Travelers</title>
+    <meta name="description" content="Page hors ligne de SOS Expat & Travelers. Vérifiez votre connexion internet pour accéder aux services d'assistance.">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#dc2626">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <style>
+        /* CSS Custom Properties for theming and i18n preparation */
+        :root {
+            --primary-color: #dc2626;
+            --primary-hover: #b91c1c;
+            --background-color: #f9fafb;
+            --text-color: #1f2937;
+            --white: #ffffff;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --border-radius: 0.5rem;
+            --border-radius-sm: 0.375rem;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        /* Reset and base styles */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* Skip link for accessibility */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--primary-color);
+            color: var(--white);
+            padding: 8px;
+            text-decoration: none;
+            border-radius: var(--border-radius-sm);
+            z-index: 1000;
+        }
+
+        .skip-link:focus {
+            top: 6px;
+        }
+
+        /* Header */
+        .header {
+            background-color: var(--primary-color);
+            color: var(--white);
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .header__title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+        }
+
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            display: block;
+        }
+
+        .offline-title {
+            color: var(--primary-color);
+            margin: 0 0 1rem 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .offline-description {
+            margin-bottom: 1.5rem;
+            color: var(--text-color);
+            font-size: 1rem;
+        }
+
+        .retry-button {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: var(--white);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius-sm);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+            border: none;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .retry-button:hover,
+        .retry-button:focus {
+            background-color: var(--primary-hover);
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        .retry-button:active {
+            transform: translateY(1px);
+        }
+
+        /* Footer */
+        .footer {
+            background-color: var(--text-color);
+            color: var(--white);
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+
+        .footer__copyright {
+            margin: 0;
+        }
+
+        /* Connection status indicator */
+        .connection-status {
+            position: fixed;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #10b981;
+            color: var(--white);
+            padding: 0.5rem 1rem;
+            border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: top 0.3s ease;
+            z-index: 1000;
+        }
+
+        .connection-status.show {
+            top: 0;
+        }
+
+        /* Responsive design - Mobile first approach */
+        @media (min-width: 640px) {
+            .main {
+                padding: 2rem;
+            }
+            
+            .container {
+                padding: 2rem;
+            }
+            
+            .offline-title {
+                font-size: 1.75rem;
+            }
+            
+            .header__title {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .offline-title {
+                font-size: 2rem;
+            }
+            
+            .offline-description {
+                font-size: 1.125rem;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .retry-button {
+                transition: none;
+            }
+            
+            .retry-button:active {
+                transform: none;
+            }
+            
+            .connection-status {
+                transition: none;
+            }
+        }
+
+        /* Dark mode support preparation */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #111827;
+                --text-color: #f9fafb;
+                --white: #1f2937;
+                --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip link for accessibility -->
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+    
+    <!-- Header -->
+    <header class="header" role="banner">
+        <h1 class="header__title">SOS Expat & Travelers</h1>
+    </header>
+    
+    <!-- Connection status indicator -->
+    <div class="connection-status" id="connectionStatus" role="status" aria-live="polite">
+        Connexion rétablie
+    </div>
+    
+    <!-- Main content -->
+    <main class="main" id="main-content" role="main">
+        <div class="container">
+            <!-- Offline icon with proper accessibility -->
+            <svg class="offline-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true" focusable="false">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636L5.636 18.364m12.728 0L5.636 5.636M12 2.458l6.364 6.364L12 15.186 5.636 8.822 12 2.458z" />
+            </svg>
+            
+            <h2 class="offline-title">Vous êtes hors ligne</h2>
+            
+            <div class="offline-description">
+                <p>Il semble que vous n'ayez pas de connexion internet. Veuillez vérifier votre connexion et réessayer.</p>
+                <p>Certaines fonctionnalités de SOS Expat & Travelers nécessitent une connexion internet pour fonctionner correctement.</p>
+            </div>
+            
+            <button type="button" class="retry-button" id="retryButton" aria-describedby="retry-description">
+                Réessayer
+            </button>
+            <div id="retry-description" class="sr-only">
+                Cliquez pour vérifier la connexion et recharger la page
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="footer" role="contentinfo">
+        <p class="footer__copyright">&copy; 2025 SOS Expat & Travelers. Tous droits réservés.</p>
+    </footer>
+
+    <script>
+        // Cache DOM elements
+        const retryButton = document.getElementById('retryButton');
+        const connectionStatus = document.getElementById('connectionStatus');
+        
+        // Connection state management
+        let isOnline = navigator.onLine;
+        let retryInterval;
+        
+        // Initialize connection checking
+        function initConnectionMonitoring() {
+            // Listen for online/offline events
+            window.addEventListener('online', handleOnline);
+            window.addEventListener('offline', handleOffline);
+            
+            // Manual retry functionality
+            retryButton.addEventListener('click', handleRetry);
+            
+            // Start periodic checking (less aggressive than original)
+            startPeriodicCheck();
+        }
+        
+        function handleOnline() {
+            isOnline = true;
+            showConnectionStatus();
+            
+            // Delay reload to show status message
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        }
+        
+        function handleOffline() {
+            isOnline = false;
+            hideConnectionStatus();
+        }
+        
+        function handleRetry() {
+            retryButton.disabled = true;
+            retryButton.textContent = 'Vérification...';
+            
+            // Check connection with fetch to a lightweight endpoint
+            fetch('/', { 
+                method: 'HEAD',
+                cache: 'no-cache',
+                signal: AbortSignal.timeout(5000)
+            })
+            .then(() => {
+                handleOnline();
+            })
+            .catch(() => {
+                // Reset button state
+                setTimeout(() => {
+                    retryButton.disabled = false;
+                    retryButton.textContent = 'Réessayer';
+                }, 1000);
+            });
+        }
+        
+        function showConnectionStatus() {
+            connectionStatus.classList.add('show');
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                hideConnectionStatus();
+            }, 3000);
+        }
+        
+        function hideConnectionStatus() {
+            connectionStatus.classList.remove('show');
+        }
+        
+        function startPeriodicCheck() {
+            // Check every 10 seconds instead of 5 for better UX
+            retryInterval = setInterval(() => {
+                if (navigator.onLine && !isOnline) {
+                    handleOnline();
+                }
+            }, 10000);
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (retryInterval) {
+                clearInterval(retryInterval);
+            }
+        });
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initConnectionMonitoring);
+        } else {
+            initConnectionMonitoring();
+        }
+        
+        // Service Worker registration for PWA (if available)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {
+                // Fail silently if no service worker available
+            });
+        }
+    </script>
+</body>
+</html>

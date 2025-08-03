@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- Exemple de pages d'expatriés -->
+  <url>
+    <loc>https://sos-expat.com/expatrie/thailande/jean-marc-leblanc-2</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sos-expat.com/expatrie/thailande/jean-marc-leblanc-2" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sos-expat.com/en/expat/thailand/jean-marc-leblanc-2" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/expatrie/australie/marie-dubois-4</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sos-expat.com/expatrie/australie/marie-dubois-4" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sos-expat.com/en/expat/australia/marie-dubois-4" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://sos-expat.com/expatrie/singapour/lisa-chen-5</loc>
+    <xhtml:link rel="alternate" hrefLang="fr" href="https://sos-expat.com/expatrie/singapour/lisa-chen-5" />
+    <xhtml:link rel="alternate" hrefLang="en" href="https://sos-expat.com/en/expat/singapore/lisa-chen-5" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>2025-01-15</lastmod>
+  </url>
+</urlset>

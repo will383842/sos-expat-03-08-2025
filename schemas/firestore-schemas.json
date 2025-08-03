@@ -1,0 +1,724 @@
+{
+  "collections": {
+    "users": {
+      "description": "Collection principale des utilisateurs de la plateforme",
+      "security": "Lecture: propriétaire ou admin. Écriture: propriétaire (champs limités) ou admin",
+      "indexes": ["role", "isApproved", "createdAt", "country", "isTestProfile"],
+      "schema": {
+        "id": {
+          "type": "string",
+          "required": true,
+          "description": "ID unique de l'utilisateur (= UID Firebase Auth)"
+        },
+        "uid": {
+          "type": "string",
+          "required": true,
+          "description": "UID Firebase Auth"
+        },
+        "email": {
+          "type": "string",
+          "required": true,
+          "description": "Adresse email de l'utilisateur"
+        },
+        "role": {
+          "type": "string",
+          "required": true,
+          "enum": ["client", "lawyer", "expat", "admin"],
+          "description": "Rôle de l'utilisateur dans la plateforme"
+        },
+        "firstName": {
+          "type": "string",
+          "required": true,
+          "description": "Prénom de l'utilisateur"
+        },
+        "lastName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom de famille de l'utilisateur"
+        },
+        "fullName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom complet (firstName + lastName)"
+        },
+        "phone": {
+          "type": "string",
+          "required": false,
+          "description": "Numéro de téléphone"
+        },
+        "phoneCountryCode": {
+          "type": "string",
+          "required": false,
+          "default": "+33",
+          "description": "Code pays du téléphone"
+        },
+        "currentCountry": {
+          "type": "string",
+          "required": false,
+          "description": "Pays de résidence actuel"
+        },
+        "currentPresenceCountry": {
+          "type": "string",
+          "required": false,
+          "description": "Pays de présence actuel (pour prestataires)"
+        },
+        "preferredLanguage": {
+          "type": "string",
+          "required": true,
+          "enum": ["fr", "en"],
+          "default": "fr",
+          "description": "Langue préférée de l'interface"
+        },
+        "languages": {
+          "type": "array",
+          "items": "string",
+          "required": false,
+          "description": "Langues parlées par l'utilisateur"
+        },
+        "profilePhoto": {
+          "type": "string",
+          "required": false,
+          "description": "URL de la photo de profil"
+        },
+        "isActive": {
+          "type": "boolean",
+          "required": true,
+          "default": true,
+          "description": "Compte actif"
+        },
+        "isApproved": {
+          "type": "boolean",
+          "required": true,
+          "default": false,
+          "description": "Compte approuvé (auto pour clients)"
+        },
+        "isVerified": {
+          "type": "boolean",
+          "required": true,
+          "default": false,
+          "description": "Expert vérifié (pour prestataires)"
+        },
+        "isBanned": {
+          "type": "boolean",
+          "required": true,
+          "default": false,
+          "description": "Utilisateur banni"
+        },
+        "isOnline": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Statut en ligne (pour prestataires)"
+        },
+        "isVisible": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Visible dans les recherches"
+        },
+        "isVisibleOnMap": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Visible sur la carte mondiale"
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "required": true,
+          "description": "Email vérifié (Firebase Auth)"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de création du compte"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de dernière mise à jour"
+        },
+        "lastLoginAt": {
+          "type": "timestamp",
+          "required": false,
+          "description": "Date de dernière connexion"
+        },
+        "specialties": {
+          "type": "array",
+          "items": "string",
+          "required": false,
+          "description": "Spécialités (pour avocats)"
+        },
+        "helpTypes": {
+          "type": "array",
+          "items": "string",
+          "required": false,
+          "description": "Types d'aide (pour expatriés)"
+        },
+        "yearsOfExperience": {
+          "type": "number",
+          "required": false,
+          "description": "Années d'expérience (pour avocats)"
+        },
+        "yearsAsExpat": {
+          "type": "number",
+          "required": false,
+          "description": "Années d'expatriation (pour expatriés)"
+        },
+        "bio": {
+          "type": "string",
+          "required": false,
+          "description": "Description/biographie"
+        },
+        "isTestProfile": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Profil de test (à supprimer en production)"
+        }
+      }
+    },
+    "sos_profiles": {
+      "description": "Profils étendus pour les prestataires (avocats et expatriés)",
+      "security": "Lecture: profils publics ou propriétaire ou admin. Écriture: propriétaire (limité) ou admin",
+      "indexes": ["type", "isVisible", "isApproved", "country", "languages", "isOnline", "featured"],
+      "schema": {
+        "uid": {
+          "type": "string",
+          "required": true,
+          "description": "UID de l'utilisateur (référence vers users)"
+        },
+        "type": {
+          "type": "string",
+          "required": true,
+          "enum": ["lawyer", "expat"],
+          "description": "Type de prestataire"
+        },
+        "fullName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom complet du prestataire"
+        },
+        "firstName": {
+          "type": "string",
+          "required": true,
+          "description": "Prénom"
+        },
+        "lastName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom de famille"
+        },
+        "email": {
+          "type": "string",
+          "required": true,
+          "description": "Email de contact"
+        },
+        "phone": {
+          "type": "string",
+          "required": false,
+          "description": "Téléphone de contact"
+        },
+        "phoneCountryCode": {
+          "type": "string",
+          "required": false,
+          "default": "+33",
+          "description": "Code pays du téléphone"
+        },
+        "languages": {
+          "type": "array",
+          "items": "string",
+          "required": true,
+          "description": "Langues parlées"
+        },
+        "country": {
+          "type": "string",
+          "required": true,
+          "description": "Pays d'intervention principal"
+        },
+        "city": {
+          "type": "string",
+          "required": false,
+          "description": "Ville de résidence"
+        },
+        "description": {
+          "type": "string",
+          "required": false,
+          "description": "Description professionnelle"
+        },
+        "profilePhoto": {
+          "type": "string",
+          "required": false,
+          "description": "URL de la photo de profil"
+        },
+        "isActive": {
+          "type": "boolean",
+          "required": true,
+          "default": true,
+          "description": "Profil actif"
+        },
+        "isApproved": {
+          "type": "boolean",
+          "required": true,
+          "default": false,
+          "description": "Profil approuvé par admin"
+        },
+        "isVerified": {
+          "type": "boolean",
+          "required": true,
+          "default": false,
+          "description": "Expert vérifié"
+        },
+        "isVisible": {
+          "type": "boolean",
+          "required": true,
+          "default": true,
+          "description": "Visible dans les recherches"
+        },
+        "isVisibleOnMap": {
+          "type": "boolean",
+          "required": true,
+          "default": true,
+          "description": "Visible sur la carte"
+        },
+        "isOnline": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Disponible pour appels"
+        },
+        "availability": {
+          "type": "string",
+          "required": false,
+          "enum": ["available", "busy", "offline"],
+          "default": "offline",
+          "description": "Statut de disponibilité"
+        },
+        "rating": {
+          "type": "number",
+          "required": true,
+          "default": 4.5,
+          "min": 0,
+          "max": 5,
+          "description": "Note moyenne"
+        },
+        "reviewCount": {
+          "type": "number",
+          "required": true,
+          "default": 0,
+          "description": "Nombre d'avis"
+        },
+        "specialties": {
+          "type": "array",
+          "items": "string",
+          "required": false,
+          "description": "Spécialités ou types d'aide"
+        },
+        "yearsOfExperience": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Années d'expérience"
+        },
+        "price": {
+          "type": "number",
+          "required": true,
+          "description": "Prix de la consultation"
+        },
+        "duration": {
+          "type": "number",
+          "required": true,
+          "description": "Durée de la consultation (minutes)"
+        },
+        "responseTime": {
+          "type": "string",
+          "required": false,
+          "default": "< 5 minutes",
+          "description": "Temps de réponse moyen"
+        },
+        "successRate": {
+          "type": "number",
+          "required": false,
+          "default": 95,
+          "description": "Taux de succès (%)"
+        },
+        "featured": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Profil mis en avant"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de création"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de mise à jour"
+        }
+      }
+    },
+    "calls": {
+      "description": "Enregistrements des appels entre clients et prestataires",
+      "security": "Lecture/écriture: participants ou admin",
+      "indexes": ["clientId", "providerId", "status", "serviceType", "createdAt"],
+      "schema": {
+        "clientId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du client"
+        },
+        "providerId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du prestataire"
+        },
+        "clientName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom du client"
+        },
+        "providerName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom du prestataire"
+        },
+        "serviceType": {
+          "type": "string",
+          "required": true,
+          "enum": ["lawyer_call", "expat_call"],
+          "description": "Type de service"
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "description": "Titre de la demande"
+        },
+        "description": {
+          "type": "string",
+          "required": false,
+          "description": "Description du problème"
+        },
+        "status": {
+          "type": "string",
+          "required": true,
+          "enum": ["pending", "in_progress", "completed", "failed", "refunded"],
+          "description": "Statut de l'appel"
+        },
+        "duration": {
+          "type": "number",
+          "required": false,
+          "description": "Durée prévue (minutes)"
+        },
+        "callDuration": {
+          "type": "number",
+          "required": false,
+          "description": "Durée réelle (secondes)"
+        },
+        "price": {
+          "type": "number",
+          "required": true,
+          "description": "Prix de l'appel"
+        },
+        "platformFee": {
+          "type": "number",
+          "required": false,
+          "description": "Commission plateforme"
+        },
+        "providerAmount": {
+          "type": "number",
+          "required": false,
+          "description": "Montant prestataire"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de création"
+        },
+        "startedAt": {
+          "type": "timestamp",
+          "required": false,
+          "description": "Date de début d'appel"
+        },
+        "endedAt": {
+          "type": "timestamp",
+          "required": false,
+          "description": "Date de fin d'appel"
+        },
+        "callSessionId": {
+          "type": "string",
+          "required": false,
+          "description": "ID de la session d'appel"
+        }
+      }
+    },
+    "payments": {
+      "description": "Enregistrements des paiements Stripe",
+      "security": "Lecture: participants ou admin. Écriture: admin uniquement",
+      "indexes": ["clientId", "providerId", "status", "callId", "createdAt"],
+      "schema": {
+        "callId": {
+          "type": "string",
+          "required": false,
+          "description": "ID de l'appel associé"
+        },
+        "clientId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du client"
+        },
+        "providerId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du prestataire"
+        },
+        "amount": {
+          "type": "number",
+          "required": true,
+          "description": "Montant total"
+        },
+        "platformFee": {
+          "type": "number",
+          "required": true,
+          "description": "Commission plateforme"
+        },
+        "providerAmount": {
+          "type": "number",
+          "required": true,
+          "description": "Montant prestataire"
+        },
+        "status": {
+          "type": "string",
+          "required": true,
+          "enum": ["pending", "authorized", "captured", "failed", "refunded", "canceled"],
+          "description": "Statut du paiement"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "default": "eur",
+          "description": "Devise"
+        },
+        "stripePaymentIntentId": {
+          "type": "string",
+          "required": false,
+          "description": "ID Stripe PaymentIntent"
+        },
+        "stripeChargeId": {
+          "type": "string",
+          "required": false,
+          "description": "ID Stripe Charge"
+        },
+        "description": {
+          "type": "string",
+          "required": false,
+          "description": "Description du paiement"
+        },
+        "clientEmail": {
+          "type": "string",
+          "required": false,
+          "description": "Email du client"
+        },
+        "clientName": {
+          "type": "string",
+          "required": false,
+          "description": "Nom du client"
+        },
+        "providerName": {
+          "type": "string",
+          "required": false,
+          "description": "Nom du prestataire"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de création"
+        },
+        "capturedAt": {
+          "type": "timestamp",
+          "required": false,
+          "description": "Date de capture"
+        },
+        "refundedAt": {
+          "type": "timestamp",
+          "required": false,
+          "description": "Date de remboursement"
+        }
+      }
+    },
+    "reviews": {
+      "description": "Avis clients sur les prestataires",
+      "security": "Lecture: avis publics ou participants ou admin. Écriture: client ou admin",
+      "indexes": ["providerId", "status", "isPublic", "rating", "createdAt"],
+      "schema": {
+        "callId": {
+          "type": "string",
+          "required": true,
+          "description": "ID de l'appel associé"
+        },
+        "clientId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du client"
+        },
+        "providerId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du prestataire"
+        },
+        "rating": {
+          "type": "number",
+          "required": true,
+          "min": 1,
+          "max": 5,
+          "description": "Note (1-5 étoiles)"
+        },
+        "comment": {
+          "type": "string",
+          "required": true,
+          "description": "Commentaire de l'avis"
+        },
+        "isPublic": {
+          "type": "boolean",
+          "required": true,
+          "default": true,
+          "description": "Avis public"
+        },
+        "status": {
+          "type": "string",
+          "required": false,
+          "enum": ["pending", "published", "hidden"],
+          "default": "published",
+          "description": "Statut de modération"
+        },
+        "clientName": {
+          "type": "string",
+          "required": true,
+          "description": "Nom du client (affiché)"
+        },
+        "clientCountry": {
+          "type": "string",
+          "required": false,
+          "description": "Pays du client"
+        },
+        "serviceType": {
+          "type": "string",
+          "required": true,
+          "enum": ["lawyer_call", "expat_call"],
+          "description": "Type de service évalué"
+        },
+        "helpfulVotes": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Votes 'utile'"
+        },
+        "reportedCount": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Nombre de signalements"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date de création"
+        }
+      }
+    },
+    "documents": {
+      "description": "Documents uploadés par les utilisateurs (justificatifs, diplômes, etc.)",
+      "security": "Lecture/écriture: propriétaire ou admin",
+      "indexes": ["userId", "type", "status", "uploadedAt"],
+      "schema": {
+        "userId": {
+          "type": "string",
+          "required": true,
+          "description": "ID du propriétaire"
+        },
+        "type": {
+          "type": "string",
+          "required": true,
+          "enum": ["identity", "diploma", "certificate", "residence_proof", "insurance"],
+          "description": "Type de document"
+        },
+        "documentType": {
+          "type": "string",
+          "required": false,
+          "description": "Type détaillé du document"
+        },
+        "filename": {
+          "type": "string",
+          "required": true,
+          "description": "Nom du fichier"
+        },
+        "url": {
+          "type": "string",
+          "required": true,
+          "description": "URL Firebase Storage"
+        },
+        "mimeType": {
+          "type": "string",
+          "required": true,
+          "description": "Type MIME du fichier"
+        },
+        "fileSize": {
+          "type": "number",
+          "required": true,
+          "description": "Taille du fichier (bytes)"
+        },
+        "status": {
+          "type": "string",
+          "required": true,
+          "enum": ["pending", "approved", "rejected"],
+          "default": "pending",
+          "description": "Statut de validation"
+        },
+        "uploadedAt": {
+          "type": "timestamp",
+          "required": true,
+          "description": "Date d'upload"
+        },
+        "reviewedAt": {
+          "type": "timestamp",
+          "required": false,
+          "description": "Date de validation"
+        },
+        "reviewNotes": {
+          "type": "string",
+          "required": false,
+          "description": "Notes de validation"
+        },
+        "verifiedBy": {
+          "type": "string",
+          "required": false,
+          "description": "ID de l'admin validateur"
+        }
+      }
+    }
+  },
+  "optimizations": {
+    "security": {
+      "users": "Accès restreint aux données personnelles",
+      "sos_profiles": "Profils publics visibles uniquement si approuvés",
+      "payments": "Écriture limitée aux admins pour sécurité financière",
+      "reviews": "Modération possible des avis"
+    },
+    "performance": {
+      "indexes": "Index optimisés pour les requêtes fréquentes",
+      "mobile_first": "Structure adaptée aux contraintes mobiles",
+      "data_types": "Types optimisés pour réduire la taille"
+    },
+    "production_ready": {
+      "validation": "Contraintes de validation ajoutées",
+      "error_handling": "Gestion d'erreurs améliorée",
+      "monitoring": "Champs pour le monitoring ajoutés"
+    },
+    "i18n_ready": {
+      "language_fields": "Champs de langue préservés",
+      "country_support": "Support multi-pays maintenu",
+      "enum_values": "Valeurs enum prêtes pour traduction"
+    }
+  }
+}

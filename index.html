@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <!-- 📱 META MOBILE FIRST - CRITIQUES EN PREMIER -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0" />
+    
+    <!-- 🎯 PWA & MOBILE NATIVE -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#dc2626" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#b91c1c" media="(prefers-color-scheme: dark)">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+
+    <!-- 📱 APPLE MOBILE OPTIMIZATIONS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SOS Urgently">
+    <meta name="apple-touch-fullscreen" content="yes">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    
+    <!-- 🤖 ANDROID CHROME OPTIMIZATIONS -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="SOS Urgently">
+    
+    <!-- 🔍 SEO MOBILE FIRST -->
+    <title>SOS Expat & Travelers - Aide d'urgence pour expatriés</title>
+    <meta name="description" content="Assistance urgente 24/7 pour expatriés francophones. Avocats, traducteurs, urgences médicales. Support immédiat partout dans le monde. Application mobile disponible." />
+    <meta name="keywords" content="expat, urgence, assistance, avocat, francophone, voyage, expatrié, aide, 24/7, mobile" />
+    <link rel="canonical" href="https://sosexpats.com" />
+    
+    <!-- 🚀 PERFORMANCE - DNS PREFETCH MOBILE OPTIMIZED -->
+    <link rel="preconnect" href="https://api.stripe.com" crossorigin>
+    <link rel="preconnect" href="https://api.twilio.com" crossorigin>
+    <link rel="preconnect" href="https://firebaseapp.com" crossorigin>
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    
+    <!-- ⚡ RESOURCE HINTS MOBILES -->
+    <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="prefetch" href="/icon-512x512.png">
+    
+    <!-- 🎨 ICONS & FAVICONS RESPONSIVE -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="/favicon-dark.svg" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    
+    <!-- 📱 MOBILE BROWSERS SPECIFIC -->
+    <!-- Samsung Internet -->
+    <meta name="theme-color" content="#dc2626">
+    <!-- UC Browser -->
+    <meta name="full-screen" content="yes">
+    <meta name="browsermode" content="application">
+    <!-- QQ Browser -->
+    <meta name="x5-fullscreen" content="true">
+    <meta name="x5-page-mode" content="app">
+    
+    <!-- 🌐 SOCIAL MEDIA - MOBILE OPTIMIZED -->
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sosexpats.com/" />
+    <meta property="og:title" content="SOS Expat & Travelers - Aide d'urgence 24/7" />
+    <meta property="og:description" content="Assistance urgente pour expatriés francophones. Avocats, traducteurs, urgences. Support immédiat mobile partout dans le monde." />
+    <meta property="og:image" content="https://sosexpats.com/og-image-1200x630.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SOS Expat - Application mobile d'assistance urgente" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="SOS Expat & Travelers" />
+    
+    <!-- Twitter Cards - Mobile Optimized -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://sosexpats.com/" />
+    <meta name="twitter:title" content="SOS Expat & Travelers - Aide d'urgence mobile" />
+    <meta name="twitter:description" content="App mobile d'assistance urgente pour expatriés. Avocats, traducteurs, urgences 24/7. Téléchargez l'app maintenant." />
+    <meta name="twitter:image" content="https://sosexpats.com/twitter-image-1200x600.jpg" />
+    <meta name="twitter:creator" content="@sosexpats" />
+    <meta name="twitter:site" content="@sosexpats" />
+    
+    <!-- 🔍 SEARCH ENGINES MOBILE -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    
+    <!-- 🚀 PERFORMANCE MOBILE CRITICAL -->
+    <script>
+      // 📱 Mobile-first critical CSS loading
+      const criticalCSS = document.createElement('style');
+      criticalCSS.textContent = `
+        * { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+               line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        #root { min-height: 100vh; }
+        .loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; 
+                  font-size: 18px; color: #666; }
+        @media (max-width: 768px) {
+          html { font-size: 16px; }
+          body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+        }
+      `;
+      document.head.appendChild(criticalCSS);
+      
+      // 🎯 Mobile redirect logic optimized
+      if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
+        window.location.href = '/admin/login';
+      }
+      
+      // 📱 Mobile performance optimization
+      if ('connection' in navigator) {
+        const connection = navigator.connection;
+        if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
+          document.documentElement.classList.add('slow-connection');
+        }
+      }
+      
+      // 🔋 Battery API for mobile optimization
+      if ('getBattery' in navigator) {
+        navigator.getBattery().then(battery => {
+          if (battery.level < 0.2) {
+            document.documentElement.classList.add('low-battery');
+          }
+        });
+      }
+    </script>
+    
+    <!-- 🎨 MOBILE THEME & APPEARANCE -->
+    <style>
+      /* Mobile-first loading state */
+      .app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 20px;
+        z-index: 9999;
+      }
+      
+      /* Mobile safe areas */
+      @supports (padding: max(0px)) {
+        body {
+          padding-left: max(12px, env(safe-area-inset-left));
+          padding-right: max(12px, env(safe-area-inset-right));
+        }
+      }
+      
+      /* Mobile dark mode */
+      @media (prefers-color-scheme: dark) {
+        .app-loading {
+          background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+        }
+      }
+      
+      /* Reduced motion for mobile */
+      @media (prefers-reduced-motion: reduce) {
+        * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  
+  <body>
+    <!-- 📱 Mobile loading state -->
+    <div id="app-loading" class="app-loading">
+      <div>
+        <div style="font-size: 32px; margin-bottom: 16px;">🆘</div>
+        <div>Chargement...</div>
+      </div>
+    </div>
+    
+    <!-- 🎯 Main app container -->
+    <div id="root"></div>
+    
+    <!-- 🚀 SCRIPTS - Mobile optimized loading -->
+    <script type="module">
+      // Remove loading screen when app is ready
+      window.addEventListener('load', () => {
+        const loading = document.getElementById('app-loading');
+        if (loading) {
+          setTimeout(() => {
+            loading.style.opacity = '0';
+            setTimeout(() => loading.remove(), 300);
+          }, 500);
+        }
+      });
+    </script>
+    
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- 📱 SERVICE WORKER - Mobile first -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              // 📱 Update available notification for mobile
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Show update notification (mobile-friendly)
+                    if (confirm('Nouvelle version disponible. Actualiser maintenant ?')) {
+                      window.location.reload();
+                    }
+                  }
+                });
+              });
+            })
+            .catch(() => {
+              // Service worker registration failed - silent fail for mobile
+            });
+        });
+      }
+      
+      // 📱 Install prompt for mobile PWA
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Show install button or banner
+        const installBanner = document.createElement('div');
+        installBanner.innerHTML = `
+          <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #dc2626; color: white; padding: 16px; border-radius: 12px; text-align: center; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="margin-bottom: 8px; font-weight: bold;">📱 Installer l'app SOS Expat</div>
+            <div style="margin-bottom: 12px; font-size: 14px;">Accès rapide à l'assistance d'urgence</div>
+            <button onclick="installApp()" style="background: white; color: #dc2626; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-right: 8px;">Installer</button>
+            <button onclick="this.parentElement.parentElement.remove()" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px;">Plus tard</button>
+          </div>
+        `;
+        document.body.appendChild(installBanner);
+      });
+      
+      window.installApp = () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then((choiceResult) => {
+            deferredPrompt = null;
+            document.querySelector('[onclick*="installApp"]').closest('div').remove();
+          });
+        }
+      };
+      
+      // 📱 Mobile performance monitoring
+      if ('performance' in window) {
+        window.addEventListener('load', () => {
+          setTimeout(() => {
+            const perfData = performance.getEntriesByType('navigation')[0];
+            if (perfData.loadEventEnd - perfData.loadEventStart > 3000) {
+              // App loaded slowly on mobile - could log analytics
+              console.info('Mobile: Chargement lent détecté');
+            }
+          }, 0);
+        });
+      }
+    </script>
+  </body>
+</html>

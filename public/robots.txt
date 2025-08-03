@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://sosexpats.com/sitemap.xml
+Sitemap: https://sosexpats.com/sitemap-lawyers.xml
+Sitemap: https://sosexpats.com/sitemap-expats.xml
+
+# Disallow admin pages
+Disallow: /admin/
+Disallow: /admin/login
+Disallow: /admin-direct
+Disallow: /test-production
+
+# Allow profile pages for SEO
+Allow: /avocat/
+Allow: /expatrie/
+
+# Allow country pages
+Allow: /pays/
+
+# Allow language pages
+Allow: /langue/

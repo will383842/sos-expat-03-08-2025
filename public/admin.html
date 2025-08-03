@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Page d'accès à la console d'administration SOS Expats pour la gestion du service d'assistance aux expatriés">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#dc2626">
+    <title>Administration SOS Expats | Console d'administration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <style>
+        :root {
+            --color-primary: #dc2626;
+            --color-primary-hover: #b91c1c;
+            --color-bg-primary: #1a1a1a;
+            --color-bg-secondary: #2a2a2a;
+            --color-text-primary: #ffffff;
+            --color-text-secondary: #d1d5db;
+            --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            --border-radius: 0.5rem;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-system);
+            background: linear-gradient(135deg, var(--color-bg-primary) 0%, #2a2a2a 100%);
+            color: var(--color-text-primary);
+            margin: 0;
+            padding: 1rem;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1.6;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 28rem;
+            padding: 2rem;
+            background-color: var(--color-bg-secondary);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .main-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--color-primary), #ef4444, var(--color-primary));
+        }
+
+        .main-title {
+            color: var(--color-primary);
+            margin: 0 0 1rem 0;
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .description {
+            margin: 0 0 2rem 0;
+            color: var(--color-text-secondary);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .admin-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--color-primary), #ef4444);
+            color: var(--color-text-primary);
+            padding: 0.875rem 2rem;
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .admin-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .admin-button:hover::before {
+            left: 100%;
+        }
+
+        .admin-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
+        }
+
+        .admin-button:active {
+            transform: translateY(0);
+        }
+
+        .admin-button:focus {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        .loading-indicator {
+            margin-top: 1.5rem;
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            opacity: 0;
+            animation: fadeIn 0.3s ease-in-out 0.8s forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--color-primary);
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+
+        .skip-link:focus {
+            top: 6px;
+        }
+
+        /* Responsive design - Mobile first */
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .main-container {
+                padding: 1.5rem;
+            }
+            
+            .main-title {
+                font-size: 1.5rem;
+            }
+            
+            .admin-button {
+                width: 100%;
+                padding: 1rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .main-container {
+                padding: 3rem;
+            }
+            
+            .main-title {
+                font-size: 2rem;
+            }
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            
+            html {
+                scroll-behavior: auto;
+            }
+        }
+
+        /* High contrast mode */
+        @media (prefers-contrast: high) {
+            :root {
+                --color-bg-primary: #000000;
+                --color-bg-secondary: #1a1a1a;
+                --color-text-primary: #ffffff;
+                --color-text-secondary: #ffffff;
+            }
+        }
+
+        /* Dark mode (default) - ready for light mode toggle */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --color-bg-primary: #f8fafc;
+                --color-bg-secondary: #ffffff;
+                --color-text-primary: #1f2937;
+                --color-text-secondary: #6b7280;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+    
+    <main id="main-content" class="main-container" role="main">
+        <h1 class="main-title">Console d'administration SOS Expats</h1>
+        <p class="description">
+            Accédez à votre espace d'administration pour gérer les services d'assistance aux expatriés.
+        </p>
+        <a href="/admin/login" 
+           class="admin-button" 
+           role="button"
+           aria-label="Accéder à la console d'administration SOS Expats">
+            Accéder à la console
+        </a>
+        <div class="loading-indicator" aria-live="polite">
+            Redirection automatique en cours...
+        </div>
+    </main>
+
+    <script>
+        (function() {
+            'use strict';
+            
+            // Configuration
+            const CONFIG = {
+                redirectUrl: '/admin/login',
+                redirectDelay: 3000, // Augmenté pour une meilleure UX
+                storageKey: 'sos_expats_admin_visited'
+            };
+
+            // Fonctions utilitaires
+            const utils = {
+                // Vérification de la prise en charge des fonctionnalités
+                supportsLocalStorage: function() {
+                    try {
+                        const test = '__test__';
+                        localStorage.setItem(test, test);
+                        localStorage.removeItem(test);
+                        return true;
+                    } catch(e) {
+                        return false;
+                    }
+                },
+
+                // Gestion des erreurs
+                handleError: function(error, context) {
+                    console.error(`Erreur dans ${context}:`, error);
+                },
+
+                // Validation d'URL
+                isValidUrl: function(url) {
+                    try {
+                        new URL(url, window.location.origin);
+                        return true;
+                    } catch {
+                        return false;
+                    }
+                }
+            };
+
+            // Gestion de la redirection
+            const redirectManager = {
+                timer: null,
+                
+                init: function() {
+                    this.setupRedirection();
+                    this.handleUserInteraction();
+                },
+
+                setupRedirection: function() {
+                    if (!utils.isValidUrl(CONFIG.redirectUrl)) {
+                        utils.handleError(new Error('URL de redirection invalide'), 'setupRedirection');
+                        return;
+                    }
+
+                    this.timer = setTimeout(() => {
+                        this.performRedirect();
+                    }, CONFIG.redirectDelay);
+                },
+
+                performRedirect: function() {
+                    try {
+                        // Marquer la visite si possible
+                        if (utils.supportsLocalStorage()) {
+                            localStorage.setItem(CONFIG.storageKey, Date.now().toString());
+                        }
+                        
+                        window.location.href = CONFIG.redirectUrl;
+                    } catch (error) {
+                        utils.handleError(error, 'performRedirect');
+                        // Fallback: redirection immédiate
+                        window.location.href = CONFIG.redirectUrl;
+                    }
+                },
+
+                cancelRedirection: function() {
+                    if (this.timer) {
+                        clearTimeout(this.timer);
+                        this.timer = null;
+                    }
+                },
+
+                handleUserInteraction: function() {
+                    const button = document.querySelector('.admin-button');
+                    if (!button) return;
+
+                    // Annuler la redirection automatique si l'utilisateur interagit
+                    ['click', 'focus', 'keydown'].forEach(event => {
+                        button.addEventListener(event, () => {
+                            this.cancelRedirection();
+                        });
+                    });
+
+                    // Gestion du clic sur le bouton
+                    button.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.performRedirect();
+                    });
+
+                    // Support clavier
+                    button.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            this.performRedirect();
+                        }
+                    });
+                }
+            };
+
+            // Gestion de l'accessibilité
+            const accessibilityManager = {
+                init: function() {
+                    this.announcePageLoad();
+                    this.handleReducedMotion();
+                },
+
+                announcePageLoad: function() {
+                    // Annoncer le chargement de la page pour les lecteurs d'écran
+                    const announcement = document.createElement('div');
+                    announcement.setAttribute('aria-live', 'polite');
+                    announcement.setAttribute('aria-atomic', 'true');
+                    announcement.className = 'sr-only';
+                    announcement.textContent = 'Page d\'administration SOS Expats chargée';
+                    document.body.appendChild(announcement);
+
+                    // Nettoyer après annonce
+                    setTimeout(() => {
+                        if (announcement.parentNode) {
+                            announcement.parentNode.removeChild(announcement);
+                        }
+                    }, 1000);
+                },
+
+                handleReducedMotion: function() {
+                    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        document.body.style.setProperty('--transition', 'none');
+                    }
+                }
+            };
+
+            // Initialisation de l'application
+            const app = {
+                init: function() {
+                    try {
+                        // Attendre que le DOM soit prêt
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', () => {
+                                this.start();
+                            });
+                        } else {
+                            this.start();
+                        }
+                    } catch (error) {
+                        utils.handleError(error, 'app.init');
+                    }
+                },
+
+                start: function() {
+                    accessibilityManager.init();
+                    redirectManager.init();
+                },
+
+                // Nettoyage avant déchargement de la page
+                cleanup: function() {
+                    redirectManager.cancelRedirection();
+                }
+            };
+
+            // Gestion des événements globaux
+            window.addEventListener('beforeunload', () => {
+                app.cleanup();
+            });
+
+            // Point d'entrée
+            app.init();
+        })();
+    </script>
+</body>
+</html>

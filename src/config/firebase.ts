@@ -4,8 +4,9 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
-// Configuration Firebase depuis .env
+// Configuration Firebase depuis les variables d'environnement
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,27 +16,39 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-console.log('✅ Clés Firebase chargées :', {
-  apiKey: firebaseConfig.apiKey,
-  storageBucket: firebaseConfig.storageBucket,
+// Vérification que les variables d'environnement sont bien chargées
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error('❌ Variables d\'environnement Firebase manquantes');
+  throw new Error('Configuration Firebase incomplète');
+}
+
+console.log('✅ Configuration Firebase chargée :', {
+  apiKey: firebaseConfig.apiKey ? '***' : 'MANQUANT',
   projectId: firebaseConfig.projectId,
+  storageBucket: firebaseConfig.storageBucket,
+  authDomain: firebaseConfig.authDomain
 });
 
-// Initialisation Firebase
+// Initialisation de l'application Firebase
 const app = initializeApp(firebaseConfig);
 
 // Services Firebase exportés
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app); // ✅ ne pas mettre d'URL manuelle
+export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
-// Persistance offline Firestore
+// Configuration de la persistance offline pour Firestore
 enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === 'failed-precondition') {
-    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+    console.warn('⚠️ Plusieurs onglets ouverts, la persistance ne peut être activée que sur un seul onglet à la fois.');
   } else if (err.code === 'unimplemented') {
-    console.warn('This browser does not support offline persistence.');
+    console.warn('⚠️ Ce navigateur ne supporte pas la persistance offline.');
+  } else {
+    console.warn('⚠️ Erreur lors de l\'activation de la persistance:', err);
   }
 });
 
-console.log('🔥 Firebase initialized with configuration from environment variables');
+console.log('🔥 Firebase initialisé avec succès');
+
+export default app;

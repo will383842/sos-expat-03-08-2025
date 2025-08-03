@@ -1,7 +1,6 @@
 import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../config/firebase"; // ou ton chemin correct
-import { sendWhatsAppMessage } from "./sendWhatsAppMessage";
-
+import { db } from "../../config/firebase"; // ou ton chemin correct
+import { sendWhatsAppViaFirebase } from "./sendWhatsAppViaFirebase";
 
 interface MessagePayload {
   clientFirstName: string;
@@ -41,7 +40,6 @@ export async function sendPostPaymentMessage(payload: MessagePayload) {
 
     const providerData = providerSnap.data();
     const providerPhone = providerData.phoneNumber || providerData.whatsappNumber || "";
-    const providerLang = providerData.languagesSpoken?.[0] || "en";
 
     // 🔹 2. Composer le message
     const message = `🆕 Nouvelle demande après paiement :
@@ -73,11 +71,7 @@ export async function sendPostPaymentMessage(payload: MessagePayload) {
 
     // 🔹 5. Envoyer sur WhatsApp (si numéro valide)
     if (providerPhone) {
-      await sendWhatsAppMessage({
-        to: providerPhone,
-        body: message, 
-        language: providerLang,
-      });
+      await sendWhatsAppViaFirebase(providerPhone, message);
     }
 
     console.log("✅ Message post-paiement envoyé.");

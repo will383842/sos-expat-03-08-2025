@@ -571,6 +571,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
   }
 });
 
+const action = req.query.action || req.body.action;
 // Webhook Twilio pour gérer les événements d'appel
 export const twilioWebhook = functions.https.onRequest(async (req, res) => {
   // Vérifier l'authentification Twilio

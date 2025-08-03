@@ -14,9 +14,6 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Routes
-const whatsappRoute = require("./routes/notifications/whatsapp");
-app.use("/api/notifications/whatsapp", whatsappRoute);
 
 // Test route
 app.get("/", (req, res) => {

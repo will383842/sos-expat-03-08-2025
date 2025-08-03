@@ -4,6 +4,7 @@ import * as admin from 'firebase-admin';
 import { twilioClient } from './lib/twilio';
 import { generateInvoice } from './invoices/generateInvoice';
 import { sendNotificationToProvider } from './notifications/sendNotificationToProvider';
+import { cancelPayment } from "./payments";
 
 export const scheduleCallSequence = async (callSessionId: string) => {
   const db = admin.firestore();
@@ -65,12 +66,7 @@ export const scheduleCallSequence = async (callSessionId: string) => {
         const endTime = admin.firestore.Timestamp.now();
         const duration = 30; // à ajuster dynamiquement si besoin
 
-        await callRef.update({
-          endTime,
-          status: 'completed',
-          duration,
-        });
-
+        
         try {
           const clientSnap = await db.collection('users').doc(call.clientId).get();
           const providerSnap = await db.collection('users').doc(call.providerId).get();
@@ -159,5 +155,6 @@ export const scheduleCallSequence = async (callSessionId: string) => {
       status: 'cancelled_by_provider',
       refunded: true,
     });
+    await cancelPayment(paymentIntentId);
   }
 };

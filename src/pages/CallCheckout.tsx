@@ -9,7 +9,7 @@ import { useApp } from '../contexts/AppContext';
 import { createPaymentRecord, logAnalyticsEvent } from '../utils/firestore';
 import { initiateCall } from '../services/api';
 import { notifyProviderOfMissedCall } from '../services/notificationService';
-import { sendPostPaymentMessage } from "../notifications/sendPostPaymentMessage";
+import { sendPostPaymentMessage } from "../services/notifications/sendPostPaymentMessage";
 import { whatsappMessageTemplates } from "../whatsapp/whatsappMessageTemplates";
 import { saveProviderMessage } from "../firebase/saveProviderMessage";
 
@@ -257,40 +257,6 @@ const CallCheckout: React.FC = () => {
     }
   }, [providerId, user, authLoading, navigate, loadProviderAndSettings]);
 
-  // ⏰ Fonction pour programmer l'appel dans 5 minutes
-  const scheduleCallIn5Minutes = async (callData: {
-    clientId: string;
-    providerId: string;
-    clientPhone: string;
-    providerPhone: string;
-    providerType: string;
-    clientLanguage: string;
-    providerLanguage: string;
-    paymentIntentId: string;
-  }) => {
-    console.log('📞 Programmation de l\'appel dans 5 minutes...');
-    
-    // Programmer l'appel avec setTimeout (5 minutes = 300000ms)
-    setTimeout(async () => {
-      try {
-        console.log('🕐 5 minutes écoulées - Lancement de l\'appel Twilio');
-        await initiateCall({
-          clientId: callData.clientId,
-          providerId: callData.providerId,
-          clientPhone: callData.clientPhone,
-          providerPhone: callData.providerPhone,
-          providerType: callData.providerType === 'lawyer' ? 'lawyer' : 'expat',
-          clientLanguage: callData.clientLanguage,
-          providerLanguage: callData.providerLanguage,
-          paymentIntentId: callData.paymentIntentId,
-        });
-        console.log('✅ Appel Twilio initié avec succès');
-      } catch (error) {
-        console.error('❌ Erreur lors de l\'initiation de l\'appel:', error);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-  };
-
   const handlePaymentAuthorized = async (paymentIntentId: string) => {
     setPaymentIntentId(paymentIntentId);
     
@@ -322,17 +288,18 @@ const CallCheckout: React.FC = () => {
       // 2. 📱 ENVOYER TOUS LES MESSAGES/NOTIFICATIONS INSTANTANÉMENT
       await sendAllNotifications();
       
-      // 3. ⏰ PROGRAMMER l'appel Twilio dans 5 minutes
-      await scheduleCallIn5Minutes({
-        clientId: user.id || '',
-        providerId: serviceData.providerId,
-        clientPhone: serviceData.clientPhone || clientPhone,
-        providerPhone: provider.phone,
-        providerType: provider.role,
-        clientLanguage: user.preferredLanguage || language || 'fr',
-        providerLanguage: provider.preferredLanguage || 'fr',
-        paymentIntentId: paymentIntentId,
-      });
+      // 3. 📞 Démarrer immédiatement la programmation côté backend (le backend attendra 5 min)
+await initiateCall({
+  clientId: user.id || '',
+  providerId: serviceData.providerId,
+  clientPhone: serviceData.clientPhone || clientPhone,
+  providerPhone: provider.phone,
+  providerType: provider.role === 'lawyer' ? 'lawyer' : 'expat',
+  clientLanguage: user.preferredLanguage || language || 'fr',
+  providerLanguage: provider.preferredLanguage || 'fr',
+  paymentIntentId: paymentIntentId,
+});
+
       
       // 4. Log analytics
       logAnalyticsEvent({
@@ -435,8 +402,8 @@ const CallCheckout: React.FC = () => {
         language:
           (user.languagesSpoken?.map((l: string) => l.toUpperCase()).join(", ")) || "Non précisé",
       });
-
-      await sendWhatsAppMessageDirect(message);
+const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
+      await sendWhatsAppViaFirebase(phoneNumber, message);
 
     } catch (error) {
       console.error("❌ Erreur lors de l'envoi WhatsApp reminder :", error);
@@ -454,12 +421,13 @@ const CallCheckout: React.FC = () => {
 👤 Client : ${user.firstName || "Client"}
 🌍 Pays : ${user.country || "Inconnu"}
 📝 Demande : ${callData?.title || "Sans titre"}`;
-
-    await sendWhatsAppMessageDirect(message);
+const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
+   await sendWhatsAppViaFirebase(phoneNumber, message);
   };
 
   // Fonction utilitaire pour l'envoi WhatsApp direct
-  const sendWhatsAppMessageDirect = async (message: string) => {
+  
+  
     if (!provider) return;
 
     try {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -9,8 +9,11 @@ import { useApp } from '../contexts/AppContext';
 import { createPaymentRecord, logAnalyticsEvent } from '../utils/firestore';
 import { initiateCall } from '../services/api';
 import { notifyProviderOfMissedCall } from '../services/notificationService';
+import { sendPostPaymentMessage } from "../notifications/sendPostPaymentMessage";
+import { whatsappMessageTemplates } from "../whatsapp/whatsappMessageTemplates";
+import { saveProviderMessage } from "../firebase/saveProviderMessage";
 
-// Types pour améliorer la sécurité des types
+// Types améliorés
 interface Provider {
   id: string;
   fullName: string;
@@ -23,6 +26,10 @@ interface Provider {
   profilePhoto: string;
   email: string;
   phone: string;
+  whatsapp?: string;
+  whatsAppNumber?: string;
+  phoneNumber?: string;
+  languagesSpoken?: string[];
   preferredLanguage?: string;
 }
 
@@ -35,6 +42,41 @@ interface ServiceData {
   clientPhone: string;
   commissionAmount: number;
   providerAmount: number;
+}
+
+interface SessionData {
+  id?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  type?: string;
+  country?: string;
+  avatar?: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+  whatsAppNumber?: string;
+  phoneNumber?: string;
+  languagesSpoken?: string[];
+  providerId?: string;
+  providerName?: string;
+  providerType?: string;
+  providerCountry?: string;
+  providerAvatar?: string;
+  providerEmail?: string;
+  providerPhone?: string;
+  providerWhatsapp?: string;
+  providerWhatsAppNumber?: string;
+  providerPhoneNumber?: string;
+  providerLanguagesSpoken?: string[];
+  price?: number;
+  duration?: number;
+  clientPhone?: string;
+  countryRequested?: string;
+  title?: string;
+  description?: string;
+  language?: string;
+  role?: string; // Ajout de la propriété role
 }
 
 type StepType = 'payment' | 'calling' | 'completed';
@@ -57,55 +99,49 @@ const CallCheckout: React.FC = () => {
   const [expiryDate, setExpiryDate] = useState('12/25');
   const [cvc, setCvc] = useState('123');
 
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      const currentUrl = window.location.pathname;
-      navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
-      return;
-    }
-    
-    if (providerId) {
-      loadProviderAndSettings();
-    }
-  }, [providerId, user, authLoading, navigate]);
-
   // Fonction utilitaire pour créer un provider à partir des données de session
-  const createProviderFromData = (data: any, dataType: 'selectedProvider' | 'bookingRequest'): Provider => {
+  const createProviderFromData = (data: SessionData, dataType: 'selectedProvider' | 'bookingRequest'): Provider => {
     if (dataType === 'selectedProvider') {
       return {
-        id: data.id,
-        fullName: data.name,
-        firstName: data.firstName || data.name.split(' ')[0],
-        lastName: data.lastName || data.name.split(' ')[1],
-        role: data.type as 'lawyer' | 'expat',
-        country: data.country,
-        currentCountry: data.country,
-        avatar: data.avatar,
-        profilePhoto: data.avatar,
+        id: data.id || '',
+        fullName: data.name || '',
+        firstName: data.firstName || data.name?.split(' ')[0] || '',
+        lastName: data.lastName || data.name?.split(' ').slice(1).join(' ') || '',
+        role: (data.type as 'lawyer' | 'expat') || 'expat',
+        country: data.country || '',
+        currentCountry: data.country || '',
+        avatar: data.avatar || '',
+        profilePhoto: data.avatar || '',
         email: data.email || `${data.firstName?.toLowerCase() || 'expert'}@example.com`,
-        phone: data.phone || '+33612345678'
+        phone: data.phone || '+33612345678',
+        whatsapp: data.whatsapp || data.whatsAppNumber || data.phoneNumber,
+        whatsAppNumber: data.whatsAppNumber || data.whatsapp,
+        phoneNumber: data.phoneNumber || data.phone,
+        languagesSpoken: data.languagesSpoken || ['fr']
       };
     } else {
       return {
-        id: data.providerId,
-        fullName: data.providerName,
-        firstName: data.providerName.split(' ')[0],
-        lastName: data.providerName.split(' ')[1],
-        role: data.providerType as 'lawyer' | 'expat',
-        country: data.providerCountry,
-        currentCountry: data.providerCountry,
-        avatar: data.providerAvatar,
-        profilePhoto: data.providerAvatar,
-        email: data.providerEmail || `${data.providerName.split(' ')[0]?.toLowerCase() || 'expert'}@example.com`,
-        phone: data.providerPhone || '+33612345678'
+        id: data.providerId || '',
+        fullName: data.providerName || '',
+        firstName: data.providerName?.split(' ')[0] || '',
+        lastName: data.providerName?.split(' ').slice(1).join(' ') || '',
+        role: (data.providerType as 'lawyer' | 'expat') || 'expat',
+        country: data.providerCountry || '',
+        currentCountry: data.providerCountry || '',
+        avatar: data.providerAvatar || '',
+        profilePhoto: data.providerAvatar || '',
+        email: data.providerEmail || `${data.providerName?.split(' ')[0]?.toLowerCase() || 'expert'}@example.com`,
+        phone: data.providerPhone || '+33612345678',
+        whatsapp: data.providerWhatsapp || data.providerWhatsAppNumber || data.providerPhoneNumber,
+        whatsAppNumber: data.providerWhatsAppNumber || data.providerWhatsapp,
+        phoneNumber: data.providerPhoneNumber || data.providerPhone,
+        languagesSpoken: data.providerLanguagesSpoken || ['fr']
       };
     }
   };
 
   // Fonction utilitaire pour récupérer les données depuis sessionStorage
-  const getSessionData = (key: string) => {
+  const getSessionData = (key: string): SessionData | null => {
     try {
       const data = sessionStorage.getItem(key);
       return data ? JSON.parse(data) : null;
@@ -115,7 +151,38 @@ const CallCheckout: React.FC = () => {
     }
   };
 
-  const loadProviderAndSettings = () => {
+  // Fonction utilitaire pour récupérer les données du prestataire depuis le storage
+  const getProviderFromStorage = (): SessionData | null => {
+    try {
+      const savedProvider = sessionStorage.getItem('selectedProvider');
+      const savedRequest = sessionStorage.getItem('bookingRequest');
+      
+      if (savedProvider) {
+        return JSON.parse(savedProvider);
+      }
+      
+      if (savedRequest) {
+        const requestData = JSON.parse(savedRequest);
+        return {
+          id: requestData.providerId,
+          name: requestData.providerName,
+          type: requestData.providerType,
+          price: requestData.price,
+          duration: requestData.duration,
+          role: requestData.providerType,
+          whatsAppNumber: requestData.providerWhatsAppNumber,
+          phoneNumber: requestData.providerPhoneNumber,
+          whatsapp: requestData.providerWhatsapp,
+          languagesSpoken: requestData.providerLanguagesSpoken || ['fr']
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing provider data:', error);
+    }
+    return null;
+  };
+
+  const loadProviderAndSettings = useCallback(() => {
     try {
       let currentProvider: Provider | null = null;
       
@@ -174,6 +241,54 @@ const CallCheckout: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  }, [providerId, searchParams, user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      const currentUrl = window.location.pathname;
+      navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+      return;
+    }
+    
+    if (providerId) {
+      loadProviderAndSettings();
+    }
+  }, [providerId, user, authLoading, navigate, loadProviderAndSettings]);
+
+  // ⏰ Fonction pour programmer l'appel dans 5 minutes
+  const scheduleCallIn5Minutes = async (callData: {
+    clientId: string;
+    providerId: string;
+    clientPhone: string;
+    providerPhone: string;
+    providerType: string;
+    clientLanguage: string;
+    providerLanguage: string;
+    paymentIntentId: string;
+  }) => {
+    console.log('📞 Programmation de l\'appel dans 5 minutes...');
+    
+    // Programmer l'appel avec setTimeout (5 minutes = 300000ms)
+    setTimeout(async () => {
+      try {
+        console.log('🕐 5 minutes écoulées - Lancement de l\'appel Twilio');
+        await initiateCall({
+          clientId: callData.clientId,
+          providerId: callData.providerId,
+          clientPhone: callData.clientPhone,
+          providerPhone: callData.providerPhone,
+          providerType: callData.providerType === 'lawyer' ? 'lawyer' : 'expat',
+          clientLanguage: callData.clientLanguage,
+          providerLanguage: callData.providerLanguage,
+          paymentIntentId: callData.paymentIntentId,
+        });
+        console.log('✅ Appel Twilio initié avec succès');
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'initiation de l\'appel:', error);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
   };
 
   const handlePaymentAuthorized = async (paymentIntentId: string) => {
@@ -187,6 +302,7 @@ const CallCheckout: React.FC = () => {
         throw new Error('Missing required data for payment');
       }
       
+      // 1. Enregistrer le paiement dans Firestore
       await createPaymentRecord({
         paymentIntentId: paymentIntentId,
         clientId: user.id || '',
@@ -203,17 +319,22 @@ const CallCheckout: React.FC = () => {
         description: `Paiement pour ${serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}`
       });
       
-      await initiateCall({
+      // 2. 📱 ENVOYER TOUS LES MESSAGES/NOTIFICATIONS INSTANTANÉMENT
+      await sendAllNotifications();
+      
+      // 3. ⏰ PROGRAMMER l'appel Twilio dans 5 minutes
+      await scheduleCallIn5Minutes({
         clientId: user.id || '',
         providerId: serviceData.providerId,
         clientPhone: serviceData.clientPhone || clientPhone,
         providerPhone: provider.phone,
-        providerType: provider.role === 'lawyer' ? 'lawyer' : 'expat',
+        providerType: provider.role,
         clientLanguage: user.preferredLanguage || language || 'fr',
         providerLanguage: provider.preferredLanguage || 'fr',
         paymentIntentId: paymentIntentId,
       });
       
+      // 4. Log analytics
       logAnalyticsEvent({
         eventType: 'payment_authorized',
         userId: user.id || '',
@@ -224,24 +345,177 @@ const CallCheckout: React.FC = () => {
           providerId: serviceData.providerId
         }
       });
+
     } catch (error) {
       console.error('Error recording payment in Firestore:', error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        paymentIntentId,
-        userId: user?.id,
-        providerId: serviceData?.providerId,
-        amount: serviceData?.amount
-      });
+      handlePaymentError(error instanceof Error ? error.message : 'Erreur inconnue');
     }
     
     setCurrentStep('calling');
     setCallProgress(1);
   };
+
+  // 📱 FONCTION POUR ENVOYER TOUS LES MESSAGES/NOTIFICATIONS
+  const sendAllNotifications = async () => {
+    try {
+      // 1. Envoi message WhatsApp post-paiement
+      const providerData = getProviderFromStorage();
+      const bookingRequestStr = sessionStorage.getItem("bookingRequest");
+      
+      if (providerData && user && bookingRequestStr) {
+        const request = JSON.parse(bookingRequestStr);
+
+        const payload = {
+          clientFirstName: user.firstName || "Client",
+          clientNationality: user.nationality || "Inconnue",
+          requestedCountry: request?.countryRequested || "Inconnu",
+          requestTitle: request?.title || "Sans titre",
+          requestDescription: request?.description || "Aucune description",
+          selectedLanguage: request?.language || "Non précisée",
+          providerId: providerData.id || '',
+          callId: `call_${Date.now()}`
+        };
+
+        try {
+          await sendPostPaymentMessage(payload);
+          console.log("✅ Message post-paiement envoyé.");
+
+          // Sauvegarder avec l'ancienne fonction si elle existe
+          if (typeof saveProviderMessage === 'function') {
+            await saveProviderMessage(providerData.id || '', "Message post-paiement", {
+              clientFirstName: user.firstName,
+              clientCountry: user.nationality,
+              providerPhone: providerData.whatsapp,
+              bookingId: request.id || null,
+            });
+            console.log("✅ Message enregistré dans Firestore.");
+          }
+        } catch (err) {
+          console.error("❌ Erreur envoi ou enregistrement message post-paiement :", err);
+        }
+      }
+
+      // 2. Envoi WhatsApp reminder
+      await sendWhatsAppReminder();
+
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'envoi des notifications:', error);
+    }
+  };
+
+  // 📱 FONCTION POUR ENVOYER LE WHATSAPP REMINDER
+  const sendWhatsAppReminder = async () => {
+    if (!user || !provider) return;
+
+    try {
+      const callData = getSessionData('bookingRequest');
+
+      // Vérifier si whatsappMessageTemplates existe
+      if (typeof whatsappMessageTemplates === 'undefined') {
+        console.warn('whatsappMessageTemplates non disponible, envoi d\'un message simple');
+        await sendSimpleWhatsAppMessage();
+        return;
+      }
+
+      const commonLang = provider.languagesSpoken?.find((lang: string) =>
+        whatsappMessageTemplates[lang]
+      ) || "en";
+
+      const template = whatsappMessageTemplates[commonLang];
+      if (!template) {
+        await sendSimpleWhatsAppMessage();
+        return;
+      }
+
+      const message = template.generate({
+        firstName: user.firstName || "Client",
+        country: user.country || "Inconnu",
+        title: callData?.title || "Sans titre",
+        description: callData?.description || "Pas de description",
+        language:
+          (user.languagesSpoken?.map((l: string) => l.toUpperCase()).join(", ")) || "Non précisé",
+      });
+
+      await sendWhatsAppMessageDirect(message);
+
+    } catch (error) {
+      console.error("❌ Erreur lors de l'envoi WhatsApp reminder :", error);
+      // Fallback vers message simple
+      await sendSimpleWhatsAppMessage();
+    }
+  };
+
+  // Fonction de fallback pour envoyer un message WhatsApp simple
+  const sendSimpleWhatsAppMessage = async () => {
+    if (!user || !provider) return;
+
+    const callData = getSessionData('bookingRequest');
+    const message = `🆕 Nouvelle demande après paiement :
+👤 Client : ${user.firstName || "Client"}
+🌍 Pays : ${user.country || "Inconnu"}
+📝 Demande : ${callData?.title || "Sans titre"}`;
+
+    await sendWhatsAppMessageDirect(message);
+  };
+
+  // Fonction utilitaire pour l'envoi WhatsApp direct
+  const sendWhatsAppMessageDirect = async (message: string) => {
+    if (!provider) return;
+
+    try {
+      // Nettoyer le numéro WhatsApp
+      const cleanedPhone = provider.whatsapp
+        ?.replace(/\s+/g, "")       // supprime tous les espaces
+        .replace(/\(0\)/g, "")      // supprime (0)
+        .replace(/[^+\d]/g, "");    // supprime tout sauf chiffres et +
+
+      const whatsappTo = `whatsapp:${cleanedPhone}`;
+
+      // Créer le message à envoyer
+      const payload = {
+        to: whatsappTo,
+        body: message,
+      };
+
+      const response = await fetch("https://sos-urgently.com/api/notifications/whatsapp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-sos-secret": import.meta.env.VITE_SOS_SECRET,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`WhatsApp API error: ${response.status}`);
+      }
+
+      console.log("✅ Message WhatsApp envoyé avec succès !");
+    } catch (err) {
+      console.error("❌ Erreur lors de l'envoi WhatsApp :", err);
+    }
+  };
   
   const handlePaymentError = (error: string) => {
     setError(`Erreur de paiement: ${error}`);
+    console.error('Payment error:', error);
+  };
+
+  // Fonction pour gérer le retour en arrière
+  const handleGoBack = () => {
+    try {
+      // Essayer de revenir à la page précédente
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        // Fallback vers la liste des prestataires
+        navigate('/prestataires');
+      }
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
+      // En cas d'erreur, aller vers la liste des prestataires
+      navigate('/prestataires');
+    }
   };
 
   // Fonction utilitaire pour récupérer les données de provider pour la navigation
@@ -253,11 +527,11 @@ const CallCheckout: React.FC = () => {
     let providerType = provider?.role || serviceData?.providerRole || 'expat';
     
     if (savedProvider) {
-      providerName = savedProvider.name;
-      providerType = savedProvider.type;
+      providerName = savedProvider.name || '';
+      providerType = (savedProvider.type as 'lawyer' | 'expat') || 'expat';
     } else if (savedRequest) {
-      providerName = savedRequest.providerName;
-      providerType = savedRequest.providerType;
+      providerName = savedRequest.providerName || '';
+      providerType = (savedRequest.providerType as 'lawyer' | 'expat') || 'expat';
     }
     
     return { providerName, providerType };
@@ -323,8 +597,8 @@ const CallCheckout: React.FC = () => {
       duration: serviceData.duration.toString()
     } : baseParams;
     
-    const searchParams = new URLSearchParams(successParams);
-    navigate(`/payment-success?${searchParams.toString()}`, { replace: true });
+    const searchParamsNav = new URLSearchParams(successParams);
+    navigate(`/payment-success?${searchParamsNav.toString()}`, { replace: true });
   };
 
   // Early returns pour les états d'erreur et de chargement
@@ -351,7 +625,7 @@ const CallCheckout: React.FC = () => {
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
             <h1 className="text-xl font-bold text-red-700 mb-4">Une erreur est survenue</h1>
             <p className="text-gray-700 mb-6">{error}</p>
-            <Button onClick={() => navigate('/prestataires')}>
+            <Button onClick={handleGoBack}>
               Retourner à la liste des experts
             </Button>
           </div>
@@ -369,7 +643,7 @@ const CallCheckout: React.FC = () => {
               Prestataire non trouvé
             </h1>
             <button
-              onClick={() => navigate('/prestataires')}
+              onClick={handleGoBack}
               className="text-red-600 hover:text-red-700"
             >
               Retour aux experts
@@ -401,7 +675,7 @@ const CallCheckout: React.FC = () => {
           {/* Header */}
           <div className="mb-8">
             <button
-              onClick={() => navigate('/prestataires')}
+              onClick={handleGoBack}
               className="flex items-center space-x-2 text-red-600 hover:text-red-700 mb-6 transition-colors"
             >
               <ArrowLeft size={20} />
@@ -565,20 +839,25 @@ const CallCheckout: React.FC = () => {
                           ? 'Connexion établie! Appel en cours...' 
                           : 'Appel en cours...'}
                   </p>
+                  <div className="mt-4 bg-blue-50 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      ⏰ L'appel Twilio sera initié dans 5 minutes après validation du paiement
+                    </p>
+                  </div>
                 </div>
                 
                 <div className="space-y-4 mb-6">
                   {callProgress < 3 && (
                     <div className="bg-yellow-100 rounded-lg p-4 flex items-center">
                       <Clock className="w-5 h-5 text-yellow-600 mr-2" />
-                      <span className="text-yellow-800">Tentative d'appel du prestataire ({callProgress + 1}/3)</span>
+                      <span className="text-yellow-800">Messages envoyés au prestataire - Attente de 5 minutes</span>
                     </div>
                   )}
                   
                   {callProgress === 3 && (
                     <div className="bg-blue-100 rounded-lg p-4 flex items-center">
                       <Phone className="w-5 h-5 text-blue-600 mr-2" />
-                      <span className="text-blue-800">{provider.fullName} a répondu! Nous vous appelons...</span>
+                      <span className="text-blue-800">Préparation de l'appel en cours...</span>
                     </div>
                   )}
                   
@@ -603,6 +882,22 @@ const CallCheckout: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Bouton pour simuler la fin d'appel (pour le développement) */}
+                <div className="mt-8 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => handleCallCompleted(true)}
+                    className="mr-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Simuler succès appel
+                  </button>
+                  <button
+                    onClick={() => handleCallCompleted(false)}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Simuler échec appel
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -616,6 +911,8 @@ const CallCheckout: React.FC = () => {
                   <p className="text-sm text-blue-800 mt-1">
                     Votre paiement est traité de manière sécurisée.
                     Vous ne serez débité que si la mise en relation téléphonique réussit.
+                    <br />
+                    <strong>L'appel sera initié automatiquement 5 minutes après le paiement.</strong>
                   </p>
                 </div>
               </div>

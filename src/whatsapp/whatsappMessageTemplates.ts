@@ -93,4 +93,4 @@ Olá, você recebeu uma nova solicitação de consulta.
   },
 };
 
-export default whatsappMessageTemplates;
+export { whatsappMessageTemplates };

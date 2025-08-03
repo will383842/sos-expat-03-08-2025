@@ -1,6 +1,19 @@
 import { getFirestore, collection, addDoc, Timestamp } from "firebase/firestore";
 
-export async function saveProviderMessage(providerId: string, message: string, metadata: any = {}) {
+// Interface pour typer les métadonnées
+interface MessageMetadata {
+  clientFirstName?: string | null;
+  clientCountry?: string | null;
+  providerPhone?: string | null;
+  bookingId?: string | null;
+  [key: string]: unknown; // Pour permettre d'autres propriétés
+}
+
+export async function saveProviderMessage(
+  providerId: string, 
+  message: string, 
+  metadata: MessageMetadata = {}
+) {
   try {
     const db = getFirestore();
     const ref = collection(db, "providerMessageOrderCustomers");
@@ -8,7 +21,7 @@ export async function saveProviderMessage(providerId: string, message: string, m
     await addDoc(ref, {
       providerId,
       message,
-      metadata, // (optionnel) on garde aussi l'objet complet si tu veux l'afficher dans le détail
+      metadata, // Objet complet pour affichage détaillé
       clientFirstName: metadata.clientFirstName || null,
       clientCountry: metadata.clientCountry || null,
       providerPhone: metadata.providerPhone || null,
@@ -16,7 +29,10 @@ export async function saveProviderMessage(providerId: string, message: string, m
       createdAt: Timestamp.now(),
       isRead: false,
     });
+
+    console.log("✅ Message prestataire enregistré avec succès");
   } catch (error) {
-    console.error("Erreur lors de l'enregistrement du message :", error);
+    console.error("❌ Erreur lors de l'enregistrement du message :", error);
+    throw error; // Re-throw pour permettre la gestion d'erreur en amont
   }
 }

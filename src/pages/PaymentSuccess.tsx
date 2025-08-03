@@ -7,9 +7,6 @@ import ReviewModal from '../components/review/ReviewModal';
 import { logAnalyticsEvent, createInvoiceRecord } from '../utils/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/common/Modal';
-import { sendPostPaymentMessage } from "@/notifications/sendPostPaymentMessage";
-import { whatsappMessageTemplates } from "@/whatsapp/whatsappMessageTemplates";
-import { saveProviderMessage } from "@/firebase/saveProviderMessage";
 
 interface ProviderInfo {
   id: string;
@@ -230,53 +227,16 @@ const PaymentSuccess: React.FC = () => {
   useEffect(() => {
     if (callState === 'completed' && user && paymentIntentId && !isGeneratingInvoices) {
       generateInvoices();
-      (async () => {
-  const providerData = getProviderFromStorage();
 
-  if (!providerData || !user) return;
+      // Show review modal after 2 seconds
+      const reviewTimer = setTimeout(() => {
+        if (!showReviewModal && !showInvoiceModal) {
+          setShowReviewModal(true);
+        }
+      }, 2000);
 
-  const bookingRequest = sessionStorage.getItem("bookingRequest");
-  if (!bookingRequest) return;
-
-  const request = JSON.parse(bookingRequest);
-
-  const payload = {
-    providerId: providerData.id,
-    providerPhone: providerData.whatsAppNumber || providerData.phoneNumber,
-    providerLang: providerData.languagesSpoken?.[0] || "fr",
-    clientFirstName: user.firstName || "Client",
-    clientNationality: user.nationality || "Inconnue",
-    targetCountry: request?.countryRequested || "Inconnu",
-    language: request?.language || "Non précisée",
-    title: request?.title || "Sans titre",
-    description: request?.description || "Aucune description",
-  };
-
-try {
-  await sendPostPaymentMessage(payload);
-  console.log("✅ Message post-paiement envoyé.");
-
-  await saveProviderMessage(provider.id, payload.body, {
-    clientFirstName: bookingData.firstName,
-    clientCountry: bookingData.country,
-    providerPhone: provider.whatsapp,
-    bookingId: bookingData.id || null,
-  });
-  console.log("✅ Message enregistré dans Firestore.");
-} catch (err) {
-  console.error("❌ Erreur envoi ou enregistrement message post-paiement :", err);
-}
-
-const reviewTimer = setTimeout(() => {
-  if (!showReviewModal && !showInvoiceModal) {
-    setShowReviewModal(true);
-  }
-}, 2000);
-
-return () => clearTimeout(reviewTimer);
-)
-
-   
+      return () => clearTimeout(reviewTimer);
+    }
   }, [callState, user, paymentIntentId, generateInvoices, showReviewModal, showInvoiceModal, isGeneratingInvoices]);
 
   // Utility functions
@@ -347,7 +307,7 @@ Montant: ${paidAmount}€
     generatingInvoices: language === 'fr' ? 'Génération des factures...' : 'Generating invoices...',
     viewInvoices: language === 'fr' ? 'Voir les factures' : 'View invoices',
     leaveReview: language === 'fr' ? 'Laisser un avis' : 'Leave a review',
-    submit: language === 'fr' ? 'Envoyer' : 'Submit',
+    goToDashboard: language === 'fr' ? 'Aller au tableau de bord' : 'Go to dashboard',
     close: language === 'fr' ? 'Fermer' : 'Close',
     platformInvoice: language === 'fr' ? 'Facture plateforme' : 'Platform invoice',
     providerInvoice: language === 'fr' ? 'Facture prestataire' : 'Provider invoice'
@@ -455,60 +415,6 @@ Montant: ${paidAmount}€
     { label: t.price, value: `€${paidAmount || (isLawyer ? '49' : '19')}`, bold: true },
     { label: t.date, value: new Date().toLocaleDateString() }
   ];
-useEffect(() => {
-  const sendWhatsAppReminder = async () => {
-    if (!user || !provider) return;
-
-    const commonLang = provider.languagesSpoken?.find((lang: string) =>
-      whatsappMessageTemplates[lang]
-    ) || "en";
-
-    const template = whatsappMessageTemplates[commonLang];
-    if (!template) return;
-
-    const message = template.generate({
-      firstName: user.firstName || "Client",
-      country: user.country || "Inconnu",
-      title: callData?.title || "Sans titre",
-      description: callData?.description || "Pas de description",
-      language:
-        (user.languagesSpoken?.map((l: string) => l.toUpperCase()).join(", ")) || "Non précisé",
-    });
-
-    // Nettoyer le numéro WhatsApp
-const cleanedPhone = provider.whatsapp
-  ?.replace(/\s+/g, "")       // supprime tous les espaces
-  .replace(/\(0\)/g, "")      // supprime (0)
-  .replace(/[^+\d]/g, "");    // supprime tout sauf chiffres et +
-
-const whatsappTo = `whatsapp:${cleanedPhone}`;
-
-// Créer le message à envoyer
-const payload = {
-  to: whatsappTo,
-  body: message,
-};
-
-
-    try {
-      await fetch("https://sos-urgently.com/api/notifications/whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-sos-secret": import.meta.env.VITE_SOS_SECRET,
-        },
-        body: JSON.stringify(payload),
-      });
-      console.log("✅ Message WhatsApp envoyé avec succès !");
-    } catch (err) {
-      console.error("❌ Erreur lors de l'envoi WhatsApp :", err);
-    }
-  };
-
-sendWhatsAppReminder();
-
-
-}, []);
 
   return (
     <Layout>
@@ -575,7 +481,7 @@ sendWhatsAppReminder();
                   onClick={() => window.location.href = '/dashboard'}
                   className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
                 >
-                  {t.submit}
+                  {t.goToDashboard}
                 </button>
               </div>
             </div>

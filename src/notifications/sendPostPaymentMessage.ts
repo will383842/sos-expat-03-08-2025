@@ -1,7 +1,7 @@
-import { doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase"; // ou ton chemin correct
-import { sendWhatsAppMessage } from "../notifications/whatsapp"; // à créer si inexistant
-import { User } from "../types"; // interface utilisateur, si tu l’as
+import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../config/firebase"; // ou ton chemin correct
+import { sendWhatsAppMessage } from "./sendWhatsAppMessage";
+
 
 interface MessagePayload {
   clientFirstName: string;
@@ -75,7 +75,7 @@ export async function sendPostPaymentMessage(payload: MessagePayload) {
     if (providerPhone) {
       await sendWhatsAppMessage({
         to: providerPhone,
-        message,
+        body: message, 
         language: providerLang,
       });
     }

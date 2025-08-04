@@ -89,7 +89,7 @@ export const scheduleCallSequence = async (callSessionId: string) => {
             // Calcul du temps limite basé sur le type de prestataire
             const timeLimit = providerType === 'lawyer' ? 1500 : 2100; // 25min ou 35min en secondes
             
-            const clientCall = await twilioClient.calls.create({
+            await twilioClient.calls.create({
               to: clientPhone,
               from: process.env.TWILIO_PHONE_NUMBER!,
               twiml: `<Response>

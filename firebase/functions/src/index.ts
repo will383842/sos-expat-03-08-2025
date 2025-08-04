@@ -1,4 +1,6 @@
 import * as functions from 'firebase-functions';
+import { CallableRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import twilio from 'twilio';
 import Stripe from 'stripe';
@@ -8,6 +10,7 @@ import { logError } from './utils/logError';
 // import { notifyAfterPayment } from './notifications/notifyAfterPayment'; // Temporairement commenté
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { onCall } from "firebase-functions/v2/https";
 
 // Charger les variables d'environnement depuis .env
 import * as dotenv from 'dotenv';
@@ -32,7 +35,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 });
 
 // Initialiser le service d'email (exemple avec Gmail/SMTP)
-const emailTransporter = nodemailer.createTransporter({
+const emailTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER || 'notifications@sosexpats.com',
@@ -43,8 +46,25 @@ const emailTransporter = nodemailer.createTransporter({
 // Promisifier exec pour l'utiliser avec async/await
 const execAsync = promisify(exec);
 
+// Interface pour les données de notification
+interface NotificationData {
+  type: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  recipientName?: string;
+  recipientCountry?: string;
+  emailSubject?: string;
+  emailHtml?: string;
+  smsMessage?: string;
+  whatsappMessage?: string;
+}
+
 // Fonction Cloud pour envoyer des notifications
-export const sendNotification = functions.https.onCall(async (data, context) => {
+export const sendNotification = onCall(async (request: CallableRequest<any>) => {
+  const data = request.data;
+  const _validateData: NotificationData = data;
+  const context = request;
+  
   // Vérifier l'authentification
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -149,8 +169,19 @@ export const sendNotification = functions.https.onCall(async (data, context) => 
   }
 });
 
+// Interface pour les données de push notification
+interface PushNotificationData {
+  userId: string;
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+}
+
 // Fonction Cloud pour envoyer des notifications push via FCM
-export const sendPushNotification = functions.https.onCall(async (data, context) => {
+export const sendPushNotification = functions.https.onCall(async (request: CallableRequest<PushNotificationData>) => {
+  const data = request.data;
+  const context = request;
+  
   if (!context.auth) {
     throw new functions.https.HttpsError(
       'unauthenticated',
@@ -218,7 +249,10 @@ interface PaymentIntentData {
 }
 
 // Fonction pour créer un PaymentIntent Stripe
-export const createPaymentIntent = functions.https.onCall(async (data: PaymentIntentData, context) => {
+export const createPaymentIntent = functions.https.onCall(async (request: CallableRequest<PaymentIntentData>) => {
+  const data = request.data;
+  const context = request;
+  
   // Vérifier l'authentification
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -265,8 +299,16 @@ export const createPaymentIntent = functions.https.onCall(async (data: PaymentIn
   }
 });
 
+// Interface pour capturer un paiement
+interface CapturePaymentData {
+  paymentIntentId: string;
+}
+
 // Fonction pour capturer un paiement
-export const capturePayment = functions.https.onCall(async (data, context) => {
+export const capturePayment = functions.https.onCall(async (request: CallableRequest<CapturePaymentData>) => {
+  const data = request.data;
+  const context = request;
+  
   // Vérifier l'authentification
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -303,8 +345,16 @@ export const capturePayment = functions.https.onCall(async (data, context) => {
   }
 });
 
+// Interface pour annuler un paiement
+interface CancelPaymentData {
+  paymentIntentId: string;
+}
+
 // Fonction pour annuler un paiement
-export const cancelPayment = functions.https.onCall(async (data, context) => {
+export const cancelPayment = functions.https.onCall(async (request: CallableRequest<CancelPaymentData>) => {
+  const data = request.data;
+  const context = request;
+  
   // Vérifier l'authentification
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -354,7 +404,10 @@ interface CallData {
 }
 
 // Fonction pour initier un appel Twilio
-export const initiateCall = functions.https.onCall(async (data: CallData, context) => {
+export const initiateCall = functions.https.onCall(async (request: CallableRequest<CallData>) => {
+  const data = request.data;
+  const context = request;
+  
   // Vérifier l'authentification
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -459,7 +512,10 @@ interface UpdateCallStatusData {
 }
 
 // Fonction pour mettre à jour le statut d'un appel
-export const updateCallStatus = functions.https.onCall(async (data: UpdateCallStatusData, context) => {
+export const updateCallStatus = functions.https.onCall(async (request: CallableRequest<UpdateCallStatusData>) => {
+  const data = request.data;
+  const context = request;
+  
   // Vérifier l'authentification
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -884,209 +940,13 @@ async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) 
   }
 }
 
-// Fonctions de gestion des événements Twilio
-async function handleCallProvider(callSessionId: string, phoneNumber: string, twiml: string, attempt: number) {
-  try {
-    // Récupérer les données de la session pour obtenir providerType
-    const callSessionDoc = await db.collection('call_sessions').doc(callSessionId).get();
-    const callSessionData = callSessionDoc.data();
-    const providerType = callSessionData?.providerType || 'default';
-
-    // Mettre à jour la session d'appel
-    const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-    await callSessionRef.update({
-      status: 'calling_provider',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    
-    // Effectuer l'appel via Twilio
-    const call = await twilioClient.calls.create({
-      to: phoneNumber,
-      from: process.env.TWILIO_PHONE_NUMBER || '',
-      twiml,
-      timeout: providerType === 'lawyer' ? 25 : 35, // Timeout en secondes
-      statusCallback: `${process.env.FUNCTION_URL}/twilioWebhook`,
-      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST'
-    });
-    
-    // Enregistrer la tentative
-    await callSessionRef.update({
-      providerAttempts: admin.firestore.FieldValue.arrayUnion({
-        phoneNumber,
-        status: 'ringing',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        callSid: call.sid
-      })
-    });
-    
-    return {
-      success: true,
-      callSid: call.sid,
-      status: 'ringing'
-    };
-  } catch (error: any) {
-    console.error('Error calling provider:', error);
-    
-    // Enregistrer l'erreur
-    const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-    await callSessionRef.update({
-      providerAttempts: admin.firestore.FieldValue.arrayUnion({
-        phoneNumber,
-        status: 'failed',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        error: error.message
-      })
-    });
-    
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-async function handleCallClient(callSessionId: string, phoneNumber: string, twiml: string, attempt: number) {
-  try {
-    // Récupérer les données de la session pour obtenir providerType
-    const callSessionDoc = await db.collection('call_sessions').doc(callSessionId).get();
-    const callSessionData = callSessionDoc.data();
-    const providerType = callSessionData?.providerType || 'default';
-
-    // Mettre à jour la session d'appel
-    const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-    await callSessionRef.update({
-      status: 'calling_client',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    
-    // Effectuer l'appel via Twilio
-    const call = await twilioClient.calls.create({
-      to: phoneNumber,
-      from: process.env.TWILIO_PHONE_NUMBER || '',
-      twiml,
-      timeout: providerType === 'lawyer' ? 25 : 35, // Timeout en secondes
-      statusCallback: `${process.env.FUNCTION_URL}/twilioWebhook`,
-      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST'
-    });
-    
-    // Enregistrer la tentative
-    await callSessionRef.update({
-      clientAttempts: admin.firestore.FieldValue.arrayUnion({
-        phoneNumber,
-        status: 'ringing',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        callSid: call.sid
-      })
-    });
-    
-    return {
-      success: true,
-      callSid: call.sid,
-      status: 'ringing'
-    };
-  } catch (error: any) {
-    console.error('Error calling client:', error);
-    
-    // Enregistrer l'erreur
-    const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-    await callSessionRef.update({
-      clientAttempts: admin.firestore.FieldValue.arrayUnion({
-        phoneNumber,
-        status: 'failed',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        error: error.message
-      })
-    });
-    
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-async function handleCallStatus(callSessionId: string, status: string, details: Record<string, any>) {
-  try {
-    const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-    const callSession = await callSessionRef.get();
-    
-    if (!callSession.exists) {
-      throw new Error('Call session not found');
-    }
-    
-    const updates: any = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-    
-    // Mettre à jour le statut si nécessaire
-    if (status === 'connected') {
-      updates.status = 'connected';
-      updates.connectedAt = admin.firestore.FieldValue.serverTimestamp();
-    } else if (status === 'completed') {
-      updates.status = 'completed';
-      updates.endedAt = admin.firestore.FieldValue.serverTimestamp();
-
-      const sessionData = callSession.data();
-      const connectedAt = sessionData?.connectedAt?.toDate?.();
-
-      if (connectedAt) {
-        const endedAt = new Date();
-        const durationSeconds = Math.round((endedAt.getTime() - connectedAt.getTime()) / 1000);
-        updates.totalDuration = durationSeconds;
-
-        // Si l'appel a duré plus de 0 secondes, capturer le paiement Stripe
-        if (durationSeconds > 0 && sessionData?.paymentIntentId) {
-          try {
-            await stripe.paymentIntents.capture(sessionData.paymentIntentId);
-            updates.paid = true;
-            
-            // Créer une demande d'avis post-appel pour le client
-            await admin.firestore().collection('reviews_requests').add({
-              clientId: sessionData?.clientId,
-              providerId: sessionData?.providerId,
-              callSessionId,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              status: 'pending'
-            });
-          } catch (error: any) {
-            console.error('Error capturing payment:', error);
-          }
-        }
-      }
-    }
-
-    // Appliquer les mises à jour
-    await callSessionRef.update(updates);
-
-    // Créer un log pour cette mise à jour
-    await db.collection('call_logs').add({
-      callSessionId,
-      type: 'status_change',
-      status,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      details
-    });
-
-    return {
-      success: true,
-      status
-    };
-  } catch (error: any) {
-    console.error('Error updating call status:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
 // Fonction cron pour sauvegarder Firestore et Storage tous les jours à 2h du matin
-export const scheduledFirestoreExport = functions.pubsub
-  .schedule('0 2 * * *')
-  .timeZone('Europe/Paris')
-  .onRun(async (context) => {
+export const scheduledFirestoreExport = onSchedule(
+  {
+    schedule: '0 2 * * *',
+    timeZone: 'Europe/Paris'
+  },
+  async (event) => {
     try {
       const projectId = process.env.GCLOUD_PROJECT;
       const bucketName = `${projectId}-backups`;
@@ -1132,7 +992,6 @@ export const scheduledFirestoreExport = functions.pubsub
         status: 'completed'
       });
       
-      return null;
     } catch (error: any) {
       console.error('Error performing scheduled backup:', error);
       
@@ -1143,10 +1002,9 @@ export const scheduledFirestoreExport = functions.pubsub
         status: 'failed',
         error: error.message
       });
-      
-      return null;
     }
-  });
+  }
+);
 
 // Export de la fonction notifyAfterPayment (temporairement commenté)
 // export { notifyAfterPayment } from './notifications/notifyAfterPayment';

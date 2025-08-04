@@ -8,12 +8,18 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { createPaymentRecord, logAnalyticsEvent } from '../utils/firestore';
 import { initiateCall } from '../services/api';
-import { whatsappMessageTemplates } from "../whatsapp/whatsappMessageTemplates";
-import { saveProviderMessage } from "../firebase/saveProviderMessage";
+
 import { getFunctions, httpsCallable } from 'firebase/functions';
+
+// Imports Stripe
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
 const functions = getFunctions();
 const notifyAfterPayment = httpsCallable(functions, 'notifyAfterPayment');
+
+// Initialisation Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 
 // Types améliorés
 interface Provider {
@@ -83,23 +89,24 @@ interface SessionData {
 
 type StepType = 'payment' | 'calling' | 'completed';
 
-const CallCheckout: React.FC = () => {
+const CheckoutForm: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { language } = useApp();
+  const stripe = useStripe();
+  const elements = useElements();
   
   const [provider, setProvider] = useState<Provider | null>(null);
   const [currentStep, setCurrentStep] = useState<StepType>('payment');
   const [callProgress, setCallProgress] = useState<number>(0);
   const [paymentIntentId, setPaymentIntentId] = useState<string>('');
+  const [clientSecret, setClientSecret] = useState<string>('');
   const [serviceData, setServiceData] = useState<ServiceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
-  const [expiryDate, setExpiryDate] = useState('12/25');
-  const [cvc, setCvc] = useState('123');
 
   const notifyProviderOfMissedCall = async (
     providerId: string,
@@ -115,6 +122,45 @@ const CallCheckout: React.FC = () => {
       throw error;
     }
   };
+
+  // Fonction pour créer un PaymentIntent côté backend
+  const createPaymentIntent = useCallback(async (): Promise<{ clientSecret: string; paymentIntentId: string }> => {
+    try {
+      if (!serviceData || !user) {
+        throw new Error('Données manquantes pour créer le paiement');
+      }
+
+      const response = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: serviceData.amount * 100, // Convertir en centimes
+          currency: 'eur',
+          serviceType: serviceData.serviceType,
+          providerId: serviceData.providerId,
+          clientId: user.id,
+          clientEmail: user.email,
+          providerName: provider?.fullName,
+          description: `Paiement pour ${serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}`
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la création du paiement');
+      }
+
+      const data = await response.json();
+      return {
+        clientSecret: data.clientSecret,
+        paymentIntentId: data.paymentIntentId
+      };
+    } catch (error) {
+      console.error('Erreur création PaymentIntent:', error);
+      throw error;
+    }
+  }, [serviceData, user, provider]);
 
   // Fonction pour envoyer toutes les notifications
   const sendAllNotifications = async () => {
@@ -188,38 +234,7 @@ const CallCheckout: React.FC = () => {
     }
   };
 
-  // Fonction utilitaire pour récupérer les données du prestataire depuis le storage
-  const getProviderFromStorage = (): SessionData | null => {
-    try {
-      const savedProvider = sessionStorage.getItem('selectedProvider');
-      const savedRequest = sessionStorage.getItem('bookingRequest');
-      
-      if (savedProvider) {
-        return JSON.parse(savedProvider);
-      }
-      
-      if (savedRequest) {
-        const requestData = JSON.parse(savedRequest);
-        return {
-          id: requestData.providerId,
-          name: requestData.providerName,
-          type: requestData.providerType,
-          price: requestData.price,
-          duration: requestData.duration,
-          role: requestData.providerType,
-          whatsAppNumber: requestData.providerWhatsAppNumber,
-          phoneNumber: requestData.providerPhoneNumber,
-          whatsapp: requestData.providerWhatsapp,
-          languagesSpoken: requestData.providerLanguagesSpoken || ['fr']
-        };
-      }
-    } catch (error) {
-      console.error('Error parsing provider data:', error);
-    }
-    return null;
-  };
-
-  const loadProviderAndSettings = useCallback(() => {
+  const loadProviderAndSettings = useCallback(async () => {
     try {
       let currentProvider: Provider | null = null;
       
@@ -261,16 +276,23 @@ const CallCheckout: React.FC = () => {
       const commissionAmount = isLawyer ? 9 : 5;
       const providerAmount = baseAmount - commissionAmount;
       
-      setServiceData({
+      const newServiceData: ServiceData = {
         providerId: currentProvider.id,
-        serviceType: isLawyer ? 'lawyer_call' : 'expat_call',
+        serviceType: (isLawyer ? 'lawyer_call' : 'expat_call') as 'lawyer_call' | 'expat_call',
         providerRole: currentProvider.role,
         amount: baseAmount,
         duration: duration,
         clientPhone: clientPhone,
         commissionAmount,
         providerAmount
-      });
+      };
+
+      setServiceData(newServiceData);
+
+      // Créer le PaymentIntent après avoir configuré serviceData
+      // Note: createPaymentIntent sera appelé après que serviceData soit défini
+      // donc on ne peut pas l'appeler ici directement
+      // Il sera appelé dans un useEffect séparé
 
     } catch (error) {
       console.error('Error loading provider and settings:', error);
@@ -294,9 +316,25 @@ const CallCheckout: React.FC = () => {
     }
   }, [providerId, user, authLoading, navigate, loadProviderAndSettings]);
 
+  // UseEffect séparé pour créer le PaymentIntent une fois que serviceData est défini
+  useEffect(() => {
+    const initializePayment = async () => {
+      if (serviceData && user && provider && !clientSecret) {
+        try {
+          const { clientSecret: newClientSecret, paymentIntentId: newPaymentIntentId } = await createPaymentIntent();
+          setClientSecret(newClientSecret);
+          setPaymentIntentId(newPaymentIntentId);
+        } catch (error) {
+          console.error('Erreur lors de l\'initialisation du paiement:', error);
+          setError('Erreur lors de l\'initialisation du paiement');
+        }
+      }
+    };
+
+    initializePayment();
+  }, [serviceData, user, provider, clientSecret, createPaymentIntent]);
+
   const handlePaymentAuthorized = async (paymentIntentId: string) => {
-    setPaymentIntentId(paymentIntentId);
-    
     try {
       const bookingRequest = getSessionData('bookingRequest');
       const clientPhone = bookingRequest?.clientPhone || user?.phone || '';
@@ -349,18 +387,62 @@ const CallCheckout: React.FC = () => {
         }
       });
 
+      setCurrentStep('calling');
+      setCallProgress(1);
+
     } catch (error) {
       console.error('Error recording payment in Firestore:', error);
-      handlePaymentError(error instanceof Error ? error.message : 'Erreur inconnue');
+      setError(error instanceof Error ? error.message : 'Erreur inconnue');
+      setIsProcessing(false);
     }
-    
-    setCurrentStep('calling');
-    setCallProgress(1);
   };
 
-  const handlePaymentError = (error: string) => {
-    setError(`Erreur de paiement: ${error}`);
-    console.error('Payment error:', error);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements || !clientSecret) {
+      setError('Stripe n\'est pas encore chargé');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
+    const card = elements.getElement(CardElement);
+    if (!card) {
+      setError('Carte non trouvée');
+      setIsProcessing(false);
+      return;
+    }
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: card,
+          billing_details: {
+            name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Client SOS',
+            email: user?.email || undefined
+          }
+        }
+      });
+
+      if (error) {
+        setError(error.message || 'Paiement échoué');
+        setIsProcessing(false);
+        return;
+      }
+
+      if (paymentIntent?.status === 'requires_capture') {
+        await handlePaymentAuthorized(paymentIntent.id);
+      } else {
+        setError('Le paiement n\'a pas pu être autorisé.');
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error('Erreur lors du paiement:', error);
+      setError('Une erreur est survenue lors du paiement');
+      setIsProcessing(false);
+    }
   };
 
   // Fonction pour gérer le retour en arrière
@@ -605,49 +687,27 @@ const CallCheckout: React.FC = () => {
           {/* Step Content */}
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             {currentStep === 'payment' && (
-              <div className="p-8 space-y-6">
+              <form onSubmit={handleSubmit} className="p-8 space-y-6">
                 <div className="space-y-4">
+                  {/* Carte bancaire avec Stripe Elements */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Numéro de carte
+                      Carte bancaire
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md p-3 bg-white"
-                        placeholder="1234 5678 9012 3456"
-                        maxLength={19}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Date d'expiration
-                      </label>
-                      <input
-                        type="text"
-                        value={expiryDate}
-                        onChange={(e) => setExpiryDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md p-3 bg-white"
-                        placeholder="MM/YY"
-                        maxLength={5}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Code de sécurité (CVC)
-                      </label>
-                      <input
-                        type="text"
-                        value={cvc}
-                        onChange={(e) => setCvc(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md p-3 bg-white"
-                        placeholder="123"
-                        maxLength={3}
+                    <div className="border border-gray-300 rounded-md p-3 bg-white">
+                      <CardElement 
+                        options={{
+                          hidePostalCode: true,
+                          style: {
+                            base: {
+                              fontSize: '16px',
+                              color: '#424770',
+                              '::placeholder': {
+                                color: '#aab7c4',
+                              },
+                            },
+                          },
+                        }}
                       />
                     </div>
                   </div>
@@ -676,13 +736,23 @@ const CallCheckout: React.FC = () => {
                 </div>
 
                 <Button
-                  onClick={() => handlePaymentAuthorized('pi_mock_' + Date.now())}
+                  type="submit"
+                  disabled={!stripe || isProcessing}
                   fullWidth
                   size="large"
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400"
                 >
-                  <Shield size={20} className="mr-2" />
-                  Autoriser le paiement
+                  {isProcessing ? (
+                    <>
+                      <LoadingSpinner size="small" color="white" />
+                      <span className="ml-2">Traitement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield size={20} className="mr-2" />
+                      Autoriser le paiement
+                    </>
+                  )}
                 </Button>
 
                 <div className="text-center">
@@ -692,7 +762,7 @@ const CallCheckout: React.FC = () => {
                     <span className="font-medium">Prix: {isLawyer ? '49€ pour 20 minutes' : '19€ pour 30 minutes'}</span>
                   </p>
                 </div>
-              </div>
+              </form>
             )}
 
             {currentStep === 'calling' && (
@@ -793,6 +863,15 @@ const CallCheckout: React.FC = () => {
         </div>
       </div>
     </Layout>
+  );
+};
+
+// Composant principal avec wrapper Elements
+const CallCheckout: React.FC = () => {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm />
+    </Elements>
   );
 };
 

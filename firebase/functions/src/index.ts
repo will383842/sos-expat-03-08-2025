@@ -4,6 +4,7 @@ import twilio from 'twilio';
 import Stripe from 'stripe';
 import * as nodemailer from 'nodemailer';
 import { scheduleCallSequence } from './callScheduler';
+import { logError } from './utils/logError';
 // import { notifyAfterPayment } from './notifications/notifyAfterPayment'; // Temporairement commenté
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -31,7 +32,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 });
 
 // Initialiser le service d'email (exemple avec Gmail/SMTP)
-const emailTransporter = nodemailer.createTransport({
+const emailTransporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER || 'notifications@sosexpats.com',
@@ -399,6 +400,20 @@ export const initiateCall = functions.https.onCall(async (data: CallData, contex
       providerType,
       clientLanguage: clientLanguage || 'fr-FR',
       providerLanguage: providerLanguage || 'fr-FR',
+      
+      // Nouveaux champs pour le tracking détaillé
+      providerCallStatus: null,
+      clientCallStatus: null,
+      clientStatus: null,
+      fullStatus: null,
+      providerConnectedAt: null,
+      clientConnectedAt: null,
+      conversationStartedAt: null,
+      conversationEndedAt: null,
+      totalConversationDuration: null,
+      paymentCaptured: false,
+      paid: false,
+      
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
@@ -520,12 +535,11 @@ async function isAdmin(uid: string): Promise<boolean> {
   }
 }
 
-// Webhook Stripe pour gérer les événements de paiement - VERSION AMÉLIORÉE
+// Webhook Stripe pour gérer les événements de paiement
 export const stripeWebhook = functions.https.onRequest(async (req, res) => {
   const signature = req.headers['stripe-signature'];
   
   if (!signature) {
-    console.error('Signature Stripe manquante');
     res.status(400).send('Signature Stripe manquante');
     return;
   }
@@ -533,7 +547,6 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
   try {
     const rawBody = req.rawBody;
     if (!rawBody) {
-      console.error('Raw body manquant');
       res.status(400).send('Raw body manquant');
       return;
     }
@@ -544,13 +557,8 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
       process.env.STRIPE_WEBHOOK_SECRET || ''
     );
     
-    console.log(`🎯 Webhook reçu: ${event.type}`);
-    
-    // Traiter l'événement selon son type
+    // Traiter l'événement
     switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
-        break;
       case 'payment_intent.succeeded':
         await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
@@ -560,208 +568,256 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
       case 'payment_intent.canceled':
         await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent);
         break;
-      default:
-        console.log(`📋 Événement non géré: ${event.type}`);
     }
     
     res.json({ received: true });
   } catch (error: any) {
-    console.error('❌ Erreur lors du traitement du webhook Stripe:', error);
+    console.error('Error processing Stripe webhook:', error);
     res.status(400).send(`Webhook Error: ${error.message}`);
   }
 });
 
-// Nouvelle fonction pour gérer checkout.session.completed
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+// 🔄 WEBHOOK TWILIO AMÉLIORÉ - GÈRE CLIENT ET DURÉE
+export const twilioWebhook = functions.https.onRequest(async (req, res) => {
   try {
-    console.log('✅ Session de checkout complétée:', session.id);
+    const { 
+      CallSid, 
+      CallStatus, 
+      To, 
+      From,
+      CallDuration,
+      Direction 
+    } = req.body;
     
-    // Enregistrer la session dans Firestore
-    await db.collection('checkout_sessions').doc(session.id).set({
-      sessionId: session.id,
-      paymentStatus: session.payment_status,
-      paymentIntentId: session.payment_intent,
-      customerId: session.customer,
-      customerEmail: session.customer_details?.email || null,
-      amountTotal: session.amount_total,
-      currency: session.currency,
-      metadata: session.metadata || {},
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'completed'
+    console.log('🔔 Webhook Twilio reçu:', { 
+      CallSid, 
+      CallStatus, 
+      To, 
+      CallDuration,
+      Direction 
     });
 
-    // Si la session contient des métadonnées spécifiques à votre app
-    if (session.metadata) {
-      const { clientId, providerId, callSessionId, serviceType } = session.metadata;
+    // Chercher la session d'appel correspondante
+    let callDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+    let isProviderCall = false;
+    let isClientCall = false;
+
+    // Vérifier si c'est un appel vers le prestataire
+    const providerCallSnap = await db.collection('call_sessions')
+      .where('providerPhone', '==', To)
+      .limit(1)
+      .get();
+
+    if (!providerCallSnap.empty) {
+      callDoc = providerCallSnap.docs[0];
+      isProviderCall = true;
+    } else {
+      // Vérifier si c'est un appel vers le client
+      const clientCallSnap = await db.collection('call_sessions')
+        .where('clientPhone', '==', To)
+        .limit(1)
+        .get();
       
-      if (callSessionId) {
-        // Mettre à jour la session d'appel
-        const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-        await callSessionRef.update({
-          checkoutSessionId: session.id,
-          paymentStatus: 'completed',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        
-        console.log(`📞 Session d'appel ${callSessionId} mise à jour avec le paiement`);
-      }
-      
-      if (clientId && providerId) {
-        // Créer une notification de paiement réussi
-        await db.collection('notifications').add({
-          type: 'payment_completed',
-          recipientId: clientId,
-          title: 'Paiement confirmé',
-          message: 'Votre paiement a été traité avec succès.',
-          data: {
-            sessionId: session.id,
-            serviceType: serviceType || 'service',
-            amount: session.amount_total,
-            currency: session.currency
-          },
-          read: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        
-        console.log(`🔔 Notification créée pour le client ${clientId}`);
+      if (!clientCallSnap.empty) {
+        callDoc = clientCallSnap.docs[0];
+        isClientCall = true;
       }
     }
-    
-    // Créer un log détaillé
-    await db.collection('payment_logs').add({
-      type: 'checkout_completed',
-      sessionId: session.id,
-      paymentIntentId: session.payment_intent,
-      amount: session.amount_total,
-      currency: session.currency,
-      customerEmail: session.customer_details?.email,
-      metadata: session.metadata,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'success'
-    });
-    
-    return true;
-  } catch (error: any) {
-    console.error('❌ Erreur lors du traitement de checkout.session.completed:', error);
-    
-    // Enregistrer l'erreur dans les logs
-    await db.collection('payment_logs').add({
-      type: 'checkout_completed_error',
-      sessionId: session.id,
-      error: error.message,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'error'
-    });
-    
-    return false;
-  }
-}
 
-// Version améliorée de handlePaymentIntentSucceeded
+    if (!callDoc) {
+      console.log('❌ Aucune session d\'appel trouvée pour ce numéro:', To);
+      res.json({ success: false, message: 'Session not found' });
+      return;
+    }
+
+    const callRef = callDoc.ref;
+    const callData = callDoc.data();
+    const updates: any = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // 🔄 Gestion des statuts selon le type d'appel et le statut
+    switch (CallStatus) {
+      case 'ringing':
+        if (isProviderCall) {
+          updates.providerCallStatus = 'ringing';
+        } else if (isClientCall) {
+          updates.clientCallStatus = 'ringing';
+        }
+        break;
+
+      case 'in-progress':
+      case 'answered':
+        if (isProviderCall) {
+          updates.status = 'connected';
+          updates.providerCallStatus = 'connected';
+          updates.providerConnectedAt = admin.firestore.FieldValue.serverTimestamp();
+          console.log('✅ Prestataire connecté');
+        } else if (isClientCall) {
+          updates.clientStatus = 'connected';
+          updates.clientCallStatus = 'connected';
+          updates.clientConnectedAt = admin.firestore.FieldValue.serverTimestamp();
+          
+          // Si les deux sont connectés, marquer l'appel comme pleinement actif
+          if (callData.status === 'connected') {
+            updates.fullStatus = 'both_connected';
+            updates.conversationStartedAt = admin.firestore.FieldValue.serverTimestamp();
+          }
+          console.log('✅ Client connecté');
+        }
+        break;
+
+      case 'completed':
+        const duration = parseInt(CallDuration) || 0;
+        
+        if (isProviderCall) {
+          updates.providerCallStatus = 'completed';
+          updates.providerCallDuration = duration;
+        } else if (isClientCall) {
+          updates.clientCallStatus = 'completed';
+          updates.clientCallDuration = duration;
+          updates.conversationEndedAt = admin.firestore.FieldValue.serverTimestamp();
+          
+          // Calculer la durée totale de conversation
+          if (callData.conversationStartedAt) {
+            const startTime = callData.conversationStartedAt.toDate();
+            const endTime = new Date();
+            const totalDurationSeconds = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
+            updates.totalConversationDuration = totalDurationSeconds;
+            
+            console.log(`📞 Conversation terminée - Durée: ${totalDurationSeconds}s`);
+            
+            // Si l'appel a duré au moins 30 secondes, capturer le paiement
+            if (totalDurationSeconds >= 30 && callData.paymentIntentId) {
+              try {
+                await stripe.paymentIntents.capture(callData.paymentIntentId);
+                updates.paymentCaptured = true;
+                updates.paid = true;
+                
+                console.log('💰 Paiement capturé pour durée:', totalDurationSeconds, 's');
+                
+                // Créer une demande d'avis
+                await db.collection('reviews_requests').add({
+                  clientId: callData.clientId,
+                  providerId: callData.providerId,
+                  callSessionId: callDoc.id,
+                  callDuration: totalDurationSeconds,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                  status: 'pending'
+                });
+                
+              } catch (paymentError) {
+                console.error('❌ Erreur capture paiement:', paymentError);
+                await logError('twilioWebhook:paymentCapture', paymentError);
+              }
+            } else if (totalDurationSeconds < 30) {
+              // Appel trop court, annuler le paiement
+              if (callData.paymentIntentId) {
+                try {
+                  await stripe.paymentIntents.cancel(callData.paymentIntentId);
+                  updates.paymentCancelled = true;
+                  updates.refunded = true;
+                  console.log('💸 Paiement annulé - Appel trop court (< 30s):', totalDurationSeconds, 's');
+                } catch (cancelError) {
+                  console.error('❌ Erreur annulation paiement:', cancelError);
+                }
+              }
+            }
+          }
+          
+          // Marquer l'appel comme complètement terminé
+          updates.status = 'completed';
+        }
+        break;
+
+      case 'failed':
+      case 'busy':
+      case 'no-answer':
+        if (isProviderCall) {
+          updates.providerCallStatus = CallStatus;
+        } else if (isClientCall) {
+          updates.clientCallStatus = CallStatus;
+        }
+        console.log(`📞 Appel ${CallStatus}:`, To);
+        break;
+    }
+
+    // Appliquer les mises à jour
+    await callRef.update(updates);
+
+    // Logger l'événement
+    await db.collection('call_logs').add({
+      callSessionId: callDoc.id,
+      type: 'webhook_event',
+      callSid: CallSid,
+      callStatus: CallStatus,
+      direction: Direction,
+      to: To,
+      from: From,
+      duration: CallDuration ? parseInt(CallDuration) : null,
+      isProviderCall,
+      isClientCall,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Webhook processed',
+      callType: isProviderCall ? 'provider' : 'client',
+      status: CallStatus
+    });
+
+  } catch (error: any) {
+    console.error('❌ Erreur webhook Twilio:', error);
+    await logError('twilioWebhook:error', error);
+    res.status(400).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Webhook séparé pour les appels clients (optionnel)
+export const twilioClientWebhook = functions.https.onRequest(async (req, res) => {
+  console.log('🔔 Webhook CLIENT reçu:', req.body);
+  
+  // Rediriger vers le webhook principal en marquant que c'est un appel client
+  req.body.isClientWebhook = true;
+  return twilioWebhook(req, res);
+});
+
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   try {
-    console.log('✅ Payment Intent réussi:', paymentIntent.id);
-    
-    // Mise à jour du paiement dans Firestore
+    // ✅ Mise à jour du paiement
     const paymentsQuery = db.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
 
     if (!paymentsSnapshot.empty) {
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
-        status: 'succeeded',
+        status: 'captured',
         capturedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
-      console.log('💰 Document payment mis à jour');
     }
 
-    // Traitement des métadonnées
-    const { clientId, providerId, callId, callSessionId } = paymentIntent.metadata;
-    
-    // Mise à jour de l'appel si applicable
-    if (callId) {
-      const callRef = db.collection('calls').doc(callId);
+    // ✅ Mise à jour de l'appel + déclenchement des notifications
+    if (paymentIntent.metadata.callId) {
+      const callRef = db.collection('calls').doc(paymentIntent.metadata.callId);
       await callRef.update({
-        status: 'paid',
-        paymentStatus: 'succeeded',
+        status: 'completed',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
-      console.log(`📞 Appel ${callId} marqué comme payé`);
-    }
-    
-    // Mise à jour de la session d'appel si applicable
-    if (callSessionId) {
-      const callSessionRef = db.collection('call_sessions').doc(callSessionId);
-      await callSessionRef.update({
-        paymentStatus: 'succeeded',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      console.log(`📞 Session d'appel ${callSessionId} mise à jour`);
-    }
 
-    // Créer des notifications pour le client et le prestataire
-    if (clientId) {
-      await db.collection('notifications').add({
-        type: 'payment_succeeded',
-        recipientId: clientId,
-        title: 'Paiement confirmé',
-        message: 'Votre paiement a été traité avec succès.',
-        data: {
-          paymentIntentId: paymentIntent.id,
-          amount: paymentIntent.amount,
-          currency: paymentIntent.currency
-        },
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // 🔔 Envoi des messages client et prestataire
+      // Note: notifyAfterPayment est une fonction importée, pas une Cloud Function
+      // Si c'est une Cloud Function, utilisez httpsCallable depuis le frontend
+      console.log('Call completed, notifications should be sent from frontend');
     }
-    
-    if (providerId) {
-      await db.collection('notifications').add({
-        type: 'payment_received',
-        recipientId: providerId,
-        title: 'Paiement reçu',
-        message: 'Un paiement a été reçu pour votre service.',
-        data: {
-          paymentIntentId: paymentIntent.id,
-          amount: paymentIntent.amount,
-          currency: paymentIntent.currency
-        },
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
-    // Log détaillé
-    await db.collection('payment_logs').add({
-      type: 'payment_intent_succeeded',
-      paymentIntentId: paymentIntent.id,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      metadata: paymentIntent.metadata,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'success'
-    });
 
     return true;
   } catch (error: any) {
-    console.error('❌ Erreur handlePaymentIntentSucceeded:', error);
-    
-    // Log d'erreur
-    await db.collection('payment_logs').add({
-      type: 'payment_intent_succeeded_error',
-      paymentIntentId: paymentIntent.id,
-      error: error.message,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'error'
-    });
-    
+    console.error('❌ Erreur handlePaymentIntentSucceeded :', error);
     return false;
   }
 }
@@ -827,34 +883,6 @@ async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) 
     return false;
   }
 }
-
-// Webhook Twilio pour gérer les événements d'appel
-export const twilioWebhook = functions.https.onRequest(async (req, res) => {
-  // Vérifier l'authentification Twilio
-  // Dans une implémentation réelle, vous devriez vérifier la signature Twilio
-  
-  try {
-    const { action, callSessionId, phoneNumber, twiml, attempt } = req.body;
-    
-    // Traiter l'action
-    switch (action) {
-      case 'call-provider':
-        await handleCallProvider(callSessionId, phoneNumber, twiml, attempt);
-        break;
-      case 'call-client':
-        await handleCallClient(callSessionId, phoneNumber, twiml, attempt);
-        break;
-      case 'call-status':
-        await handleCallStatus(callSessionId, req.body.status, req.body.details);
-        break;
-    }
-    
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error('Error processing Twilio webhook:', error);
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
 
 // Fonctions de gestion des événements Twilio
 async function handleCallProvider(callSessionId: string, phoneNumber: string, twiml: string, attempt: number) {

@@ -8,10 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { createPaymentRecord, logAnalyticsEvent } from '../utils/firestore';
 import { initiateCall } from '../services/api';
-import { notifyProviderOfMissedCall } from '../services/notificationService';
-import { sendPostPaymentMessage } from "../services/notifications/sendPostPaymentMessage";
 import { whatsappMessageTemplates } from "../whatsapp/whatsappMessageTemplates";
 import { saveProviderMessage } from "../firebase/saveProviderMessage";
+import { functions } from '../config/firebase'; // ton fichier firebase.ts
+import { httpsCallable } from 'firebase/functions';
+
+const sendWhatsAppAfterPayment = httpsCallable(functions, 'sendWhatsAppAfterPayment');
 
 // Types améliorés
 interface Provider {
@@ -98,6 +100,46 @@ const CallCheckout: React.FC = () => {
   const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
   const [expiryDate, setExpiryDate] = useState('12/25');
   const [cvc, setCvc] = useState('123');
+
+  // Fonctions utilitaires définies avant leur utilisation
+  const sendPostPaymentMessage = async (payload: any) => {
+    try {
+      const result = await sendWhatsAppAfterPayment(payload);
+      console.log('Message post-paiement envoyé:', result);
+      return result;
+    } catch (error) {
+      console.error('Erreur envoi message post-paiement:', error);
+      throw error;
+    }
+  };
+
+  const sendWhatsAppViaFirebase = async (phoneNumber: string, message: string) => {
+    try {
+      // Implémentation de l'envoi WhatsApp via Firebase
+      // Remplacez par votre logique d'envoi WhatsApp
+      console.log(`Envoi WhatsApp vers ${phoneNumber}: ${message}`);
+      // Exemple d'appel à une fonction Firebase
+      // await httpsCallable(functions, 'sendWhatsApp')({ phoneNumber, message });
+    } catch (error) {
+      console.error('Erreur envoi WhatsApp:', error);
+      throw error;
+    }
+  };
+
+  const notifyProviderOfMissedCall = async (
+    providerId: string,
+    clientInfo: { name: string; country: string },
+    callInfo: { attempts: number; lastAttemptTime: Date }
+  ) => {
+    try {
+      // Implémentation de la notification d'appel manqué
+      console.log('Notification appel manqué:', { providerId, clientInfo, callInfo });
+      // Logique de notification à implémenter
+    } catch (error) {
+      console.error('Erreur notification appel manqué:', error);
+      throw error;
+    }
+  };
 
   // Fonction utilitaire pour créer un provider à partir des données de session
   const createProviderFromData = (data: SessionData, dataType: 'selectedProvider' | 'bookingRequest'): Provider => {
@@ -257,71 +299,6 @@ const CallCheckout: React.FC = () => {
     }
   }, [providerId, user, authLoading, navigate, loadProviderAndSettings]);
 
-  const handlePaymentAuthorized = async (paymentIntentId: string) => {
-    setPaymentIntentId(paymentIntentId);
-    
-    try {
-      const bookingRequest = getSessionData('bookingRequest');
-      const clientPhone = bookingRequest?.clientPhone || user?.phone || '';
-      
-      if (!serviceData || !user || !provider) {
-        throw new Error('Missing required data for payment');
-      }
-      
-      // 1. Enregistrer le paiement dans Firestore
-      await createPaymentRecord({
-        paymentIntentId: paymentIntentId,
-        clientId: user.id || '',
-        providerId: serviceData.providerId,
-        amount: serviceData.amount,
-        platformFee: serviceData.commissionAmount,
-        providerAmount: serviceData.providerAmount,
-        status: 'authorized',
-        currency: 'eur',
-        serviceType: serviceData.serviceType,
-        clientEmail: user.email || '',
-        clientName: `${user.firstName || ''} ${user.lastName || ''}`,
-        providerName: provider.fullName,
-        description: `Paiement pour ${serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}`
-      });
-      
-      // 2. 📱 ENVOYER TOUS LES MESSAGES/NOTIFICATIONS INSTANTANÉMENT
-      await sendAllNotifications();
-      
-      // 3. 📞 Démarrer immédiatement la programmation côté backend (le backend attendra 5 min)
-await initiateCall({
-  clientId: user.id || '',
-  providerId: serviceData.providerId,
-  clientPhone: serviceData.clientPhone || clientPhone,
-  providerPhone: provider.phone,
-  providerType: provider.role === 'lawyer' ? 'lawyer' : 'expat',
-  clientLanguage: user.preferredLanguage || language || 'fr',
-  providerLanguage: provider.preferredLanguage || 'fr',
-  paymentIntentId: paymentIntentId,
-});
-
-      
-      // 4. Log analytics
-      logAnalyticsEvent({
-        eventType: 'payment_authorized',
-        userId: user.id || '',
-        eventData: {
-          paymentIntentId,
-          amount: serviceData.amount,
-          serviceType: serviceData.serviceType,
-          providerId: serviceData.providerId
-        }
-      });
-
-    } catch (error) {
-      console.error('Error recording payment in Firestore:', error);
-      handlePaymentError(error instanceof Error ? error.message : 'Erreur inconnue');
-    }
-    
-    setCurrentStep('calling');
-    setCallProgress(1);
-  };
-
   // 📱 FONCTION POUR ENVOYER TOUS LES MESSAGES/NOTIFICATIONS
   const sendAllNotifications = async () => {
     try {
@@ -402,7 +379,8 @@ await initiateCall({
         language:
           (user.languagesSpoken?.map((l: string) => l.toUpperCase()).join(", ")) || "Non précisé",
       });
-const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
+
+      const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
       await sendWhatsAppViaFirebase(phoneNumber, message);
 
     } catch (error) {
@@ -421,49 +399,75 @@ const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
 👤 Client : ${user.firstName || "Client"}
 🌍 Pays : ${user.country || "Inconnu"}
 📝 Demande : ${callData?.title || "Sans titre"}`;
-const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
-   await sendWhatsAppViaFirebase(phoneNumber, message);
+
+    const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
+    await sendWhatsAppViaFirebase(phoneNumber, message);
   };
 
-  // Fonction utilitaire pour l'envoi WhatsApp direct
-  
-  
-    if (!provider) return;
-
+  const handlePaymentAuthorized = async (paymentIntentId: string) => {
+    setPaymentIntentId(paymentIntentId);
+    
     try {
-      // Nettoyer le numéro WhatsApp
-      const cleanedPhone = provider.whatsapp
-        ?.replace(/\s+/g, "")       // supprime tous les espaces
-        .replace(/\(0\)/g, "")      // supprime (0)
-        .replace(/[^+\d]/g, "");    // supprime tout sauf chiffres et +
-
-      const whatsappTo = `whatsapp:${cleanedPhone}`;
-
-      // Créer le message à envoyer
-      const payload = {
-        to: whatsappTo,
-        body: message,
-      };
-
-      const response = await fetch("https://sos-urgently.com/api/notifications/whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-sos-secret": import.meta.env.VITE_SOS_SECRET,
-        },
-        body: JSON.stringify(payload),
+      const bookingRequest = getSessionData('bookingRequest');
+      const clientPhone = bookingRequest?.clientPhone || user?.phone || '';
+      
+      if (!serviceData || !user || !provider) {
+        throw new Error('Missing required data for payment');
+      }
+      
+      // 1. Enregistrer le paiement dans Firestore
+      await createPaymentRecord({
+        paymentIntentId: paymentIntentId,
+        clientId: user.id || '',
+        providerId: serviceData.providerId,
+        amount: serviceData.amount,
+        platformFee: serviceData.commissionAmount,
+        providerAmount: serviceData.providerAmount,
+        status: 'authorized',
+        currency: 'eur',
+        serviceType: serviceData.serviceType,
+        clientEmail: user.email || '',
+        clientName: `${user.firstName || ''} ${user.lastName || ''}`,
+        providerName: provider.fullName,
+        description: `Paiement pour ${serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}`
+      });
+      
+      // 2. 📱 ENVOYER TOUS LES MESSAGES/NOTIFICATIONS INSTANTANÉMENT
+      await sendAllNotifications();
+      
+      // 3. 📞 Démarrer immédiatement la programmation côté backend (le backend attendra 5 min)
+      await initiateCall({
+        clientId: user.id || '',
+        providerId: serviceData.providerId,
+        clientPhone: serviceData.clientPhone || clientPhone,
+        providerPhone: provider.phone,
+        providerType: provider.role === 'lawyer' ? 'lawyer' : 'expat',
+        clientLanguage: user.preferredLanguage || language || 'fr',
+        providerLanguage: provider.preferredLanguage || 'fr',
+        paymentIntentId: paymentIntentId,
+      });
+      
+      // 4. Log analytics
+      logAnalyticsEvent({
+        eventType: 'payment_authorized',
+        userId: user.id || '',
+        eventData: {
+          paymentIntentId,
+          amount: serviceData.amount,
+          serviceType: serviceData.serviceType,
+          providerId: serviceData.providerId
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`WhatsApp API error: ${response.status}`);
-      }
-
-      console.log("✅ Message WhatsApp envoyé avec succès !");
-    } catch (err) {
-      console.error("❌ Erreur lors de l'envoi WhatsApp :", err);
+    } catch (error) {
+      console.error('Error recording payment in Firestore:', error);
+      handlePaymentError(error instanceof Error ? error.message : 'Erreur inconnue');
     }
+    
+    setCurrentStep('calling');
+    setCallProgress(1);
   };
-  
+
   const handlePaymentError = (error: string) => {
     setError(`Erreur de paiement: ${error}`);
     console.error('Payment error:', error);
@@ -570,9 +574,19 @@ const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
   };
 
   // Early returns pour les états d'erreur et de chargement
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex flex-col items-center justify-center">
+          <LoadingSpinner size="large" color="red" />
+          <p className="mt-4 text-gray-600">Authentification en cours...</p>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!user) {
-    navigate('/login');
-    return null;
+    return null; // useEffect gère la redirection
   }
 
   if (isLoading) {

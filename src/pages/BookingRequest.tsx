@@ -5,7 +5,6 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { createBookingRequest } from '../utils/firestore';
-import { notifyProviderOfCallRequest } from '../services/notificationService';
 import { logLanguageMismatch } from '../services/analytics';
 import { Link } from 'react-router-dom';
 import MultiLanguageSelect from '../components/forms-data/MultiLanguageSelect';

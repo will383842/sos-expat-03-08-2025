@@ -21,7 +21,7 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 import { useAuth } from '../../contexts/AuthContext';
-import { testNotificationSystem, sendProviderNotification } from '../../services/notificationService';
+import  testNotificationSystem  from '../../services/notifications/notificationService';
 
 interface NotificationLog {
   id: string;

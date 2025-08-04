@@ -1,27 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle } from 'lucide-react';
-import Layout from '../components/layout/Layout';
-import Button from '../components/common/Button';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import { useAuth } from '../contexts/AuthContext';
-import { useApp } from '../contexts/AppContext';
-import { createPaymentRecord, logAnalyticsEvent } from '../utils/firestore';
-import { initiateCall } from '../services/api';
+import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle, CreditCard, Lock, User, Calendar, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
-
-// Imports Stripe
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-
-const functions = getFunctions();
-const notifyAfterPayment = httpsCallable(functions, 'notifyAfterPayment');
-
-// Initialisation Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
-
-// Types améliorés
+// Types simulés
 interface Provider {
   id: string;
   fullName: string;
@@ -52,563 +32,263 @@ interface ServiceData {
   providerAmount: number;
 }
 
-interface SessionData {
-  id?: string;
-  name?: string;
-  firstName?: string;
-  lastName?: string;
-  type?: string;
-  country?: string;
-  avatar?: string;
-  email?: string;
-  phone?: string;
-  whatsapp?: string;
-  whatsAppNumber?: string;
-  phoneNumber?: string;
-  languagesSpoken?: string[];
-  providerId?: string;
-  providerName?: string;
-  providerType?: string;
-  providerCountry?: string;
-  providerAvatar?: string;
-  providerEmail?: string;
-  providerPhone?: string;
-  providerWhatsapp?: string;
-  providerWhatsAppNumber?: string;
-  providerPhoneNumber?: string;
-  providerLanguagesSpoken?: string[];
-  price?: number;
-  duration?: number;
-  clientPhone?: string;
-  countryRequested?: string;
-  title?: string;
-  description?: string;
-  language?: string;
-  role?: string;
-}
-
 type StepType = 'payment' | 'calling' | 'completed';
 
-const CheckoutForm: React.FC = () => {
-  const { providerId } = useParams<{ providerId: string }>();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { user, isLoading: authLoading } = useAuth();
-  const { language } = useApp();
-  const stripe = useStripe();
-  const elements = useElements();
+// Composant de bouton personnalisé
+const Button = ({ children, onClick, disabled, className = '', type = 'button', fullWidth = false }) => (
+  <button
+    type={type}
+    onClick={onClick}
+    disabled={disabled}
+    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+      disabled 
+        ? 'bg-gray-400 text-white cursor-not-allowed' 
+        : 'bg-red-600 hover:bg-red-700 text-white'
+    } ${fullWidth ? 'w-full' : ''} ${className}`}
+  >
+    {children}
+  </button>
+);
+
+// Composant de spinner de chargement
+const LoadingSpinner = ({ size = 'medium', color = 'red' }) => {
+  const sizeClass = size === 'small' ? 'w-4 h-4' : size === 'large' ? 'w-8 h-8' : 'w-6 h-6';
+  const colorClass = color === 'white' ? 'border-white border-t-transparent' : 'border-red-600 border-t-transparent';
   
-  const [provider, setProvider] = useState<Provider | null>(null);
+  return (
+    <div className={`animate-spin rounded-full border-2 ${sizeClass} ${colorClass}`}></div>
+  );
+};
+
+const CallCheckout = () => {
+  // Données mockées pour la démo
+  const [provider] = useState<Provider>({
+    id: '1',
+    fullName: 'avocat 1',
+    firstName: 'Avocat',
+    lastName: '1',
+    role: 'lawyer',
+    country: 'Autriche',
+    currentCountry: 'Autriche',
+    avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
+    profilePhoto: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
+    email: 'avocat1@example.com',
+    phone: '+33612345678',
+    languagesSpoken: ['fr', 'de']
+  });
+
+  const [serviceData] = useState<ServiceData>({
+    providerId: '1',
+    serviceType: 'lawyer_call',
+    providerRole: 'lawyer',
+    amount: 49,
+    duration: 20,
+    clientPhone: '+33612345678',
+    commissionAmount: 9,
+    providerAmount: 40
+  });
+
   const [currentStep, setCurrentStep] = useState<StepType>('payment');
   const [callProgress, setCallProgress] = useState<number>(0);
   const [paymentIntentId, setPaymentIntentId] = useState<string>('');
-  const [clientSecret, setClientSecret] = useState<string>('');
-  const [serviceData, setServiceData] = useState<ServiceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [clientSecret, setClientSecret] = useState<string>('mock_client_secret');
+  const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const notifyProviderOfMissedCall = async (
-    providerId: string,
-    clientInfo: { name: string; country: string },
-    callInfo: { attempts: number; lastAttemptTime: Date }
-  ) => {
-    try {
-      // Implémentation de la notification d'appel manqué
-      console.log('Notification appel manqué:', { providerId, clientInfo, callInfo });
-      // Logique de notification à implémenter
-    } catch (error) {
-      console.error('Erreur notification appel manqué:', error);
-      throw error;
+  // États pour le formulaire de carte personnalisé
+  const [formData, setFormData] = useState({
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    cardholderName: ''
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [focusedField, setFocusedField] = useState('');
+  const [showCvv, setShowCvv] = useState(false);
+  const [useCustomForm, setUseCustomForm] = useState(true);
+  const [stripeElementsReady, setStripeElementsReady] = useState(true);
+
+  // Formatage du numéro de carte
+  const formatCardNumber = (value) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
+    
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
     }
-  };
-
-  // Fonction pour créer un PaymentIntent côté backend
-  const createPaymentIntent = useCallback(async (): Promise<{ clientSecret: string; paymentIntentId: string }> => {
-    try {
-      if (!serviceData || !user) {
-        throw new Error('Données manquantes pour créer le paiement');
-      }
-
-      const response = await fetch('/api/create-payment-intent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: serviceData.amount * 100, // Convertir en centimes
-          currency: 'eur',
-          serviceType: serviceData.serviceType,
-          providerId: serviceData.providerId,
-          clientId: user.id,
-          clientEmail: user.email,
-          providerName: provider?.fullName,
-          description: `Paiement pour ${serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}`
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de la création du paiement');
-      }
-
-      const data = await response.json();
-      return {
-        clientSecret: data.clientSecret,
-        paymentIntentId: data.paymentIntentId
-      };
-    } catch (error) {
-      console.error('Erreur création PaymentIntent:', error);
-      throw error;
-    }
-  }, [serviceData, user, provider]);
-
-  // Fonction pour envoyer toutes les notifications
-  const sendAllNotifications = async () => {
-    try {
-      console.log('Envoi des notifications post-paiement...');
-      // Implémentation de l'envoi des notifications
-      
-      const callId = sessionStorage.getItem("callId");
-      if (callId) {
-        try {
-          await notifyAfterPayment({ callId });
-          console.log("✅ Notifications post-paiement envoyées avec succès.");
-        } catch (error) {
-          console.error("❌ Erreur lors de l'envoi des notifications post-paiement :", error);
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi des notifications:', error);
-    }
-  };
-
-  // Fonction utilitaire pour créer un provider à partir des données de session
-  const createProviderFromData = (data: SessionData, dataType: 'selectedProvider' | 'bookingRequest'): Provider => {
-    if (dataType === 'selectedProvider') {
-      return {
-        id: data.id || '',
-        fullName: data.name || '',
-        firstName: data.firstName || data.name?.split(' ')[0] || '',
-        lastName: data.lastName || data.name?.split(' ').slice(1).join(' ') || '',
-        role: (data.type as 'lawyer' | 'expat') || 'expat',
-        country: data.country || '',
-        currentCountry: data.country || '',
-        avatar: data.avatar || '',
-        profilePhoto: data.avatar || '',
-        email: data.email || `${data.firstName?.toLowerCase() || 'expert'}@example.com`,
-        phone: data.phone || '+33612345678',
-        whatsapp: data.whatsapp || data.whatsAppNumber || data.phoneNumber,
-        whatsAppNumber: data.whatsAppNumber || data.whatsapp,
-        phoneNumber: data.phoneNumber || data.phone,
-        languagesSpoken: data.languagesSpoken || ['fr']
-      };
+    
+    if (parts.length) {
+      return parts.join(' ');
     } else {
-      return {
-        id: data.providerId || '',
-        fullName: data.providerName || '',
-        firstName: data.providerName?.split(' ')[0] || '',
-        lastName: data.providerName?.split(' ').slice(1).join(' ') || '',
-        role: (data.providerType as 'lawyer' | 'expat') || 'expat',
-        country: data.providerCountry || '',
-        currentCountry: data.providerCountry || '',
-        avatar: data.providerAvatar || '',
-        profilePhoto: data.providerAvatar || '',
-        email: data.providerEmail || `${data.providerName?.split(' ')[0]?.toLowerCase() || 'expert'}@example.com`,
-        phone: data.providerPhone || '+33612345678',
-        whatsapp: data.providerWhatsapp || data.providerWhatsAppNumber || data.providerPhoneNumber,
-        whatsAppNumber: data.providerWhatsAppNumber || data.providerWhatsapp,
-        phoneNumber: data.providerPhoneNumber || data.providerPhone,
-        languagesSpoken: data.providerLanguagesSpoken || ['fr']
-      };
+      return v;
     }
   };
 
-  // Fonction utilitaire pour récupérer les données depuis sessionStorage
-  const getSessionData = (key: string): SessionData | null => {
-    try {
-      const data = sessionStorage.getItem(key);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      console.error(`Error parsing ${key} data:`, error);
-      return null;
+  // Formatage de la date d'expiration
+  const formatExpiryDate = (value) => {
+    const v = value.replace(/\D/g, '');
+    if (v.length >= 2) {
+      return v.substring(0, 2) + '/' + v.substring(2, 4);
     }
+    return v;
   };
 
-  const loadProviderAndSettings = useCallback(async () => {
-    try {
-      let currentProvider: Provider | null = null;
-      
-      // Récupérer les données du prestataire depuis sessionStorage
-      const savedProvider = getSessionData('selectedProvider');
-      if (savedProvider && savedProvider.id === providerId) {
-        currentProvider = createProviderFromData(savedProvider, 'selectedProvider');
-      }
-      
-      // Si pas trouvé, essayer depuis bookingRequest
-      if (!currentProvider) {
-        const savedRequest = getSessionData('bookingRequest');
-        if (savedRequest && savedRequest.providerId === providerId) {
-          currentProvider = createProviderFromData(savedRequest, 'bookingRequest');
-        }
-      }
-      
-      // Si toujours pas trouvé, c'est une erreur
-      if (!currentProvider) {
-        throw new Error('Prestataire non trouvé. Veuillez sélectionner un prestataire depuis la liste.');
-      }
+  // Détection du type de carte
+  const getCardType = (number) => {
+    const cleanNumber = number.replace(/\s/g, '');
+    if (cleanNumber.match(/^4/)) return 'visa';
+    if (cleanNumber.match(/^5/)) return 'mastercard';
+    if (cleanNumber.match(/^3[47]/)) return 'amex';
+    return 'generic';
+  };
 
-      // Mise à jour du rôle depuis les paramètres URL
-      const typeParam = searchParams.get('type');
-      if (typeParam === 'lawyer' || typeParam === 'expat') {
-        currentProvider.role = typeParam;
-      }
-      
-      setProvider(currentProvider);
-      
-      // Récupération des données de réservation
-      const bookingRequest = getSessionData('bookingRequest');
-      const clientPhone = bookingRequest?.clientPhone || user?.phone || '';
-      
-      // Configuration des prix et durées
-      const isLawyer = currentProvider.role === 'lawyer';
-      const baseAmount = bookingRequest?.price || (isLawyer ? 49 : 19);
-      const duration = bookingRequest?.duration || (isLawyer ? 20 : 30);
-      const commissionAmount = isLawyer ? 9 : 5;
-      const providerAmount = baseAmount - commissionAmount;
-      
-      const newServiceData: ServiceData = {
-        providerId: currentProvider.id,
-        serviceType: (isLawyer ? 'lawyer_call' : 'expat_call') as 'lawyer_call' | 'expat_call',
-        providerRole: currentProvider.role,
-        amount: baseAmount,
-        duration: duration,
-        clientPhone: clientPhone,
-        commissionAmount,
-        providerAmount
-      };
-
-      setServiceData(newServiceData);
-
-      // Créer le PaymentIntent après avoir configuré serviceData
-      // Note: createPaymentIntent sera appelé après que serviceData soit défini
-      // donc on ne peut pas l'appeler ici directement
-      // Il sera appelé dans un useEffect séparé
-
-    } catch (error) {
-      console.error('Error loading provider and settings:', error);
-      setError(error instanceof Error ? error.message : 'Erreur lors du chargement des données. Veuillez réessayer.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [providerId, searchParams, user]);
-
-  useEffect(() => {
-    if (authLoading) return;
+  // Validation des champs du formulaire personnalisé
+  const validateField = (name, value) => {
+    const newErrors = { ...formErrors };
     
-    if (!user) {
-      const currentUrl = window.location.pathname;
-      navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
-      return;
+    switch (name) {
+      case 'cardNumber':
+        const cleanNumber = value.replace(/\s/g, '');
+        if (!cleanNumber) {
+          newErrors.cardNumber = 'Numéro de carte requis';
+        } else if (cleanNumber.length < 13 || cleanNumber.length > 19) {
+          newErrors.cardNumber = 'Numéro de carte invalide';
+        } else {
+          delete newErrors.cardNumber;
+        }
+        break;
+      
+      case 'expiryDate':
+        if (!value) {
+          newErrors.expiryDate = 'Date d\'expiration requise';
+        } else if (!/^\d{2}\/\d{2}$/.test(value)) {
+          newErrors.expiryDate = 'Format invalide (MM/AA)';
+        } else {
+          const [month, year] = value.split('/');
+          const currentYear = new Date().getFullYear() % 100;
+          const currentMonth = new Date().getMonth() + 1;
+          
+          if (parseInt(month) < 1 || parseInt(month) > 12) {
+            newErrors.expiryDate = 'Mois invalide';
+          } else if (parseInt(year) < currentYear || (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
+            newErrors.expiryDate = 'Carte expirée';
+          } else {
+            delete newErrors.expiryDate;
+          }
+        }
+        break;
+      
+      case 'cvv':
+        if (!value) {
+          newErrors.cvv = 'CVV requis';
+        } else if (!/^\d{3,4}$/.test(value)) {
+          newErrors.cvv = 'CVV invalide (3-4 chiffres)';
+        } else {
+          delete newErrors.cvv;
+        }
+        break;
+      
+      case 'cardholderName':
+        if (!value.trim()) {
+          newErrors.cardholderName = 'Nom du titulaire requis';
+        } else if (value.trim().length < 2) {
+          newErrors.cardholderName = 'Nom trop court';
+        } else {
+          delete newErrors.cardholderName;
+        }
+        break;
     }
     
-    if (providerId) {
-      loadProviderAndSettings();
+    setFormErrors(newErrors);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    let formattedValue = value;
+
+    if (name === 'cardNumber') {
+      formattedValue = formatCardNumber(value);
+    } else if (name === 'expiryDate') {
+      formattedValue = formatExpiryDate(value);
+    } else if (name === 'cvv') {
+      formattedValue = value.replace(/\D/g, '').substring(0, 4);
+    } else if (name === 'cardholderName') {
+      formattedValue = value.toUpperCase();
     }
-  }, [providerId, user, authLoading, navigate, loadProviderAndSettings]);
 
-  // UseEffect séparé pour créer le PaymentIntent une fois que serviceData est défini
-  useEffect(() => {
-    const initializePayment = async () => {
-      if (serviceData && user && provider && !clientSecret) {
-        try {
-          const { clientSecret: newClientSecret, paymentIntentId: newPaymentIntentId } = await createPaymentIntent();
-          setClientSecret(newClientSecret);
-          setPaymentIntentId(newPaymentIntentId);
-        } catch (error) {
-          console.error('Erreur lors de l\'initialisation du paiement:', error);
-          setError('Erreur lors de l\'initialisation du paiement');
-        }
-      }
-    };
+    setFormData({ ...formData, [name]: formattedValue });
+    validateField(name, formattedValue);
+  };
 
-    initializePayment();
-  }, [serviceData, user, provider, clientSecret, createPaymentIntent]);
+  const cardType = getCardType(formData.cardNumber);
+  const isCustomFormValid = Object.keys(formErrors).length === 0 && 
+                           formData.cardNumber && 
+                           formData.expiryDate && 
+                           formData.cvv && 
+                           formData.cardholderName;
 
-  const handlePaymentAuthorized = async (paymentIntentId: string) => {
-    try {
-      const bookingRequest = getSessionData('bookingRequest');
-      const clientPhone = bookingRequest?.clientPhone || user?.phone || '';
-      
-      if (!serviceData || !user || !provider) {
-        throw new Error('Missing required data for payment');
-      }
-      
-      // 1. Enregistrer le paiement dans Firestore
-      await createPaymentRecord({
-        paymentIntentId: paymentIntentId,
-        clientId: user.id || '',
-        providerId: serviceData.providerId,
-        amount: serviceData.amount,
-        platformFee: serviceData.commissionAmount,
-        providerAmount: serviceData.providerAmount,
-        status: 'authorized',
-        currency: 'eur',
-        serviceType: serviceData.serviceType,
-        clientEmail: user.email || '',
-        clientName: `${user.firstName || ''} ${user.lastName || ''}`,
-        providerName: provider.fullName,
-        description: `Paiement pour ${serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}`
-      });
-      
-      // 2. 📱 ENVOYER TOUS LES MESSAGES/NOTIFICATIONS INSTANTANÉMENT
-      await sendAllNotifications();
-      
-      // 3. 📞 Démarrer immédiatement la programmation côté backend (le backend attendra 5 min)
-      await initiateCall({
-        clientId: user.id || '',
-        providerId: serviceData.providerId,
-        clientPhone: serviceData.clientPhone || clientPhone,
-        providerPhone: provider.phone,
-        providerType: provider.role === 'lawyer' ? 'lawyer' : 'expat',
-        clientLanguage: user.preferredLanguage || language || 'fr',
-        providerLanguage: provider.preferredLanguage || 'fr',
-        paymentIntentId: paymentIntentId,
-      });
-      
-      // 4. Log analytics
-      logAnalyticsEvent({
-        eventType: 'payment_authorized',
-        userId: user.id || '',
-        eventData: {
-          paymentIntentId,
-          amount: serviceData.amount,
-          serviceType: serviceData.serviceType,
-          providerId: serviceData.providerId
-        }
-      });
-
-      setCurrentStep('calling');
-      setCallProgress(1);
-
-    } catch (error) {
-      console.error('Error recording payment in Firestore:', error);
-      setError(error instanceof Error ? error.message : 'Erreur inconnue');
-      setIsProcessing(false);
+  const getCardIcon = (type) => {
+    switch (type) {
+      case 'visa':
+        return (
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-2 py-1 rounded text-xs font-bold">
+            VISA
+          </div>
+        );
+      case 'mastercard':
+        return (
+          <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-bold">
+            MC
+          </div>
+        );
+      case 'amex':
+        return (
+          <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-2 py-1 rounded text-xs font-bold">
+            AMEX
+          </div>
+        );
+      default:
+        return <CreditCard className="w-4 h-4 text-gray-400" />;
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  // Simulation du paiement
+  const handlePaymentSubmit = async (event) => {
     event.preventDefault();
-
-    if (!stripe || !elements || !clientSecret) {
-      setError('Stripe n\'est pas encore chargé');
-      return;
-    }
-
     setIsProcessing(true);
     setError(null);
 
-    const card = elements.getElement(CardElement);
-    if (!card) {
-      setError('Carte non trouvée');
+    // Simuler le traitement du paiement
+    setTimeout(() => {
+      setPaymentIntentId('pi_mock_payment_intent');
+      setCurrentStep('calling');
+      setCallProgress(1);
       setIsProcessing(false);
-      return;
-    }
-
-    try {
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: card,
-          billing_details: {
-            name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Client SOS',
-            email: user?.email || undefined
-          }
-        }
-      });
-
-      if (error) {
-        setError(error.message || 'Paiement échoué');
-        setIsProcessing(false);
-        return;
-      }
-
-      if (paymentIntent?.status === 'requires_capture') {
-        await handlePaymentAuthorized(paymentIntent.id);
-      } else {
-        setError('Le paiement n\'a pas pu être autorisé.');
-        setIsProcessing(false);
-      }
-    } catch (error) {
-      console.error('Erreur lors du paiement:', error);
-      setError('Une erreur est survenue lors du paiement');
-      setIsProcessing(false);
-    }
-  };
-
-  // Fonction pour gérer le retour en arrière
-  const handleGoBack = () => {
-    try {
-      // Essayer de revenir à la page précédente
-      if (window.history.length > 1) {
-        navigate(-1);
-      } else {
-        // Fallback vers la liste des prestataires
-        navigate('/prestataires');
-      }
-    } catch (error) {
-      console.error('Erreur lors du retour:', error);
-      // En cas d'erreur, aller vers la liste des prestataires
-      navigate('/prestataires');
-    }
-  };
-
-  // Fonction utilitaire pour récupérer les données de provider pour la navigation
-  const getProviderDataForNavigation = () => {
-    const savedProvider = getSessionData('selectedProvider');
-    const savedRequest = getSessionData('bookingRequest');
-    
-    let providerName = provider?.fullName || 'Expert';
-    let providerType = provider?.role || serviceData?.providerRole || 'expat';
-    
-    if (savedProvider) {
-      providerName = savedProvider.name || '';
-      providerType = (savedProvider.type as 'lawyer' | 'expat') || 'expat';
-    } else if (savedRequest) {
-      providerName = savedRequest.providerName || '';
-      providerType = (savedRequest.providerType as 'lawyer' | 'expat') || 'expat';
-    }
-    
-    return { providerName, providerType };
+    }, 2000);
   };
 
   const handleCallCompleted = (success: boolean) => {
     setCurrentStep('completed');
-    
-    // 🔔 Si l'appel a échoué, notifier le prestataire
-    if (!success && provider && user) {
-      notifyProviderOfMissedCall(
-        provider.id,
-        {
-          name: `${user.firstName} ${user.lastName}`,
-          country: user.currentCountry || 'Non spécifié'
-        },
-        {
-          attempts: 3,
-          lastAttemptTime: new Date()
-        }
-      ).catch(error => {
-        console.error('Erreur notification appel manqué:', error);
-      });
-    }
-    
-    try {
-      if (user && paymentIntentId && serviceData) {
-        logAnalyticsEvent({
-          eventType: success ? 'call_completed' : 'call_failed',
-          userId: user.id,
-          eventData: {
-            paymentIntentId,
-            success,
-            providerId: serviceData.providerId
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error updating call status in Firestore:', error);
-    }
-    
-    if (!serviceData) {
-      console.error('Service data is missing for navigation');
-      return;
-    }
-    
-    const { providerName, providerType } = getProviderDataForNavigation();
-    
-    const baseParams = {
-      call: success ? 'success' : 'failed',
-      paymentIntentId: paymentIntentId,
-      amount: serviceData.amount.toString(),
-      serviceType: serviceData.serviceType,
-      providerId: serviceData.providerId,
-      providerRole: providerType
-    };
-    
-    const successParams = success ? {
-      ...baseParams,
-      providerName: providerName,
-      platformFee: serviceData.commissionAmount.toString(),
-      providerAmount: serviceData.providerAmount.toString(),
-      duration: serviceData.duration.toString()
-    } : baseParams;
-    
-    const searchParamsNav = new URLSearchParams(successParams);
-    navigate(`/payment-success?${searchParamsNav.toString()}`, { replace: true });
+    alert(success ? 'Appel terminé avec succès !' : 'Appel échoué - vous serez remboursé');
   };
 
-  // Early returns pour les états d'erreur et de chargement
-  if (authLoading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex flex-col items-center justify-center">
-          <LoadingSpinner size="large" color="red" />
-          <p className="mt-4 text-gray-600">Authentification en cours...</p>
-        </div>
-      </Layout>
-    );
-  }
+  const handleGoBack = () => {
+    alert('Retour à la liste des experts');
+  };
 
-  if (!user) {
-    return null; // useEffect gère la redirection
-  }
+  // Simulation de la progression d'appel
+  useEffect(() => {
+    if (currentStep === 'calling' && callProgress < 5) {
+      const timer = setTimeout(() => {
+        setCallProgress(prev => prev + 1);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, callProgress]);
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex flex-col items-center justify-center">
-          <LoadingSpinner size="large" color="red" />
-          <p className="mt-4 text-gray-600">Chargement des informations...</p>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex flex-col items-center justify-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <h1 className="text-xl font-bold text-red-700 mb-4">Une erreur est survenue</h1>
-            <p className="text-gray-700 mb-6">{error}</p>
-            <Button onClick={handleGoBack}>
-              Retourner à la liste des experts
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!provider || !serviceData) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Prestataire non trouvé
-            </h1>
-            <button
-              onClick={handleGoBack}
-              className="text-red-600 hover:text-red-700"
-            >
-              Retour aux experts
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Rendu principal du composant
   const isLawyer = provider.role === 'lawyer';
   const stepTitles: Record<StepType, string> = {
     payment: 'Paiement sécurisé',
@@ -622,256 +302,488 @@ const CheckoutForm: React.FC = () => {
     completed: 'Merci d\'avoir utilisé nos services'
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LoadingSpinner size="large" color="red" />
+        <p className="mt-4 text-gray-600 text-sm">Chargement des informations...</p>
+      </div>
+    );
+  }
+
   return (
-    <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 py-12">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <button
-              onClick={handleGoBack}
-              className="flex items-center space-x-2 text-red-600 hover:text-red-700 mb-6 transition-colors"
-            >
-              <ArrowLeft size={20} />
-              <span>Retour aux experts</span>
-            </button>
-            
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {stepTitles[currentStep]}
-              </h1>
-              <p className="text-gray-600">
-                {stepDescriptions[currentStep]}
-              </p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100">
+      <div className="max-w-sm mx-auto px-4 py-6">
+        {/* Header Mobile */}
+        <div className="mb-6">
+          <button
+            onClick={handleGoBack}
+            className="flex items-center space-x-2 text-red-600 hover:text-red-700 mb-4 transition-colors text-sm"
+          >
+            <ArrowLeft size={18} />
+            <span>Retour</span>
+          </button>
+          
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              {stepTitles[currentStep]}
+            </h1>
+            <p className="text-gray-600 text-sm">
+              {stepDescriptions[currentStep]}
+            </p>
           </div>
+        </div>
 
-          {/* Provider Info */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-            <div className="flex items-center space-x-4">
+        {/* Provider Info - Mobile optimized */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="relative">
               <img
-                src={provider.avatar || provider.profilePhoto || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'}
+                src={provider.avatar}
                 alt={provider.fullName}
-                className="w-16 h-16 rounded-full object-cover"
+                className="w-12 h-12 rounded-xl object-cover"
               />
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {provider.fullName}
-                </h3>
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    isLawyer 
-                      ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-green-100 text-green-800'
-                  }`}>
-                    {isLawyer ? 'Avocat certifié' : 'Expatrié expert'}
-                  </span>
-                  <span>{provider.country || provider.currentCountry}</span>
-                  <div className="flex items-center space-x-1">
-                    <Clock size={14} />
-                    <span>{isLawyer ? '20 min' : '30 min'}</span>
-                  </div>
-                </div>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-900 truncate">
+                {provider.fullName}
+              </h3>
+              <div className="flex items-center space-x-2 text-xs">
+                <span className={`px-2 py-0.5 rounded-full font-medium ${
+                  isLawyer 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-green-100 text-green-800'
+                }`}>
+                  {isLawyer ? 'Avocat certifié' : 'Expatrié expert'}
+                </span>
+                <span className="text-gray-600">{provider.country}</span>
               </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-red-600">
-                  €{serviceData.amount}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {isLawyer ? '20 minutes' : '30 minutes'}
-                </div>
+              <div className="flex items-center space-x-1 text-xs text-gray-500 mt-1">
+                <Clock size={12} />
+                <span>{serviceData.duration} min</span>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <div className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
+                €{serviceData.amount}
+              </div>
+              <div className="text-xs text-gray-500">
+                {serviceData.duration} minutes
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Step Content */}
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            {currentStep === 'payment' && (
-              <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                <div className="space-y-4">
-                  {/* Carte bancaire avec Stripe Elements */}
+        {/* Step Content */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-white/20">
+          {currentStep === 'payment' && (
+            <div className="p-6">
+              <div className="flex items-center space-x-2 mb-6">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                  <CreditCard className="w-4 h-4 text-white" />
+                </div>
+                <h4 className="text-lg font-bold text-gray-900">Carte bancaire</h4>
+              </div>
+
+              {useCustomForm ? (
+                // Formulaire personnalisé mobile first
+                <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                  {/* Numéro de carte */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Carte bancaire
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center space-x-2">
+                      <span>Numéro de carte</span>
+                      {formData.cardNumber && !formErrors.cardNumber && (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      )}
                     </label>
-                    <div className="border border-gray-300 rounded-md p-3 bg-white">
-                      <CardElement 
-                        options={{
-                          hidePostalCode: true,
-                          style: {
-                            base: {
-                              fontSize: '16px',
-                              color: '#424770',
-                              '::placeholder': {
-                                color: '#aab7c4',
-                              },
-                            },
-                          },
-                        }}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="cardNumber"
+                        value={formData.cardNumber}
+                        onChange={handleInputChange}
+                        onFocus={() => setFocusedField('cardNumber')}
+                        onBlur={() => setFocusedField('')}
+                        placeholder="1234 5678 9012 3456"
+                        maxLength="19"
+                        className={`w-full px-4 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base font-mono ${
+                          formErrors.cardNumber ? 'border-red-400 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
+                        } ${focusedField === 'cardNumber' ? 'transform scale-105 shadow-xl' : 'shadow-md'}`}
                       />
+                      <div className="absolute right-3 top-3">
+                        {getCardIcon(cardType)}
+                      </div>
+                    </div>
+                    {formErrors.cardNumber && (
+                      <div className="flex items-center mt-2 text-red-500 text-sm">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {formErrors.cardNumber}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Date et CVV */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <span>Expiration</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          name="expiryDate"
+                          value={formData.expiryDate}
+                          onChange={handleInputChange}
+                          onFocus={() => setFocusedField('expiryDate')}
+                          onBlur={() => setFocusedField('')}
+                          placeholder="MM/AA"
+                          maxLength="5"
+                          className={`w-full px-3 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base font-mono ${
+                            formErrors.expiryDate ? 'border-red-400' : 'border-gray-200'
+                          }`}
+                        />
+                        <Calendar className="absolute right-2 top-3 w-4 h-4 text-gray-400" />
+                      </div>
+                      {formErrors.expiryDate && (
+                        <div className="text-red-500 text-xs mt-1">{formErrors.expiryDate}</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <span>CVV</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showCvv ? "text" : "password"}
+                          name="cvv"
+                          value={formData.cvv}
+                          onChange={handleInputChange}
+                          onFocus={() => setFocusedField('cvv')}
+                          onBlur={() => setFocusedField('')}
+                          placeholder="123"
+                          maxLength="4"
+                          className={`w-full px-3 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base font-mono ${
+                            formErrors.cvv ? 'border-red-400' : 'border-gray-200'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCvv(!showCvv)}
+                          className="absolute right-2 top-3 text-gray-400 hover:text-gray-600"
+                        >
+                          {showCvv ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {formErrors.cvv && (
+                        <div className="text-red-500 text-xs mt-1">{formErrors.cvv}</div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-3">Détail du paiement</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Service</span>
-                        <span>{serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}</span>
+                  {/* Nom du titulaire */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <span>Nom du titulaire</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="cardholderName"
+                        value={formData.cardholderName}
+                        onChange={handleInputChange}
+                        onFocus={() => setFocusedField('cardholderName')}
+                        onBlur={() => setFocusedField('')}
+                        placeholder="JEAN DUPONT"
+                        className={`w-full px-4 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base ${
+                          formErrors.cardholderName ? 'border-red-400' : 'border-gray-200'
+                        }`}
+                      />
+                      <User className="absolute right-3 top-3 w-4 h-4 text-gray-400" />
+                    </div>
+                    {formErrors.cardholderName && (
+                      <div className="flex items-center mt-2 text-red-500 text-sm">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {formErrors.cardholderName}
                       </div>
-                      <div className="flex justify-between">
-                        <span>Frais de mise en relation</span>
-                        <span>{serviceData.commissionAmount.toFixed(2)} €</span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setUseCustomForm(false)}
+                    className="text-blue-600 text-sm underline"
+                  >
+                    Utiliser Stripe Elements (simulé)
+                  </button>
+                </form>
+              ) : (
+                // Stripe Elements simulé
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Informations de carte
+                    </label>
+                    <div className="border-2 border-gray-200 rounded-xl p-4 bg-white/70 backdrop-blur-sm focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/20 transition-all">
+                      <div className="text-gray-500 text-sm">
+                        [Simulation Stripe Elements]<br />
+                        Numéro de carte: 4242 4242 4242 4242<br />
+                        Expiration: 12/34 | CVV: 123
                       </div>
-                      <div className="flex justify-between">
-                        <span>Montant consultation</span>
-                        <span>{serviceData.providerAmount.toFixed(2)} €</span>
-                      </div>
-                      <div className="border-t pt-2 flex justify-between font-medium">
-                        <span>Total</span>
-                        <span>{serviceData.amount.toFixed(2)} €</span>
-                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setUseCustomForm(true)}
+                    className="text-blue-600 text-sm underline"
+                  >
+                    Utiliser un formulaire personnalisé
+                  </button>
+                </div>
+              )}
+
+              {/* Détail du paiement - Mobile optimized */}
+              <div className="mt-6 bg-gray-50/80 backdrop-blur-sm rounded-xl p-4">
+                <h4 className="font-bold text-gray-900 mb-3 text-sm">Détail du paiement</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Service</span>
+                    <span className="font-medium">{serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Frais de mise en relation</span>
+                    <span className="font-medium">{serviceData.commissionAmount.toFixed(2)} €</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Montant consultation</span>
+                    <span className="font-medium">{serviceData.providerAmount.toFixed(2)} €</span>
+                  </div>
+                  <div className="border-t border-gray-200 pt-2 mt-2">
+                    <div className="flex justify-between font-bold">
+                      <span>Total</span>
+                      <span className="text-red-600">{serviceData.amount.toFixed(2)} €</span>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <Button
-                  type="submit"
-                  disabled={!stripe || isProcessing}
-                  fullWidth
-                  size="large"
-                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400"
+              {/* Bouton de paiement - Mobile optimized */}
+              <div className="mt-6">
+                <button
+                  onClick={handlePaymentSubmit}
+                  disabled={(useCustomForm ? !isCustomFormValid : !stripeElementsReady) || isProcessing}
+                  className={`relative w-full py-4 rounded-xl font-bold text-white text-base transition-all duration-300 transform overflow-hidden ${
+                    ((useCustomForm ? isCustomFormValid : stripeElementsReady) && !isProcessing)
+                      ? 'bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:to-pink-700 hover:scale-105 active:scale-95 shadow-lg hover:shadow-red-500/25'
+                      : 'bg-gray-400 cursor-not-allowed opacity-60'
+                  }`}
                 >
                   {isProcessing ? (
-                    <>
+                    <div className="flex items-center justify-center space-x-2">
                       <LoadingSpinner size="small" color="white" />
-                      <span className="ml-2">Traitement...</span>
-                    </>
+                      <span>Traitement...</span>
+                    </div>
                   ) : (
-                    <>
-                      <Shield size={20} className="mr-2" />
-                      Autoriser le paiement
-                    </>
+                    <div className="flex items-center justify-center space-x-2">
+                      <Lock className="w-5 h-5" />
+                      <span>Autoriser le paiement</span>
+                    </div>
                   )}
-                </Button>
+                </button>
 
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">
-                    En autorisant ce paiement, vous acceptez nos <Link to="/cgu-clients" className="text-blue-600 hover:text-blue-700 underline">conditions générales de vente</Link>.
-                    Aucun débit ne sera effectué sans mise en relation réussie.<br />
-                    <span className="font-medium">Prix: {isLawyer ? '49€ pour 20 minutes' : '19€ pour 30 minutes'}</span>
+                {/* Informations légales - Mobile optimized */}
+                <div className="mt-4 space-y-2 text-xs text-gray-500 text-center">
+                  <p>
+                    En autorisant ce paiement, vous acceptez nos{' '}
+                    <button className="text-blue-600 underline font-medium">
+                      conditions générales
+                    </button>
+                  </p>
+                  <p className="text-green-600 font-medium">
+                    ✓ Aucun débit sans mise en relation réussie
+                  </p>
+                  <p className="font-bold text-gray-700">
+                    Prix: {serviceData.amount}€ pour {serviceData.duration} minutes
                   </p>
                 </div>
-              </form>
-            )}
 
-            {currentStep === 'calling' && (
-              <div className="p-8 text-center">
-                <div className="animate-pulse mb-6">
-                  <Phone size={48} className={`mx-auto ${isLawyer ? 'text-blue-600' : 'text-green-600'} mb-4`} />
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    {isLawyer ? 'Appel avocat en cours...' : 'Appel expatrié en cours...'}
-                  </h2>
-                  <p className="text-gray-600">
-                    {callProgress < 3 
-                      ? `Nous contactons ${provider.fullName}. Veuillez patienter.` 
-                      : callProgress === 3 
-                        ? `${provider.fullName} a répondu! Nous vous appelons...` 
-                        : callProgress === 4 
-                          ? 'Connexion établie! Appel en cours...' 
-                          : 'Appel en cours...'}
-                  </p>
-                  <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
-                      ⏰ L'appel Twilio sera initié dans 5 minutes après validation du paiement
-                    </p>
+                {/* Badge de sécurité */}
+                <div className="mt-4 flex items-center justify-center">
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-green-50 to-blue-50 px-3 py-2 rounded-full border border-green-200/50">
+                    <Shield className="w-4 h-4 text-green-600" />
+                    <span className="text-xs font-bold text-gray-700">Sécurisé par Stripe</span>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   </div>
-                </div>
-                
-                <div className="space-y-4 mb-6">
-                  {callProgress < 3 && (
-                    <div className="bg-yellow-100 rounded-lg p-4 flex items-center">
-                      <Clock className="w-5 h-5 text-yellow-600 mr-2" />
-                      <span className="text-yellow-800">Messages envoyés au prestataire - Attente de 5 minutes</span>
-                    </div>
-                  )}
-                  
-                  {callProgress === 3 && (
-                    <div className="bg-blue-100 rounded-lg p-4 flex items-center">
-                      <Phone className="w-5 h-5 text-blue-600 mr-2" />
-                      <span className="text-blue-800">Préparation de l'appel en cours...</span>
-                    </div>
-                  )}
-                  
-                  {callProgress >= 4 && (
-                    <div className="bg-green-100 rounded-lg p-4 flex items-center">
-                      <Check className="w-5 h-5 text-green-600 mr-2" />
-                      <span className="text-green-800">Connexion établie! Appel en cours - {isLawyer ? '20' : '30'} minutes</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="mt-4">
-                  {callProgress < 5 ? (
-                    <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${isLawyer ? 'border-blue-600' : 'border-green-600'} mx-auto`}></div>
-                  ) : (
-                    <div className="flex justify-center">
-                      <div className="bg-gray-200 w-full max-w-md h-4 rounded-full overflow-hidden">
-                        <div className="bg-green-500 h-full flex items-center justify-center text-xs text-white" style={{ width: '80%' }}>
-                          {isLawyer ? '16:00 / 20:00' : '24:00 / 30:00'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Bouton pour simuler la fin d'appel (pour le développement) */}
-                <div className="mt-8 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => handleCallCompleted(true)}
-                    className="mr-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Simuler succès appel
-                  </button>
-                  <button
-                    onClick={() => handleCallCompleted(false)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    Simuler échec appel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {currentStep === 'payment' && (
-            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-blue-900">Paiement sécurisé</h4>
-                  <p className="text-sm text-blue-800 mt-1">
-                    Votre paiement est traité de manière sécurisée.
-                    Vous ne serez débité que si la mise en relation téléphonique réussit.
-                    <br />
-                    <strong>L'appel sera initié automatiquement 5 minutes après le paiement.</strong>
-                  </p>
                 </div>
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </Layout>
-  );
-};
 
-// Composant principal avec wrapper Elements
-const CallCheckout: React.FC = () => {
-  return (
-    <Elements stripe={stripePromise}>
-      <CheckoutForm />
-    </Elements>
+          {currentStep === 'calling' && (
+            <div className="p-6 text-center">
+              <div className="animate-pulse mb-6">
+                <Phone size={40} className={`mx-auto ${isLawyer ? 'text-blue-600' : 'text-green-600'} mb-4`} />
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  {isLawyer ? 'Appel avocat en cours...' : 'Appel expatrié en cours...'}
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  {callProgress < 3 
+                    ? `Nous contactons ${provider.fullName}. Veuillez patienter.` 
+                    : callProgress === 3 
+                      ? `${provider.fullName} a répondu! Nous vous appelons...` 
+                      : callProgress === 4 
+                        ? 'Connexion établie! Appel en cours...' 
+                        : 'Appel en cours...'}
+                </p>
+                <div className="mt-4 bg-blue-50 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    ⏰ L'appel Twilio sera initié dans 5 minutes après validation du paiement
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-3 mb-6">
+                {callProgress < 3 && (
+                  <div className="bg-yellow-100 rounded-lg p-3 flex items-center text-sm">
+                    <Clock className="w-4 h-4 text-yellow-600 mr-2" />
+                    <span className="text-yellow-800">Messages envoyés - Attente de 5 minutes</span>
+                  </div>
+                )}
+                
+                {callProgress === 3 && (
+                  <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
+                    <Phone className="w-4 h-4 text-blue-600 mr-2" />
+                    <span className="text-blue-800">Préparation de l'appel...</span>
+                  </div>
+                )}
+                
+                {callProgress >= 4 && (
+                  <div className="bg-green-100 rounded-lg p-3 flex items-center text-sm">
+                    <Check className="w-4 h-4 text-green-600 mr-2" />
+                    <span className="text-green-800">Connexion établie! Appel en cours - {serviceData.duration} minutes</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-4">
+                {callProgress < 5 ? (
+                  <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${isLawyer ? 'border-blue-600' : 'border-green-600'} mx-auto`}></div>
+                ) : (
+                  <div className="flex justify-center">
+                    <div className="bg-gray-200 w-full max-w-xs h-3 rounded-full overflow-hidden">
+                      <div className="bg-green-500 h-full flex items-center justify-center text-xs text-white" style={{ width: '80%' }}>
+                        {Math.floor(serviceData.duration * 0.8)}:00 / {serviceData.duration}:00
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Boutons de simulation - Mobile */}
+              <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
+                <button
+                  onClick={() => handleCallCompleted(true)}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                >
+                  Simuler succès appel
+                </button>
+                <button
+                  onClick={() => handleCallCompleted(false)}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                >
+                  Simuler échec appel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 'completed' && (
+            <div className="p-6 text-center">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check size={32} className="text-green-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Appel terminé
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  Merci d'avoir utilisé nos services. Votre avis nous intéresse !
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => alert('Redirection vers la page d\'évaluation')}
+                  fullWidth
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Évaluer la consultation
+                </Button>
+                <Button 
+                  onClick={handleGoBack}
+                  fullWidth
+                  className="bg-gray-600 hover:bg-gray-700"
+                >
+                  Retour à l'accueil
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {currentStep === 'payment' && (
+          <div className="mt-4 bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-semibold text-blue-900 text-sm">Paiement sécurisé</h4>
+                <p className="text-sm text-blue-800 mt-1">
+                  Votre paiement est traité de manière sécurisée.
+                  Vous ne serez débité que si la mise en relation téléphonique réussit.
+                  <br />
+                  <strong>L'appel sera initié automatiquement 5 minutes après le paiement.</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Styles CSS pour les animations personnalisées */}
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%) skewX(-12deg); }
+          100% { transform: translateX(200%) skewX(-12deg); }
+        }
+        
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+        
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        
+        .animate-pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
+    </div>
   );
 };
 

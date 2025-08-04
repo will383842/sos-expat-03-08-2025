@@ -1,5 +1,4 @@
-import * as functions from 'firebase-functions';
-import { CallableRequest } from 'firebase-functions/v2/https';
+import { onCall, onRequest, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import twilio from 'twilio';
@@ -10,7 +9,12 @@ import { logError } from './utils/logError';
 // import { notifyAfterPayment } from './notifications/notifyAfterPayment'; // Temporairement commenté
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { onCall } from "firebase-functions/v2/https";
+import type { Request as ExpressRequest, Response } from 'express';
+
+// Interface pour les requêtes avec rawBody (Firebase Functions)
+interface FirebaseRequest extends ExpressRequest {
+  rawBody: Buffer;
+}
 
 // Charger les variables d'environnement depuis .env
 import * as dotenv from 'dotenv';
@@ -35,7 +39,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 });
 
 // Initialiser le service d'email (exemple avec Gmail/SMTP)
-const emailTransporter = nodemailer.createTransport({
+const emailTransporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER || 'notifications@sosexpats.com',
@@ -60,114 +64,113 @@ interface NotificationData {
 }
 
 // Fonction Cloud pour envoyer des notifications
-export const sendNotification = onCall(async (request: CallableRequest<any>) => {
-  const data = request.data;
-  const _validateData: NotificationData = data;
-  const context = request;
+export const sendEmail = onCall(
+  async (request: CallableRequest<NotificationData>) => {
+    const data = request.data;
   
-  // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'L\'utilisateur doit être authentifié pour envoyer des notifications.'
-    );
-  }
-
-  const { 
-    type, 
-    recipientEmail, 
-    recipientPhone, 
-    recipientName,
-    recipientCountry,
-    emailSubject,
-    emailHtml,
-    smsMessage,
-    whatsappMessage 
-  } = data;
-
-  try {
-    const results: Array<{ channel: string; success: boolean; error?: string }> = [];
-
-    // 1. Envoyer l'email
-    if (recipientEmail && emailSubject && emailHtml) {
-      try {
-        await emailTransporter.sendMail({
-          from: '"SOS Expats" <notifications@sosexpats.com>',
-          to: recipientEmail,
-          subject: emailSubject,
-          html: emailHtml,
-          priority: 'high'
-        });
-        results.push({ channel: 'email', success: true });
-        console.log('✅ Email envoyé à:', recipientEmail);
-      } catch (emailError: any) {
-        console.error('❌ Erreur email:', emailError);
-        results.push({ channel: 'email', success: false, error: emailError.message });
-      }
+    // Vérifier l'authentification
+    if (!request.auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'L\'utilisateur doit être authentifié pour envoyer des notifications.'
+      );
     }
 
-    // 2. Envoyer le SMS via Twilio
-    if (recipientPhone && smsMessage && twilioClient) {
-      try {
-        await twilioClient.messages.create({
-          body: smsMessage,
-          from: process.env.TWILIO_PHONE_NUMBER,
-          to: recipientPhone
-        });
-        results.push({ channel: 'sms', success: true });
-        console.log('✅ SMS envoyé à:', recipientPhone);
-      } catch (smsError: any) {
-        console.error('❌ Erreur SMS:', smsError);
-        results.push({ channel: 'sms', success: false, error: smsError.message });
-      }
-    } else if (recipientPhone && smsMessage) {
-      results.push({ channel: 'sms', success: false, error: 'Twilio not configured' });
-    }
-
-    // 3. Envoyer WhatsApp via Twilio
-    if (recipientPhone && whatsappMessage && twilioClient) {
-      try {
-        await twilioClient.messages.create({
-          body: whatsappMessage,
-          from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-          to: `whatsapp:${recipientPhone}`
-        });
-        results.push({ channel: 'whatsapp', success: true });
-        console.log('✅ WhatsApp envoyé à:', recipientPhone);
-      } catch (whatsappError: any) {
-        console.error('❌ Erreur WhatsApp:', whatsappError);
-        results.push({ channel: 'whatsapp', success: false, error: whatsappError.message });
-      }
-    } else if (recipientPhone && whatsappMessage) {
-      results.push({ channel: 'whatsapp', success: false, error: 'Twilio not configured' });
-    }
-
-    // Enregistrer les résultats dans Firestore
-    await db.collection('notification_logs').add({
-      type,
-      recipientEmail,
-      recipientPhone,
+    const { 
+      type, 
+      recipientEmail, 
+      recipientPhone, 
       recipientName,
       recipientCountry,
-      results,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      success: results.some(r => r.success)
-    });
+      emailSubject,
+      emailHtml,
+      smsMessage,
+      whatsappMessage 
+    } = data;
 
-    return {
-      success: results.some(r => r.success),
-      results
-    };
+    try {
+      const results: Array<{ channel: string; success: boolean; error?: string }> = [];
 
-  } catch (error: any) {
-    console.error('Erreur générale lors de l\'envoi de notification:', error);
-    throw new functions.https.HttpsError(
-      'internal',
-      'Erreur lors de l\'envoi de la notification',
-      error
-    );
-  }
-});
+      // 1. Envoyer l'email
+      if (recipientEmail && emailSubject && emailHtml) {
+        try {
+          await emailTransporter.sendMail({
+            from: '"SOS Expats" <notifications@sosexpats.com>',
+            to: recipientEmail,
+            subject: emailSubject,
+            html: emailHtml,
+            priority: 'high'
+          });
+          results.push({ channel: 'email', success: true });
+          console.log('✅ Email envoyé à:', recipientEmail);
+        } catch (emailError: any) {
+          console.error('❌ Erreur email:', emailError);
+          results.push({ channel: 'email', success: false, error: emailError.message });
+        }
+      }
+
+      // 2. Envoyer le SMS via Twilio
+      if (recipientPhone && smsMessage && twilioClient) {
+        try {
+          await twilioClient.messages.create({
+            body: smsMessage,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: recipientPhone
+          });
+          results.push({ channel: 'sms', success: true });
+          console.log('✅ SMS envoyé à:', recipientPhone);
+        } catch (smsError: any) {
+          console.error('❌ Erreur SMS:', smsError);
+          results.push({ channel: 'sms', success: false, error: smsError.message });
+        }
+      } else if (recipientPhone && smsMessage) {
+        results.push({ channel: 'sms', success: false, error: 'Twilio not configured' });
+      }
+
+      // 3. Envoyer WhatsApp via Twilio
+      if (recipientPhone && whatsappMessage && twilioClient) {
+        try {
+          await twilioClient.messages.create({
+            body: whatsappMessage,
+            from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+            to: `whatsapp:${recipientPhone}`
+          });
+          results.push({ channel: 'whatsapp', success: true });
+          console.log('✅ WhatsApp envoyé à:', recipientPhone);
+        } catch (whatsappError: any) {
+          console.error('❌ Erreur WhatsApp:', whatsappError);
+          results.push({ channel: 'whatsapp', success: false, error: whatsappError.message });
+        }
+      } else if (recipientPhone && whatsappMessage) {
+        results.push({ channel: 'whatsapp', success: false, error: 'Twilio not configured' });
+      }
+
+      // Enregistrer les résultats dans Firestore
+      await db.collection('notification_logs').add({
+        type,
+        recipientEmail,
+        recipientPhone,
+        recipientName,
+        recipientCountry,
+        results,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        success: results.some(r => r.success)
+      });
+
+      return {
+        success: results.some(r => r.success),
+        results
+      };
+
+    } catch (error: any) {
+      console.error('Erreur générale lors de l\'envoi de notification:', error);
+      throw new HttpsError(
+        'internal',
+        'Erreur lors de l\'envoi de la notification',
+        error
+      );
+    }
+  });
 
 // Interface pour les données de push notification
 interface PushNotificationData {
@@ -178,12 +181,11 @@ interface PushNotificationData {
 }
 
 // Fonction Cloud pour envoyer des notifications push via FCM
-export const sendPushNotification = functions.https.onCall(async (request: CallableRequest<PushNotificationData>) => {
+export const sendPushNotification = onCall(async (request: CallableRequest<PushNotificationData>) => {
   const data = request.data;
-  const context = request;
   
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+  if (!request.auth) {
+    throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié.'
     );
@@ -228,7 +230,7 @@ export const sendPushNotification = functions.https.onCall(async (request: Calla
 
   } catch (error: any) {
     console.error('Erreur envoi push notification:', error);
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal',
       'Erreur lors de l\'envoi de la push notification',
       error
@@ -249,13 +251,12 @@ interface PaymentIntentData {
 }
 
 // Fonction pour créer un PaymentIntent Stripe
-export const createPaymentIntent = functions.https.onCall(async (request: CallableRequest<PaymentIntentData>) => {
+export const createPaymentIntent = onCall(async (request: CallableRequest<PaymentIntentData>) => {
   const data = request.data;
-  const context = request;
   
   // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+  if (!request.auth) {
+    throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié pour effectuer cette action.'
     );
@@ -291,7 +292,7 @@ export const createPaymentIntent = functions.https.onCall(async (request: Callab
       message: error.message || 'Unknown error',
       data: { amount, currency, clientId, providerId, serviceType }
     });
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal',
       'Erreur lors de la création du paiement',
       error
@@ -305,13 +306,12 @@ interface CapturePaymentData {
 }
 
 // Fonction pour capturer un paiement
-export const capturePayment = functions.https.onCall(async (request: CallableRequest<CapturePaymentData>) => {
+export const capturePayment = onCall(async (request: CallableRequest<CapturePaymentData>) => {
   const data = request.data;
-  const context = request;
   
   // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+  if (!request.auth) {
+    throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié pour effectuer cette action.'
     );
@@ -337,7 +337,7 @@ export const capturePayment = functions.https.onCall(async (request: CallableReq
     };
   } catch (error: any) {
     console.error('Error capturing payment:', error);
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal',
       'Erreur lors de la capture du paiement',
       error
@@ -351,13 +351,12 @@ interface CancelPaymentData {
 }
 
 // Fonction pour annuler un paiement
-export const cancelPayment = functions.https.onCall(async (request: CallableRequest<CancelPaymentData>) => {
+export const cancelPayment = onCall(async (request: CallableRequest<CancelPaymentData>) => {
   const data = request.data;
-  const context = request;
   
   // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+  if (!request.auth) {
+    throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié pour effectuer cette action.'
     );
@@ -383,7 +382,7 @@ export const cancelPayment = functions.https.onCall(async (request: CallableRequ
     };
   } catch (error: any) {
     console.error('Error canceling payment:', error);
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal',
       'Erreur lors de l\'annulation du paiement',
       error
@@ -404,13 +403,12 @@ interface CallData {
 }
 
 // Fonction pour initier un appel Twilio
-export const initiateCall = functions.https.onCall(async (request: CallableRequest<CallData>) => {
+export const initiateCall = onCall(async (request: CallableRequest<CallData>) => {
   const data = request.data;
-  const context = request;
   
   // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+  if (!request.auth) {
+    throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié pour effectuer cette action.'
     );
@@ -430,7 +428,7 @@ export const initiateCall = functions.https.onCall(async (request: CallableReque
   try {
     // Vérifier que les numéros de téléphone sont valides
     if (!clientPhone || !providerPhone) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'invalid-argument',
         'Les numéros de téléphone sont requis'
       );
@@ -496,7 +494,7 @@ export const initiateCall = functions.https.onCall(async (request: CallableReque
     };
   } catch (error: any) {
     console.error('Error initiating call:', error);
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal',
       'Erreur lors de l\'initiation de l\'appel',
       error
@@ -512,13 +510,12 @@ interface UpdateCallStatusData {
 }
 
 // Fonction pour mettre à jour le statut d'un appel
-export const updateCallStatus = functions.https.onCall(async (request: CallableRequest<UpdateCallStatusData>) => {
+export const updateCallStatus = onCall(async (request: CallableRequest<UpdateCallStatusData>) => {
   const data = request.data;
-  const context = request;
   
   // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+  if (!request.auth) {
+    throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié pour effectuer cette action.'
     );
@@ -531,7 +528,7 @@ export const updateCallStatus = functions.https.onCall(async (request: CallableR
     const callSession = await callSessionRef.get();
     
     if (!callSession.exists) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'not-found',
         'Session d\'appel non trouvée'
       );
@@ -540,10 +537,10 @@ export const updateCallStatus = functions.https.onCall(async (request: CallableR
     const callSessionData = callSession.data();
     
     // Vérifier que l'utilisateur est autorisé à mettre à jour cette session
-    if (context.auth.uid !== callSessionData?.clientId && 
-        context.auth.uid !== callSessionData?.providerId && 
-        !(await isAdmin(context.auth.uid))) {
-      throw new functions.https.HttpsError(
+    if (request.auth.uid !== callSessionData?.clientId && 
+        request.auth.uid !== callSessionData?.providerId && 
+        !(await isAdmin(request.auth.uid))) {
+      throw new HttpsError(
         'permission-denied',
         'Vous n\'êtes pas autorisé à mettre à jour cette session d\'appel'
       );
@@ -572,7 +569,7 @@ export const updateCallStatus = functions.https.onCall(async (request: CallableR
     };
   } catch (error: any) {
     console.error('Error updating call status:', error);
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal',
       'Erreur lors de la mise à jour du statut de l\'appel',
       error
@@ -592,7 +589,7 @@ async function isAdmin(uid: string): Promise<boolean> {
 }
 
 // Webhook Stripe pour gérer les événements de paiement
-export const stripeWebhook = functions.https.onRequest(async (req, res) => {
+export const stripeWebhook = onRequest(async (req: FirebaseRequest, res: Response) => {
   const signature = req.headers['stripe-signature'];
   
   if (!signature) {
@@ -634,7 +631,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
 });
 
 // 🔄 WEBHOOK TWILIO AMÉLIORÉ - GÈRE CLIENT ET DURÉE
-export const twilioWebhook = functions.https.onRequest(async (req, res) => {
+export const twilioWebhook = onRequest(async (req: FirebaseRequest, res: Response) => {
   try {
     const { 
       CallSid, 
@@ -834,7 +831,7 @@ export const twilioWebhook = functions.https.onRequest(async (req, res) => {
 });
 
 // Webhook séparé pour les appels clients (optionnel)
-export const twilioClientWebhook = functions.https.onRequest(async (req, res) => {
+export const twilioClientWebhook = onRequest(async (req: FirebaseRequest, res: Response) => {
   console.log('🔔 Webhook CLIENT reçu:', req.body);
   
   // Rediriger vers le webhook principal en marquant que c'est un appel client

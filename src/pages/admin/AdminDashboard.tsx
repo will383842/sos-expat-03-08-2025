@@ -10,7 +10,8 @@ import ErrorBoundary from '../../components/common/ErrorBoundary';
 import { logError } from '../../utils/logging';
 import Modal from '../../components/common/Modal';
 import { validateDataIntegrity, cleanupObsoleteData } from '../../utils/firestore';
-import { testNotificationSystem } from '../../services/notificationService';
+import testNotificationSystem from '../../services/notifications/notificationService';
+
 // Interface pour les paramètres admin
 interface AdminSettings {
   sosCommission: {
@@ -20,6 +21,7 @@ interface AdminSettings {
   twilioSettings: {
     maxAttempts: number;
     timeoutSeconds: number;
+    
   };
   createdAt: unknown;
   updatedAt?: unknown;

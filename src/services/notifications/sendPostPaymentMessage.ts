@@ -66,13 +66,13 @@ export async function sendPostPaymentMessage(payload: MessagePayload) {
       context: "post_payment",
       callId,
       sentAt: serverTimestamp(),
-      read: false,
+      read: false, 
     });
 
     // 🔹 5. Envoyer sur WhatsApp (si numéro valide)
     if (providerPhone) {
       await sendWhatsAppViaFirebase(providerPhone, message);
-    }
+    }       
 
     console.log("✅ Message post-paiement envoyé.");
   } catch (error) {

@@ -1,289 +1,282 @@
 import { logCallRecord } from './utils/logCallRecord';
 import { logError } from './utils/logError';
 import * as admin from 'firebase-admin';
-import twilio from 'twilio';
-import Stripe from 'stripe';
-import * as dotenv from 'dotenv';
-
-// Charger les variables d'environnement
-dotenv.config();
+import { twilioCallManager, CallSessionState } from './lib/TwilioCallManager';
 
 // Assurer que Firebase Admin est initialisé
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// Initialiser Twilio avec vos credentials
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
+const db = admin.firestore();
 
-// Initialiser Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
-});
+/**
+ * Fonction principale pour programmer une séquence d'appel
+ * Utilise maintenant le TwilioCallManager pour une gestion robuste
+ */
+export const scheduleCallSequence = async (
+  callSessionId: string, 
+  delayMinutes: number = 5
+): Promise<void> => {
+  try {
+    await logCallRecord({
+      callId: callSessionId,
+      status: 'sequence_scheduled',
+      retryCount: 0,
+    });
 
-export const scheduleCallSequence = async (callSessionId: string) => {
-  const db = admin.firestore();
-  const callRef = db.collection('call_sessions').doc(callSessionId);
-  const doc = await callRef.get();
-  if (!doc.exists) return;
+    console.log(`⏰ Séquence d'appel programmée pour ${callSessionId} dans ${delayMinutes} minutes`);
 
-  const call = doc.data();
-  if (!call) return;
+    // Utiliser le TwilioCallManager pour la gestion robuste des appels
+    await twilioCallManager.initiateCallSequence(callSessionId, delayMinutes);
 
-  await logCallRecord({
-    callId: callSessionId,
-    status: 'scheduled',
-    retryCount: 0,
-  });
-
-  const { providerPhone, clientPhone, paymentIntentId, providerType } = call;
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-  await delay(5 * 60 * 1000); // ⏳ Attente 5 minutes
-
-  let providerAnswered = false;
-  let clientAnswered = false;
-
-  // ✳️ PARTIE A : APPEL DU PRESTATAIRE (3 tentatives)
-  for (let i = 0; i < 3; i++) {
+  } catch (error) {
+    await logError('scheduleCallSequence:error', error);
+    
+    // En cas d'erreur, marquer la session comme échouée
     try {
-      await twilioClient.calls.create({
-        to: providerPhone,
-        from: process.env.TWILIO_PHONE_NUMBER!,
-        twiml: `<Response><Say voice="alice">Restez en ligne, vous allez être mis en relation avec votre client SOS Expat.</Say><Dial timeout="20" timeLimit="${providerType === 'lawyer' ? 1500 : 2100}">${clientPhone}</Dial></Response>`,
-        statusCallback: `${process.env.FUNCTION_URL}/twilioWebhook`,
-        statusCallbackMethod: 'POST',
-        timeout: 20,
-      });
-
+      await twilioCallManager.updateCallSessionStatus(callSessionId, 'failed');
+      
       await logCallRecord({
         callId: callSessionId,
-        status: `provider_attempt_${i + 1}`,
-        retryCount: i + 1,
+        status: 'sequence_failed',
+        retryCount: 0,
       });
-
-      await delay(60 * 1000); // 🕐 Attente 1 min
-
-      const updated = (await callRef.get()).data();
-      if (updated?.status === 'connected') {
-        providerAnswered = true;
-
-        const startTime = admin.firestore.Timestamp.now();
-        await logCallRecord({
-          callId: callSessionId,
-          status: 'provider_connected',
-          retryCount: i + 1,
-        });
-
-        await callRef.update({
-          startTime,
-          status: 'provider_connected',
-        });
-
-        // ✳️ PARTIE B : APPEL DU CLIENT (3 tentatives) - NOUVEAU CODE
-        for (let j = 0; j < 3; j++) {
-          try {
-            // Calcul du temps limite basé sur le type de prestataire
-            const timeLimit = providerType === 'lawyer' ? 1500 : 2100; // 25min ou 35min en secondes
-            
-            await twilioClient.calls.create({
-              to: clientPhone,
-              from: process.env.TWILIO_PHONE_NUMBER!,
-              twiml: `<Response>
-                <Say voice="alice">Votre prestataire SOS Expat est disponible. Restez en ligne pour être mis en relation.</Say>
-                <Dial timeout="20" timeLimit="${timeLimit}">${providerPhone}</Dial>
-              </Response>`,
-              statusCallback: `${process.env.FUNCTION_URL}/twilioClientWebhook`,
-              statusCallbackMethod: 'POST',
-              timeout: 20,
-            });
-
-            await logCallRecord({
-              callId: callSessionId,
-              status: `client_attempt_${j + 1}`,
-              retryCount: j + 1,
-            });
-
-            await delay(10 * 1000); // ⚡ Attente 10 secondes avant de vérifier
-
-            const statusSnap = await callRef.get();
-            const statusData = statusSnap.data();
-            
-            if (statusData?.clientStatus === 'connected') {
-              clientAnswered = true;
-              
-              await callRef.update({
-                clientConnectedAt: admin.firestore.Timestamp.now(),
-                clientStatus: 'connected',
-                fullStatus: 'both_connected'
-              });
-
-              await logCallRecord({
-                callId: callSessionId,
-                status: 'client_connected',
-                retryCount: j + 1,
-              });
-
-              break; // Client connecté, sortir de la boucle
-            }
-          } catch (error) {
-            await logError('callScheduler:tryCallClient', error);
-            await logCallRecord({
-              callId: callSessionId,
-              status: `client_error_attempt_${j + 1}`,
-              retryCount: j + 1,
-            });
-          }
-        }
-
-        // Si le client n'a pas répondu après 3 tentatives
-        if (!clientAnswered) {
-          await callRef.update({
-            status: 'client_no_answer',
-            refunded: true,
-          });
-
-          // Prévenir le prestataire que le client n'a pas répondu
-          await twilioClient.calls.create({
-            to: providerPhone,
-            from: process.env.TWILIO_PHONE_NUMBER!,
-            twiml: `<Response><Say voice="alice">Le client n'a pas répondu. L'appel est annulé. Merci.</Say></Response>`,
-          });
-
-          await logCallRecord({
-            callId: callSessionId,
-            status: 'failed_client_no_answer',
-            retryCount: 3,
-          });
-
-          // Annuler le paiement
-          if (paymentIntentId) {
-            try {
-              await stripe.paymentIntents.cancel(paymentIntentId);
-              console.log(`Payment ${paymentIntentId} cancelled - client no answer`);
-            } catch (error) {
-              await logError('callScheduler:cancelPayment:clientNoAnswer', error);
-            }
-          }
-          return;
-        }
-
-        // ✳️ PARTIE C : Si BOTH sont connectés, générer facture et notifications
-        if (providerAnswered && clientAnswered) {
-          try {
-            const clientSnap = await db.collection('users').doc(call.clientId).get();
-            const providerSnap = await db.collection('users').doc(call.providerId).get();
-            const client = clientSnap.data();
-            const provider = providerSnap.data();
-
-            if (client && provider) {
-              const sharedLang =
-                client.languages?.find((l: string) => provider.languages?.includes(l)) || 'en';
-
-              // 🧾 GÉNÉRATION DE LA FACTURE (à réactiver si nécessaire)
-              /*
-              await generateInvoice({
-                invoiceNumber: `INV-${Date.now()}`,
-                type: 'platform',
-                callId: callSessionId,
-                clientId: call.clientId,
-                providerId: call.providerId,
-                amount: call.amount || 1900,
-                currency: 'EUR',
-                downloadUrl: '',
-                createdAt: admin.firestore.Timestamp.now(),
-                status: 'issued',
-                sentToAdmin: false,
-                locale: sharedLang,
-              });
-              */
-
-              // 🔔 NOTIFICATION MULTILINGUE (à réactiver si nécessaire)
-              /*
-              await sendNotificationToProvider({
-                type: 'payment_received',
-                recipientId: call.providerId,
-                recipientEmail: provider.email,
-                recipientPhone: provider.phone,
-                recipientName: provider.firstName,
-                recipientCountry: provider.country,
-                title: sharedLang === 'fr' ? 'Paiement confirmé' : 'Payment confirmed',
-                message:
-                  sharedLang === 'fr'
-                    ? `Vous avez reçu une demande confirmée de ${client.firstName}`
-                    : `You have received a confirmed request from ${client.firstName}`,
-                requestDetails: {
-                  clientName: client.firstName,
-                  clientCountry: client.country,
-                  requestTitle: call.title || '',
-                  requestDescription: call.description || '',
-                  urgencyLevel: 'medium',
-                  serviceType: call.serviceType || 'lawyer_call',
-                  estimatedPrice: call.amount || 1900,
-                  clientPhone: client.phone,
-                  languages: [sharedLang],
-                },
-              });
-              */
-              
-              console.log('Both participants connected successfully', { 
-                callSessionId, 
-                sharedLang,
-                providerAnswered,
-                clientAnswered 
-              });
-            }
-          } catch (err) {
-            await logError('callScheduler:postBothConnectedError', err);
-          }
-        }
-
-        break; // Provider connecté, sortir de la boucle des tentatives prestataire
-      }
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error(`Tentative prestataire ${i + 1} échouée :`, errorMessage);
-
-      await logError('callScheduler:tryCallProvider', e);
-      await logCallRecord({
-        callId: callSessionId,
-        status: `provider_error_attempt_${i + 1}`,
-        retryCount: i + 1,
-      });
+    } catch (updateError) {
+      await logError('scheduleCallSequence:updateError', updateError);
     }
   }
+};
 
-  // Si le prestataire n'a pas répondu du tout après 3 tentatives
-  if (!providerAnswered) {
-    await twilioClient.calls.create({
-      to: clientPhone,
-      from: process.env.TWILIO_PHONE_NUMBER!,
-      twiml: `<Response><Say voice="alice">Le prestataire n'a pas répondu. Vous ne serez pas débité. Merci pour votre compréhension.</Say></Response>`,
+/**
+ * Fonction pour créer une nouvelle session d'appel
+ * Remplace l'ancienne logique dispersée
+ */
+export const createAndScheduleCall = async (params: {
+  sessionId?: string;
+  providerId: string;
+  clientId: string;
+  providerPhone: string;
+  clientPhone: string;
+  serviceType: 'lawyer_call' | 'expat_call';
+  providerType: 'lawyer' | 'expat';
+  paymentIntentId: string;
+  amount: number;
+  delayMinutes?: number;
+}): Promise<CallSessionState> => {
+  try {
+    const sessionId = params.sessionId || `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Créer la session via le TwilioCallManager
+    const callSession = await twilioCallManager.createCallSession({
+      sessionId,
+      providerId: params.providerId,
+      clientId: params.clientId,
+      providerPhone: params.providerPhone,
+      clientPhone: params.clientPhone,
+      serviceType: params.serviceType,
+      providerType: params.providerType,
+      paymentIntentId: params.paymentIntentId,
+      amount: params.amount
+    });
+
+    // Programmer la séquence d'appel (en arrière-plan)
+    setImmediate(() => {
+      scheduleCallSequence(sessionId, params.delayMinutes || 5);
     });
 
     await logCallRecord({
-      callId: callSessionId,
-      status: 'failed_all_provider_attempts',
-      retryCount: 3,
+      callId: sessionId,
+      status: 'call_session_created',
+      retryCount: 0,
     });
 
-    await callRef.update({
-      status: 'cancelled_by_provider',
-      refunded: true,
-    });
+    return callSession;
 
-    // Annuler le paiement Stripe si disponible
-    if (paymentIntentId) {
-      try {
-        await stripe.paymentIntents.cancel(paymentIntentId);
-        console.log(`Payment ${paymentIntentId} cancelled successfully - provider no answer`);
-      } catch (error) {
-        console.error('Error cancelling payment:', error);
-        await logError('callScheduler:cancelPayment:providerNoAnswer', error);
-      }
+  } catch (error) {
+    await logError('createAndScheduleCall:error', error);
+    throw error;
+  }
+};
+
+/**
+ * Fonction pour annuler une séquence d'appel programmée
+ */
+export const cancelScheduledCall = async (callSessionId: string, reason: string): Promise<void> => {
+  try {
+    const session = await twilioCallManager.getCallSession(callSessionId);
+    if (!session) {
+      throw new Error(`Session d'appel non trouvée: ${callSessionId}`);
     }
+
+    // Mettre à jour le statut
+    await twilioCallManager.updateCallSessionStatus(callSessionId, 'cancelled');
+
+    // Rembourser si nécessaire (sera géré par le PaymentManager)
+    if (session.payment.status === 'authorized') {
+      await db.collection('call_sessions').doc(callSessionId).update({
+        'payment.status': 'refunded',
+        'payment.refundedAt': admin.firestore.Timestamp.now(),
+        'metadata.updatedAt': admin.firestore.Timestamp.now()
+      });
+    }
+
+    await logCallRecord({
+      callId: callSessionId,
+      status: `call_cancelled_${reason}`,
+      retryCount: 0,
+    });
+
+    console.log(`✅ Appel annulé: ${callSessionId}, raison: ${reason}`);
+
+  } catch (error) {
+    await logError('cancelScheduledCall:error', error);
+    throw error;
+  }
+};
+
+/**
+ * Fonction pour reprendre les appels en attente au redémarrage
+ * Utile pour la récupération après un crash ou redéploiement
+ */
+export const resumePendingCalls = async (): Promise<void> => {
+  try {
+    const now = admin.firestore.Timestamp.now();
+    const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 5 * 60 * 1000);
+
+    // Chercher les sessions en attente créées il y a plus de 5 minutes
+    const pendingSessions = await db.collection('call_sessions')
+      .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
+      .where('metadata.createdAt', '<=', fiveMinutesAgo)
+      .get();
+
+    console.log(`🔄 Récupération de ${pendingSessions.size} sessions d'appel en attente`);
+
+    const resumePromises = pendingSessions.docs.map(async (doc) => {
+      const session = doc.data() as CallSessionState;
+      const sessionId = doc.id;
+
+      try {
+        // Relancer la séquence d'appel immédiatement
+        await twilioCallManager.initiateCallSequence(sessionId, 0);
+        
+        await logCallRecord({
+          callId: sessionId,
+          status: 'call_resumed_after_restart',
+          retryCount: 0,
+        });
+
+      } catch (error) {
+        await logError(`resumePendingCalls:session_${sessionId}`, error);
+        
+        // Marquer comme échoué si impossible de reprendre
+        await twilioCallManager.updateCallSessionStatus(sessionId, 'failed');
+      }
+    });
+
+    await Promise.allSettled(resumePromises);
+    console.log(`✅ Récupération des sessions terminée`);
+
+  } catch (error) {
+    await logError('resumePendingCalls:error', error);
+  }
+};
+
+/**
+ * Fonction de nettoyage des anciennes sessions
+ * À exécuter périodiquement pour nettoyer les données
+ */
+export const cleanupOldSessions = async (olderThanDays: number = 30): Promise<void> => {
+  try {
+    const cutoffDate = admin.firestore.Timestamp.fromMillis(
+      Date.now() - (olderThanDays * 24 * 60 * 60 * 1000)
+    );
+
+    const oldSessions = await db.collection('call_sessions')
+      .where('metadata.createdAt', '<=', cutoffDate)
+      .where('status', 'in', ['completed', 'failed', 'cancelled'])
+      .limit(100) // Traiter par batch pour éviter les timeouts
+      .get();
+
+    if (oldSessions.empty) {
+      console.log('Aucune ancienne session à nettoyer');
+      return;
+    }
+
+    console.log(`🧹 Nettoyage de ${oldSessions.size} anciennes sessions`);
+
+    const batch = db.batch();
+    oldSessions.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    console.log(`✅ ${oldSessions.size} sessions supprimées`);
+
+  } catch (error) {
+    await logError('cleanupOldSessions:error', error);
+  }
+};
+
+/**
+ * Fonction pour obtenir des statistiques sur les appels
+ */
+export const getCallStatistics = async (periodDays: number = 7): Promise<{
+  total: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  averageDuration: number;
+  successRate: number;
+}> => {
+  try {
+    const startDate = admin.firestore.Timestamp.fromMillis(
+      Date.now() - (periodDays * 24 * 60 * 60 * 1000)
+    );
+
+    const sessions = await db.collection('call_sessions')
+      .where('metadata.createdAt', '>=', startDate)
+      .get();
+
+    const stats = {
+      total: sessions.size,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+      averageDuration: 0,
+      successRate: 0
+    };
+
+    let totalDuration = 0;
+    let completedWithDuration = 0;
+
+    sessions.docs.forEach(doc => {
+      const session = doc.data() as CallSessionState;
+      
+      switch (session.status) {
+        case 'completed':
+          stats.completed++;
+          if (session.conference.duration) {
+            totalDuration += session.conference.duration;
+            completedWithDuration++;
+          }
+          break;
+        case 'failed':
+          stats.failed++;
+          break;
+        case 'cancelled':
+          stats.cancelled++;
+          break;
+      }
+    });
+
+    stats.averageDuration = completedWithDuration > 0 ? totalDuration / completedWithDuration : 0;
+    stats.successRate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+
+    return stats;
+
+  } catch (error) {
+    await logError('getCallStatistics:error', error);
+    throw error;
   }
 };

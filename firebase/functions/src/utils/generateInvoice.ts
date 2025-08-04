@@ -1,23 +1,6 @@
-import * as admin from 'firebase-admin';
-import { logError } from '../utils/logError';
-
-const db = admin.firestore();
-const storage = admin.storage();
-
-interface InvoiceRecord {
-  invoiceNumber: string;
-  type: 'platform' | 'provider';
-  callId: string;
-  clientId: string;
-  providerId: string;
-  amount: number;
-  currency: string;
-  downloadUrl: string;
-  createdAt: FirebaseFirestore.Timestamp;
-  status: 'issued' | 'sent' | 'paid' | 'cancelled';
-  sentToAdmin: boolean;
-  locale?: string;
-}
+import { db, storage, FieldValue } from './firebase';
+import { InvoiceRecord } from './types';
+import { logError } from './logError';
 
 export const generateInvoice = async (invoice: InvoiceRecord) => {
   try {
@@ -28,15 +11,21 @@ export const generateInvoice = async (invoice: InvoiceRecord) => {
 
     const file = storage.bucket().file(filePath);
     await file.save(buffer, { contentType: 'text/plain' });
+    
     const [url] = await file.getSignedUrl({
       action: 'read',
       expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 jours
     });
 
-    await db.collection('invoice_records').doc(invoice.invoiceNumber).set({
+    const invoiceData = {
       ...invoice,
       downloadUrl: url,
-    });
+      timestamp: FieldValue.serverTimestamp(),
+      createdAt: new Date(),
+      environment: process.env.NODE_ENV || 'development'
+    };
+
+    await db.collection('invoice_records').doc(invoice.invoiceNumber).set(invoiceData);
 
     return url;
   } catch (e) {

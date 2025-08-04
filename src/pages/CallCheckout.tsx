@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle, CreditCard, Lock, User, Calendar, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
-// Types simulés
+// Types
 interface Provider {
   id: string;
   fullName: string;
@@ -34,6 +34,13 @@ interface ServiceData {
 
 type StepType = 'payment' | 'calling' | 'completed';
 
+// Props du composant
+interface CallCheckoutProps {
+  selectedProvider: Provider;
+  serviceData: ServiceData;
+  onGoBack?: () => void;
+}
+
 // Composant de bouton personnalisé
 const Button = ({ children, onClick, disabled, className = '', type = 'button', fullWidth = false }) => (
   <button
@@ -60,33 +67,14 @@ const LoadingSpinner = ({ size = 'medium', color = 'red' }) => {
   );
 };
 
-const CallCheckout = () => {
-  // Données mockées pour la démo
-  const [provider] = useState<Provider>({
-    id: '1',
-    fullName: 'avocat 1',
-    firstName: 'Avocat',
-    lastName: '1',
-    role: 'lawyer',
-    country: 'Autriche',
-    currentCountry: 'Autriche',
-    avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-    profilePhoto: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-    email: 'avocat1@example.com',
-    phone: '+33612345678',
-    languagesSpoken: ['fr', 'de']
-  });
-
-  const [serviceData] = useState<ServiceData>({
-    providerId: '1',
-    serviceType: 'lawyer_call',
-    providerRole: 'lawyer',
-    amount: 49,
-    duration: 20,
-    clientPhone: '+33612345678',
-    commissionAmount: 9,
-    providerAmount: 40
-  });
+const CallCheckout: React.FC<CallCheckoutProps> = ({ 
+  selectedProvider, 
+  serviceData, 
+  onGoBack 
+}) => {
+  // États du composant
+  const [provider] = useState<Provider>(selectedProvider);
+  const [service] = useState<ServiceData>(serviceData);
 
   const [currentStep, setCurrentStep] = useState<StepType>('payment');
   const [callProgress, setCallProgress] = useState<number>(0);
@@ -95,6 +83,7 @@ const CallCheckout = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [callId] = useState<string>('call_' + Date.now());
 
   // États pour le formulaire de carte personnalisé
   const [formData, setFormData] = useState({
@@ -108,6 +97,26 @@ const CallCheckout = () => {
   const [showCvv, setShowCvv] = useState(false);
   const [useCustomForm, setUseCustomForm] = useState(true);
   const [stripeElementsReady, setStripeElementsReady] = useState(true);
+
+  // Simulation de la fonction initiateCall
+  const initiateCall = async ({ callId, clientId, providerId }) => {
+    console.log('🚀 Initiation de l\'appel avec:', { 
+      callId, 
+      clientId, 
+      providerId,
+      providerName: provider.fullName,
+      serviceAmount: service.amount,
+      serviceDuration: service.duration
+    });
+    
+    // Simulation de la création de la session d'appel et programmation
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        console.log(`✅ Session d'appel créée pour ${provider.fullName} - ${service.amount}€ pendant ${service.duration}min`);
+        resolve({ success: true, sessionId: 'session_' + Date.now() });
+      }, 1000);
+    });
+  };
 
   // Formatage du numéro de carte
   const formatCardNumber = (value) => {
@@ -255,28 +264,54 @@ const CallCheckout = () => {
     }
   };
 
-  // Simulation du paiement
+  // Simulation du paiement - VERSION MISE À JOUR
   const handlePaymentSubmit = async (event) => {
     event.preventDefault();
     setIsProcessing(true);
     setError(null);
 
-    // Simuler le traitement du paiement
-    setTimeout(() => {
+    try {
+      // Simulation du traitement du paiement
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // ✅ NE GARDE QUE initiateCall - suppression de notifyAfterPayment
+      console.log(`💳 Paiement validé pour ${provider.fullName} - ${service.amount}€, initiation de l'appel...`);
+      
+      // Simulation d'un user.uid
+      const mockUserId = 'user_' + Date.now();
+      
+      // ✅ SEUL APPEL : initiateCall (crée la session + programme l'appel)
+      await initiateCall({ 
+        callId, 
+        clientId: mockUserId,
+        providerId: provider.id
+      });
+
       setPaymentIntentId('pi_mock_payment_intent');
       setCurrentStep('calling');
       setCallProgress(1);
       setIsProcessing(false);
-    }, 2000);
+      
+      console.log(`✅ Appel programmé avec succès pour ${provider.fullName} dans 5 minutes`);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du traitement:', error);
+      setError('Erreur lors du traitement du paiement');
+      setIsProcessing(false);
+    }
   };
 
   const handleCallCompleted = (success: boolean) => {
     setCurrentStep('completed');
-    alert(success ? 'Appel terminé avec succès !' : 'Appel échoué - vous serez remboursé');
+    // Transition automatique vers la page de fin d'appel
   };
 
   const handleGoBack = () => {
-    alert('Retour à la liste des experts');
+    if (onGoBack) {
+      onGoBack();
+    } else {
+      alert('Retour à la liste des experts');
+    }
   };
 
   // Simulation de la progression d'appel
@@ -339,9 +374,14 @@ const CallCheckout = () => {
           <div className="flex items-center space-x-3">
             <div className="relative">
               <img
-                src={provider.avatar}
-                alt={provider.fullName}
+                src={provider.avatar || provider.profilePhoto}
+                alt={`Photo de profil de ${provider.fullName}`}
                 className="w-12 h-12 rounded-xl object-cover"
+                onError={(e) => {
+                  // Fallback en cas d'erreur de chargement d'image
+                  console.warn(`Erreur de chargement de l'image pour ${provider.fullName}`);
+                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.fullName)}&size=150&background=random`;
+                }}
               />
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
             </div>
@@ -362,16 +402,16 @@ const CallCheckout = () => {
               </div>
               <div className="flex items-center space-x-1 text-xs text-gray-500 mt-1">
                 <Clock size={12} />
-                <span>{serviceData.duration} min</span>
+                <span>{service.duration} min</span>
               </div>
             </div>
             
             <div className="text-right">
               <div className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                €{serviceData.amount}
+                €{service.amount}
               </div>
               <div className="text-xs text-gray-500">
-                {serviceData.duration} minutes
+                {service.duration} minutes
               </div>
             </div>
           </div>
@@ -552,20 +592,20 @@ const CallCheckout = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Service</span>
-                    <span className="font-medium">{serviceData.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}</span>
+                    <span className="font-medium">{service.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Frais de mise en relation</span>
-                    <span className="font-medium">{serviceData.commissionAmount.toFixed(2)} €</span>
+                    <span className="font-medium">{service.commissionAmount.toFixed(2)} €</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Montant consultation</span>
-                    <span className="font-medium">{serviceData.providerAmount.toFixed(2)} €</span>
+                    <span className="font-medium">{service.providerAmount.toFixed(2)} €</span>
                   </div>
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between font-bold">
                       <span>Total</span>
-                      <span className="text-red-600">{serviceData.amount.toFixed(2)} €</span>
+                      <span className="text-red-600">{service.amount.toFixed(2)} €</span>
                     </div>
                   </div>
                 </div>
@@ -607,7 +647,7 @@ const CallCheckout = () => {
                     ✓ Aucun débit sans mise en relation réussie
                   </p>
                   <p className="font-bold text-gray-700">
-                    Prix: {serviceData.amount}€ pour {serviceData.duration} minutes
+                    Prix: {service.amount}€ pour {service.duration} minutes
                   </p>
                 </div>
 
@@ -636,12 +676,12 @@ const CallCheckout = () => {
                     : callProgress === 3 
                       ? `${provider.fullName} a répondu! Nous vous appelons...` 
                       : callProgress === 4 
-                        ? 'Connexion établie! Appel en cours...' 
-                        : 'Appel en cours...'}
+                        ? `Connexion établie avec ${provider.fullName}!` 
+                        : `Appel en cours avec ${provider.fullName}...`}
                 </p>
                 <div className="mt-4 bg-blue-50 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
-                    ⏰ L'appel Twilio sera initié dans 5 minutes après validation du paiement
+                    ⏰ L'appel avec {provider.fullName} sera initié dans 5 minutes après validation du paiement
                   </p>
                 </div>
               </div>
@@ -650,21 +690,21 @@ const CallCheckout = () => {
                 {callProgress < 3 && (
                   <div className="bg-yellow-100 rounded-lg p-3 flex items-center text-sm">
                     <Clock className="w-4 h-4 text-yellow-600 mr-2" />
-                    <span className="text-yellow-800">Messages envoyés - Attente de 5 minutes</span>
+                    <span className="text-yellow-800">Session créée - Appel avec {provider.fullName} programmé dans 5 minutes</span>
                   </div>
                 )}
                 
                 {callProgress === 3 && (
                   <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
                     <Phone className="w-4 h-4 text-blue-600 mr-2" />
-                    <span className="text-blue-800">Préparation de l'appel...</span>
+                    <span className="text-blue-800">Préparation de l'appel avec {provider.fullName}...</span>
                   </div>
                 )}
                 
                 {callProgress >= 4 && (
                   <div className="bg-green-100 rounded-lg p-3 flex items-center text-sm">
                     <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span className="text-green-800">Connexion établie! Appel en cours - {serviceData.duration} minutes</span>
+                    <span className="text-green-800">Vous allez être mis en relation avec {provider.fullName} dans quelques minutes</span>
                   </div>
                 )}
               </div>
@@ -676,27 +716,11 @@ const CallCheckout = () => {
                   <div className="flex justify-center">
                     <div className="bg-gray-200 w-full max-w-xs h-3 rounded-full overflow-hidden">
                       <div className="bg-green-500 h-full flex items-center justify-center text-xs text-white" style={{ width: '80%' }}>
-                        {Math.floor(serviceData.duration * 0.8)}:00 / {serviceData.duration}:00
+                        {Math.floor(service.duration * 0.8)}:00 / {service.duration}:00
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Boutons de simulation - Mobile */}
-              <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
-                <button
-                  onClick={() => handleCallCompleted(true)}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                >
-                  Simuler succès appel
-                </button>
-                <button
-                  onClick={() => handleCallCompleted(false)}
-                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                >
-                  Simuler échec appel
-                </button>
               </div>
             </div>
           )}
@@ -708,20 +732,20 @@ const CallCheckout = () => {
                   <Check size={32} className="text-green-600" />
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  Appel terminé
+                  Appel avec {provider.fullName} terminé
                 </h2>
                 <p className="text-gray-600 text-sm">
-                  Merci d'avoir utilisé nos services. Votre avis nous intéresse !
+                  Merci d'avoir utilisé nos services pour votre consultation avec {provider.fullName}. Votre avis nous intéresse !
                 </p>
               </div>
 
               <div className="space-y-3">
                 <Button 
-                  onClick={() => alert('Redirection vers la page d\'évaluation')}
+                  onClick={() => alert(`Redirection vers la page d'évaluation de ${provider.fullName}`)}
                   fullWidth
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Évaluer la consultation
+                  Évaluer {provider.fullName}
                 </Button>
                 <Button 
                   onClick={handleGoBack}
@@ -787,4 +811,38 @@ const CallCheckout = () => {
   );
 };
 
-export default CallCheckout;
+// Exemple d'utilisation avec des données par défaut pour la démo
+const defaultProvider: Provider = {
+  id: '1',
+  fullName: 'avocat 1',
+  firstName: 'Avocat',
+  lastName: '1',
+  role: 'lawyer',
+  country: 'Autriche',
+  currentCountry: 'Autriche',
+  avatar: `https://ui-avatars.com/api/?name=avocat+1&size=150&background=4F46E5&color=fff`,
+  profilePhoto: `https://ui-avatars.com/api/?name=avocat+1&size=150&background=4F46E5&color=fff`,
+  email: 'avocat1@example.com',
+  phone: '+33612345678',
+  languagesSpoken: ['fr', 'de']
+};
+
+const defaultServiceData: ServiceData = {
+  providerId: '1',
+  serviceType: 'lawyer_call',
+  providerRole: 'lawyer',
+  amount: 49,
+  duration: 20,
+  clientPhone: '+33612345678',
+  commissionAmount: 9,
+  providerAmount: 40
+};
+
+// Export avec des props par défaut pour la démo
+export default () => (
+  <CallCheckout 
+    selectedProvider={defaultProvider}
+    serviceData={defaultServiceData}
+    onGoBack={() => console.log('Retour à la liste des experts')}
+  />
+);

@@ -63,6 +63,9 @@ interface NotificationData {
   whatsappMessage?: string;
 }
 
+// Import des webhooks Twilio existants (pas de re-définition)
+export { twilioWebhook, twilioClientWebhook } from './twilioWebhooks';
+
 // Fonction Cloud pour envoyer des notifications
 export const sendEmail = onCall(
   async (request: CallableRequest<NotificationData>) => {
@@ -471,8 +474,8 @@ export const initiateCall = onCall(async (request: CallableRequest<CallData>) =>
     
     await callSessionRef.set(callSession);
     
-    // Lance le processus d'appel après 5 minutes
-    scheduleCallSequence(callSessionId); // ne pas await = en arrière-plan
+    // Lance le processus d'appel après 5 minutes (ne pas await = en arrière-plan)
+    scheduleCallSequence(callSessionId);
 
     // Créer un log pour la session
     await db.collection('call_logs').add({
@@ -628,215 +631,6 @@ export const stripeWebhook = onRequest(async (req: FirebaseRequest, res: Respons
     console.error('Error processing Stripe webhook:', error);
     res.status(400).send(`Webhook Error: ${error.message}`);
   }
-});
-
-// 🔄 WEBHOOK TWILIO AMÉLIORÉ - GÈRE CLIENT ET DURÉE
-export const twilioWebhook = onRequest(async (req: FirebaseRequest, res: Response) => {
-  try {
-    const { 
-      CallSid, 
-      CallStatus, 
-      To, 
-      From,
-      CallDuration,
-      Direction 
-    } = req.body;
-    
-    console.log('🔔 Webhook Twilio reçu:', { 
-      CallSid, 
-      CallStatus, 
-      To, 
-      CallDuration,
-      Direction 
-    });
-
-    // Chercher la session d'appel correspondante
-    let callDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
-    let isProviderCall = false;
-    let isClientCall = false;
-
-    // Vérifier si c'est un appel vers le prestataire
-    const providerCallSnap = await db.collection('call_sessions')
-      .where('providerPhone', '==', To)
-      .limit(1)
-      .get();
-
-    if (!providerCallSnap.empty) {
-      callDoc = providerCallSnap.docs[0];
-      isProviderCall = true;
-    } else {
-      // Vérifier si c'est un appel vers le client
-      const clientCallSnap = await db.collection('call_sessions')
-        .where('clientPhone', '==', To)
-        .limit(1)
-        .get();
-      
-      if (!clientCallSnap.empty) {
-        callDoc = clientCallSnap.docs[0];
-        isClientCall = true;
-      }
-    }
-
-    if (!callDoc) {
-      console.log('❌ Aucune session d\'appel trouvée pour ce numéro:', To);
-      res.json({ success: false, message: 'Session not found' });
-      return;
-    }
-
-    const callRef = callDoc.ref;
-    const callData = callDoc.data();
-    const updates: any = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    // 🔄 Gestion des statuts selon le type d'appel et le statut
-    switch (CallStatus) {
-      case 'ringing':
-        if (isProviderCall) {
-          updates.providerCallStatus = 'ringing';
-        } else if (isClientCall) {
-          updates.clientCallStatus = 'ringing';
-        }
-        break;
-
-      case 'in-progress':
-      case 'answered':
-        if (isProviderCall) {
-          updates.status = 'connected';
-          updates.providerCallStatus = 'connected';
-          updates.providerConnectedAt = admin.firestore.FieldValue.serverTimestamp();
-          console.log('✅ Prestataire connecté');
-        } else if (isClientCall) {
-          updates.clientStatus = 'connected';
-          updates.clientCallStatus = 'connected';
-          updates.clientConnectedAt = admin.firestore.FieldValue.serverTimestamp();
-          
-          // Si les deux sont connectés, marquer l'appel comme pleinement actif
-          if (callData.status === 'connected') {
-            updates.fullStatus = 'both_connected';
-            updates.conversationStartedAt = admin.firestore.FieldValue.serverTimestamp();
-          }
-          console.log('✅ Client connecté');
-        }
-        break;
-
-      case 'completed':
-        const duration = parseInt(CallDuration) || 0;
-        
-        if (isProviderCall) {
-          updates.providerCallStatus = 'completed';
-          updates.providerCallDuration = duration;
-        } else if (isClientCall) {
-          updates.clientCallStatus = 'completed';
-          updates.clientCallDuration = duration;
-          updates.conversationEndedAt = admin.firestore.FieldValue.serverTimestamp();
-          
-          // Calculer la durée totale de conversation
-          if (callData.conversationStartedAt) {
-            const startTime = callData.conversationStartedAt.toDate();
-            const endTime = new Date();
-            const totalDurationSeconds = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
-            updates.totalConversationDuration = totalDurationSeconds;
-            
-            console.log(`📞 Conversation terminée - Durée: ${totalDurationSeconds}s`);
-            
-            // Si l'appel a duré au moins 30 secondes, capturer le paiement
-            if (totalDurationSeconds >= 30 && callData.paymentIntentId) {
-              try {
-                await stripe.paymentIntents.capture(callData.paymentIntentId);
-                updates.paymentCaptured = true;
-                updates.paid = true;
-                
-                console.log('💰 Paiement capturé pour durée:', totalDurationSeconds, 's');
-                
-                // Créer une demande d'avis
-                await db.collection('reviews_requests').add({
-                  clientId: callData.clientId,
-                  providerId: callData.providerId,
-                  callSessionId: callDoc.id,
-                  callDuration: totalDurationSeconds,
-                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                  status: 'pending'
-                });
-                
-              } catch (paymentError) {
-                console.error('❌ Erreur capture paiement:', paymentError);
-                await logError('twilioWebhook:paymentCapture', paymentError);
-              }
-            } else if (totalDurationSeconds < 30) {
-              // Appel trop court, annuler le paiement
-              if (callData.paymentIntentId) {
-                try {
-                  await stripe.paymentIntents.cancel(callData.paymentIntentId);
-                  updates.paymentCancelled = true;
-                  updates.refunded = true;
-                  console.log('💸 Paiement annulé - Appel trop court (< 30s):', totalDurationSeconds, 's');
-                } catch (cancelError) {
-                  console.error('❌ Erreur annulation paiement:', cancelError);
-                }
-              }
-            }
-          }
-          
-          // Marquer l'appel comme complètement terminé
-          updates.status = 'completed';
-        }
-        break;
-
-      case 'failed':
-      case 'busy':
-      case 'no-answer':
-        if (isProviderCall) {
-          updates.providerCallStatus = CallStatus;
-        } else if (isClientCall) {
-          updates.clientCallStatus = CallStatus;
-        }
-        console.log(`📞 Appel ${CallStatus}:`, To);
-        break;
-    }
-
-    // Appliquer les mises à jour
-    await callRef.update(updates);
-
-    // Logger l'événement
-    await db.collection('call_logs').add({
-      callSessionId: callDoc.id,
-      type: 'webhook_event',
-      callSid: CallSid,
-      callStatus: CallStatus,
-      direction: Direction,
-      to: To,
-      from: From,
-      duration: CallDuration ? parseInt(CallDuration) : null,
-      isProviderCall,
-      isClientCall,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    res.json({ 
-      success: true, 
-      message: 'Webhook processed',
-      callType: isProviderCall ? 'provider' : 'client',
-      status: CallStatus
-    });
-
-  } catch (error: any) {
-    console.error('❌ Erreur webhook Twilio:', error);
-    await logError('twilioWebhook:error', error);
-    res.status(400).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
-// Webhook séparé pour les appels clients (optionnel)
-export const twilioClientWebhook = onRequest(async (req: FirebaseRequest, res: Response) => {
-  console.log('🔔 Webhook CLIENT reçu:', req.body);
-  
-  // Rediriger vers le webhook principal en marquant que c'est un appel client
-  req.body.isClientWebhook = true;
-  return twilioWebhook(req, res);
 });
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {

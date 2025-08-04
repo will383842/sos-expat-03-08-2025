@@ -10,10 +10,10 @@ import { createPaymentRecord, logAnalyticsEvent } from '../utils/firestore';
 import { initiateCall } from '../services/api';
 import { whatsappMessageTemplates } from "../whatsapp/whatsappMessageTemplates";
 import { saveProviderMessage } from "../firebase/saveProviderMessage";
-import { functions } from '../config/firebase'; // ton fichier firebase.ts
-import { httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
-const sendWhatsAppAfterPayment = httpsCallable(functions, 'sendWhatsAppAfterPayment');
+const functions = getFunctions();
+const notifyAfterPayment = httpsCallable(functions, 'notifyAfterPayment');
 
 // Types améliorés
 interface Provider {
@@ -78,7 +78,7 @@ interface SessionData {
   title?: string;
   description?: string;
   language?: string;
-  role?: string; // Ajout de la propriété role
+  role?: string;
 }
 
 type StepType = 'payment' | 'calling' | 'completed';
@@ -101,31 +101,6 @@ const CallCheckout: React.FC = () => {
   const [expiryDate, setExpiryDate] = useState('12/25');
   const [cvc, setCvc] = useState('123');
 
-  // Fonctions utilitaires définies avant leur utilisation
-  const sendPostPaymentMessage = async (payload: any) => {
-    try {
-      const result = await sendWhatsAppAfterPayment(payload);
-      console.log('Message post-paiement envoyé:', result);
-      return result;
-    } catch (error) {
-      console.error('Erreur envoi message post-paiement:', error);
-      throw error;
-    }
-  };
-
-  const sendWhatsAppViaFirebase = async (phoneNumber: string, message: string) => {
-    try {
-      // Implémentation de l'envoi WhatsApp via Firebase
-      // Remplacez par votre logique d'envoi WhatsApp
-      console.log(`Envoi WhatsApp vers ${phoneNumber}: ${message}`);
-      // Exemple d'appel à une fonction Firebase
-      // await httpsCallable(functions, 'sendWhatsApp')({ phoneNumber, message });
-    } catch (error) {
-      console.error('Erreur envoi WhatsApp:', error);
-      throw error;
-    }
-  };
-
   const notifyProviderOfMissedCall = async (
     providerId: string,
     clientInfo: { name: string; country: string },
@@ -138,6 +113,26 @@ const CallCheckout: React.FC = () => {
     } catch (error) {
       console.error('Erreur notification appel manqué:', error);
       throw error;
+    }
+  };
+
+  // Fonction pour envoyer toutes les notifications
+  const sendAllNotifications = async () => {
+    try {
+      console.log('Envoi des notifications post-paiement...');
+      // Implémentation de l'envoi des notifications
+      
+      const callId = sessionStorage.getItem("callId");
+      if (callId) {
+        try {
+          await notifyAfterPayment({ callId });
+          console.log("✅ Notifications post-paiement envoyées avec succès.");
+        } catch (error) {
+          console.error("❌ Erreur lors de l'envoi des notifications post-paiement :", error);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi des notifications:', error);
     }
   };
 
@@ -298,111 +293,6 @@ const CallCheckout: React.FC = () => {
       loadProviderAndSettings();
     }
   }, [providerId, user, authLoading, navigate, loadProviderAndSettings]);
-
-  // 📱 FONCTION POUR ENVOYER TOUS LES MESSAGES/NOTIFICATIONS
-  const sendAllNotifications = async () => {
-    try {
-      // 1. Envoi message WhatsApp post-paiement
-      const providerData = getProviderFromStorage();
-      const bookingRequestStr = sessionStorage.getItem("bookingRequest");
-      
-      if (providerData && user && bookingRequestStr) {
-        const request = JSON.parse(bookingRequestStr);
-
-        const payload = {
-          clientFirstName: user.firstName || "Client",
-          clientNationality: user.nationality || "Inconnue",
-          requestedCountry: request?.countryRequested || "Inconnu",
-          requestTitle: request?.title || "Sans titre",
-          requestDescription: request?.description || "Aucune description",
-          selectedLanguage: request?.language || "Non précisée",
-          providerId: providerData.id || '',
-          callId: `call_${Date.now()}`
-        };
-
-        try {
-          await sendPostPaymentMessage(payload);
-          console.log("✅ Message post-paiement envoyé.");
-
-          // Sauvegarder avec l'ancienne fonction si elle existe
-          if (typeof saveProviderMessage === 'function') {
-            await saveProviderMessage(providerData.id || '', "Message post-paiement", {
-              clientFirstName: user.firstName,
-              clientCountry: user.nationality,
-              providerPhone: providerData.whatsapp,
-              bookingId: request.id || null,
-            });
-            console.log("✅ Message enregistré dans Firestore.");
-          }
-        } catch (err) {
-          console.error("❌ Erreur envoi ou enregistrement message post-paiement :", err);
-        }
-      }
-
-      // 2. Envoi WhatsApp reminder
-      await sendWhatsAppReminder();
-
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'envoi des notifications:', error);
-    }
-  };
-
-  // 📱 FONCTION POUR ENVOYER LE WHATSAPP REMINDER
-  const sendWhatsAppReminder = async () => {
-    if (!user || !provider) return;
-
-    try {
-      const callData = getSessionData('bookingRequest');
-
-      // Vérifier si whatsappMessageTemplates existe
-      if (typeof whatsappMessageTemplates === 'undefined') {
-        console.warn('whatsappMessageTemplates non disponible, envoi d\'un message simple');
-        await sendSimpleWhatsAppMessage();
-        return;
-      }
-
-      const commonLang = provider.languagesSpoken?.find((lang: string) =>
-        whatsappMessageTemplates[lang]
-      ) || "en";
-
-      const template = whatsappMessageTemplates[commonLang];
-      if (!template) {
-        await sendSimpleWhatsAppMessage();
-        return;
-      }
-
-      const message = template.generate({
-        firstName: user.firstName || "Client",
-        country: user.country || "Inconnu",
-        title: callData?.title || "Sans titre",
-        description: callData?.description || "Pas de description",
-        language:
-          (user.languagesSpoken?.map((l: string) => l.toUpperCase()).join(", ")) || "Non précisé",
-      });
-
-      const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
-      await sendWhatsAppViaFirebase(phoneNumber, message);
-
-    } catch (error) {
-      console.error("❌ Erreur lors de l'envoi WhatsApp reminder :", error);
-      // Fallback vers message simple
-      await sendSimpleWhatsAppMessage();
-    }
-  };
-
-  // Fonction de fallback pour envoyer un message WhatsApp simple
-  const sendSimpleWhatsAppMessage = async () => {
-    if (!user || !provider) return;
-
-    const callData = getSessionData('bookingRequest');
-    const message = `🆕 Nouvelle demande après paiement :
-👤 Client : ${user.firstName || "Client"}
-🌍 Pays : ${user.country || "Inconnu"}
-📝 Demande : ${callData?.title || "Sans titre"}`;
-
-    const phoneNumber = provider?.whatsapp || provider?.phoneNumber || "";
-    await sendWhatsAppViaFirebase(phoneNumber, message);
-  };
 
   const handlePaymentAuthorized = async (paymentIntentId: string) => {
     setPaymentIntentId(paymentIntentId);

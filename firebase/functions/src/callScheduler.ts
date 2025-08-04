@@ -1,10 +1,28 @@
 import { logCallRecord } from './utils/logCallRecord';
 import { logError } from './utils/logError';
 import * as admin from 'firebase-admin';
-import { twilioClient } from './lib/twilio';
-import { generateInvoice } from './invoices/generateInvoice';
-import { sendNotificationToProvider } from './notifications/sendNotificationToProvider';
-import { cancelPayment } from "./payments";
+import twilio from 'twilio';
+import Stripe from 'stripe';
+import * as dotenv from 'dotenv';
+
+// Charger les variables d'environnement
+dotenv.config();
+
+// Assurer que Firebase Admin est initialisé
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+// Initialiser Twilio avec vos credentials
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID!,
+  process.env.TWILIO_AUTH_TOKEN!
+);
+
+// Initialiser Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
+});
 
 export const scheduleCallSequence = async (callSessionId: string) => {
   const db = admin.firestore();
@@ -21,7 +39,7 @@ export const scheduleCallSequence = async (callSessionId: string) => {
     retryCount: 0,
   });
 
-  const { providerPhone, clientPhone } = call;
+  const { providerPhone, clientPhone, paymentIntentId } = call;
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   await delay(5 * 60 * 1000); // ⏳ Attente 5 minutes
@@ -32,7 +50,7 @@ export const scheduleCallSequence = async (callSessionId: string) => {
     try {
       await twilioClient.calls.create({
         to: providerPhone,
-        from: process.env.TWILIO_PHONE_NUMBER,
+        from: process.env.TWILIO_PHONE_NUMBER!,
         twiml: `<Response><Say voice="alice">Un client souhaite vous parler. Restez en ligne.</Say></Response>`,
         statusCallback: `${process.env.FUNCTION_URL}/twilioWebhook`,
         statusCallbackMethod: 'POST',
@@ -63,10 +81,6 @@ export const scheduleCallSequence = async (callSessionId: string) => {
           status: 'connected',
         });
 
-        const endTime = admin.firestore.Timestamp.now();
-        const duration = 30; // à ajuster dynamiquement si besoin
-
-        
         try {
           const clientSnap = await db.collection('users').doc(call.clientId).get();
           const providerSnap = await db.collection('users').doc(call.providerId).get();
@@ -78,7 +92,8 @@ export const scheduleCallSequence = async (callSessionId: string) => {
           const sharedLang =
             client.languages?.find((l: string) => provider.languages?.includes(l)) || 'en';
 
-          // 🧾 GÉNÉRATION DE LA FACTURE
+          // 🧾 GÉNÉRATION DE LA FACTURE (temporairement désactivée)
+          /*
           await generateInvoice({
             invoiceNumber: `INV-${Date.now()}`,
             type: 'platform',
@@ -93,8 +108,10 @@ export const scheduleCallSequence = async (callSessionId: string) => {
             sentToAdmin: false,
             locale: sharedLang,
           });
+          */
 
-          // 🔔 NOTIFICATION MULTILINGUE
+          // 🔔 NOTIFICATION MULTILINGUE (temporairement désactivée)
+          /*
           await sendNotificationToProvider({
             type: 'payment_received',
             recipientId: call.providerId,
@@ -119,6 +136,9 @@ export const scheduleCallSequence = async (callSessionId: string) => {
               languages: [sharedLang],
             },
           });
+          */
+          
+          console.log('Call connected successfully', { callSessionId, sharedLang });
         } catch (err) {
           await logError('callScheduler:postConnectedError', err);
         }
@@ -141,7 +161,7 @@ export const scheduleCallSequence = async (callSessionId: string) => {
   if (!providerAnswered) {
     await twilioClient.calls.create({
       to: clientPhone,
-      from: process.env.TWILIO_PHONE_NUMBER,
+      from: process.env.TWILIO_PHONE_NUMBER!,
       twiml: `<Response><Say voice="alice">Le prestataire n'a pas répondu. Vous ne serez pas débité. Merci pour votre compréhension.</Say></Response>`,
     });
 
@@ -155,6 +175,16 @@ export const scheduleCallSequence = async (callSessionId: string) => {
       status: 'cancelled_by_provider',
       refunded: true,
     });
-    await cancelPayment(paymentIntentId);
+
+    // Annuler le paiement Stripe si disponible
+    if (paymentIntentId) {
+      try {
+        await stripe.paymentIntents.cancel(paymentIntentId);
+        console.log(`Payment ${paymentIntentId} cancelled successfully`);
+      } catch (error) {
+        console.error('Error cancelling payment:', error);
+        await logError('callScheduler:cancelPayment', error);
+      }
+    }
   }
 };

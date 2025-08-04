@@ -1,95 +1,18 @@
-// Soumission du formulaire avec codes ISO pour les langues
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-
-    if (!validateForm()) return;
-
-    try {
-      // Extraction des codes ISO pour l'enregistrement en base
-      const languageCodesISO = selectedLanguages.map((lang) => lang.value);
-      
-      // Création des noms complets pour l'affichage côté client
-      const languageDisplayNames = selectedLanguages.map((lang) => 
-        getLanguageDisplayName(lang.value)
-      );
-
-      console.log('🌐 Langues sélectionnées:', {
-        codesISO: languageCodesISO,
-        displayNames: languageDisplayNames,
-        selectedLanguages: selectedLanguages
-      });
-
-      // Données utilisateur compatibles avec ProfileCards
-      const userData = {
-        role: 'lawyer' as const,
-        type: 'lawyer' as const,
-        email: lawyerForm.email,
-        fullName: `${lawyerForm.firstName} ${lawyerForm.lastName}`,
-        name: `${lawyerForm.firstName} ${lawyerForm.lastName}`,
-        firstName: lawyerForm.firstName,
-        lastName: lawyerForm.lastName,
-        phone: lawyerForm.phoneCountryCode + lawyerForm.phone,
-        whatsapp: lawyerForm.whatsappCountryCode + lawyerForm.whatsappNumber,
-        phoneCountryCode: lawyerForm.phoneCountryCode,
-        whatsappCountryCode: lawyerForm.whatsappCountryCode,
-        whatsappNumber: lawyerForm.whatsappNumber,
-        currentCountry: lawyerForm.currentCountry === 'Autre' ? lawyerForm.customCountry : lawyerForm.currentCountry,
-        country: lawyerForm.currentPresenceCountry,
-        currentPresenceCountry: lawyerForm.currentPresenceCountry,
-        practiceCountries: lawyerForm.practiceCountries,
-        profilePhoto: lawyerForm.profilePhoto,
-        photoURL: lawyerForm.profilePhoto,
-        avatar: lawyerForm.profilePhoto,
-        
-        // Enregistrement avec codes ISO
-        languages: languageCodesISO,
-        languagesSpoken: languageCodesISO,
-        
-        // Noms complets pour l'affichage
-        languageDisplayNames: languageDisplayNames,
-        
-        specialties: lawyerForm.specialties,
-        certifications: lawyerForm.certifications,
-        education: lawyerForm.education,
-        barNumber: lawyerForm.barNumber,
-        yearsOfExperience: lawyerForm.yearsOfExperience,
-        graduationYear: lawyerForm.graduationYear,
-        bio: lawyerForm.bio,
-        description: lawyerForm.bio,
-        price: lawyerForm.price,
-        duration: lawyerForm.duration,
-        availability: lawyerForm.availability,
-        isOnline: lawyerForm.availability === 'available',
-        isApproved: false,
-        isVisible: true,
-        isActive: true,
-        rating: 4.5,
-        reviewCount: 0,
-        preferredLanguage: lawyerForm.preferredLanguage,
-        createdAt: serverTimestamp()
-      };
-
-      console.log('📝 Données envoyées pour l\'inscription avocat:', userData);
-
-      await register(userData, lawyerForm.password);
-      navigate('/dashboard?pending=true');
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'inscription avocat:', error);
-    }
-  }, [lawyerForm, selectedLanguages, validateForm, register, navigate, getLanguageDisplayName]);import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Scale, Mail, Lock, Eye, EyeOff, AlertCircle, Globe, MapPin, Award, Phone, CheckCircle, XCircle } from 'lucide-react';
+import { Scale, Mail, Lock, Eye, EyeOff, AlertCircle, Globe, MapPin, Award, Phone, CheckCircle, XCircle, Users, Camera, Heart, X } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import ImageUploader from '../components/common/ImageUploader';
 import { serverTimestamp } from 'firebase/firestore';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import MultiLanguageSelect from '../components/forms-data/MultiLanguageSelect';
 import { MultiValue } from 'react-select';
+
+// Lazy loading des composants
+const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
+const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
 
 // Constants pour éviter la duplication
 const COUNTRY_OPTIONS = [
@@ -222,143 +145,269 @@ interface EmailCheckStatus {
   hasBeenChecked: boolean;
 }
 
+// Props pour FormField
+interface FormFieldProps {
+  id: string;
+  name: string;
+  label: string;
+  type?: string;
+  required?: boolean;
+  value: string | number;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  autoComplete?: string;
+  className?: string;
+  icon?: React.ReactNode;
+  error?: string;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+}
+
 // Textes pour i18n
 const texts = {
-  fr: {
-    title: 'Inscription Avocat',
-    subtitle: 'Rejoignez notre réseau d\'avocats vérifiés et aidez des expatriés francophones',
-    alreadyRegistered: 'Déjà inscrit ?',
-    login: 'Se connecter',
-    personalInfo: 'Informations personnelles',
-    geographicInfo: 'Informations géographiques',
-    professionalInfo: 'Informations professionnelles',
-    pricingInfo: 'Tarification',
-    validationNotice: 'Validation manuelle',
-    validationText: 'Votre compte sera validé manuellement par notre équipe après vérification sous 24h.',
-    acceptTerms: 'J\'accepte les',
-    termsLink: 'conditions générales pour avocats',
-    createAccount: 'Créer mon compte avocat',
-    required: 'obligatoire',
-    // Champs
-    firstName: 'Prénom',
-    lastName: 'Nom',
-    email: 'Adresse email',
-    password: 'Mot de passe',
-    confirmPassword: 'Confirmer le mot de passe',
-    phone: 'Numéro de téléphone',
-    whatsappNumber: 'Numéro WhatsApp',
-    countryCode: 'Indicatif pays',
-    residenceCountry: 'Pays de résidence',
-    currentPresenceCountry: 'Pays de présence actuel',
-    barNumber: 'Numéro au barreau',
-    yearsOfExperience: 'Années d\'expérience',
-    graduationYear: 'Année de diplôme',
-    bio: 'Description professionnelle',
-    profilePhoto: 'Photo de profil',
-    specialties: 'Spécialités',
-    practiceCountries: 'Pays d\'intervention',
-    languagesSpoken: 'Langues parlées',
-    certifications: 'Certifications',
-    price: 'Prix par consultation (€)',
-    duration: 'Durée de consultation (min)',
-    // Email status
-    emailChecking: 'Vérification de l\'email en cours...',
-    emailAvailable: 'Email disponible',
-    emailTaken: 'Cet email est déjà utilisé',
-    emailCheckError: 'Erreur lors de la vérification de l\'email',
-    // Erreurs
-    allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
-    passwordMismatch: 'Les mots de passe ne correspondent pas',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
-    selectCountry: 'Veuillez sélectionner votre pays de résidence',
-    specifyCountry: 'Veuillez préciser votre pays de résidence',
-    selectPracticeCountry: 'Veuillez sélectionner au moins un pays d\'intervention',
-    selectLanguage: 'Veuillez sélectionner au moins une langue parlée',
-    selectSpecialty: 'Veuillez sélectionner au moins une spécialité',
-    barNumberRequired: 'Le numéro au barreau est obligatoire',
-    bioRequired: 'La description professionnelle est obligatoire',
-    phoneRequired: 'Le numéro de téléphone est obligatoire',
-    whatsappRequired: 'Le numéro WhatsApp est obligatoire',
-    whatsappInvalid: 'Le numéro WhatsApp doit être au format international valide',
-    presenceCountryRequired: 'Le pays de présence actuel est obligatoire',
-    profilePhotoRequired: 'La photo de profil est obligatoire',
-    selectCertification: 'Veuillez sélectionner au moins une certification',
-    acceptTermsRequired: 'Vous devez accepter les conditions générales pour les avocats',
-    priceRequired: 'Le prix par consultation est obligatoire',
-    priceInvalid: 'Le prix doit être supérieur à 0',
-    durationRequired: 'La durée de consultation est obligatoire',
-    durationInvalid: 'La durée doit être supérieure à 0',
-    emailAlreadyUsed: 'Cet email est déjà utilisé par un autre compte',
-    emailValidRequired: 'Veuillez utiliser un email valide et disponible'
-  },
-  en: {
-    title: 'Lawyer Registration',
-    subtitle: 'Join our network of verified lawyers and help French-speaking expatriates',
-    alreadyRegistered: 'Already registered?',
-    login: 'Log in',
-    personalInfo: 'Personal Information',
-    geographicInfo: 'Geographic Information',
-    professionalInfo: 'Professional Information',
-    pricingInfo: 'Pricing',
-    validationNotice: 'Manual Validation',
-    validationText: 'Your account will be manually validated by our team after verification within 24h.',
-    acceptTerms: 'I accept the',
-    termsLink: 'general terms for lawyers',
-    createAccount: 'Create my lawyer account',
-    required: 'required',
-    // Fields
-    firstName: 'First Name',
-    lastName: 'Last Name',
-    email: 'Email Address',
-    password: 'Password',
-    confirmPassword: 'Confirm Password',
-    phone: 'Phone Number',
-    whatsappNumber: 'WhatsApp Number',
-    countryCode: 'Country Code',
-    residenceCountry: 'Country of Residence',
-    currentPresenceCountry: 'Current Presence Country',
-    barNumber: 'Bar Number',
-    yearsOfExperience: 'Years of Experience',
-    graduationYear: 'Graduation Year',
-    bio: 'Professional Description',
-    profilePhoto: 'Profile Photo',
-    specialties: 'Specialties',
-    practiceCountries: 'Practice Countries',
-    languagesSpoken: 'Languages Spoken',
-    certifications: 'Certifications',
-    price: 'Price per consultation (€)',
-    duration: 'Consultation duration (min)',
-    // Email status
-    emailChecking: 'Checking email availability...',
-    emailAvailable: 'Email available',
-    emailTaken: 'This email is already in use',
-    emailCheckError: 'Error checking email availability',
-    // Errors
-    allFieldsRequired: 'All required fields must be filled',
-    passwordMismatch: 'Passwords do not match',
-    passwordTooShort: 'Password must contain at least 6 characters',
-    selectCountry: 'Please select your country of residence',
-    specifyCountry: 'Please specify your country of residence',
-    selectPracticeCountry: 'Please select at least one practice country',
-    selectLanguage: 'Please select at least one spoken language',
-    selectSpecialty: 'Please select at least one specialty',
-    barNumberRequired: 'Bar number is required',
-    bioRequired: 'Professional description is required',
-    phoneRequired: 'Phone number is required',
-    whatsappRequired: 'WhatsApp number is required',
-    whatsappInvalid: 'WhatsApp number must be in valid international format',
-    presenceCountryRequired: 'Current presence country is required',
-    profilePhotoRequired: 'Profile photo is required',
-    selectCertification: 'Please select at least one certification',
-    acceptTermsRequired: 'You must accept the general terms for lawyers',
-    priceRequired: 'Price per consultation is required',
-    priceInvalid: 'Price must be greater than 0',
-    durationRequired: 'Consultation duration is required',
-    durationInvalid: 'Duration must be greater than 0',
-    emailAlreadyUsed: 'This email is already used by another account',
-    emailValidRequired: 'Please use a valid and available email'
-  }
+  title: 'Inscription Avocat',
+  subtitle: 'Rejoignez notre réseau d\'avocats vérifiés et aidez des expatriés francophones dans leurs démarches juridiques',
+  alreadyRegistered: 'Déjà inscrit ?',
+  login: 'Se connecter',
+  personalInfo: 'Informations personnelles',
+  geographicInfo: 'Informations géographiques',
+  professionalInfo: 'Informations professionnelles',
+  pricingInfo: 'Tarification',
+  validationNotice: 'Validation manuelle',
+  validationText: 'Votre compte sera validé manuellement par notre équipe après vérification sous 24h.',
+  acceptTerms: 'J\'accepte les',
+  termsLink: 'conditions générales pour avocats',
+  createAccount: 'Créer mon compte avocat',
+  required: 'obligatoire',
+  loading: 'Création en cours...',
+  // Champs
+  firstName: 'Prénom',
+  lastName: 'Nom',
+  email: 'Adresse email',
+  password: 'Mot de passe',
+  confirmPassword: 'Confirmer le mot de passe',
+  phone: 'Numéro de téléphone',
+  whatsappNumber: 'Numéro WhatsApp',
+  countryCode: 'Indicatif pays',
+  residenceCountry: 'Pays de résidence',
+  currentPresenceCountry: 'Pays de présence actuel',
+  barNumber: 'Numéro au barreau',
+  yearsOfExperience: 'Années d\'expérience',
+  graduationYear: 'Année de diplôme',
+  bio: 'Description professionnelle',
+  profilePhoto: 'Photo de profil',
+  specialties: 'Spécialités',
+  practiceCountries: 'Pays d\'intervention',
+  languagesSpoken: 'Langues parlées',
+  certifications: 'Certifications',
+  price: 'Prix par consultation (€)',
+  duration: 'Durée de consultation (min)',
+  // Email status
+  emailChecking: 'Vérification de l\'email en cours...',
+  emailAvailable: 'Email disponible',
+  emailTaken: 'Cet email est déjà utilisé',
+  emailCheckError: 'Erreur lors de la vérification de l\'email',
+  // Erreurs
+  allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
+  passwordMismatch: 'Les mots de passe ne correspondent pas',
+  passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
+  selectCountry: 'Veuillez sélectionner votre pays de résidence',
+  specifyCountry: 'Veuillez préciser votre pays de résidence',
+  selectPracticeCountry: 'Veuillez sélectionner au moins un pays d\'intervention',
+  selectLanguage: 'Veuillez sélectionner au moins une langue parlée',
+  selectSpecialty: 'Veuillez sélectionner au moins une spécialité',
+  barNumberRequired: 'Le numéro au barreau est obligatoire',
+  bioRequired: 'La description professionnelle est obligatoire',
+  phoneRequired: 'Le numéro de téléphone est obligatoire',
+  whatsappRequired: 'Le numéro WhatsApp est obligatoire',
+  whatsappInvalid: 'Le numéro WhatsApp doit être au format international valide',
+  presenceCountryRequired: 'Le pays de présence actuel est obligatoire',
+  profilePhotoRequired: 'La photo de profil est obligatoire',
+  selectCertification: 'Veuillez sélectionner au moins une certification',
+  acceptTermsRequired: 'Vous devez accepter les conditions générales pour les avocats',
+  priceRequired: 'Le prix par consultation est obligatoire',
+  priceInvalid: 'Le prix doit être supérieur à 0',
+  durationRequired: 'La durée de consultation est obligatoire',
+  durationInvalid: 'La durée doit être supérieure à 0',
+  emailAlreadyUsed: 'Cet email est déjà utilisé par un autre compte',
+  emailValidRequired: 'Veuillez utiliser un email valide et disponible'
 };
+
+// Composant FormField
+const FormField = React.memo<FormFieldProps>(({ 
+  id, 
+  name, 
+  label, 
+  type = 'text', 
+  required = false, 
+  value, 
+  onChange, 
+  placeholder, 
+  autoComplete, 
+  className = '', 
+  icon, 
+  error,
+  maxLength,
+  min,
+  max
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const baseClasses = `
+    w-full px-4 py-3 border-2 rounded-xl font-medium
+    transition-all duration-300 bg-white focus:outline-none
+    ${icon ? 'pl-12' : ''}
+    ${isFocused ? 'border-blue-500 shadow-lg' : ''}
+    ${error ? 'border-red-500 bg-red-50' : 'border-gray-300'}
+  `;
+  
+  return (
+    <div className="space-y-3">
+      <label htmlFor={id} className="block text-sm font-bold text-gray-800">
+        {label} 
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="relative">
+        {icon && (
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+            {icon}
+          </div>
+        )}
+        <input
+          id={id}
+          name={name}
+          type={type}
+          required={required}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          className={`${baseClasses} ${className}`}
+          maxLength={maxLength}
+          min={min}
+          max={max}
+        />
+      </div>
+      {error && (
+        <p className="text-sm text-red-600 flex items-center">
+          <AlertCircle className="w-4 h-4 mr-2" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+});
+
+FormField.displayName = 'FormField';
+
+// Composant TagSelector
+const TagSelector = React.memo(({ 
+  items, 
+  onRemove, 
+  color = 'blue'
+}: { 
+  items: string[];
+  onRemove: (item: string) => void;
+  color?: 'green' | 'blue';
+}) => {
+  if (items.length === 0) return null;
+
+  const colorClasses = color === 'green' 
+    ? 'bg-green-100 text-green-800 border-green-300' 
+    : 'bg-blue-100 text-blue-800 border-blue-300';
+
+  return (
+    <div className="mb-6">
+      <div className="flex flex-wrap gap-3">
+        {items.map((item, index) => (
+          <div 
+            key={`${item}-${index}`}
+            className={`${colorClasses} px-4 py-2 rounded-xl text-sm flex items-center gap-2 border-2 font-medium`}
+          >
+            <span>{item}</span>
+            <button 
+              type="button" 
+              onClick={() => onRemove(item)}
+              className="text-current hover:bg-black hover:bg-opacity-20 rounded-full p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+TagSelector.displayName = 'TagSelector';
+
+// Composant LoadingSpinner
+const LoadingSpinner = React.memo(() => (
+  <div className="flex justify-center items-center py-8">
+    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+  </div>
+));
+
+LoadingSpinner.displayName = 'LoadingSpinner';
+
+// Composant ProgressBar
+const ProgressBar = React.memo(({ progress }: { progress: number }) => (
+  <div className="mb-8">
+    <div className="flex items-center justify-between mb-3">
+      <span className="text-sm font-bold text-gray-700">Progression</span>
+      <span className="text-sm font-bold text-blue-600">{progress}%</span>
+    </div>
+    <div className="w-full bg-gray-200 rounded-full h-3">
+      <div 
+        className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-700"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  </div>
+));
+
+ProgressBar.displayName = 'ProgressBar';
+
+// Composant SectionHeader
+const SectionHeader = React.memo(({ 
+  icon, 
+  title, 
+  subtitle, 
+  step, 
+  totalSteps 
+}: { 
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  step?: number;
+  totalSteps?: number;
+}) => (
+  <div className="flex items-center space-x-4 mb-8">
+    <div className="relative">
+      <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-4 shadow-lg">
+        <div className="text-white">{icon}</div>
+      </div>
+      {step && totalSteps && (
+        <div className="absolute -bottom-2 -right-2 bg-white rounded-full px-2 py-1 shadow-md border-2 border-blue-200">
+          <span className="text-xs font-bold text-blue-600">{step}/{totalSteps}</span>
+        </div>
+      )}
+    </div>
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900">
+        {title}
+      </h2>
+      {subtitle && (
+        <p className="text-gray-600 mt-1 font-medium">{subtitle}</p>
+      )}
+    </div>
+  </div>
+));
+
+SectionHeader.displayName = 'SectionHeader';
 
 const RegisterLawyer: React.FC = () => {
   const navigate = useNavigate();
@@ -406,9 +455,11 @@ const RegisterLawyer: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showCustomCountry, setShowCustomCountry] = useState(false);
   const [showCustomSpecialty, setShowCustomSpecialty] = useState(false);
   const [showCustomCertification, setShowCustomCertification] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // État pour la vérification de l'email
   const [emailStatus, setEmailStatus] = useState<EmailCheckStatus>({
@@ -417,13 +468,38 @@ const RegisterLawyer: React.FC = () => {
     hasBeenChecked: false
   });
 
-  // Textes actuels basés sur la langue
-  const t = texts[language as keyof typeof texts] || texts.fr;
+  // État pour le timeout de vérification email
+  const [emailCheckTimeout, setEmailCheckTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Classes CSS pour les champs obligatoires avec effet grisé
-  const requiredFieldClasses = "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white";
+  // Calcul du progrès
+  const formProgress = useMemo(() => {
+    const fields = [
+      lawyerForm.firstName.trim().length > 0,
+      lawyerForm.lastName.trim().length > 0,
+      lawyerForm.email.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lawyerForm.email),
+      lawyerForm.password.length >= 6,
+      lawyerForm.phone.trim().length >= 6,
+      lawyerForm.whatsappNumber.trim().length >= 6,
+      lawyerForm.currentCountry.trim().length > 0,
+      lawyerForm.currentPresenceCountry.trim().length > 0,
+      lawyerForm.barNumber.trim().length > 0,
+      lawyerForm.yearsOfExperience >= 0,
+      lawyerForm.bio.trim().length >= 50,
+      lawyerForm.profilePhoto.length > 0,
+      lawyerForm.specialties.length > 0,
+      lawyerForm.certifications.length > 0,
+      lawyerForm.practiceCountries.length > 0,
+      selectedLanguages.length > 0,
+      lawyerForm.price > 0,
+      lawyerForm.duration > 0,
+      lawyerForm.acceptTerms
+    ];
+    
+    const completed = fields.filter(Boolean).length;
+    return Math.round((completed / fields.length) * 100);
+  }, [lawyerForm, selectedLanguages]);
 
-  // ✅ NOUVEAU: Fonction pour vérifier l'unicité de l'email
+  // Fonction pour vérifier l'unicité de l'email
   const checkEmailAvailability = useCallback(async (email: string): Promise<boolean> => {
     try {
       // Nettoyer l'email
@@ -448,1086 +524,8 @@ const RegisterLawyer: React.FC = () => {
     }
   }, []);
 
-  // ✅ NOUVEAU: Debounced email check
-  const [emailCheckTimeout, setEmailCheckTimeout] = useState<NodeJS.Timeout | null>(null);
-
-  const handleAddCustomSpecialty = useCallback(() => {
-    if (formData.customSpecialty && !formData.specialties.includes(formData.customSpecialty)) {
-      setFormData(prev => ({
-        ...prev,
-        specialties: [...prev.specialties, prev.customSpecialty],
-        customSpecialty: ''
-      }));
-      setShowCustomSpecialty(false);
-    }
-  }, [formData.customSpecialty, formData.specialties]);
-  
-  // Gestion des certifications
-  const handleCertificationSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedCertification = e.target.value;
-    
-    if (selectedCertification === 'Autre') {
-      setShowCustomCertification(true);
-      return;
-    }
-    
-    if (selectedCertification && !lawyerForm.certifications.includes(selectedCertification)) {
-      setLawyerForm(prev => ({
-        ...prev,
-        certifications: [...prev.certifications, selectedCertification]
-      }));
-    }
-  }, [lawyerForm.certifications]);
-  
-  const handleRemoveCertification = useCallback((certification: string) => {
-    setLawyerForm(prev => ({
-      ...prev,
-      certifications: prev.certifications.filter(c => c !== certification)
-    }));
-  }, []);
-  
-  const handleAddCustomCertification = useCallback(() => {
-    if (lawyerForm.customCertification && !lawyerForm.certifications.includes(lawyerForm.customCertification)) {
-      setLawyerForm(prev => ({
-        ...prev,
-        certifications: [...prev.certifications, prev.customCertification],
-        customCertification: ''
-      }));
-      setShowCustomCertification(false);
-    }
-  }, [lawyerForm.customCertification, lawyerForm.certifications]);
-
-  // Validation du formulaire avec vérification email
-  const validateForm = useCallback((): boolean => {
-    const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Vérification de l'email en premier
-    if (!emailStatus.hasBeenChecked || emailStatus.isChecking) {
-      setFormError('Veuillez attendre la vérification de l\'email');
-      scrollToTop();
-      return false;
-    }
-
-    if (emailStatus.isAvailable === false) {
-      setFormError(t.emailAlreadyUsed);
-      scrollToTop();
-      return false;
-    }
-
-    // Validation des champs obligatoires
-    if (!lawyerForm.firstName || !lawyerForm.lastName || !lawyerForm.email || !lawyerForm.password) {
-      setFormError(t.allFieldsRequired);
-      scrollToTop();
-      return false;
-    }
-
-    if (lawyerForm.password !== lawyerForm.confirmPassword) {
-      setFormError(t.passwordMismatch);
-      scrollToTop();
-      return false;
-    }
-
-    if (lawyerForm.password.length < 6) {
-      setFormError(t.passwordTooShort);
-      scrollToTop();
-      return false;
-    }
-
-    if (!lawyerForm.currentCountry) {
-      setFormError(t.selectCountry);
-      scrollToTop();
-      return false;
-    }
-
-    if (lawyerForm.currentCountry === 'Autre' && !lawyerForm.customCountry) {
-      setFormError(t.specifyCountry);
-      scrollToTop();
-      return false;
-    }
-
-    if (!lawyerForm.currentPresenceCountry) {
-      setFormError(t.presenceCountryRequired);
-      scrollToTop();
-      return false;
-    }
-    
-    if (lawyerForm.practiceCountries.length === 0) {
-      setFormError(t.selectPracticeCountry);
-      scrollToTop();
-      return false;
-    }
-    
-    if (selectedLanguages.length === 0) {
-      setFormError(t.selectLanguage);
-      scrollToTop();
-      return false;
-    }
-    
-    if (lawyerForm.specialties.length === 0) {
-      setFormError(t.selectSpecialty);
-      scrollToTop();
-      return false;
-    }
-    
-    if (!lawyerForm.barNumber) {
-      setFormError(t.barNumberRequired);
-      scrollToTop();
-      return false;
-    }
-    
-    if (!lawyerForm.bio) {
-      setFormError(t.bioRequired);
-      scrollToTop();
-      return false;
-    }
-    
-    if (!lawyerForm.phone) {
-      setFormError(t.phoneRequired);
-      scrollToTop();
-      return false;
-    }
-
-    if (!lawyerForm.whatsappNumber) {
-      setFormError(t.whatsappRequired);
-      scrollToTop();
-      return false;
-    }
-
-    // Validation du format WhatsApp
-    const whatsappRegex = /^\+[1-9]\d{6,14}$/;
-    const fullWhatsappNumber = lawyerForm.whatsappCountryCode + lawyerForm.whatsappNumber;
-    if (!whatsappRegex.test(fullWhatsappNumber)) {
-      setFormError(t.whatsappInvalid);
-      scrollToTop();
-      return false;
-    }
-
-    if (!lawyerForm.profilePhoto) {
-      setFormError(t.profilePhotoRequired);
-      scrollToTop();
-      return false;
-    }
-    
-    if (lawyerForm.certifications.length === 0) {
-      setFormError(t.selectCertification);
-      scrollToTop();
-      return false;
-    }
-
-    if (!lawyerForm.price || lawyerForm.price <= 0) {
-      setFormError(t.priceInvalid);
-      scrollToTop();
-      return false;
-    }
-
-    if (!lawyerForm.duration || lawyerForm.duration <= 0) {
-      setFormError(t.durationInvalid);
-      scrollToTop();
-      return false;
-    }
-    
-    if (!lawyerForm.acceptTerms) {
-      setFormError(t.acceptTermsRequired);
-      scrollToTop();
-      return false;
-    }
-
-    return true;
-  }, [lawyerForm, selectedLanguages, emailStatus, t]);
-
-  // Soumission du formulaire avec codes ISO pour les langues
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-
-    if (!validateForm()) return;
-
-    try {
-      // Extraction des codes ISO pour l'enregistrement en base
-      const languageCodesISO = selectedLanguages.map((lang) => lang.value);
-      
-      // Création des noms complets pour l'affichage côté client
-      const languageDisplayNames = selectedLanguages.map((lang) => 
-        getLanguageDisplayName(lang.value)
-      );
-
-      console.log('🌐 Langues sélectionnées:', {
-        codesISO: languageCodesISO,
-        displayNames: languageDisplayNames,
-        selectedLanguages: selectedLanguages
-      });
-
-      // Données utilisateur compatibles avec ProfileCards
-      const userData = {
-        role: 'lawyer' as const,
-        type: 'lawyer' as const,
-        email: formData.email,
-        fullName: `${formData.firstName} ${formData.lastName}`,
-        name: `${formData.firstName} ${formData.lastName}`,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phoneCountryCode + formData.phone,
-        whatsapp: formData.whatsappCountryCode + formData.whatsappNumber,
-        phoneCountryCode: formData.phoneCountryCode,
-        whatsappCountryCode: formData.whatsappCountryCode,
-        whatsappNumber: formData.whatsappNumber,
-        currentCountry: formData.currentCountry === 'Autre' ? formData.customCountry : formData.currentCountry,
-        country: formData.currentPresenceCountry,
-        currentPresenceCountry: formData.currentPresenceCountry,
-        practiceCountries: formData.practiceCountries,
-        profilePhoto: formData.profilePhoto,
-        photoURL: formData.profilePhoto,
-        avatar: formData.profilePhoto,
-        
-        // Enregistrement avec codes ISO
-        languages: languageCodesISO,
-        languagesSpoken: languageCodesISO,
-        
-        // Noms complets pour l'affichage
-        languageDisplayNames: languageDisplayNames,
-        
-        specialties: formData.specialties,
-        certifications: formData.certifications,
-        education: formData.education,
-        barNumber: formData.barNumber,
-        yearsOfExperience: formData.yearsOfExperience,
-        graduationYear: formData.graduationYear,
-        bio: formData.bio,
-        description: formData.bio,
-        price: formData.price,
-        duration: formData.duration,
-        availability: formData.availability,
-        isOnline: formData.availability === 'available',
-        isApproved: false,
-        isVisible: true,
-        isActive: true,
-        rating: 4.5,
-        reviewCount: 0,
-        preferredLanguage: formData.preferredLanguage,
-        createdAt: serverTimestamp()
-      };
-
-      console.log('📝 Données envoyées pour l\'inscription avocat:', userData);
-
-      await register(userData, formData.password);
-      navigate('/dashboard?pending=true');
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'inscription avocat:', error);
-    }
-  }, [formData, selectedLanguages, validateForm, register, navigate, getLanguageDisplayName]);
-        preferredLanguage: formData.preferredLanguage,
-        createdAt: serverTimestamp()
-      };
-
-      console.log('📝 Données envoyées pour l\'inscription avocat:', userData);
-
-      await register(userData, formData.password);
-      navigate('/dashboard?pending=true');
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'inscription avocat:', error);
-    }
-  }, [formData, selectedLanguages, validateForm, register, navigate, getLanguageDisplayName]);
-
-  // Options mémorisées pour éviter les re-renders
-  const countrySelectOptions = useMemo(() => 
-    COUNTRY_OPTIONS.map(country => (
-      <option key={country} value={country}>{country}</option>
-    )), []
-  );
-
-  const specialtySelectOptions = useMemo(() => 
-    SPECIALTY_OPTIONS.map(specialty => (
-      <option key={specialty} value={specialty}>{specialty}</option>
-    )), []
-  );
-
-  const certificationSelectOptions = useMemo(() => 
-    CERTIFICATION_OPTIONS.map(certification => (
-      <option key={certification} value={certification}>{certification}</option>
-    )), []
-  );
-
-  const countryCodeOptions = useMemo(() => 
-    COUNTRY_CODES.map(({ code, flag, name }) => (
-      <option key={code} value={code}>{flag} {code} ({name})</option>
-    )), []
-  );
-
-  // Rendu du statut de l'email
-  const renderEmailStatus = useCallback(() => {
-    if (!lawyerForm.email) return null;
-
-    if (emailStatus.isChecking) {
-      return (
-        <div className="mt-1 flex items-center text-sm text-blue-600">
-          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
-          {t.emailChecking}
-        </div>
-      );
-    }
-
-    if (emailStatus.hasBeenChecked) {
-      if (emailStatus.isAvailable) {
-        return (
-          <div className="mt-1 flex items-center text-sm text-green-600">
-            <CheckCircle className="h-4 w-4 mr-1" />
-            {t.emailAvailable}
-          </div>
-        );
-      } else {
-        return (
-          <div className="mt-1 flex items-center text-sm text-red-600">
-            <XCircle className="h-4 w-4 mr-1" />
-            {t.emailTaken}
-          </div>
-        );
-      }
-    }
-
-    return null;
-  }, [lawyerForm.email, emailStatus, t]);
-
-  return (
-    <Layout>
-      <div className="min-h-screen bg-gray-50 py-6 sm:py-12">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* En-tête */}
-          <header className="text-center mb-6 sm:mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="bg-blue-100 rounded-full p-3 sm:p-4">
-                <Scale className="w-8 h-8 sm:w-12 sm:h-12 text-blue-600" />
-              </div>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              {t.title}
-            </h1>
-            <p className="text-sm sm:text-base text-gray-600 px-4">
-              {t.subtitle}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500 mt-2">
-              {t.alreadyRegistered} <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">{t.login}</Link>
-            </p>
-          </header>
-
-          {/* Formulaire */}
-          <main className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-8">
-            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-              {/* Messages d'erreur */}
-              {(error || formError) && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4" role="alert">
-                  <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" aria-hidden="true" />
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">
-                        Erreur d'inscription
-                      </h3>
-                      <div className="mt-2 text-sm text-red-700">
-                        {error || formError}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Section : Informations personnelles */}
-              <section className="space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                  {t.personalInfo}
-                </h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.firstName} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="firstName"
-                      name="firstName"
-                      type="text"
-                      required
-                      value={lawyerForm.firstName}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                      autoComplete="given-name"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.lastName} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="lastName"
-                      name="lastName"
-                      type="text"
-                      required
-                      value={lawyerForm.lastName}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                      autoComplete="family-name"
-                    />
-                  </div>
-                </div>
-
-                {/* ✅ Champ email avec vérification en temps réel */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.email} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      value={lawyerForm.email}
-                      onChange={handleInputChange}
-                      className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white ${
-                        emailStatus.hasBeenChecked 
-                          ? emailStatus.isAvailable 
-                            ? 'border-green-300' 
-                            : 'border-red-300'
-                          : 'border-gray-300'
-                      }`}
-                      placeholder="votre@email.com"
-                      autoComplete="email"
-                    />
-                    <Mail className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" aria-hidden="true" />
-                  </div>
-                  {/* ✅ Affichage du statut de vérification */}
-                  {renderEmailStatus()}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.password} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="password"
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={lawyerForm.password}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white"
-                        placeholder="Minimum 6 caractères"
-                        autoComplete="new-password"
-                      />
-                      <Lock className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" aria-hidden="true" />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 transition-colors"
-                        aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.confirmPassword} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        required
-                        value={lawyerForm.confirmPassword}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white"
-                        autoComplete="new-password"
-                      />
-                      <Lock className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" aria-hidden="true" />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 transition-colors"
-                        aria-label={showConfirmPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Téléphone */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label htmlFor="phoneCountryCode" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.countryCode} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <select
-                      id="phoneCountryCode"
-                      name="phoneCountryCode"
-                      value={lawyerForm.phoneCountryCode}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                    >
-                      {countryCodeOptions}
-                    </select>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.phone} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        required
-                        value={lawyerForm.phone}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white"
-                        placeholder="123456789"
-                        autoComplete="tel"
-                      />
-                      <Phone className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" aria-hidden="true" />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Numéro sans l'indicatif pays (sera ajouté automatiquement)
-                    </p>
-                  </div>
-                </div>
-
-                {/* WhatsApp */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label htmlFor="whatsappCountryCode" className="block text-sm font-medium text-gray-700 mb-1">
-                      WhatsApp - Indicatif <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <select
-                      id="whatsappCountryCode"
-                      name="whatsappCountryCode"
-                      value={lawyerForm.whatsappCountryCode}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                    >
-                      {countryCodeOptions}
-                    </select>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="whatsappNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.whatsappNumber} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="whatsappNumber"
-                      name="whatsappNumber"
-                      type="tel"
-                      required
-                      value={lawyerForm.whatsappNumber}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                      placeholder="612345678"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Numéro WhatsApp sans l'indicatif pays ni le 0 initial
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Section : Informations géographiques */}
-              <section className="space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                  {t.geographicInfo}
-                </h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="currentCountry" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.residenceCountry} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <div className="relative">
-                      <MapPin className="h-5 w-5 text-gray-400 absolute left-3 top-2.5 z-10" aria-hidden="true" />
-                      <select
-                        id="currentCountry"
-                        name="currentCountry"
-                        required
-                        value={formData.currentCountry}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white"
-                      >
-                        <option value="">Sélectionnez un pays</option>
-                        {countrySelectOptions}
-                      </select>
-                    </div>
-                    
-                    {showCustomCountry && (
-                      <div className="mt-2">
-                        <input
-                          type="text"
-                          placeholder="Précisez votre pays"
-                          value={formData.customCountry}
-                          onChange={(e) => setFormData(prev => ({ ...prev, customCountry: e.target.value }))}
-                          className={requiredFieldClasses}
-                          required={formData.currentCountry === 'Autre'}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="currentPresenceCountry" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.currentPresenceCountry} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <div className="relative">
-                      <Globe className="h-5 w-5 text-gray-400 absolute left-3 top-2.5 z-10" aria-hidden="true" />
-                      <select
-                        id="currentPresenceCountry"
-                        name="currentPresenceCountry"
-                        required
-                        value={formData.currentPresenceCountry}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white"
-                      >
-                        <option value="">Sélectionnez votre pays de présence</option>
-                        {countrySelectOptions}
-                      </select>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Pays où vous exercez actuellement (apparaîtra sur la carte et dans les recherches)
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Section : Informations professionnelles */}
-              <section className="space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                  {t.professionalInfo}
-                </h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="barNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.barNumber} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="barNumber"
-                      name="barNumber"
-                      type="text"
-                      required
-                      value={lawyerForm.barNumber}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                      placeholder="Ex: 12345"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="yearsOfExperience" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.yearsOfExperience} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="yearsOfExperience"
-                      name="yearsOfExperience"
-                      type="number"
-                      min="0"
-                      max="50"
-                      required
-                      value={formData.yearsOfExperience}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="graduationYear" className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.graduationYear} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  <input
-                    id="graduationYear"
-                    name="graduationYear"
-                    type="number"
-                    min="1980"
-                    max={new Date().getFullYear()}
-                    required
-                    value={lawyerForm.graduationYear}
-                    onChange={handleInputChange}
-                    className={requiredFieldClasses}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.bio} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  <textarea
-                    id="bio"
-                    name="bio"
-                    required
-                    value={lawyerForm.bio}
-                    onChange={handleInputChange}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical transition-all duration-200 bg-gray-50 focus:bg-white hover:bg-white"
-                    placeholder="Décrivez votre expertise, votre expérience et comment vous aidez vos clients..."
-                    maxLength={500}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {lawyerForm.bio.length}/500 - Cette description apparaîtra sur votre profil public
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.profilePhoto} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  <ImageUploader
-                    onImageUploaded={(url) => {
-                      setLawyerForm(prev => ({ ...prev, profilePhoto: url }));
-                    }}
-                    currentImage={lawyerForm.profilePhoto}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Photo professionnelle obligatoire - Format JPG/PNG recommandé
-                  </p>
-                </div>
-
-                {/* Spécialités */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.specialties} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  
-                  {lawyerForm.specialties.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {lawyerForm.specialties.map(specialty => (
-                        <div key={specialty} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center">
-                          <span>{specialty}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveSpecialty(specialty)}
-                            className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
-                            aria-label={`Supprimer la spécialité ${specialty}`}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <select
-                    onChange={handleSpecialtySelect}
-                    value=""
-                    className={requiredFieldClasses}
-                    aria-label="Ajouter une spécialité"
-                  >
-                    <option value="">Ajouter une spécialité</option>
-                    {specialtySelectOptions}
-                  </select>
-                  
-                  {showCustomSpecialty && (
-                    <div className="mt-2 flex items-center space-x-2">
-                      <input
-                        type="text"
-                        placeholder="Précisez la spécialité"
-                        value={lawyerForm.customSpecialty}
-                        onChange={(e) => setLawyerForm(prev => ({ ...prev, customSpecialty: e.target.value }))}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddCustomSpecialty}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        disabled={!lawyerForm.customSpecialty}
-                      >
-                        Ajouter
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Pays d'intervention */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.practiceCountries} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  
-                  {lawyerForm.practiceCountries.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {lawyerForm.practiceCountries.map(country => (
-                        <div key={country} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center">
-                          <span>{country}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemovePracticeCountry(country)}
-                            className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
-                            aria-label={`Supprimer le pays ${country}`}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <select
-                    onChange={handlePracticeCountrySelect}
-                    value=""
-                    className={requiredFieldClasses}
-                    aria-label="Ajouter un pays d'intervention"
-                  >
-                    <option value="">Ajouter un pays d'intervention</option>
-                    {countrySelectOptions}
-                  </select>
-                  
-                  {showCustomCountry && (
-                    <div className="mt-2 flex items-center space-x-2">
-                      <input
-                        type="text"
-                        placeholder="Précisez le pays"
-                        value={lawyerForm.customPracticeCountry}
-                        onChange={(e) => setLawyerForm(prev => ({ ...prev, customPracticeCountry: e.target.value }))}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddCustomPracticeCountry}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        disabled={!lawyerForm.customPracticeCountry}
-                      >
-                        Ajouter
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Langues parlées avec affichage des codes ISO */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.languagesSpoken} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-
-                  {/* Affichage des langues sélectionnées avec codes ISO et noms complets */}
-                  {selectedLanguages.length > 0 && (
-                    <div className="mb-3 p-3 bg-blue-50 rounded-md">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Langues sélectionnées :</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedLanguages.map((lang) => (
-                          <div key={lang.value} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center">
-                            <span className="font-medium">{lang.value.toUpperCase()}</span>
-                            <span className="mx-1">•</span>
-                            <span>{getLanguageDisplayName(lang.value)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        📌 Les codes ISO ({selectedLanguages.map(l => l.value).join(', ')}) seront enregistrés en base. 
-                        Les noms complets s'afficheront côté client.
-                      </p>
-                    </div>
-                  )}
-
-                  <MultiLanguageSelect
-                    value={selectedLanguages}
-                    onChange={setSelectedLanguages}
-                  />
-                  
-                  <p className="text-xs text-gray-500 mt-1">
-                    Sélectionnez toutes les langues que vous parlez couramment pour vos consultations
-                  </p>
-                </div>
-
-                {/* Certifications */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.certifications} <span className="text-red-600" aria-label="obligatoire">*</span>
-                  </label>
-                  
-                  {lawyerForm.certifications.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {lawyerForm.certifications.map(certification => (
-                        <div key={certification} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center">
-                          <Award size={12} className="mr-1" aria-hidden="true" />
-                          <span>{certification}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveCertification(certification)}
-                            className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
-                            aria-label={`Supprimer la certification ${certification}`}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <select
-                    onChange={handleCertificationSelect}
-                    value=""
-                    className={requiredFieldClasses}
-                    aria-label="Ajouter une certification"
-                  >
-                    <option value="">Ajouter une certification</option>
-                    {certificationSelectOptions}
-                  </select>
-                  
-                  {showCustomCertification && (
-                    <div className="mt-2 flex items-center space-x-2">
-                      <input
-                        type="text"
-                        placeholder="Précisez la certification"
-                        value={lawyerForm.customCertification}
-                        onChange={(e) => setLawyerForm(prev => ({ ...prev, customCertification: e.target.value }))}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddCustomCertification}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        disabled={!lawyerForm.customCertification}
-                      >
-                        Ajouter
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Section Tarification */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.price} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="price"
-                      name="price"
-                      type="number"
-                      min="1"
-                      max="500"
-                      required
-                      value={lawyerForm.price}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                      placeholder="49"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Prix en euros par consultation
-                    </p>
-                  </div>
-
-                  <div>
-                    <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.duration} <span className="text-red-600" aria-label="obligatoire">*</span>
-                    </label>
-                    <input
-                      id="duration"
-                      name="duration"
-                      type="number"
-                      min="15"
-                      max="120"
-                      step="5"
-                      required
-                      value={lawyerForm.duration}
-                      onChange={handleInputChange}
-                      className={requiredFieldClasses}
-                      placeholder="20"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Durée en minutes (15-120 min)
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Notice de validation */}
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4" role="region" aria-labelledby="validation-notice">
-                <div className="flex">
-                  <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0" aria-hidden="true" />
-                  <div className="ml-3">
-                    <h3 id="validation-notice" className="text-sm font-medium text-blue-800">
-                      {t.validationNotice}
-                    </h3>
-                    <div className="mt-2 text-sm text-blue-700">
-                      <p>{t.validationText}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Acceptation des conditions */}
-              <div className="flex items-start space-x-3">
-                <div className="flex items-center h-5">
-                  <input
-                    id="acceptTerms"
-                    name="acceptTerms"
-                    type="checkbox"
-                    checked={lawyerForm.acceptTerms}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                    required
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <label htmlFor="acceptTerms" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
-                    {t.acceptTerms}{' '}
-                    <Link 
-                      to="/cgu-avocats" 
-                      className="text-blue-600 hover:text-blue-700 underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {t.termsLink}
-                    </Link>
-                    <span className="text-red-600" aria-label="obligatoire"> *</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* ✅ Bouton de soumission avec vérification email */}
-              <div className="mt-6">
-                <Button
-                  type="submit"
-                  loading={isLoading}
-                  fullWidth={true}
-                  size="large"
-                  className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 transition-colors"
-                  disabled={
-                    !lawyerForm.email || 
-                    !lawyerForm.password || 
-                    !lawyerForm.firstName || 
-                    !lawyerForm.lastName || 
-                    !lawyerForm.barNumber || 
-                    !lawyerForm.acceptTerms ||
-                    emailStatus.isChecking ||
-                    !emailStatus.hasBeenChecked ||
-                    emailStatus.isAvailable === false
-                  }
-                >
-                  {emailStatus.isChecking ? 'Vérification de l\'email...' : t.createAccount}
-                </Button>
-                
-                {/* Message d'aide pour le bouton */}
-                {emailStatus.isChecking && (
-                  <p className="text-xs text-blue-600 text-center mt-2">
-                    Veuillez patienter pendant la vérification de l'email...
-                  </p>
-                )}
-                
-                {emailStatus.hasBeenChecked && emailStatus.isAvailable === false && (
-                  <p className="text-xs text-red-600 text-center mt-2">
-                    Veuillez utiliser un email différent pour continuer
-                  </p>
-                )}
-              </div>
-            </form>
-          </main>
-        </div>
-      </div>
-    </Layout>
-  );
-};
-
-export default RegisterLawyer;EmailCheck = useCallback(async (email: string) => {
+  // Debounced email check
+  const handleEmailCheck = useCallback(async (email: string) => {
     // Nettoyer le timeout précédent
     if (emailCheckTimeout) {
       clearTimeout(emailCheckTimeout);
@@ -1669,7 +667,19 @@ export default RegisterLawyer;EmailCheck = useCallback(async (email: string) => 
     if (name === 'currentCountry') {
       setShowCustomCountry(value === 'Autre');
     }
-  }, [handleEmailCheck]);
+
+    // Clear field errors
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => {
+        const { [name]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+
+    if (formError) {
+      setFormError('');
+    }
+  }, [handleEmailCheck, fieldErrors, formError]);
 
   // Gestion des pays d'intervention
   const handlePracticeCountrySelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -1686,6 +696,8 @@ export default RegisterLawyer;EmailCheck = useCallback(async (email: string) => 
         practiceCountries: [...prev.practiceCountries, selectedCountry]
       }));
     }
+    
+    e.target.value = '';
   }, [lawyerForm.practiceCountries]);
   
   const handleRemovePracticeCountry = useCallback((country: string) => {
@@ -1715,19 +727,1190 @@ export default RegisterLawyer;EmailCheck = useCallback(async (email: string) => 
       return;
     }
     
-    if (selectedSpecialty && !formData.specialties.includes(selectedSpecialty)) {
-      setFormData(prev => ({
+    if (selectedSpecialty && !lawyerForm.specialties.includes(selectedSpecialty)) {
+      setLawyerForm(prev => ({
         ...prev,
         specialties: [...prev.specialties, selectedSpecialty]
       }));
     }
-  }, [formData.specialties]);
+    
+    e.target.value = '';
+  }, [lawyerForm.specialties]);
   
   const handleRemoveSpecialty = useCallback((specialty: string) => {
-    setFormData(prev => ({
+    setLawyerForm(prev => ({
       ...prev,
       specialties: prev.specialties.filter(s => s !== specialty)
     }));
   }, []);
   
-  const handle
+  const handleAddCustomSpecialty = useCallback(() => {
+    if (lawyerForm.customSpecialty && !lawyerForm.specialties.includes(lawyerForm.customSpecialty)) {
+      setLawyerForm(prev => ({
+        ...prev,
+        specialties: [...prev.specialties, prev.customSpecialty],
+        customSpecialty: ''
+      }));
+      setShowCustomSpecialty(false);
+    }
+  }, [lawyerForm.customSpecialty, lawyerForm.specialties]);
+  
+  // Gestion des certifications
+  const handleCertificationSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCertification = e.target.value;
+    
+    if (selectedCertification === 'Autre') {
+      setShowCustomCertification(true);
+      return;
+    }
+    
+    if (selectedCertification && !lawyerForm.certifications.includes(selectedCertification)) {
+      setLawyerForm(prev => ({
+        ...prev,
+        certifications: [...prev.certifications, selectedCertification]
+      }));
+    }
+    
+    e.target.value = '';
+  }, [lawyerForm.certifications]);
+  
+  const handleRemoveCertification = useCallback((certification: string) => {
+    setLawyerForm(prev => ({
+      ...prev,
+      certifications: prev.certifications.filter(c => c !== certification)
+    }));
+  }, []);
+  
+  const handleAddCustomCertification = useCallback(() => {
+    if (lawyerForm.customCertification && !lawyerForm.certifications.includes(lawyerForm.customCertification)) {
+      setLawyerForm(prev => ({
+        ...prev,
+        certifications: [...prev.certifications, prev.customCertification],
+        customCertification: ''
+      }));
+      setShowCustomCertification(false);
+    }
+  }, [lawyerForm.customCertification, lawyerForm.certifications]);
+
+  // Validation du formulaire avec vérification email
+  const validateForm = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Vérification de l'email en premier
+    if (!emailStatus.hasBeenChecked || emailStatus.isChecking) {
+      errors.email = 'Veuillez attendre la vérification de l\'email';
+    }
+
+    if (emailStatus.isAvailable === false) {
+      errors.email = texts.emailAlreadyUsed;
+    }
+
+    // Validation des champs obligatoires
+    if (!lawyerForm.firstName.trim()) errors.firstName = texts.allFieldsRequired;
+    if (!lawyerForm.lastName.trim()) errors.lastName = texts.allFieldsRequired;
+    if (!lawyerForm.email.trim()) errors.email = texts.allFieldsRequired;
+    if (!lawyerForm.password) errors.password = texts.allFieldsRequired;
+    else if (lawyerForm.password.length < 6) errors.password = texts.passwordTooShort;
+    if (lawyerForm.password !== lawyerForm.confirmPassword) errors.confirmPassword = texts.passwordMismatch;
+    if (!lawyerForm.phone.trim()) errors.phone = texts.phoneRequired;
+    if (!lawyerForm.whatsappNumber.trim()) errors.whatsappNumber = texts.whatsappRequired;
+    if (!lawyerForm.currentCountry) errors.currentCountry = texts.selectCountry;
+    if (lawyerForm.currentCountry === 'Autre' && !lawyerForm.customCountry) errors.customCountry = texts.specifyCountry;
+    if (!lawyerForm.currentPresenceCountry) errors.currentPresenceCountry = texts.presenceCountryRequired;
+    if (lawyerForm.practiceCountries.length === 0) errors.practiceCountries = texts.selectPracticeCountry;
+    if (selectedLanguages.length === 0) errors.languages = texts.selectLanguage;
+    if (lawyerForm.specialties.length === 0) errors.specialties = texts.selectSpecialty;
+    if (!lawyerForm.barNumber.trim()) errors.barNumber = texts.barNumberRequired;
+    if (!lawyerForm.bio.trim()) errors.bio = texts.bioRequired;
+    else if (lawyerForm.bio.length < 50) errors.bio = 'La description doit contenir au moins 50 caractères';
+    if (!lawyerForm.profilePhoto) errors.profilePhoto = texts.profilePhotoRequired;
+    if (lawyerForm.certifications.length === 0) errors.certifications = texts.selectCertification;
+    if (!lawyerForm.price || lawyerForm.price <= 0) errors.price = texts.priceInvalid;
+    if (!lawyerForm.duration || lawyerForm.duration <= 0) errors.duration = texts.durationInvalid;
+    if (!lawyerForm.acceptTerms) errors.acceptTerms = texts.acceptTermsRequired;
+
+    setFieldErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      setFormError(texts.allFieldsRequired);
+      return false;
+    }
+
+    return true;
+  }, [lawyerForm, selectedLanguages, emailStatus]);
+
+  // Soumission du formulaire avec codes ISO pour les langues
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    setFormError('');
+
+    if (!validateForm()) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      // Extraction des codes ISO pour l'enregistrement en base
+      const languageCodesISO = selectedLanguages.map((lang) => lang.value);
+      
+      // Création des noms complets pour l'affichage côté client
+      const languageDisplayNames = selectedLanguages.map((lang) => 
+        getLanguageDisplayName(lang.value)
+      );
+
+      console.log('🌐 Langues sélectionnées:', {
+        codesISO: languageCodesISO,
+        displayNames: languageDisplayNames,
+        selectedLanguages: selectedLanguages
+      });
+
+      // Données utilisateur compatibles avec ProfileCards
+      const userData = {
+        role: 'lawyer' as const,
+        type: 'lawyer' as const,
+        email: lawyerForm.email.trim().toLowerCase(),
+        fullName: `${lawyerForm.firstName.trim()} ${lawyerForm.lastName.trim()}`,
+        name: `${lawyerForm.firstName.trim()} ${lawyerForm.lastName.trim()}`,
+        firstName: lawyerForm.firstName.trim(),
+        lastName: lawyerForm.lastName.trim(),
+        phone: lawyerForm.phoneCountryCode + lawyerForm.phone.trim(),
+        whatsapp: lawyerForm.whatsappCountryCode + lawyerForm.whatsappNumber.trim(),
+        phoneCountryCode: lawyerForm.phoneCountryCode,
+        whatsappCountryCode: lawyerForm.whatsappCountryCode,
+        whatsappNumber: lawyerForm.whatsappNumber.trim(),
+        currentCountry: lawyerForm.currentCountry === 'Autre' ? lawyerForm.customCountry : lawyerForm.currentCountry,
+        country: lawyerForm.currentPresenceCountry,
+        currentPresenceCountry: lawyerForm.currentPresenceCountry,
+        practiceCountries: lawyerForm.practiceCountries,
+        profilePhoto: lawyerForm.profilePhoto,
+        photoURL: lawyerForm.profilePhoto,
+        avatar: lawyerForm.profilePhoto,
+        
+        // Enregistrement avec codes ISO
+        languages: languageCodesISO,
+        languagesSpoken: languageCodesISO,
+        
+        // Noms complets pour l'affichage
+        languageDisplayNames: languageDisplayNames,
+        
+        specialties: lawyerForm.specialties,
+        certifications: lawyerForm.certifications,
+        education: lawyerForm.education,
+        barNumber: lawyerForm.barNumber.trim(),
+        yearsOfExperience: lawyerForm.yearsOfExperience,
+        graduationYear: lawyerForm.graduationYear,
+        bio: lawyerForm.bio.trim(),
+        description: lawyerForm.bio.trim(),
+        price: lawyerForm.price,
+        duration: lawyerForm.duration,
+        availability: lawyerForm.availability,
+        isOnline: lawyerForm.availability === 'available',
+        isApproved: false,
+        isVisible: true,
+        isActive: true,
+        rating: 4.5,
+        reviewCount: 0,
+        preferredLanguage: lawyerForm.preferredLanguage,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      console.log('📝 Données envoyées pour l\'inscription avocat:', userData);
+
+      await register(userData, lawyerForm.password);
+      
+      navigate('/dashboard', { 
+        state: { 
+          message: 'Inscription réussie ! Votre compte sera validé sous 24h.',
+          type: 'success'
+        } 
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'inscription avocat:', error);
+      
+      if (error.code === 'auth/email-already-in-use') {
+        setFieldErrors(prev => ({ ...prev, email: texts.emailAlreadyUsed }));
+        setFormError(texts.emailAlreadyUsed);
+      } else if (error.code === 'auth/network-request-failed') {
+        setFormError('Erreur de connexion réseau');
+      } else {
+        setFormError(error.message || 'Erreur lors de l\'inscription');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [lawyerForm, selectedLanguages, validateForm, register, navigate, getLanguageDisplayName, isSubmitting]);
+
+  // Options mémorisées pour éviter les re-renders
+  const countrySelectOptions = useMemo(() => 
+    COUNTRY_OPTIONS.map(country => (
+      <option key={country} value={country}>{country}</option>
+    )), []
+  );
+
+  const specialtySelectOptions = useMemo(() => 
+    SPECIALTY_OPTIONS.map(specialty => (
+      <option key={specialty} value={specialty}>{specialty}</option>
+    )), []
+  );
+
+  const certificationSelectOptions = useMemo(() => 
+    CERTIFICATION_OPTIONS.map(certification => (
+      <option key={certification} value={certification}>{certification}</option>
+    )), []
+  );
+
+  const countryCodeOptions = useMemo(() => 
+    COUNTRY_CODES.map(({ code, flag, name }) => (
+      <option key={code} value={code}>{flag} {code} ({name})</option>
+    )), []
+  );
+
+  // Rendu du statut de l'email
+  const renderEmailStatus = useCallback(() => {
+    if (!lawyerForm.email) return null;
+
+    if (emailStatus.isChecking) {
+      return (
+        <div className="mt-1 flex items-center text-sm text-blue-600">
+          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+          {texts.emailChecking}
+        </div>
+      );
+    }
+
+    if (emailStatus.hasBeenChecked) {
+      if (emailStatus.isAvailable) {
+        return (
+          <div className="mt-1 flex items-center text-sm text-green-600">
+            <CheckCircle className="h-4 w-4 mr-1" />
+            {texts.emailAvailable}
+          </div>
+        );
+      } else {
+        return (
+          <div className="mt-1 flex items-center text-sm text-red-600">
+            <XCircle className="h-4 w-4 mr-1" />
+            {texts.emailTaken}
+          </div>
+        );
+      }
+    }
+
+    return null;
+  }, [lawyerForm.email, emailStatus]);
+
+  // Vérification de soumission
+  const canSubmit = useMemo(() => {
+    return lawyerForm.email && 
+           lawyerForm.password && 
+           lawyerForm.firstName && 
+           lawyerForm.lastName && 
+           lawyerForm.barNumber && 
+           lawyerForm.acceptTerms &&
+           lawyerForm.bio &&
+           lawyerForm.profilePhoto &&
+           selectedLanguages.length > 0 &&
+           lawyerForm.specialties.length > 0 &&
+           lawyerForm.certifications.length > 0 &&
+           lawyerForm.practiceCountries.length > 0 &&
+           Object.keys(fieldErrors).length === 0 &&
+           !isLoading && 
+           !isSubmitting;
+  }, [lawyerForm, selectedLanguages, fieldErrors, isLoading, isSubmitting]);
+
+  return (
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-50 py-8">
+        <div className="max-w-2xl mx-auto px-4">
+          
+          <ProgressBar progress={formProgress} />
+
+          {/* Header */}
+          <header className="text-center mb-8">
+            <h1 className="text-4xl font-black mb-4">
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {texts.title}
+              </span>
+            </h1>
+            
+            <p className="text-base text-gray-700 mb-6 font-medium">
+              {texts.subtitle}
+            </p>
+            
+            <div className="bg-white rounded-xl p-4 shadow-md border border-blue-200 inline-block">
+              <p className="text-gray-700 font-medium">
+                {texts.alreadyRegistered}{' '}
+                <Link 
+                  to="/login" 
+                  className="text-blue-600 hover:text-blue-700 font-bold underline"
+                >
+                  {texts.login} →
+                </Link>
+              </p>
+            </div>
+          </header>
+
+          {/* Formulaire */}
+          <main className="bg-white rounded-2xl shadow-lg border overflow-hidden">
+            <form onSubmit={handleSubmit} className="divide-y divide-gray-50" noValidate>
+              
+              {/* Messages d'erreur */}
+              {(error || formError) && (
+                <div className="p-6 bg-red-50 border-l-4 border-red-500">
+                  <div className="flex items-start">
+                    <AlertCircle className="h-6 w-6 text-red-500 mr-3 mt-0.5" />
+                    <div>
+                      <h3 className="text-lg font-bold text-red-800 mb-2">
+                        Erreur lors de l'inscription
+                      </h3>
+                      <div className="text-red-700">
+                        {error || formError}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section 1: Informations personnelles */}
+              <section className="p-6 space-y-6">
+                <SectionHeader
+                  icon={<Users className="w-6 h-6" />}
+                  title={texts.personalInfo}
+                  subtitle="Commençons par vous connaître"
+                  step={1}
+                  totalSteps={4}
+                />
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    id="firstName"
+                    name="firstName"
+                    label={texts.firstName}
+                    type="text"
+                    required
+                    value={lawyerForm.firstName}
+                    onChange={handleInputChange}
+                    autoComplete="given-name"
+                    error={fieldErrors.firstName}
+                    placeholder="Jean"
+                  />
+
+                  <FormField
+                    id="lastName"
+                    name="lastName"
+                    label={texts.lastName}
+                    type="text"
+                    required
+                    value={lawyerForm.lastName}
+                    onChange={handleInputChange}
+                    autoComplete="family-name"
+                    error={fieldErrors.lastName}
+                    placeholder="Dupont"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label htmlFor="email" className="block text-sm font-bold text-gray-800">
+                    {texts.email} <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      value={lawyerForm.email}
+                      onChange={handleInputChange}
+                      className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl font-medium transition-all duration-300 bg-white focus:outline-none ${
+                        emailStatus.hasBeenChecked 
+                          ? emailStatus.isAvailable 
+                            ? 'border-green-300 focus:border-green-500' 
+                            : 'border-red-300 focus:border-red-500'
+                          : fieldErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-500'
+                      }`}
+                      placeholder="avocat@example.com"
+                      autoComplete="email"
+                    />
+                  </div>
+                  {renderEmailStatus()}
+                  {fieldErrors.email && (
+                    <p className="text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.email}
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <label htmlFor="password" className="block text-sm font-bold text-gray-800">
+                      {texts.password} <span className="text-red-500 ml-1">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
+                      <input
+                        id="password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={lawyerForm.password}
+                        onChange={handleInputChange}
+                        autoComplete="new-password"
+                        className={`w-full pl-12 pr-16 py-3 border-2 rounded-xl font-medium transition-all duration-300 bg-white focus:outline-none ${
+                          fieldErrors.password ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-500'
+                        }`}
+                        placeholder="Mot de passe"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                    {fieldErrors.password && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {fieldErrors.password}
+                      </p>
+                    )}
+                    {lawyerForm.password && (
+                      <div className="text-sm">
+                        Force du mot de passe: <span className={`font-bold ${
+                          lawyerForm.password.length < 6 ? 'text-red-500' : 
+                          lawyerForm.password.length < 10 ? 'text-orange-500' : 'text-green-500'
+                        }`}>
+                          {lawyerForm.password.length < 6 ? 'Faible' : 
+                           lawyerForm.password.length < 10 ? 'Moyen' : 'Solide'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <label htmlFor="confirmPassword" className="block text-sm font-bold text-gray-800">
+                      {texts.confirmPassword} <span className="text-red-500 ml-1">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
+                      <input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        required
+                        value={lawyerForm.confirmPassword}
+                        onChange={handleInputChange}
+                        autoComplete="new-password"
+                        className={`w-full pl-12 pr-16 py-3 border-2 rounded-xl font-medium transition-all duration-300 bg-white focus:outline-none ${
+                          fieldErrors.confirmPassword ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-500'
+                        }`}
+                        placeholder="Confirmer"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                    {fieldErrors.confirmPassword && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {fieldErrors.confirmPassword}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section téléphone */}
+                <div className="bg-gray-50 rounded-xl p-4 border">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
+                    <Phone className="w-5 h-5 text-blue-600 mr-3" />
+                    Informations de contact
+                  </h3>
+                  
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label htmlFor="phoneCountryCode" className="block text-sm font-bold text-gray-800 mb-2">
+                        Code pays <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        id="phoneCountryCode"
+                        name="phoneCountryCode"
+                        value={lawyerForm.phoneCountryCode}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-blue-500"
+                      >
+                        {countryCodeOptions}
+                      </select>
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <FormField
+                        id="phone"
+                        name="phone"
+                        label="Téléphone"
+                        type="tel"
+                        required
+                        value={lawyerForm.phone}
+                        onChange={handleInputChange}
+                        error={fieldErrors.phone}
+                        placeholder="123456789"
+                        autoComplete="tel"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label htmlFor="whatsappCountryCode" className="block text-sm font-bold text-gray-800 mb-2">
+                        WhatsApp <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        id="whatsappCountryCode"
+                        name="whatsappCountryCode"
+                        value={lawyerForm.whatsappCountryCode}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-green-500"
+                      >
+                        {countryCodeOptions}
+                      </select>
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <FormField
+                        id="whatsappNumber"
+                        name="whatsappNumber"
+                        label="Numéro WhatsApp"
+                        type="tel"
+                        required
+                        value={lawyerForm.whatsappNumber}
+                        onChange={handleInputChange}
+                        error={fieldErrors.whatsappNumber}
+                        placeholder="612345678"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Section 2: Informations géographiques */}
+              <section className="p-6 space-y-6">
+                <SectionHeader
+                  icon={<Globe className="w-6 h-6" />}
+                  title={texts.geographicInfo}
+                  subtitle="Où exercez-vous ?"
+                  step={2}
+                  totalSteps={4}
+                />
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="currentCountry" className="block text-sm font-bold text-gray-800 mb-3">
+                      {texts.residenceCountry} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 z-10" />
+                      <select
+                        id="currentCountry"
+                        name="currentCountry"
+                        required
+                        value={lawyerForm.currentCountry}
+                        onChange={handleInputChange}
+                        className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none ${
+                          fieldErrors.currentCountry ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="">Sélectionnez votre pays</option>
+                        {countrySelectOptions}
+                      </select>
+                    </div>
+                    {fieldErrors.currentCountry && (
+                      <p className="text-sm text-red-600 flex items-center mt-2">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {fieldErrors.currentCountry}
+                      </p>
+                    )}
+                    
+                    {showCustomCountry && (
+                      <div className="mt-4 p-4 bg-blue-50 rounded-xl border">
+                        <input
+                          type="text"
+                          placeholder="Précisez votre pays"
+                          value={lawyerForm.customCountry}
+                          onChange={(e) => setLawyerForm(prev => ({ ...prev, customCountry: e.target.value }))}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
+                          required={lawyerForm.currentCountry === 'Autre'}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="currentPresenceCountry" className="block text-sm font-bold text-gray-800 mb-3">
+                      {texts.currentPresenceCountry} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Globe className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 z-10" />
+                      <select
+                        id="currentPresenceCountry"
+                        name="currentPresenceCountry"
+                        required
+                        value={lawyerForm.currentPresenceCountry}
+                        onChange={handleInputChange}
+                        className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none ${
+                          fieldErrors.currentPresenceCountry ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="">Sélectionnez votre pays de présence</option>
+                        {countrySelectOptions}
+                      </select>
+                    </div>
+                    {fieldErrors.currentPresenceCountry && (
+                      <p className="text-sm text-red-600 flex items-center mt-2">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {fieldErrors.currentPresenceCountry}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">
+                      Pays où vous exercez actuellement (apparaîtra sur la carte)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pays d'intervention */}
+                <div className="bg-gray-50 rounded-xl p-4 border">
+                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <MapPin className="w-5 h-5 text-green-600 mr-3" />
+                    {texts.practiceCountries} <span className="text-red-500 ml-2">*</span>
+                  </label>
+                  
+                  <TagSelector
+                    items={lawyerForm.practiceCountries}
+                    onRemove={handleRemovePracticeCountry}
+                    color="green"
+                  />
+                  
+                  <select
+                    onChange={handlePracticeCountrySelect}
+                    value=""
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-green-500"
+                  >
+                    <option value="">Ajouter un pays d'intervention</option>
+                    {countrySelectOptions}
+                  </select>
+                  
+                  {fieldErrors.practiceCountries && (
+                    <p className="text-sm text-red-600 flex items-center mt-3">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.practiceCountries}
+                    </p>
+                  )}
+                  
+                  {showCustomCountry && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-xl border">
+                      <div className="flex gap-4">
+                        <input
+                          type="text"
+                          placeholder="Précisez le pays"
+                          value={lawyerForm.customPracticeCountry}
+                          onChange={(e) => setLawyerForm(prev => ({ ...prev, customPracticeCountry: e.target.value }))}
+                          className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomPracticeCountry}
+                          disabled={!lawyerForm.customPracticeCountry.trim()}
+                          className="px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 font-bold"
+                        >
+                          Ajouter
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Section 3: Informations professionnelles */}
+              <section className="p-6 space-y-6">
+                <SectionHeader
+                  icon={<Scale className="w-6 h-6" />}
+                  title={texts.professionalInfo}
+                  subtitle="Votre expertise juridique"
+                  step={3}
+                  totalSteps={4}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <FormField
+                    id="barNumber"
+                    name="barNumber"
+                    label={texts.barNumber}
+                    type="text"
+                    required
+                    value={lawyerForm.barNumber}
+                    onChange={handleInputChange}
+                    error={fieldErrors.barNumber}
+                    placeholder="Ex: 12345"
+                  />
+
+                  <FormField
+                    id="yearsOfExperience"
+                    name="yearsOfExperience"
+                    label={texts.yearsOfExperience}
+                    type="number"
+                    required
+                    value={lawyerForm.yearsOfExperience}
+                    onChange={handleInputChange}
+                    error={fieldErrors.yearsOfExperience}
+                    min={0}
+                    max={50}
+                    placeholder="5"
+                  />
+                </div>
+
+                <FormField
+                  id="graduationYear"
+                  name="graduationYear"
+                  label={texts.graduationYear}
+                  type="number"
+                  required
+                  value={lawyerForm.graduationYear}
+                  onChange={handleInputChange}
+                  error={fieldErrors.graduationYear}
+                  min={1980}
+                  max={new Date().getFullYear()}
+                  placeholder="2015"
+                />
+
+                {/* Spécialités */}
+                <div className="bg-gray-50 rounded-xl p-4 border">
+                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <Award className="w-5 h-5 text-purple-600 mr-3" />
+                    {texts.specialties} <span className="text-red-500 ml-2">*</span>
+                  </label>
+                  
+                  <TagSelector
+                    items={lawyerForm.specialties}
+                    onRemove={handleRemoveSpecialty}
+                    color="blue"
+                  />
+                  
+                  <select
+                    onChange={handleSpecialtySelect}
+                    value=""
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">Ajouter une spécialité</option>
+                    {specialtySelectOptions}
+                  </select>
+                  
+                  {fieldErrors.specialties && (
+                    <p className="text-sm text-red-600 flex items-center mt-3">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.specialties}
+                    </p>
+                  )}
+                  
+                  {showCustomSpecialty && (
+                    <div className="mt-4 p-4 bg-purple-50 rounded-xl border">
+                      <div className="flex gap-4">
+                        <input
+                          type="text"
+                          placeholder="Précisez la spécialité"
+                          value={lawyerForm.customSpecialty}
+                          onChange={(e) => setLawyerForm(prev => ({ ...prev, customSpecialty: e.target.value }))}
+                          className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomSpecialty}
+                          disabled={!lawyerForm.customSpecialty.trim()}
+                          className="px-6 py-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 disabled:opacity-50 font-bold"
+                        >
+                          Ajouter
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Certifications */}
+                <div className="bg-gray-50 rounded-xl p-4 border">
+                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <CheckCircle className="w-5 h-5 text-indigo-600 mr-3" />
+                    {texts.certifications} <span className="text-red-500 ml-2">*</span>
+                  </label>
+                  
+                  <TagSelector
+                    items={lawyerForm.certifications}
+                    onRemove={handleRemoveCertification}
+                    color="blue"
+                  />
+                  
+                  <select
+                    onChange={handleCertificationSelect}
+                    value=""
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">Ajouter une certification</option>
+                    {certificationSelectOptions}
+                  </select>
+                  
+                  {fieldErrors.certifications && (
+                    <p className="text-sm text-red-600 flex items-center mt-3">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.certifications}
+                    </p>
+                  )}
+                  
+                  {showCustomCertification && (
+                    <div className="mt-4 p-4 bg-indigo-50 rounded-xl border">
+                      <div className="flex gap-4">
+                        <input
+                          type="text"
+                          placeholder="Précisez la certification"
+                          value={lawyerForm.customCertification}
+                          onChange={(e) => setLawyerForm(prev => ({ ...prev, customCertification: e.target.value }))}
+                          className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-indigo-500 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomCertification}
+                          disabled={!lawyerForm.customCertification.trim()}
+                          className="px-6 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 disabled:opacity-50 font-bold"
+                        >
+                          Ajouter
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Langues parlées */}
+                <div className="bg-gray-50 rounded-xl p-4 border">
+                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <span className="text-xl mr-3">🗣️</span>
+                    {texts.languagesSpoken} <span className="text-red-500 ml-2">*</span>
+                  </label>
+                  
+                  {selectedLanguages.length > 0 && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-md">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Langues sélectionnées :</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedLanguages.map((lang) => (
+                          <div key={lang.value} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center">
+                            <span className="font-medium">{lang.value.toUpperCase()}</span>
+                            <span className="mx-1">•</span>
+                            <span>{getLanguageDisplayName(lang.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        📌 Les codes ISO ({selectedLanguages.map(l => l.value).join(', ')}) seront enregistrés en base. 
+                        Les noms complets s'afficheront côté client.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <MultiLanguageSelect
+                      value={selectedLanguages}
+                      onChange={(value) => {
+                        setSelectedLanguages(value);
+                        
+                        if ((value as LanguageOption[]).length > 0 && fieldErrors.languages) {
+                          setFieldErrors(prev => {
+                            const { languages: _, ...rest } = prev;
+                            return rest;
+                          });
+                        }
+                      }}
+                    />
+                  </Suspense>
+                  
+                  {fieldErrors.languages && (
+                    <p className="text-sm text-red-600 flex items-center mt-3">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.languages}
+                    </p>
+                  )}
+                  
+                  <p className="text-xs text-gray-500 mt-2">
+                    Sélectionnez toutes les langues que vous parlez couramment pour vos consultations
+                  </p>
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <label htmlFor="bio" className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <span className="text-xl mr-3">📝</span>
+                    {texts.bio} <span className="text-red-500 ml-2">*</span>
+                  </label>
+                  <textarea
+                    id="bio"
+                    name="bio"
+                    required
+                    value={lawyerForm.bio}
+                    onChange={handleInputChange}
+                    rows={5}
+                    maxLength={500}
+                    className={`w-full px-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none min-h-[120px] resize-y ${
+                      fieldErrors.bio ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-500'
+                    }`}
+                    placeholder="Décrivez votre parcours professionnel, vos spécialisations et comment vous pouvez aider les expatriés francophones..."
+                  />
+                  {fieldErrors.bio && (
+                    <p className="text-sm text-red-600 flex items-center mt-2">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.bio}
+                    </p>
+                  )}
+                  <div className="flex justify-between text-sm mt-3">
+                    <div className="text-gray-600">
+                      {lawyerForm.bio.length < 50 ? (
+                        <span className="text-orange-600 font-medium">
+                          Plus que {50 - lawyerForm.bio.length} caractères pour valider ce champ
+                        </span>
+                      ) : (
+                        <span className="text-green-600 font-medium">✓ Champ validé</span>
+                      )}
+                    </div>
+                    <span className={`font-bold ${lawyerForm.bio.length > 450 ? 'text-orange-500' : 'text-gray-500'}`}>
+                      {lawyerForm.bio.length}/500
+                    </span>
+                  </div>
+                </div>
+
+                {/* Photo de profil */}
+                <div className="bg-gray-50 rounded-xl p-4 border">
+                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <Camera className="w-5 h-5 text-pink-600 mr-3" />
+                    {texts.profilePhoto} <span className="text-red-500 ml-2">*</span>
+                  </label>
+                  
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <ImageUploader
+                      onImageUploaded={(url) => {
+                        setLawyerForm(prev => ({ ...prev, profilePhoto: url }));
+                        
+                        if (fieldErrors.profilePhoto) {
+                          setFieldErrors(prev => {
+                            const { profilePhoto: _, ...rest } = prev;
+                            return rest;
+                          });
+                        }
+                      }}
+                      currentImage={lawyerForm.profilePhoto}
+                    />
+                  </Suspense>
+                  
+                  {fieldErrors.profilePhoto && (
+                    <p className="text-sm text-red-600 flex items-center mt-3">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.profilePhoto}
+                    </p>
+                  )}
+                  
+                  <p className="text-xs text-gray-500 mt-2">
+                    Photo professionnelle obligatoire - Format JPG/PNG recommandé
+                  </p>
+                </div>
+              </section>
+
+              {/* Section 4: Tarification */}
+              <section className="p-6 space-y-6">
+                <SectionHeader
+                  icon={<Heart className="w-6 h-6" />}
+                  title={texts.pricingInfo}
+                  subtitle="Définissez vos tarifs"
+                  step={4}
+                  totalSteps={4}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <FormField
+                    id="price"
+                    name="price"
+                    label={texts.price}
+                    type="number"
+                    required
+                    value={lawyerForm.price}
+                    onChange={handleInputChange}
+                    error={fieldErrors.price}
+                    min={1}
+                    max={500}
+                    placeholder="49"
+                  />
+
+                  <FormField
+                    id="duration"
+                    name="duration"
+                    label={texts.duration}
+                    type="number"
+                    required
+                    value={lawyerForm.duration}
+                    onChange={handleInputChange}
+                    error={fieldErrors.duration}
+                    min={15}
+                    max={120}
+                    placeholder="30"
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mr-3" />
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-800">
+                        {texts.validationNotice}
+                      </h3>
+                      <p className="mt-1 text-sm text-blue-700">
+                        {texts.validationText}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Conditions générales et soumission */}
+              <section className="p-6 space-y-6 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600">
+                <div className="bg-white rounded-xl p-6 shadow-lg">
+                  <div className="flex items-start space-x-4">
+                    <input
+                      type="checkbox"
+                      id="acceptTerms"
+                      checked={lawyerForm.acceptTerms}
+                      onChange={(e) => setLawyerForm(prev => ({ ...prev, acceptTerms: e.target.checked }))}
+                      className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
+                      required
+                    />
+                    <label htmlFor="acceptTerms" className="text-sm text-gray-700 font-medium">
+                      {texts.acceptTerms}{' '}
+                      <Link 
+                        to="/cgu-avocats" 
+                        className="text-blue-600 hover:text-blue-700 underline font-bold"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {texts.termsLink}
+                      </Link>{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
+                  </div>
+                  {fieldErrors.acceptTerms && (
+                    <p className="text-sm text-red-600 flex items-center mt-3 ml-9">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      {fieldErrors.acceptTerms}
+                    </p>
+                  )}
+                </div>
+
+                {/* Bouton de soumission */}
+                <div className="text-center">
+                  <Button
+                    type="submit"
+                    loading={isLoading || isSubmitting}
+                    fullWidth={true}
+                    size="large"
+                    className={`
+                      ${canSubmit 
+                        ? 'bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-700 hover:from-blue-600 hover:via-purple-700 hover:to-indigo-800 shadow-xl' 
+                        : 'bg-gray-400 cursor-not-allowed opacity-60'
+                      } 
+                      text-white font-black py-4 px-6 rounded-2xl text-lg w-full
+                    `}
+                    disabled={!canSubmit}
+                  >
+                    {isLoading || isSubmitting ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-4 border-white border-t-transparent mr-3"></div>
+                        <span>{texts.loading}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center">
+                        <Scale className="w-6 h-6 mr-3" />
+                        <span>
+                          {canSubmit 
+                            ? `${texts.createAccount} ⚖️` 
+                            : `Compléter (${formProgress}%)`
+                          }
+                        </span>
+                      </div>
+                    )}
+                  </Button>
+                  
+                  {/* Indicateur de progression */}
+                  {!canSubmit && (
+                    <div className="mt-4">
+                      <div className="bg-white bg-opacity-20 rounded-xl px-6 py-3 inline-block">
+                        <p className="text-white font-bold text-sm">
+                          ⚠️ Complétion: {formProgress}% - Plus que quelques champs !
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {canSubmit && (
+                    <div className="mt-4">
+                      <div className="bg-green-500 bg-opacity-20 rounded-xl px-6 py-3 inline-block border border-green-400 border-opacity-50">
+                        <p className="text-white font-bold text-sm">
+                          ✅ Formulaire complet - Prêt pour l'inscription !
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center pt-4">
+                  <p className="text-xs text-white text-opacity-80 font-medium">
+                    🔒 Données protégées • Validation sous 24h • Support juridique
+                  </p>
+                </div>
+              </section>
+            </form>
+          </main>
+
+          {/* Footer */}
+          <footer className="text-center mt-8 space-y-6">
+            <div className="bg-white rounded-xl p-6 shadow-lg border">
+              <h3 className="text-xl font-black text-gray-900 mb-3">
+                ⚖️ Rejoignez le réseau d'avocats SOS Expat
+              </h3>
+              <p className="text-sm text-gray-700 font-medium">
+                En vous inscrivant, vous rejoignez un réseau de <strong className="text-blue-600">plus de 500 avocats vérifiés</strong> 
+                spécialisés dans l'accompagnement des expatriés francophones.
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-500 font-medium">
+              <Link to="/confidentialite" className="hover:text-blue-600 underline">
+                🔒 Confidentialité
+              </Link>
+              <Link to="/cgu-avocats" className="hover:text-purple-600 underline">
+                📋 CGU Avocats
+              </Link>
+              <Link to="/aide" className="hover:text-green-600 underline">
+                💬 Aide
+              </Link>
+              <Link to="/contact" className="hover:text-orange-600 underline">
+                📧 Contact
+              </Link>
+            </div>
+          </footer>
+        </div>
+      </div>
+    </Layout>
+  );
+};
+
+export default RegisterLawyer;

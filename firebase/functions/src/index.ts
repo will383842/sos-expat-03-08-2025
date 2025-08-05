@@ -26,25 +26,74 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// Initialiser Twilio avec vos credentials
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
+// ========================================
+// CONFIGURATION SÉCURISÉE DES SERVICES
+// ========================================
 
-// Initialiser Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
-});
-
-// Initialiser le service d'email (exemple avec Gmail/SMTP)
-const emailTransporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER || 'notifications@sosexpats.com',
-    pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+// Configuration Twilio avec gestion d'erreurs
+let twilioClient: twilio.Twilio | null = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  try {
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    console.log('✅ Twilio configuré avec succès');
+  } catch (error) {
+    console.error('❌ Erreur configuration Twilio:', error);
+    twilioClient = null;
   }
-});
+} else {
+  console.warn('⚠️ Twilio non configuré - Variables d\'environnement manquantes:', {
+    TWILIO_ACCOUNT_SID: !!process.env.TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN: !!process.env.TWILIO_AUTH_TOKEN
+  });
+}
+
+// Configuration Stripe avec gestion d'erreurs
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')) {
+  try {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
+    });
+    console.log('✅ Stripe configuré avec succès');
+  } catch (error) {
+    console.error('❌ Erreur configuration Stripe:', error);
+    stripe = null;
+  }
+} else {
+  console.warn('⚠️ Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide:', {
+    exists: !!process.env.STRIPE_SECRET_KEY,
+    format: process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.substring(0, 3) + '...' : 'N/A'
+  });
+}
+
+// Configuration Email avec gestion d'erreurs
+let emailTransporter: nodemailer.Transporter | null = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+  try {
+    emailTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+    console.log('✅ Email configuré avec succès');
+  } catch (error) {
+    console.error('❌ Erreur configuration Email:', error);
+    emailTransporter = null;
+  }
+} else {
+  console.warn('⚠️ Email non configuré - Variables d\'environnement manquantes:', {
+    EMAIL_USER: !!process.env.EMAIL_USER,
+    EMAIL_PASSWORD: !!process.env.EMAIL_PASSWORD
+  });
+}
+
+// Export du client Twilio pour TwilioCallManager
+export { twilioClient };
 
 // Promisifier exec pour l'utiliser avec async/await
 const execAsync = promisify(exec);
@@ -63,7 +112,7 @@ interface NotificationData {
 }
 
 // Import des webhooks Twilio existants (pas de re-définition)
-export { twilioWebhook, twilioClientWebhook } from './twilioWebhooks';
+export { twilioWebhook, twilioClientWebhook } from './Webhooks/twilioWebhooks';
 
 // Fonction Cloud pour envoyer des notifications
 export const sendEmail = onCall(
@@ -95,56 +144,64 @@ export const sendEmail = onCall(
 
       // 1. Envoyer l'email
       if (recipientEmail && emailSubject && emailHtml) {
-        try {
-          await emailTransporter.sendMail({
-            from: '"SOS Expats" <notifications@sosexpats.com>',
-            to: recipientEmail,
-            subject: emailSubject,
-            html: emailHtml,
-            priority: 'high'
-          });
-          results.push({ channel: 'email', success: true });
-          console.log('✅ Email envoyé à:', recipientEmail);
-        } catch (emailError: any) {
-          console.error('❌ Erreur email:', emailError);
-          results.push({ channel: 'email', success: false, error: emailError.message });
+        if (emailTransporter) {
+          try {
+            await emailTransporter.sendMail({
+              from: '"SOS Expats" <notifications@sosexpats.com>',
+              to: recipientEmail,
+              subject: emailSubject,
+              html: emailHtml,
+              priority: 'high'
+            });
+            results.push({ channel: 'email', success: true });
+            console.log('✅ Email envoyé à:', recipientEmail);
+          } catch (emailError: any) {
+            console.error('❌ Erreur email:', emailError);
+            results.push({ channel: 'email', success: false, error: emailError.message });
+          }
+        } else {
+          results.push({ channel: 'email', success: false, error: 'Service email non configuré' });
         }
       }
 
       // 2. Envoyer le SMS via Twilio
-      if (recipientPhone && smsMessage && twilioClient) {
-        try {
-          await twilioClient.messages.create({
-            body: smsMessage,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: recipientPhone
-          });
-          results.push({ channel: 'sms', success: true });
-          console.log('✅ SMS envoyé à:', recipientPhone);
-        } catch (smsError: any) {
-          console.error('❌ Erreur SMS:', smsError);
-          results.push({ channel: 'sms', success: false, error: smsError.message });
+      if (recipientPhone && smsMessage) {
+        if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
+          try {
+            await twilioClient.messages.create({
+              body: smsMessage,
+              from: process.env.TWILIO_PHONE_NUMBER,
+              to: recipientPhone
+            });
+            results.push({ channel: 'sms', success: true });
+            console.log('✅ SMS envoyé à:', recipientPhone);
+          } catch (smsError: any) {
+            console.error('❌ Erreur SMS:', smsError);
+            results.push({ channel: 'sms', success: false, error: smsError.message });
+          }
+        } else {
+          results.push({ channel: 'sms', success: false, error: 'Service SMS non configuré' });
         }
-      } else if (recipientPhone && smsMessage) {
-        results.push({ channel: 'sms', success: false, error: 'Twilio not configured' });
       }
 
       // 3. Envoyer WhatsApp via Twilio
-      if (recipientPhone && whatsappMessage && twilioClient) {
-        try {
-          await twilioClient.messages.create({
-            body: whatsappMessage,
-            from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-            to: `whatsapp:${recipientPhone}`
-          });
-          results.push({ channel: 'whatsapp', success: true });
-          console.log('✅ WhatsApp envoyé à:', recipientPhone);
-        } catch (whatsappError: any) {
-          console.error('❌ Erreur WhatsApp:', whatsappError);
-          results.push({ channel: 'whatsapp', success: false, error: whatsappError.message });
+      if (recipientPhone && whatsappMessage) {
+        if (twilioClient && process.env.TWILIO_WHATSAPP_NUMBER) {
+          try {
+            await twilioClient.messages.create({
+              body: whatsappMessage,
+              from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+              to: `whatsapp:${recipientPhone}`
+            });
+            results.push({ channel: 'whatsapp', success: true });
+            console.log('✅ WhatsApp envoyé à:', recipientPhone);
+          } catch (whatsappError: any) {
+            console.error('❌ Erreur WhatsApp:', whatsappError);
+            results.push({ channel: 'whatsapp', success: false, error: whatsappError.message });
+          }
+        } else {
+          results.push({ channel: 'whatsapp', success: false, error: 'Service WhatsApp non configuré' });
         }
-      } else if (recipientPhone && whatsappMessage) {
-        results.push({ channel: 'whatsapp', success: false, error: 'Twilio not configured' });
       }
 
       // Enregistrer les résultats dans Firestore
@@ -264,9 +321,33 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
     );
   }
 
+  // Vérifier que Stripe est configuré
+  if (!stripe) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Service de paiement non disponible. Configuration Stripe manquante.'
+    );
+  }
+
   const { amount, currency, clientId, providerId, serviceType, commissionAmount, providerAmount, metadata } = data;
 
+  // Validation des données
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    throw new HttpsError('invalid-argument', 'Montant manquant ou invalide.');
+  }
+
+  if (!clientId || !providerId || !serviceType) {
+    throw new HttpsError('invalid-argument', 'Données requises manquantes.');
+  }
+
+  // Vérifier que l'utilisateur authentifié correspond au clientId
+  if (request.auth.uid !== clientId) {
+    throw new HttpsError('permission-denied', 'Vous ne pouvez créer un paiement que pour votre propre compte.');
+  }
+
   try {
+    console.log('Création PaymentIntent pour:', { amount, currency: currency || 'eur', serviceType, clientId, providerId });
+
     // Créer un PaymentIntent avec Stripe
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
@@ -279,25 +360,39 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
         commissionAmount: commissionAmount.toString(),
         providerAmount: providerAmount.toString(),
         ...metadata
-      }
+      },
+      description: `Service ${serviceType} - Prestataire ${providerId}`
     });
 
+    console.log('PaymentIntent créé avec succès:', paymentIntent.id);
+
     return {
+      success: true,
       paymentIntentId: paymentIntent.id,
       clientSecret: paymentIntent.client_secret,
       status: paymentIntent.status
     };
+
   } catch (error: any) {
-    console.error('Error creating payment intent:', error);
-    console.error('Error stack:', error.stack || 'No stack trace available');
-    console.error('Error details:', {
-      message: error.message || 'Unknown error',
-      data: { amount, currency, clientId, providerId, serviceType }
-    });
+    console.error('❌ Erreur création PaymentIntent:', error);
+    console.error('Stack trace:', error.stack || 'No stack trace available');
+    console.error('Données reçues:', { amount, currency, clientId, providerId, serviceType });
+
+    // Gestion spécifique des erreurs Stripe
+    if (error.type === 'StripeCardError') {
+      throw new HttpsError('invalid-argument', `Erreur de carte: ${error.message}`);
+    }
+    if (error.type === 'StripeInvalidRequestError') {
+      throw new HttpsError('invalid-argument', `Requête invalide: ${error.message}`);
+    }
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
     throw new HttpsError(
       'internal',
-      'Erreur lors de la création du paiement',
-      error
+      `Erreur lors de la création du paiement: ${error.message || 'Erreur inconnue'}`,
+      { originalError: error.message, code: error.code, type: error.type }
     );
   }
 });
@@ -316,6 +411,14 @@ export const capturePayment = onCall(async (request: CallableRequest<CapturePaym
     throw new HttpsError(
       'unauthenticated',
       'L\'utilisateur doit être authentifié pour effectuer cette action.'
+    );
+  }
+
+  // Vérifier que Stripe est configuré
+  if (!stripe) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Service de paiement non disponible.'
     );
   }
 
@@ -364,6 +467,14 @@ export const cancelPayment = onCall(async (request: CallableRequest<CancelPaymen
     );
   }
 
+  // Vérifier que Stripe est configuré
+  if (!stripe) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Service de paiement non disponible.'
+    );
+  }
+
   const { paymentIntentId } = data;
 
   try {
@@ -392,7 +503,7 @@ export const cancelPayment = onCall(async (request: CallableRequest<CancelPaymen
   }
 });
 
-// Interface pour les données d'appel
+// Interface pour les données d'appel (fonction initiateCall originale)
 interface CallData {
   clientId: string;
   providerId: string;
@@ -404,7 +515,132 @@ interface CallData {
   paymentIntentId: string;
 }
 
-// Fonction pour initier un appel Twilio
+// Interface pour createAndScheduleCall (nouvelle fonction pour CallCheckout)
+interface CreateAndScheduleCallData {
+  providerId: string;
+  clientId: string;
+  providerPhone: string;
+  clientPhone: string;
+  providerType: string;
+  serviceType: string;
+  amount: number;
+  duration: number;
+  paymentIntentId: string;
+}
+
+// Nouvelle fonction pour créer et programmer un appel (pour CallCheckout)
+export const createAndScheduleCall = onCall(async (request: CallableRequest<CreateAndScheduleCallData>) => {
+  const data = request.data;
+  
+  // Vérifier l'authentification
+  if (!request.auth) {
+    throw new HttpsError(
+      'unauthenticated',
+      'L\'utilisateur doit être authentifié pour effectuer cette action.'
+    );
+  }
+
+  const { 
+    providerId,
+    clientId, 
+    providerPhone, 
+    clientPhone, 
+    providerType, 
+    serviceType,
+    amount,
+    duration,
+    paymentIntentId 
+  } = data;
+
+  // Validation des données
+  if (!providerId || !clientId || !providerPhone || !clientPhone || !paymentIntentId) {
+    throw new HttpsError('invalid-argument', 'Données requises manquantes.');
+  }
+
+  // Vérifier que l'utilisateur authentifié correspond au clientId
+  if (request.auth.uid !== clientId) {
+    throw new HttpsError('permission-denied', 'Vous ne pouvez créer un appel que pour votre propre compte.');
+  }
+
+  try {
+    // Générer un ID unique pour la session d'appel
+    const sessionId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    
+    // Créer une session d'appel dans Firestore
+    const callSessionRef = db.collection('call_sessions').doc(sessionId);
+    
+    const callSession = {
+      id: sessionId,
+      clientId,
+      providerId,
+      clientPhone,
+      providerPhone,
+      status: 'pending',
+      providerAttempts: [],
+      clientAttempts: [],
+      paymentIntentId,
+      providerType,
+      serviceType,
+      amount,
+      duration,
+      
+      // Nouveaux champs pour le tracking détaillé
+      providerCallStatus: null,
+      clientCallStatus: null,
+      clientStatus: null,
+      fullStatus: null,
+      providerConnectedAt: null,
+      clientConnectedAt: null,
+      conversationStartedAt: null,
+      conversationEndedAt: null,
+      totalConversationDuration: null,
+      paymentCaptured: false,
+      paid: false,
+      
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    await callSessionRef.set(callSession);
+    
+    // Lance le processus d'appel après 5 minutes (ne pas await = en arrière-plan)
+    scheduleCallSequence(sessionId);
+
+    // Créer un log pour la session
+    await db.collection('call_logs').add({
+      callSessionId: sessionId,
+      type: 'session_created',
+      status: 'pending',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      details: {
+        clientId,
+        providerId,
+        providerType,
+        serviceType,
+        amount,
+        duration
+      }
+    });
+
+    console.log('✅ Session d\'appel créée:', sessionId);
+
+    return {
+      success: true,
+      callSessionId: sessionId,
+      status: 'pending'
+    };
+    
+  } catch (error: any) {
+    console.error('❌ Erreur création session d\'appel:', error);
+    throw new HttpsError(
+      'internal',
+      'Erreur lors de l\'initiation de l\'appel',
+      error
+    );
+  }
+});
+
+// Fonction pour initier un appel Twilio (fonction originale conservée)
 export const initiateCall = onCall(async (request: CallableRequest<CallData>) => {
   const data = request.data;
   
@@ -596,6 +832,11 @@ export const stripeWebhook = onRequest(async (req: FirebaseRequest, res: Respons
   
   if (!signature) {
     res.status(400).send('Signature Stripe manquante');
+    return;
+  }
+
+  if (!stripe) {
+    res.status(500).send('Service Stripe non configuré');
     return;
   }
   
@@ -795,7 +1036,9 @@ export const scheduledFirestoreExport = onSchedule(
     }
   }
 );
+
 // Export de la fonction d'initialisation des templates
 export { initializeMessageTemplates } from './initializeMessageTemplates';
+
 // Export de la fonction notifyAfterPayment (temporairement commenté)
 // export { notifyAfterPayment } from './notifications/notifyAfterPayment';

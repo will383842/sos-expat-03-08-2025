@@ -1,32 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle, CreditCard, Lock, User, Calendar, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { functions } from '../config/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, HttpsCallable } from 'firebase/functions';
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
 
-// Types
+// Types cohérents avec CallCheckoutWrapper
 interface Provider {
   id: string;
-  fullName: string;
-  firstName: string;
-  lastName: string;
+  fullName?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
   role: 'lawyer' | 'expat';
+  type?: 'lawyer' | 'expat';
   country: string;
-  currentCountry: string;
-  avatar: string;
-  profilePhoto: string;
-  email: string;
-  phone: string;
+  currentCountry?: string;
+  avatar?: string;
+  profilePhoto?: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
   whatsapp?: string;
   whatsAppNumber?: string;
-  phoneNumber?: string;
   languagesSpoken?: string[];
+  languages?: string[];
   preferredLanguage?: string;
+  price?: number;
+  duration?: number;
+  rating?: number;
+  reviewCount?: number;
+  specialties?: string[];
+  isActive?: boolean;
+  isApproved?: boolean;
 }
 
 interface ServiceData {
@@ -40,6 +50,44 @@ interface ServiceData {
   providerAmount: number;
 }
 
+interface User {
+  uid: string;
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  fullName?: string;
+}
+
+interface PaymentIntentData {
+  amount: number;
+  currency: string;
+  providerId: string;
+  customerId: string;
+  serviceType: string;
+}
+
+interface PaymentIntentResponse {
+  data: {
+    clientSecret: string;
+    paymentIntentId: string;
+    status: string;
+  };
+}
+
+interface CreateAndScheduleCallData {
+  providerId: string;
+  clientId: string;
+  providerPhone: string;
+  clientPhone: string;
+  providerType: string;
+  serviceType: string;
+  amount: number;
+  duration: number;
+  paymentIntentId: string;
+}
+
 type StepType = 'payment' | 'calling' | 'completed';
 
 // Props du composant
@@ -50,7 +98,23 @@ interface CallCheckoutProps {
 }
 
 // Composant de bouton personnalisé
-const Button = ({ children, onClick, disabled, className = '', type = 'button', fullWidth = false }) => (
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+  type?: 'button' | 'submit' | 'reset';
+  fullWidth?: boolean;
+}
+
+const Button: React.FC<ButtonProps> = ({ 
+  children, 
+  onClick, 
+  disabled = false, 
+  className = '', 
+  type = 'button', 
+  fullWidth = false 
+}) => (
   <button
     type={type}
     onClick={onClick}
@@ -66,7 +130,12 @@ const Button = ({ children, onClick, disabled, className = '', type = 'button', 
 );
 
 // Composant de spinner de chargement
-const LoadingSpinner = ({ size = 'medium', color = 'red' }) => {
+interface LoadingSpinnerProps {
+  size?: 'small' | 'medium' | 'large';
+  color?: 'red' | 'white';
+}
+
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ size = 'medium', color = 'red' }) => {
   const sizeClass = size === 'small' ? 'w-4 h-4' : size === 'large' ? 'w-8 h-8' : 'w-6 h-6';
   const colorClass = color === 'white' ? 'border-white border-t-transparent' : 'border-red-600 border-t-transparent';
   
@@ -102,19 +171,29 @@ const cardStyle = {
 };
 
 // Composant interne pour le formulaire de paiement avec Stripe
-const PaymentForm: React.FC<{
-  user: any;
+interface PaymentFormProps {
+  user: User;
   provider: Provider;
   service: ServiceData;
   onSuccess: (paymentIntentId: string) => void;
   onError: (error: string) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
-}> = ({ user, provider, service, onSuccess, onError, isProcessing, setIsProcessing }) => {
+}
+
+const PaymentForm: React.FC<PaymentFormProps> = ({ 
+  user, 
+  provider, 
+  service, 
+  onSuccess, 
+  onError, 
+  isProcessing, 
+  setIsProcessing 
+}) => {
   const stripe = useStripe();
   const elements = useElements();
 
-  const handlePaymentSubmit = async (event: React.FormEvent) => {
+  const handlePaymentSubmit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     
     if (!stripe || !elements || !user?.uid) {
@@ -127,8 +206,8 @@ const PaymentForm: React.FC<{
 
     try {
       // 1. Créer le PaymentIntent via Firebase Function
-      const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
-      const paymentResponse: any = await createPaymentIntent({
+      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> = httpsCallable(functions, 'createPaymentIntent');
+      const paymentResponse = await createPaymentIntent({
         amount: service.amount * 100, // Convertir en centimes
         currency: 'eur',
         providerId: provider.id,
@@ -149,7 +228,7 @@ const PaymentForm: React.FC<{
           card: cardElement,
           billing_details: {
             name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-            email: user.email,
+            email: user.email || '',
           },
         },
       });
@@ -163,13 +242,13 @@ const PaymentForm: React.FC<{
       }
 
       // 3. Programmer l'appel via Firebase Function
-      const createAndScheduleCall = httpsCallable(functions, 'createAndScheduleCall');
+      const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> = httpsCallable(functions, 'createAndScheduleCall');
       await createAndScheduleCall({
         providerId: provider.id,
         clientId: user.uid,
-        providerPhone: provider.phoneNumber || provider.phone,
-        clientPhone: service.clientPhone || user.phone,
-        providerType: provider.role,
+        providerPhone: provider.phoneNumber || provider.phone || '',
+        clientPhone: service.clientPhone || user.phone || '',
+        providerType: provider.role || provider.type || 'expat',
         serviceType: service.serviceType,
         amount: service.amount,
         duration: service.duration,
@@ -178,9 +257,10 @@ const PaymentForm: React.FC<{
 
       onSuccess(paymentIntent.id);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erreur lors du paiement:', error);
-      onError(error.message || 'Une erreur est survenue lors du paiement');
+      const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue lors du paiement';
+      onError(errorMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -224,18 +304,22 @@ const PaymentForm: React.FC<{
             <span className="text-gray-600">Expert</span>
             <div className="flex items-center space-x-2">
               <img 
-                src={provider.avatar || provider.profilePhoto} 
+                src={provider.avatar || provider.profilePhoto || '/default-avatar.png'} 
                 className="w-6 h-6 rounded-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.fullName)}&size=50`;
+                  const target = e.currentTarget;
+                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.fullName || provider.name || 'Expert')}&size=50`;
                 }}
+                alt="Avatar expert"
               />
-              <span className="font-semibold text-gray-900">{provider.fullName}</span>
+              <span className="font-semibold text-gray-900">{provider.fullName || provider.name}</span>
             </div>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-600">Service</span>
-            <span className="font-medium text-gray-800">{service.serviceType === 'lawyer_call' ? 'Consultation Avocat' : 'Consultation Expatrié'}</span>
+            <span className="font-medium text-gray-800">
+              {service.serviceType === 'lawyer_call' ? 'Consultation Avocat' : 'Consultation Expatrié'}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-600">Durée</span>
@@ -323,7 +407,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
   const { user } = useAuth();
   
   // 🔧 FONCTION HANDLEGOBACK DÉFINIE EN PREMIER
-  const handleGoBack = () => {
+  const handleGoBack = (): void => {
     if (onGoBack) {
       onGoBack();
     } else {
@@ -333,7 +417,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
   };
 
   // 🔍 RÉCUPÉRATION DES DONNÉES DEPUIS PLUSIEURS SOURCES
-  const getProviderFromSources = () => {
+  const getProviderFromSources = (): Provider | null => {
     // 1. Props (priorité haute)
     if (selectedProvider && selectedProvider.id) {
       console.log('✅ Provider trouvé via props:', selectedProvider);
@@ -344,7 +428,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     try {
       const savedProvider = sessionStorage.getItem('selectedProvider');
       if (savedProvider) {
-        const providerData = JSON.parse(savedProvider);
+        const providerData = JSON.parse(savedProvider) as Provider;
         if (providerData && providerData.id) {
           console.log('✅ Provider trouvé via sessionStorage:', providerData);
           return providerData;
@@ -359,7 +443,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
       const locationState = (window as any).history?.state?.usr;
       if (locationState?.selectedProvider?.id) {
         console.log('✅ Provider trouvé via location state:', locationState.selectedProvider);
-        return locationState.selectedProvider;
+        return locationState.selectedProvider as Provider;
       }
     } catch (error) {
       console.error('❌ Erreur récupération location state:', error);
@@ -369,7 +453,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     return null;
   };
 
-  const getServiceFromSources = () => {
+  const getServiceFromSources = (): ServiceData | null => {
     // 1. Props (priorité haute)
     if (serviceData && serviceData.amount) {
       console.log('✅ Service trouvé via props:', serviceData);
@@ -380,7 +464,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     try {
       const savedService = sessionStorage.getItem('serviceData');
       if (savedService) {
-        const serviceInfo = JSON.parse(savedService);
+        const serviceInfo = JSON.parse(savedService) as ServiceData;
         if (serviceInfo && serviceInfo.amount) {
           console.log('✅ Service trouvé via sessionStorage:', serviceInfo);
           return serviceInfo;
@@ -392,16 +476,19 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
 
     // 3. Reconstruction depuis provider (fallback)
     const provider = getProviderFromSources();
-    if (provider && provider.price) {
-      const reconstructedService = {
+    if (provider && (provider.price || provider.price === 0)) {
+      const price = provider.price || (provider.role === 'lawyer' || provider.type === 'lawyer' ? 49 : 19);
+      const duration = provider.duration || (provider.role === 'lawyer' || provider.type === 'lawyer' ? 20 : 30);
+      
+      const reconstructedService: ServiceData = {
         providerId: provider.id,
         serviceType: (provider.role || provider.type) === 'lawyer' ? 'lawyer_call' : 'expat_call',
-        providerRole: provider.role || provider.type,
-        amount: provider.price,
-        duration: provider.duration || 20,
+        providerRole: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
+        amount: price,
+        duration: duration,
         clientPhone: user?.phone || '',
-        commissionAmount: Math.round(provider.price * 0.2),
-        providerAmount: Math.round(provider.price * 0.8)
+        commissionAmount: Math.round(price * 0.2 * 100) / 100,
+        providerAmount: Math.round(price * 0.8 * 100) / 100
       };
       console.log('✅ Service reconstruit depuis provider:', reconstructedService);
       return reconstructedService;
@@ -423,6 +510,14 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
   // 🔒 RÉCUPÉRATION SÉCURISÉE DES DONNÉES
   const provider = getProviderFromSources();
   const service = getServiceFromSources();
+
+  // State management
+  const [currentStep, setCurrentStep] = useState<StepType>('payment');
+  const [callProgress, setCallProgress] = useState<number>(0);
+  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [callId] = useState<string>('call_' + Date.now());
 
   // 🚨 EARLY RETURN SI DONNÉES MANQUANTES
   if (!provider || !service) {
@@ -456,13 +551,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     );
   }
 
-  const [currentStep, setCurrentStep] = useState<StepType>('payment');
-  const [callProgress, setCallProgress] = useState<number>(0);
-  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [callId] = useState<string>('call_' + Date.now());
-
   // Gestion de la progression d'appel
   useEffect(() => {
     if (currentStep === 'calling' && callProgress < 5) {
@@ -481,18 +569,18 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     }
   }, [currentStep, callProgress]);
 
-  const handlePaymentSuccess = (paymentIntentId: string) => {
+  const handlePaymentSuccess = (paymentIntentId: string): void => {
     setPaymentIntentId(paymentIntentId);
     setCurrentStep('calling');
     setCallProgress(1);
-    console.log(`✅ Paiement réussi, appel programmé avec ${provider.fullName}`);
+    console.log(`✅ Paiement réussi, appel programmé avec ${provider.fullName || provider.name}`);
   };
 
-  const handlePaymentError = (errorMessage: string) => {
+  const handlePaymentError = (errorMessage: string): void => {
     setError(errorMessage);
   };
 
-  const isLawyer = provider?.role === 'lawyer';
+  const isLawyer = (provider?.role || provider?.type) === 'lawyer';
   const stepTitles: Record<StepType, string> = {
     payment: 'Paiement sécurisé',
     calling: 'Mise en relation en cours',
@@ -564,11 +652,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
           <div className="flex items-center space-x-4">
             <div className="relative flex-shrink-0">
               <img
-                src={provider?.avatar || provider?.profilePhoto}
-                alt={`Photo de profil de ${provider?.fullName || 'Expert'}`}
+                src={provider?.avatar || provider?.profilePhoto || '/default-avatar.png'}
+                alt={`Photo de profil de ${provider?.fullName || provider?.name || 'Expert'}`}
                 className="w-16 h-16 rounded-xl object-cover ring-2 ring-white shadow-lg"
                 onError={(e) => {
-                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider?.fullName || 'Expert')}&size=150&background=4F46E5&color=fff`;
+                  const target = e.currentTarget;
+                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider?.fullName || provider?.name || 'Expert')}&size=150&background=4F46E5&color=fff`;
                 }}
               />
               <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
@@ -578,7 +667,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
             
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-bold text-gray-900 truncate">
-                {provider?.fullName || 'Expert non défini'}
+                {provider?.fullName || provider?.name || 'Expert non défini'}
               </h3>
               <div className="flex items-center space-x-2 text-sm mt-1">
                 <span className={`px-3 py-1 rounded-full font-medium text-xs ${
@@ -654,12 +743,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                 </h2>
                 <p className="text-gray-600 text-sm">
                   {callProgress < 3 
-                    ? `Nous contactons ${provider?.fullName}...` 
+                    ? `Nous contactons ${provider?.fullName || provider?.name}...` 
                     : callProgress === 3 
-                      ? `${provider?.fullName} a accepté! Préparation de votre appel...` 
+                      ? `${provider?.fullName || provider?.name} a accepté! Préparation de votre appel...` 
                       : callProgress === 4 
-                        ? `Connexion établie avec ${provider?.fullName}!` 
-                        : `Consultation en cours avec ${provider?.fullName}...`}
+                        ? `Connexion établie avec ${provider?.fullName || provider?.name}!` 
+                        : `Consultation en cours avec ${provider?.fullName || provider?.name}...`}
                 </p>
               </div>
               
@@ -672,7 +761,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                 {callProgress >= 2 && (
                   <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
                     <Phone className="w-4 h-4 text-blue-600 mr-2" />
-                    <span className="text-blue-800">{provider?.fullName} a été contacté(e)</span>
+                    <span className="text-blue-800">{provider?.fullName || provider?.name} a été contacté(e)</span>
                   </div>
                 )}
                 
@@ -708,7 +797,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                   Consultation terminée
                 </h2>
                 <p className="text-gray-600 text-sm">
-                  Votre consultation avec {provider?.fullName} s'est terminée avec succès.
+                  Votre consultation avec {provider?.fullName || provider?.name} s'est terminée avec succès.
                 </p>
                 
                 {/* Résumé */}
@@ -717,7 +806,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex justify-between">
                       <span>Expert:</span>
-                      <span className="font-medium">{provider?.fullName}</span>
+                      <span className="font-medium">{provider?.fullName || provider?.name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Durée:</span>
@@ -741,7 +830,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                   fullWidth
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  ⭐ Évaluer {provider?.fullName}
+                  ⭐ Évaluer {provider?.fullName || provider?.name}
                 </Button>
                 <Button 
                   onClick={() => window.location.href = `/receipt/${paymentIntentId}`}

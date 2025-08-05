@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.messageManager = exports.MessageManager = void 0;
 const admin = __importStar(require("firebase-admin"));
 const twilio_1 = require("./lib/twilio");
-const logError_1 = require("./utils/logError");
+const logError_1 = require("./utils/logs/logError");
 class MessageManager {
     constructor() {
         this.db = admin.firestore();

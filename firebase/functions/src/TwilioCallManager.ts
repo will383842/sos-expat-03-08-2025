@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import twilio from 'twilio';
-import { logError } from './utils/logError';
-import { logCallRecord } from './utils/logCallRecord';
+import { logError } from './utils/logs/logError';
+import { logCallRecord } from './utils/logs/logCallRecord';
 import { messageManager } from './MessageManager';
 
 export interface CallSessionState {

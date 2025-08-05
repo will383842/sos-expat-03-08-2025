@@ -34,8 +34,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCallStatistics = exports.cleanupOldSessions = exports.resumePendingCalls = exports.cancelScheduledCall = exports.createAndScheduleCall = exports.scheduleCallSequence = void 0;
-const logCallRecord_1 = require("./utils/logCallRecord");
-const logError_1 = require("./utils/logError");
+const logCallRecord_1 = require("./utils/logs/logCallRecord");
+const logError_1 = require("./utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));
 const TwilioCallManager_1 = require("./TwilioCallManager");
 // Assurer que Firebase Admin est initialisé

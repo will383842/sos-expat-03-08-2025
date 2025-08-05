@@ -1,6 +1,6 @@
 import { db, storage, FieldValue } from './firebase';
 import { InvoiceRecord } from './types';
-import { logError } from './logError';
+import { logError } from '../utils/logs/logError';
 
 export const generateInvoice = async (invoice: InvoiceRecord) => {
   try {

@@ -1,5 +1,5 @@
-import { logCallRecord } from './utils/logCallRecord';
-import { logError } from './utils/logError';
+import { logCallRecord } from './utils/logs/logCallRecord';
+import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 import { twilioCallManager, CallSessionState } from './TwilioCallManager';
 

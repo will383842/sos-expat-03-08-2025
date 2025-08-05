@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateInvoice = void 0;
 const firebase_1 = require("./firebase");
-const logError_1 = require("./logError");
+const logError_1 = require("../utils/logs/logError");
 const generateInvoice = async (invoice) => {
     try {
         const content = `Facture #${invoice.invoiceNumber}\nMontant : ${invoice.amount} ${invoice.currency}`;

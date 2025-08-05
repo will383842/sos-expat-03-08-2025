@@ -39,8 +39,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.twilioCallManager = exports.TwilioCallManager = void 0;
 const admin = __importStar(require("firebase-admin"));
 const twilio_1 = __importDefault(require("twilio"));
-const logError_1 = require("./utils/logError");
-const logCallRecord_1 = require("./utils/logCallRecord");
+const logError_1 = require("./utils/logs/logError");
+const logCallRecord_1 = require("./utils/logs/logCallRecord");
 const MessageManager_1 = require("./MessageManager");
 class TwilioCallManager {
     constructor() {

@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { twilioClient } from './lib/twilio';
-import { logError } from './utils/logError';
+import { logError } from './utils/logs/logError';
 
 export interface MessageTemplate {
   id: string;

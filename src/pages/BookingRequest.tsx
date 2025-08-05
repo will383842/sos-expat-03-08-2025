@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom';
 import MultiLanguageSelect from '../components/forms-data/MultiLanguageSelect';
 import { Language } from '../data/Languages-spoken';
 import languages from '../data/Languages-spoken';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../config/firebase';
 
 const countries = [
   'Afghanistan',
@@ -209,31 +211,48 @@ const countries = [
   'Zimbabwe'
 ];
 
-// Dans BookingRequest.tsx, ajoutez cette fonction
-const notifyProviderOfCallRequest = async (providerId: string, requestData: any) => {
-  try {
-    // Simulation ou appel à votre API de notification
-    console.log('Notification envoyée au prestataire:', providerId, requestData);
-    
-    // Si vous avez Firebase Functions, appelez-la ici :
-    // const notifyProvider = httpsCallable(functions, 'notifyProviderOfCallRequest');
-    // await notifyProvider({ providerId, requestData });
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Erreur notification prestataire:', error);
-    throw error;
-  }
-};
+interface NotificationData {
+  type: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  recipientName?: string;
+  emailSubject?: string;
+  emailHtml?: string;
+  smsMessage?: string;
+  whatsappMessage?: string;
+}
 
-// Dans la fonction handleSubmit, remplacez l'appel par :
-(async () => {
-  try {
-    await notifyProviderOfCallRequest(selectedProvider.id, requestData);
-  } catch (error) {
-    console.warn("Notification prestataire échouée (non bloquant):", error);
-  }
-})();
+interface BookingRequestData {
+  clientPhone: string;
+  clientId?: string;
+  clientName: string;
+  clientFirstName: string;
+  clientLastName: string;
+  clientNationality: string;
+  clientCurrentCountry: string;
+  clientWhatsapp: string;
+  providerId: string;
+  providerName: string;
+  providerType: string;
+  providerCountry: string;
+  providerAvatar: string;
+  providerRating?: number;
+  providerReviewCount?: number;
+  providerLanguages?: string[];
+  providerSpecialties?: string[];
+  title: string;
+  description: string;
+  clientLanguages: string[];
+  clientLanguagesDetails: Array<{ code: string; name: string }>;
+  price: number;
+  duration: number;
+  status: string;
+  createdAt: Date;
+  ip: string;
+  userAgent: string;
+  providerEmail?: string;
+  providerPhone?: string;
+}
 
 interface Provider {
   id: string;
@@ -275,8 +294,6 @@ const BookingRequest: React.FC = () => {
     whatsappCountryCode: '+33',
     autrePays: '',    
   });
-  
-  const [firstErrorRef, setFirstErrorRef] = useState<HTMLElement | null>(null);
   
   const [languagesSpoken, setLanguagesSpoken] = useState<Language[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -450,6 +467,45 @@ const BookingRequest: React.FC = () => {
     }
   };
 
+  // Fonction réelle pour notifier le prestataire via Firebase Functions
+  const notifyProviderOfRequest = async (providerId: string, requestData: BookingRequestData): Promise<{ success: boolean; result?: unknown; error?: unknown }> => {
+    try {
+      const sendNotification = httpsCallable(functions, 'sendEmail');
+      
+      const notificationData: NotificationData = {
+        type: 'provider_booking_request',
+        recipientEmail: requestData.providerEmail || 'provider@example.com', // À récupérer du profil prestataire
+        recipientPhone: requestData.providerPhone,
+        recipientName: requestData.providerName,
+        emailSubject: `Nouvelle demande de consultation - ${requestData.title}`,
+        emailHtml: `
+          <h2>Nouvelle demande de consultation</h2>
+          <p><strong>Client :</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
+          <p><strong>Nationalité :</strong> ${requestData.clientNationality}</p>
+          <p><strong>Pays :</strong> ${requestData.clientCurrentCountry}</p>
+          <p><strong>Langues :</strong> ${requestData.clientLanguagesDetails?.map((l) => l.name).join(', ')}</p>
+          <p><strong>Titre :</strong> ${requestData.title}</p>
+          <p><strong>Description :</strong></p>
+          <p>${requestData.description}</p>
+          <p><strong>Téléphone client :</strong> ${requestData.clientPhone}</p>
+          <hr>
+          <p>Connectez-vous à votre espace prestataire pour répondre à cette demande.</p>
+        `,
+        smsMessage: `SOS Expat: Nouvelle demande de consultation de ${requestData.clientFirstName}. Titre: "${requestData.title}". Consultez votre espace prestataire.`,
+        whatsappMessage: `🔔 SOS Expat: Nouvelle demande de consultation de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire pour plus de détails.`
+      };
+
+      const result = await sendNotification(notificationData);
+      console.log('✅ Notification prestataire envoyée:', result);
+      return { success: true, result };
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'envoi de notification au prestataire:', error);
+      // Ne pas faire échouer le processus si la notification échoue
+      return { success: false, error };
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -458,8 +514,7 @@ const BookingRequest: React.FC = () => {
         await logLanguageMismatch({
           clientLanguages: languagesSpoken.map(lang => lang.code),
           customLanguage: undefined,
-          providerId: provider?.id,
-          userId: user?.id,
+          providerId: provider?.id || '',
           providerLanguages: provider?.languages || provider?.languagesSpoken || [],
           formData: {
             title: formData.title,
@@ -467,7 +522,6 @@ const BookingRequest: React.FC = () => {
             nationality: formData.nationality,
             currentCountry: formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry
           },
-          timestamp: new Date(),
           source: 'booking_request_form'
         });
         console.log('📊 Incompatibilité linguistique loggée pour analyse');
@@ -577,7 +631,7 @@ const BookingRequest: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const requestData = {
+      const requestData: BookingRequestData = {
         clientPhone: `${formData.phoneCountryCode}${formData.phoneNumber.replace(/\s+/g, '')}`,
         clientId: user?.id,
         clientName: sanitizeInput(`${user?.firstName || ''} ${user?.lastName || ''}`),
@@ -612,43 +666,31 @@ const BookingRequest: React.FC = () => {
         userAgent: navigator.userAgent
       };
 
+      // Sauvegarder la demande dans Firestore
       if (user) {
         try {
           await createBookingRequest(requestData);
+          console.log('✅ Demande de réservation sauvegardée dans Firestore');
         } catch (error) {
-          console.error('Error saving booking request to Firestore:', error);
+          console.error('❌ Erreur lors de la sauvegarde:', error);
         }
       }
 
+      // Sauvegarder en sessionStorage pour le checkout
       sessionStorage.setItem('bookingRequest', JSON.stringify(requestData));
 
+      // Envoyer la notification au prestataire (non bloquant)
       try {
-        const notificationSuccess = await notifyProviderOfCallRequest(
-          provider.id,
-          {
-            name: sanitizeInput(`${formData.firstName} ${formData.lastName}`),
-            country: formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry,
-            phone: `${formData.phoneCountryCode}${formData.phoneNumber.replace(/\s+/g, '')}`
-          },
-          {
-            title: sanitizeInput(formData.title),
-            description: sanitizeInput(formData.description),
-            serviceType: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-            price: provider.price,
-            languages: languagesSpoken.map(lang => lang.code)
-          }
-        );
-        
-        if (!notificationSuccess) {
-          console.warn('⚠️ Échec de l\'envoi de notification au prestataire');
-        }
+        await notifyProviderOfRequest(provider.id, requestData);
       } catch (notificationError) {
-        console.error('❌ Erreur lors de l\'envoi de notification:', notificationError);
+        console.warn("⚠️ Échec de l'envoi de notification au prestataire (non bloquant):", notificationError);
       }
 
+      // Rediriger vers le checkout
       navigate(`/call-checkout/${provider.id}`);
+      
     } catch (error) {
-      console.error('Error submitting request:', error);
+      console.error('❌ Erreur lors de la soumission:', error);
       setFormError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
@@ -1157,7 +1199,7 @@ const BookingRequest: React.FC = () => {
                       onChange={handleInputChange}
                       className={`${inputClass('phoneNumber')} w-20 sm:w-24 text-sm`}
                     >
-                      {countryCodeOptions.map(({ code, flag, country }) => (
+                      {countryCodeOptions.map(({ code, flag }) => (
                         <option key={code} value={code}>
                           {flag} {code}
                         </option>
@@ -1223,7 +1265,6 @@ const BookingRequest: React.FC = () => {
                   </div>
                 </div>
               </div>
-
 
               {/* CGU */}
               <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
@@ -1325,8 +1366,8 @@ const BookingRequest: React.FC = () => {
                     <div className="grid grid-cols-1 gap-1 text-xs text-yellow-700">
                       {formData.firstName.trim().length === 0 && <div>• Prénom requis</div>}
                       {formData.lastName.trim().length === 0 && <div>• Nom requis</div>}
-                      {formData.title.trim().length < 5 && <div>• Titre trop court (min. 5 car.)</div>}
-                      {formData.description.trim().length < 20 && <div>• Description trop courte (min. 20 car.)</div>}
+                      {formData.title.trim().length < 10 && <div>• Titre trop court (min. 10 car.)</div>}
+                      {formData.description.trim().length < 50 && <div>• Description trop courte (min. 50 car.)</div>}
                       {formData.phoneNumber.trim().length < 6 && <div>• Numéro de téléphone invalide</div>}
                       {formData.nationality.trim().length === 0 && <div>• Nationalité requise</div>}
                       {formData.currentCountry.trim().length === 0 && <div>• Pays d'intervention requis</div>}

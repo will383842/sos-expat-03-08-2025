@@ -64,7 +64,7 @@ interface PaymentIntentData {
   amount: number;
   currency: string;
   providerId: string;
-  customerId: string;
+  clientId: string;
   serviceType: string;
 }
 
@@ -201,69 +201,85 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
-    setIsProcessing(true);
-    onError('');
+try {
+  setIsProcessing(true);
 
-    try {
-      // 1. Créer le PaymentIntent via Firebase Function
-      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> = httpsCallable(functions, 'createPaymentIntent');
-      const paymentResponse = await createPaymentIntent({
-        amount: service.amount * 100, // Convertir en centimes
-        currency: 'eur',
-        providerId: provider.id,
-        customerId: user.uid,
-        serviceType: service.serviceType,
-      });
+  // 1. Créer le PaymentIntent via Firebase Function
+  const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
+    httpsCallable(functions, 'createPaymentIntent');
+  const paymentResponse = await createPaymentIntent({
+    amount: service.amount * 100, // Convertir en centimes
+    currency: 'eur',
+    providerId: provider.id,
+    clientId: user.uid,
+    serviceType: service.serviceType,
+    commissionAmount: Math.round(service.commissionAmount * 100),
+    providerAmount: Math.round(service.providerAmount * 100),
+  });
 
-      const clientSecret = paymentResponse.data.clientSecret;
+  console.log("🧪 paymentResponse reçu :", paymentResponse);
+  const clientSecret = paymentResponse.data.clientSecret;
 
-      // 2. Confirmer le paiement avec Stripe
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Élément de carte non trouvé');
-      }
+  // 2. Confirmer le paiement avec Stripe
+  const cardElement = elements.getElement(CardElement);
+  if (!cardElement) {
+    throw new Error('Élément de carte non trouvé');
+  }
 
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardElement,
-          billing_details: {
-            name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-            email: user.email || '',
-          },
-        },
-      });
+  const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+    payment_method: {
+      card: cardElement,
+      billing_details: {
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: user.email || '',
+      },
+    },
+  });
 
-      if (error) {
-        throw new Error(error.message || 'Erreur de paiement');
-      }
+  if (error) {
+    throw new Error(error.message || 'Erreur de paiement');
+  }
 
-      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-        throw new Error('Le paiement a échoué');
-      }
+  if (!paymentIntent) {
+    throw new Error("Le paiement a échoué (pas de PaymentIntent)");
+  }
 
-      // 3. Programmer l'appel via Firebase Function
-      const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> = httpsCallable(functions, 'createAndScheduleCall');
-      await createAndScheduleCall({
-        providerId: provider.id,
-        clientId: user.uid,
-        providerPhone: provider.phoneNumber || provider.phone || '',
-        clientPhone: service.clientPhone || user.phone || '',
-        providerType: provider.role || provider.type || 'expat',
-        serviceType: service.serviceType,
-        amount: service.amount,
-        duration: service.duration,
-        paymentIntentId: paymentIntent.id,
-      });
+  if (paymentIntent.status === 'succeeded') {
+    console.log("✅ Paiement réussi :", paymentIntent.id);
+  } else if (paymentIntent.status === 'processing') {
+    console.warn("⚠️ Paiement en cours de traitement :", paymentIntent.id);
+    toast.info("Votre paiement est en cours de traitement. Vous recevrez une confirmation sous peu.");
+  } else {
+    throw new Error(`Le paiement a échoué. Statut : ${paymentIntent.status}`);
+  }
 
-      onSuccess(paymentIntent.id);
+  // 3. Programmer l'appel via Firebase Function
+  const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
+    httpsCallable(functions, 'createAndScheduleCall');
+  await createAndScheduleCall({
+    providerId: provider.id,
+    clientId: user.uid,
+    providerPhone: provider.phoneNumber || provider.phone || '',
+    clientPhone: service.clientPhone || user.phone || '',
+    providerType: provider.role || provider.type || 'expat',
+    serviceType: service.serviceType,
+    amount: service.amount,
+    duration: service.duration,
+    paymentIntentId: paymentIntent.id,
+  });
 
-    } catch (error: unknown) {
-      console.error('Erreur lors du paiement:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue lors du paiement';
-      onError(errorMessage);
-    } finally {
-      setIsProcessing(false);
-    }
+  onSuccess(paymentIntent.id);
+
+} catch (error: unknown) {
+  console.error('❌ Erreur lors du paiement:', error);
+  const errorMessage = error instanceof Error
+    ? error.message
+    : 'Une erreur est survenue lors du paiement';
+  onError(errorMessage);
+} finally {
+  setIsProcessing(false);
+}
+
   };
 
   return (

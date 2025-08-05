@@ -211,6 +211,7 @@ async function handleParticipantLeave(sessionId, body) {
         const duration = (session === null || session === void 0 ? void 0 : session.conference.duration) || 0;
         // Gérer la déconnexion selon le participant et la durée
         await TwilioCallManager_1.twilioCallManager.handleEarlyDisconnection(sessionId, participantType, duration);
+        // (Maintenant que la méthode existe dans TwilioCallManager)
         await (0, logCallRecord_1.logCallRecord)({
             callId: sessionId,
             status: `${participantType}_left_conference`,

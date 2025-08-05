@@ -2,8 +2,9 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { twilioCallManager } from '../TwilioCallManager';
 import { logCallRecord } from '../utils/logs/logCallRecord';
 import { logError } from '../utils/logs/logError';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import * as admin from 'firebase-admin';
+import { Request } from 'firebase-functions/v2/https';
 
 interface TwilioCallWebhookBody {
   CallSid: string;
@@ -263,7 +264,7 @@ async function handleCallFailed(
 export const twilioConferenceWebhook = onRequest(async (req: Request, res: Response) => {
   // Rediriger vers le webhook de conférence moderne
   const { twilioConferenceWebhook: modernWebhook } = await import('./TwilioConferenceWebhook');
-  return modernWebhook(req, res);
+  return modernWebhook(req as Request, res);
 });
 
 /**
@@ -272,7 +273,7 @@ export const twilioConferenceWebhook = onRequest(async (req: Request, res: Respo
 export const twilioRecordingWebhook = onRequest(async (req: Request, res: Response) => {
   // Rediriger vers le webhook d'enregistrement moderne
   const { twilioRecordingWebhook: modernWebhook } = await import('./TwilioRecordingWebhook');
-  return modernWebhook(req, res);
+  return modernWebhook(req as Request, res);
 });
 
 /**

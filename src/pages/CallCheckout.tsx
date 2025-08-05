@@ -66,6 +66,8 @@ interface PaymentIntentData {
   providerId: string;
   clientId: string;
   serviceType: string;
+  commissionAmount: number;
+  providerAmount: number;
 }
 
 interface PaymentIntentResponse {
@@ -201,85 +203,97 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
-try {
-  setIsProcessing(true);
+    try {
+      setIsProcessing(true);
 
-  // 1. Créer le PaymentIntent via Firebase Function
-  const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
-    httpsCallable(functions, 'createPaymentIntent');
-  const paymentResponse = await createPaymentIntent({
-    amount: service.amount * 100, // Convertir en centimes
-    currency: 'eur',
-    providerId: provider.id,
-    clientId: user.uid,
-    serviceType: service.serviceType,
-    commissionAmount: Math.round(service.commissionAmount * 100),
-    providerAmount: Math.round(service.providerAmount * 100),
-  });
+      // 1. Créer le PaymentIntent via Firebase Function
+      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
+        httpsCallable(functions, 'createPaymentIntent');
+      const paymentResponse = await createPaymentIntent({
+        amount: service.amount * 100, // Convertir en centimes
+        currency: 'eur',
+        providerId: provider.id,
+        clientId: user.uid,
+        serviceType: service.serviceType,
+        commissionAmount: Math.round(service.commissionAmount * 100),
+        providerAmount: Math.round(service.providerAmount * 100),
+      });
 
-  console.log("🧪 paymentResponse reçu :", paymentResponse);
-  const clientSecret = paymentResponse.data.clientSecret;
+      console.log("🧪 paymentResponse reçu :", paymentResponse);
+      const clientSecret = paymentResponse.data.clientSecret;
 
-  // 2. Confirmer le paiement avec Stripe
-  const cardElement = elements.getElement(CardElement);
-  if (!cardElement) {
-    throw new Error('Élément de carte non trouvé');
-  }
+      // 2. Confirmer le paiement avec Stripe
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Élément de carte non trouvé');
+      }
 
-  const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-    payment_method: {
-      card: cardElement,
-      billing_details: {
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        email: user.email || '',
-      },
-    },
-  });
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+            email: user.email || '',
+          },
+        },
+      });
 
-  if (error) {
-    throw new Error(error.message || 'Erreur de paiement');
-  }
+      if (error) {
+        throw new Error(error.message || 'Erreur de paiement');
+      }
 
-  if (!paymentIntent) {
-    throw new Error("Le paiement a échoué (pas de PaymentIntent)");
-  }
+      if (!paymentIntent) {
+        throw new Error("Le paiement a échoué (pas de PaymentIntent)");
+      }
 
-  if (paymentIntent.status === 'succeeded') {
-    console.log("✅ Paiement réussi :", paymentIntent.id);
-  } else if (paymentIntent.status === 'processing') {
-    console.warn("⚠️ Paiement en cours de traitement :", paymentIntent.id);
-    toast.info("Votre paiement est en cours de traitement. Vous recevrez une confirmation sous peu.");
-  } else {
-    throw new Error(`Le paiement a échoué. Statut : ${paymentIntent.status}`);
-  }
+      // ✅ CORRECTION: Traiter requires_capture comme un SUCCÈS
+      if (paymentIntent.status === 'succeeded') {
+        console.log("✅ Paiement réussi et débité immédiatement :", paymentIntent.id);
+      } else if (paymentIntent.status === 'requires_capture') {
+        console.log("✅ Paiement autorisé, fonds réservés :", paymentIntent.id);
+        console.log("💰 Le débit aura lieu après la mise en relation réussie");
+        // ✅ C'est un SUCCÈS dans votre workflow de capture différée !
+      } else if (paymentIntent.status === 'processing') {
+        console.warn("⚠️ Paiement en cours de traitement :", paymentIntent.id);
+        // ✅ Également un succès, continuer
+      } else if (paymentIntent.status === 'requires_action') {
+        console.warn("⚠️ Action supplémentaire requise :", paymentIntent.id);
+        throw new Error("Une authentification supplémentaire est requise pour ce paiement.");
+      } else if (paymentIntent.status === 'requires_payment_method') {
+        throw new Error("Méthode de paiement invalide. Veuillez réessayer avec une autre carte.");
+      } else if (paymentIntent.status === 'canceled') {
+        throw new Error("Le paiement a été annulé.");
+      } else {
+        // Pour tous les autres statuts inattendus
+        throw new Error(`Statut de paiement inattendu : ${paymentIntent.status}`);
+      }
 
-  // 3. Programmer l'appel via Firebase Function
-  const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
-    httpsCallable(functions, 'createAndScheduleCall');
-  await createAndScheduleCall({
-    providerId: provider.id,
-    clientId: user.uid,
-    providerPhone: provider.phoneNumber || provider.phone || '',
-    clientPhone: service.clientPhone || user.phone || '',
-    providerType: provider.role || provider.type || 'expat',
-    serviceType: service.serviceType,
-    amount: service.amount,
-    duration: service.duration,
-    paymentIntentId: paymentIntent.id,
-  });
+      // 3. Programmer l'appel via Firebase Function
+      const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
+        httpsCallable(functions, 'createAndScheduleCall');
+      await createAndScheduleCall({
+        providerId: provider.id,
+        clientId: user.uid,
+        providerPhone: provider.phoneNumber || provider.phone || '',
+        clientPhone: service.clientPhone || user.phone || '',
+        providerType: provider.role || provider.type || 'expat',
+        serviceType: service.serviceType,
+        amount: service.amount,
+        duration: service.duration,
+        paymentIntentId: paymentIntent.id,
+      });
 
-  onSuccess(paymentIntent.id);
+      onSuccess(paymentIntent.id);
 
-} catch (error: unknown) {
-  console.error('❌ Erreur lors du paiement:', error);
-  const errorMessage = error instanceof Error
-    ? error.message
-    : 'Une erreur est survenue lors du paiement';
-  onError(errorMessage);
-} finally {
-  setIsProcessing(false);
-}
-
+    } catch (error: unknown) {
+      console.error('❌ Erreur lors du paiement:', error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Une erreur est survenue lors du paiement';
+      onError(errorMessage);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (

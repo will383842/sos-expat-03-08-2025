@@ -16,13 +16,15 @@ export { stripeManager } from './StripeManager';
 export { twilioCallManager } from './TwilioCallManager';
 
 // Export des fonctions utilitaires
-export { scheduleCallSequence, createAndScheduleCall, cancelScheduledCall } from './callScheduler';
+export { scheduleCallSequence, cancelScheduledCall } from './callScheduler';
 
 // Export de l'initialisation des templates
 export { initializeMessageTemplates } from './initializeMessageTemplates';
 
 // Export des fonctions de notification (si nécessaire)
 export { notifyAfterPayment } from './notifications/notifyAfterPayment';
+
+export { createAndScheduleCallHTTPS as createAndScheduleCall } from './createAndScheduleCallFunction';
 
 // ====== FONCTIONS CLOUD EXISTANTES (MAINTENUES POUR COMPATIBILITÉ) ======
 

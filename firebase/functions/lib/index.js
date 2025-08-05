@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createAndScheduleCallLegacy = exports.createPaymentIntentLegacy = exports.sendPushNotification = exports.sendEmail = exports.twilioClient = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.createAndScheduleCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.createPaymentIntent = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
+exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createAndScheduleCallLegacy = exports.createPaymentIntentLegacy = exports.sendPushNotification = exports.sendEmail = exports.twilioClient = exports.createAndScheduleCall = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.createPaymentIntent = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
 // Export des webhooks modernisés (remplace les anciens)
 var twilioWebhooks_1 = require("./Webhooks/twilioWebhooks");
 Object.defineProperty(exports, "twilioCallWebhook", { enumerable: true, get: function () { return twilioWebhooks_1.twilioCallWebhook; } });
@@ -61,7 +61,6 @@ Object.defineProperty(exports, "twilioCallManager", { enumerable: true, get: fun
 // Export des fonctions utilitaires
 var callScheduler_1 = require("./callScheduler");
 Object.defineProperty(exports, "scheduleCallSequence", { enumerable: true, get: function () { return callScheduler_1.scheduleCallSequence; } });
-Object.defineProperty(exports, "createAndScheduleCall", { enumerable: true, get: function () { return callScheduler_1.createAndScheduleCall; } });
 Object.defineProperty(exports, "cancelScheduledCall", { enumerable: true, get: function () { return callScheduler_1.cancelScheduledCall; } });
 // Export de l'initialisation des templates
 var initializeMessageTemplates_1 = require("./initializeMessageTemplates");
@@ -69,6 +68,8 @@ Object.defineProperty(exports, "initializeMessageTemplates", { enumerable: true,
 // Export des fonctions de notification (si nécessaire)
 var notifyAfterPayment_1 = require("./notifications/notifyAfterPayment");
 Object.defineProperty(exports, "notifyAfterPayment", { enumerable: true, get: function () { return notifyAfterPayment_1.notifyAfterPayment; } });
+var createAndScheduleCallFunction_1 = require("./createAndScheduleCallFunction");
+Object.defineProperty(exports, "createAndScheduleCall", { enumerable: true, get: function () { return createAndScheduleCallFunction_1.createAndScheduleCallHTTPS; } });
 // ====== FONCTIONS CLOUD EXISTANTES (MAINTENUES POUR COMPATIBILITÉ) ======
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");

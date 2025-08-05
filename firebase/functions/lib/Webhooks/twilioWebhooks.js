@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.findCallSessionByCallSid = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
+exports.findCallSessionByCallSid = exports.twilioRecordingWebhookLegacy = exports.twilioConferenceWebhookLegacy = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const TwilioCallManager_1 = require("../TwilioCallManager");
 const logCallRecord_1 = require("../utils/logs/logCallRecord");
@@ -164,10 +164,7 @@ async function handleCallCompleted(sessionId, participantType, body) {
         }
         else {
             // Déconnexion précoce
-            export async function handleEarlyDisconnection(sessionId, participantType, duration) {
-                console.log(`[Twilio] Déconnexion précoce - session: ${sessionId}, type: ${participantType}, durée: ${duration}s`);
-                // Tu peux ajouter une logique ici si besoin
-            }
+            await handleEarlyDisconnection(sessionId, participantType, duration);
         }
         await (0, logCallRecord_1.logCallRecord)({
             callId: sessionId,
@@ -183,6 +180,14 @@ async function handleCallCompleted(sessionId, participantType, body) {
     catch (error) {
         await (0, logError_1.logError)('handleCallCompleted', error);
     }
+}
+/**
+ * Gère la déconnexion précoce
+ */
+async function handleEarlyDisconnection(sessionId, participantType, duration) {
+    console.log(`[Twilio] Déconnexion précoce - session: ${sessionId}, type: ${participantType}, durée: ${duration}s`);
+    // Logique de gestion de déconnexion précoce
+    await TwilioCallManager_1.twilioCallManager.handleCallFailure(sessionId, 'early_disconnection');
 }
 /**
  * Gère les échecs d'appel
@@ -220,20 +225,61 @@ async function handleCallFailed(sessionId, participantType, body) {
     }
 }
 /**
- * Webhook pour les événements de conférence (délégué au système moderne)
+ * Webhook pour les événements de conférence - Version moderne
  */
 exports.twilioConferenceWebhook = (0, https_1.onRequest)(async (req, res) => {
-    // Rediriger vers le webhook de conférence moderne
-    const { twilioConferenceWebhook: modernWebhook } = await Promise.resolve().then(() => __importStar(require('./TwilioConferenceWebhook')));
-    return modernWebhook(req, res);
+    try {
+        // Importer dynamiquement le webhook moderne
+        const { twilioConferenceWebhook: modernWebhook } = await Promise.resolve().then(() => __importStar(require('./TwilioConferenceWebhook')));
+        return modernWebhook(req, res);
+    }
+    catch (error) {
+        console.error('❌ Erreur import TwilioConferenceWebhook:', error);
+        res.status(500).send('Conference webhook error');
+    }
 });
 /**
- * Webhook pour les événements d'enregistrement (délégué au système moderne)
+ * Webhook pour les événements d'enregistrement - Version moderne
  */
 exports.twilioRecordingWebhook = (0, https_1.onRequest)(async (req, res) => {
-    // Rediriger vers le webhook d'enregistrement moderne
-    const { twilioRecordingWebhook: modernWebhook } = await Promise.resolve().then(() => __importStar(require('./TwilioRecordingWebhook')));
-    return modernWebhook(req, res);
+    try {
+        // Importer dynamiquement le webhook moderne
+        const { twilioRecordingWebhook: modernWebhook } = await Promise.resolve().then(() => __importStar(require('./TwilioRecordingWebhook')));
+        return modernWebhook(req, res);
+    }
+    catch (error) {
+        console.error('❌ Erreur import TwilioRecordingWebhook:', error);
+        res.status(500).send('Recording webhook error');
+    }
+});
+/**
+ * VERSIONS LEGACY - Gardées pour compatibilité avec les anciens endpoints
+ */
+exports.twilioConferenceWebhookLegacy = (0, https_1.onRequest)(async (req, res) => {
+    console.log('📞 Conference webhook legacy appelé');
+    try {
+        const body = req.body;
+        console.log('Conference event:', body);
+        // Traitement legacy minimal ou redirection
+        res.status(200).send('Legacy conference webhook processed');
+    }
+    catch (error) {
+        console.error('❌ Erreur conference webhook legacy:', error);
+        res.status(500).send('Legacy conference webhook error');
+    }
+});
+exports.twilioRecordingWebhookLegacy = (0, https_1.onRequest)(async (req, res) => {
+    console.log('🎙️ Recording webhook legacy appelé');
+    try {
+        const body = req.body;
+        console.log('Recording event:', body);
+        // Traitement legacy minimal ou redirection
+        res.status(200).send('Legacy recording webhook processed');
+    }
+    catch (error) {
+        console.error('❌ Erreur recording webhook legacy:', error);
+        res.status(500).send('Legacy recording webhook error');
+    }
 });
 /**
  * Fonction utilitaire pour recherche de session (compatible avec l'ancien système)

@@ -286,7 +286,7 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
     // 6. VALIDATION DES ENUMS ET TYPES
     // ========================================
     const safeCurrency = (currency ?? 'eur') as 'eur' | 'usd' | 'gbp';
-    if (!currency || !SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
+    if (!currency || !SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency as any)) {
       throw new HttpsError(
         'invalid-argument', 
         `Devise non supportée. Devises autorisées: ${SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.join(', ')}`
@@ -429,7 +429,7 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
       clientSecret: result.clientSecret!,
       paymentIntentId: result.paymentIntentId!,
       amount,
-     currency: currency ?? "eur"
+      currency: currency ?? "eur", // 🔧 CORRECTION : Virgule ajoutée
       serviceType,
       status: 'requires_payment_method',
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h expiration

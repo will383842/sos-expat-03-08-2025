@@ -474,7 +474,44 @@ class TwilioCallManager {
     `.trim();
     }
     /**
+     * Gère les déconnexions précoces avec logique différenciée
+     * 🔧 NOUVELLE MÉTHODE PUBLIQUE pour corriger l'erreur
+     */
+    async handleEarlyDisconnection(sessionId, participantType, duration) {
+        try {
+            console.log(`⚠️ Déconnexion précoce détectée: ${sessionId}, participant: ${participantType}, durée: ${duration}s`);
+            const session = await this.getCallSession(sessionId);
+            if (!session) {
+                console.warn(`Session non trouvée pour déconnexion précoce: ${sessionId}`);
+                return;
+            }
+            // Si la durée est inférieure à 2 minutes, considérer comme échec
+            if (duration < CALL_CONFIG.MIN_CALL_DURATION) {
+                await this.handleCallFailure(sessionId, `early_disconnect_${participantType}`);
+                await (0, logCallRecord_1.logCallRecord)({
+                    callId: sessionId,
+                    status: `early_disconnect_${participantType}`,
+                    retryCount: 0,
+                    additionalData: {
+                        participantType,
+                        duration,
+                        reason: 'Disconnection before minimum duration'
+                    }
+                });
+            }
+            else {
+                // Durée suffisante, traiter comme completion normale
+                await this.handleCallCompletion(sessionId, duration);
+            }
+            console.log(`✅ Déconnexion précoce traitée pour ${sessionId}`);
+        }
+        catch (error) {
+            await (0, logError_1.logError)('TwilioCallManager:handleEarlyDisconnection', error);
+        }
+    }
+    /**
      * Gère les échecs d'appel avec notifications intelligentes
+     * 🔧 CHANGÉ DE PRIVATE À PUBLIC pour corriger l'erreur
      */
     async handleCallFailure(sessionId, reason) {
         var _a, _b;

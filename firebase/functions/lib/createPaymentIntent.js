@@ -220,7 +220,7 @@ exports.createPaymentIntent = (0, https_1.onCall)(async (request) => {
         // 6. VALIDATION DES ENUMS ET TYPES
         // ========================================
         const safeCurrency = (currency !== null && currency !== void 0 ? currency : 'eur');
-        if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
+        if (!currency || !SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
             throw new https_1.HttpsError('invalid-argument', `Devise non supportée. Devises autorisées: ${SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.join(', ')}`);
         }
         if (!SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
@@ -323,7 +323,7 @@ exports.createPaymentIntent = (0, https_1.onCall)(async (request) => {
             clientSecret: result.clientSecret,
             paymentIntentId: result.paymentIntentId,
             amount,
-            currency,
+            currency: currency !== null && currency !== void 0 ? currency : "eur", // 🔧 CORRECTION : Virgule ajoutée
             serviceType,
             status: 'requires_payment_method',
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h expiration

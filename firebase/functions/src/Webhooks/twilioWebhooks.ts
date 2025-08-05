@@ -191,11 +191,8 @@ async function handleCallCompleted(
     if (duration >= 120) {
       await twilioCallManager.handleCallCompletion(sessionId, duration);
     } else {
-      // Déconnexion précoce
-      export async function handleEarlyDisconnection(sessionId: string, participantType: string, duration: number) {
-  console.log(`[Twilio] Déconnexion précoce - session: ${sessionId}, type: ${participantType}, durée: ${duration}s`);
-  // Tu peux ajouter une logique ici si besoin
-}
+      // Déconnexion précoce - utiliser la méthode du TwilioCallManager
+      await twilioCallManager.handleEarlyDisconnection(sessionId, participantType, duration);
     }
 
     await logCallRecord({

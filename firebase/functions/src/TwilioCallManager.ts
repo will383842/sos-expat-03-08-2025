@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { logError } from './utils/logs/logError';
 import { logCallRecord } from './utils/logs/logCallRecord';
 import { messageManager } from './MessageManager';
+import { stripeManager } from './StripeManager';
 
 export interface CallSessionState {
   id: string;
@@ -14,6 +15,7 @@ export interface CallSessionState {
       callSid?: string;
       connectedAt?: admin.firestore.Timestamp;
       disconnectedAt?: admin.firestore.Timestamp;
+      attemptCount: number;
     };
     client: {
       phone: string;
@@ -21,6 +23,7 @@ export interface CallSessionState {
       callSid?: string;
       connectedAt?: admin.firestore.Timestamp;
       disconnectedAt?: admin.firestore.Timestamp;
+      attemptCount: number;
     };
   };
   conference: {
@@ -30,31 +33,48 @@ export interface CallSessionState {
     endedAt?: admin.firestore.Timestamp;
     duration?: number;
     recordingUrl?: string;
+    recordingSid?: string;
   };
   payment: {
     intentId: string;
-    status: 'pending' | 'authorized' | 'captured' | 'refunded';
+    status: 'pending' | 'authorized' | 'captured' | 'refunded' | 'failed';
     amount: number;
     capturedAt?: admin.firestore.Timestamp;
     refundedAt?: admin.firestore.Timestamp;
+    failureReason?: string;
   };
   metadata: {
     providerId: string;
     clientId: string;
     serviceType: 'lawyer_call' | 'expat_call';
     providerType: 'lawyer' | 'expat';
-    maxDuration: number; // en secondes
+    maxDuration: number;
     createdAt: admin.firestore.Timestamp;
     updatedAt: admin.firestore.Timestamp;
+    requestId?: string;
+    clientLanguages?: string[];
+    providerLanguages?: string[];
   };
 }
+
+// Configuration sécurisée pour la production
+const CALL_CONFIG = {
+  MAX_RETRIES: 3,
+  CALL_TIMEOUT: 30,
+  CONNECTION_WAIT_TIME: 45000, // 45 secondes
+  MIN_CALL_DURATION: 120, // 2 minutes pour considérer comme succès
+  MAX_CONCURRENT_CALLS: 50,
+  WEBHOOK_VALIDATION: true,
+} as const;
 
 export class TwilioCallManager {
   private twilioClient: twilio.Twilio;
   private db: admin.firestore.Firestore;
+  private activeCalls = new Map<string, NodeJS.Timeout>();
+  private callQueue: string[] = [];
+  private isProcessingQueue = false;
 
   constructor() {
-    // Valider l'environnement avant d'initialiser
     this.validateEnvironment();
     
     this.twilioClient = twilio(
@@ -62,6 +82,9 @@ export class TwilioCallManager {
       process.env.TWILIO_AUTH_TOKEN!
     );
     this.db = admin.firestore();
+
+    // Démarrer le processeur de queue
+    this.startQueueProcessor();
   }
 
   /**
@@ -77,17 +100,58 @@ export class TwilioCallManager {
     
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
-      throw new Error(`Variables d'environnement manquantes: ${missing.join(', ')}`);
+      throw new Error(`Variables d'environnement Twilio manquantes: ${missing.join(', ')}`);
     }
 
-    // Valider le format des URLs
-    if (process.env.FUNCTION_URL && !process.env.FUNCTION_URL.startsWith('https://')) {
+    // Valider le format des URLs et numéros
+    const phoneNumber = process.env.TWILIO_PHONE_NUMBER!;
+    if (!phoneNumber.startsWith('+') || phoneNumber.length < 10) {
+      throw new Error('TWILIO_PHONE_NUMBER doit être au format international (+33...)');
+    }
+
+    const functionUrl = process.env.FUNCTION_URL!;
+    if (!functionUrl.startsWith('https://')) {
       throw new Error('FUNCTION_URL doit commencer par https://');
     }
   }
 
   /**
-   * Valide et formate un numéro de téléphone avec support international amélioré
+   * Démarrer le processeur de queue pour gérer les appels en file d'attente
+   */
+  private startQueueProcessor(): void {
+    setInterval(async () => {
+      if (!this.isProcessingQueue && this.callQueue.length > 0) {
+        this.isProcessingQueue = true;
+        try {
+          const sessionId = this.callQueue.shift();
+          if (sessionId) {
+            await this.processQueuedCall(sessionId);
+          }
+        } catch (error) {
+          await logError('TwilioCallManager:queueProcessor', error);
+        } finally {
+          this.isProcessingQueue = false;
+        }
+      }
+    }, 2000); // Vérifier toutes les 2 secondes
+  }
+
+  /**
+   * Traiter un appel en file d'attente
+   */
+  private async processQueuedCall(sessionId: string): Promise<void> {
+    try {
+      const session = await this.getCallSession(sessionId);
+      if (session && session.status === 'pending') {
+        await this.initiateCallSequence(sessionId, 0); // Démarrer immédiatement
+      }
+    } catch (error) {
+      await logError('TwilioCallManager:processQueuedCall', error);
+    }
+  }
+
+  /**
+   * Valide et formate un numéro de téléphone avec support international étendu
    */
   private validatePhoneNumber(phone: string): string {
     if (!phone || typeof phone !== 'string') {
@@ -108,24 +172,11 @@ export class TwilioCallManager {
       throw new Error(`Numéro de téléphone invalide: ${phone}. Longueur incorrecte (8-15 chiffres après +)`);
     }
 
-    // Valider les codes pays les plus courants
+    // Validation renforcée des codes pays
     const validCountryCodes = [
-      '1',    // US/Canada
-      '33',   // France
-      '44',   // UK
-      '49',   // Germany
-      '34',   // Spain
-      '39',   // Italy
-      '32',   // Belgium
-      '41',   // Switzerland
-      '31',   // Netherlands
-      '351',  // Portugal
-      '352',  // Luxembourg
-      '212',  // Morocco
-      '213',  // Algeria
-      '216',  // Tunisia
-      '225',  // Côte d'Ivoire
-      '221',  // Senegal
+      '1', '33', '44', '49', '34', '39', '32', '41', '31', '351', '352',
+      '212', '213', '216', '225', '221', '223', '224', '226', '227', '228',
+      '229', '230', '231', '232', '233', '234', '235', '236', '237', '238'
     ];
 
     const hasValidCountryCode = validCountryCodes.some(code => digits.startsWith(code));
@@ -149,9 +200,12 @@ export class TwilioCallManager {
     providerType: 'lawyer' | 'expat';
     paymentIntentId: string;
     amount: number;
+    requestId?: string;
+    clientLanguages?: string[];
+    providerLanguages?: string[];
   }): Promise<CallSessionState> {
     try {
-      // Validation des paramètres
+      // Validation des paramètres obligatoires
       if (!params.sessionId || !params.providerId || !params.clientId) {
         throw new Error('Paramètres requis manquants: sessionId, providerId, clientId');
       }
@@ -169,6 +223,12 @@ export class TwilioCallManager {
         throw new Error('Les numéros du prestataire et du client doivent être différents');
       }
 
+      // Vérifier les limites de concurrence
+      const activeSessions = await this.getActiveSessionsCount();
+      if (activeSessions >= CALL_CONFIG.MAX_CONCURRENT_CALLS) {
+        throw new Error('Limite d\'appels simultanés atteinte. Veuillez réessayer dans quelques minutes.');
+      }
+
       const maxDuration = params.providerType === 'lawyer' ? 1500 : 2100; // 25min ou 35min
       const conferenceName = `conf_${params.sessionId}_${Date.now()}`;
 
@@ -178,11 +238,13 @@ export class TwilioCallManager {
         participants: {
           provider: {
             phone: validProviderPhone,
-            status: 'pending'
+            status: 'pending',
+            attemptCount: 0
           },
           client: {
             phone: validClientPhone,
-            status: 'pending'
+            status: 'pending',
+            attemptCount: 0
           }
         },
         conference: {
@@ -200,7 +262,10 @@ export class TwilioCallManager {
           providerType: params.providerType,
           maxDuration,
           createdAt: admin.firestore.Timestamp.now(),
-          updatedAt: admin.firestore.Timestamp.now()
+          updatedAt: admin.firestore.Timestamp.now(),
+          requestId: params.requestId,
+          clientLanguages: params.clientLanguages || ['fr'],
+          providerLanguages: params.providerLanguages || ['fr']
         }
       };
 
@@ -210,7 +275,7 @@ export class TwilioCallManager {
         throw new Error(`Session d'appel existe déjà: ${params.sessionId}`);
       }
 
-      // Sauvegarder en base avec retry
+      // Sauvegarder avec retry automatique
       await this.saveWithRetry(() => 
         this.db.collection('call_sessions').doc(params.sessionId).set(callSession)
       );
@@ -218,7 +283,12 @@ export class TwilioCallManager {
       await logCallRecord({
         callId: params.sessionId,
         status: 'session_created',
-        retryCount: 0
+        retryCount: 0,
+        additionalData: {
+          serviceType: params.serviceType,
+          amount: params.amount,
+          requestId: params.requestId
+        }
       });
 
       console.log(`✅ Session d'appel créée: ${params.sessionId}`);
@@ -231,74 +301,115 @@ export class TwilioCallManager {
   }
 
   /**
-   * Lance la séquence d'appel avec conférence et gestion d'erreurs améliorée
+   * Lance la séquence d'appel avec gestion robuste des erreurs et queue
    */
   async initiateCallSequence(sessionId: string, delayMinutes: number = 5): Promise<void> {
     try {
       console.log(`🚀 Initialisation séquence d'appel pour ${sessionId} dans ${delayMinutes} minutes`);
 
-      // Attendre le délai spécifié (avec timeout maximum de 10 minutes)
-      const maxDelay = Math.min(delayMinutes, 10);
-      await this.delay(maxDelay * 60 * 1000);
+      // Si délai, programmer l'exécution
+      if (delayMinutes > 0) {
+        const timeout = setTimeout(async () => {
+          this.activeCalls.delete(sessionId);
+          await this.executeCallSequence(sessionId);
+        }, Math.min(delayMinutes, 10) * 60 * 1000); // Max 10 minutes
 
-      const callSession = await this.getCallSession(sessionId);
-      if (!callSession) {
-        throw new Error(`Session d'appel non trouvée: ${sessionId}`);
-      }
-
-      // Vérifier que la session est toujours valide
-      if (callSession.status === 'cancelled' || callSession.status === 'failed') {
-        console.log(`Session ${sessionId} déjà ${callSession.status}, arrêt de la séquence`);
+        this.activeCalls.set(sessionId, timeout);
         return;
       }
 
-      await this.updateCallSessionStatus(sessionId, 'provider_connecting');
-
-      // Étape 1: Appeler le prestataire (3 tentatives)
-      console.log(`📞 Étape 1: Appel du prestataire pour ${sessionId}`);
-      const providerConnected = await this.callParticipantWithRetries(
-        sessionId,
-        'provider',
-        callSession.participants.provider.phone,
-        callSession.conference.name,
-        callSession.metadata.maxDuration
-      );
-
-      if (!providerConnected) {
-        await this.handleCallFailure(sessionId, 'provider_no_answer');
-        return;
-      }
-
-      await this.updateCallSessionStatus(sessionId, 'client_connecting');
-
-      // Étape 2: Appeler le client (3 tentatives)
-      console.log(`📞 Étape 2: Appel du client pour ${sessionId}`);
-      const clientConnected = await this.callParticipantWithRetries(
-        sessionId,
-        'client',
-        callSession.participants.client.phone,
-        callSession.conference.name,
-        callSession.metadata.maxDuration
-      );
-
-      if (!clientConnected) {
-        await this.handleCallFailure(sessionId, 'client_no_answer');
-        return;
-      }
-
-      await this.updateCallSessionStatus(sessionId, 'both_connecting');
-      
-      await logCallRecord({
-        callId: sessionId,
-        status: 'both_participants_called',
-        retryCount: 0
-      });
-
-      console.log(`✅ Séquence d'appel complétée pour ${sessionId}`);
+      // Exécution immédiate
+      await this.executeCallSequence(sessionId);
 
     } catch (error) {
       await logError('TwilioCallManager:initiateCallSequence', error);
       await this.handleCallFailure(sessionId, 'system_error');
+    }
+  }
+
+  /**
+   * Exécute la séquence d'appel réelle
+   */
+  private async executeCallSequence(sessionId: string): Promise<void> {
+    const callSession = await this.getCallSession(sessionId);
+    if (!callSession) {
+      throw new Error(`Session d'appel non trouvée: ${sessionId}`);
+    }
+
+    // Vérifier que la session est toujours valide
+    if (callSession.status === 'cancelled' || callSession.status === 'failed') {
+      console.log(`Session ${sessionId} déjà ${callSession.status}, arrêt de la séquence`);
+      return;
+    }
+
+    // Vérifier que le paiement est toujours valide
+    const paymentValid = await this.validatePaymentStatus(callSession.payment.intentId);
+    if (!paymentValid) {
+      await this.handleCallFailure(sessionId, 'payment_invalid');
+      return;
+    }
+
+    await this.updateCallSessionStatus(sessionId, 'provider_connecting');
+
+    // Étape 1: Appeler le prestataire (3 tentatives max)
+    console.log(`📞 Étape 1: Appel du prestataire pour ${sessionId}`);
+    const providerConnected = await this.callParticipantWithRetries(
+      sessionId,
+      'provider',
+      callSession.participants.provider.phone,
+      callSession.conference.name,
+      callSession.metadata.maxDuration
+    );
+
+    if (!providerConnected) {
+      await this.handleCallFailure(sessionId, 'provider_no_answer');
+      return;
+    }
+
+    await this.updateCallSessionStatus(sessionId, 'client_connecting');
+
+    // Étape 2: Appeler le client (3 tentatives max)
+    console.log(`📞 Étape 2: Appel du client pour ${sessionId}`);
+    const clientConnected = await this.callParticipantWithRetries(
+      sessionId,
+      'client',
+      callSession.participants.client.phone,
+      callSession.conference.name,
+      callSession.metadata.maxDuration
+    );
+
+    if (!clientConnected) {
+      await this.handleCallFailure(sessionId, 'client_no_answer');
+      return;
+    }
+
+    await this.updateCallSessionStatus(sessionId, 'both_connecting');
+    
+    await logCallRecord({
+      callId: sessionId,
+      status: 'both_participants_called',
+      retryCount: 0
+    });
+
+    console.log(`✅ Séquence d'appel complétée pour ${sessionId}`);
+  }
+
+  /**
+   * Valide le statut du paiement avant de commencer l'appel
+   */
+  private async validatePaymentStatus(paymentIntentId: string): Promise<boolean> {
+    try {
+      const payment = await stripeManager.getPayment(paymentIntentId);
+      if (!payment || !payment.stripe) {
+        return false;
+      }
+
+      const validStatuses = ['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing', 'requires_capture', 'succeeded'];
+      return validStatuses.includes(payment.stripe.status);
+
+    } catch (error) {
+      await logError('TwilioCallManager:validatePaymentStatus', error);
+      return false;
     }
   }
 
@@ -311,12 +422,15 @@ export class TwilioCallManager {
     phoneNumber: string,
     conferenceName: string,
     timeLimit: number,
-    maxRetries: number = 3
+    maxRetries: number = CALL_CONFIG.MAX_RETRIES
   ): Promise<boolean> {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`📞 Tentative ${attempt}/${maxRetries} pour ${participantType} - ${sessionId}`);
+
+        // Incrémenter le compteur de tentatives
+        await this.incrementAttemptCount(sessionId, participantType);
 
         await logCallRecord({
           callId: sessionId,
@@ -324,22 +438,25 @@ export class TwilioCallManager {
           retryCount: attempt
         });
 
-        // Créer l'appel avec timeout approprié
+        // Créer l'appel avec configuration optimisée
         const call = await this.twilioClient.calls.create({
           to: phoneNumber,
           from: process.env.TWILIO_PHONE_NUMBER!,
           twiml: this.generateConferenceTwiML(
             conferenceName,
             participantType,
-            timeLimit
+            timeLimit,
+            sessionId
           ),
           statusCallback: `${process.env.FUNCTION_URL}/twilioConferenceWebhook`,
           statusCallbackMethod: 'POST',
           statusCallbackEvent: ['ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer'],
-          timeout: 30, // Augmenté de 20 à 30 secondes
+          timeout: CALL_CONFIG.CALL_TIMEOUT,
           record: true,
           recordingStatusCallback: `${process.env.FUNCTION_URL}/twilioRecordingWebhook`,
-          recordingStatusCallbackMethod: 'POST'
+          recordingStatusCallbackMethod: 'POST',
+          machineDetection: 'Enable', // Détection répondeur
+          machineDetectionTimeout: 10
         });
 
         console.log(`📞 Appel créé: ${call.sid} pour ${participantType}`);
@@ -362,7 +479,7 @@ export class TwilioCallManager {
         // Si ce n'est pas la dernière tentative, attendre avant de réessayer
         if (attempt < maxRetries) {
           console.log(`⏳ Attente avant nouvelle tentative pour ${participantType} - ${sessionId}`);
-          await this.delay(15000); // 15 secondes entre les tentatives
+          await this.delay(15000 + (attempt * 5000)); // Délai progressif
         }
 
       } catch (error) {
@@ -371,7 +488,8 @@ export class TwilioCallManager {
         await logCallRecord({
           callId: sessionId,
           status: `${participantType}_error_attempt_${attempt}`,
-          retryCount: attempt
+          retryCount: attempt,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
         });
 
         // Si c'est la dernière tentative, ne pas attendre
@@ -391,15 +509,29 @@ export class TwilioCallManager {
   }
 
   /**
-   * Attend la connexion d'un participant avec timeout
+   * Incrémenter le compteur de tentatives pour un participant
+   */
+  private async incrementAttemptCount(sessionId: string, participantType: 'provider' | 'client'): Promise<void> {
+    try {
+      await this.db.collection('call_sessions').doc(sessionId).update({
+        [`participants.${participantType}.attemptCount`]: admin.firestore.FieldValue.increment(1),
+        'metadata.updatedAt': admin.firestore.Timestamp.now()
+      });
+    } catch (error) {
+      await logError('TwilioCallManager:incrementAttemptCount', error);
+    }
+  }
+
+  /**
+   * Attend la connexion d'un participant avec timeout optimisé
    */
   private async waitForConnection(
     sessionId: string, 
     participantType: 'provider' | 'client', 
     attempt: number
   ): Promise<boolean> {
-    const maxWaitTime = 45000; // 45 secondes
-    const checkInterval = 3000; // Vérifier toutes les 3 secondes
+    const maxWaitTime = CALL_CONFIG.CONNECTION_WAIT_TIME;
+    const checkInterval = 3000;
     const maxChecks = Math.floor(maxWaitTime / checkInterval);
 
     for (let check = 0; check < maxChecks; check++) {
@@ -434,49 +566,50 @@ export class TwilioCallManager {
   }
 
   /**
-   * Génère le TwiML pour la conférence avec améliorations
+   * Génère le TwiML optimisé pour la conférence
    */
+  private generateConferenceTwiML(
+    conferenceName: string,
+    participantType: 'provider' | 'client',
+    timeLimit: number,
+    sessionId: string
+  ): string {
+    const welcomeMessage = participantType === 'provider' 
+      ? "Bonjour, vous allez être mis en relation avec votre client SOS Expat. Veuillez patienter."
+      : "Bonjour, vous allez être mis en relation avec votre expert SOS Expat. Veuillez patienter.";
+
+    const participantLabel = participantType === 'provider' ? 'provider' : 'client';
+
+    return `
+      <Response>
+        <Say voice="alice" language="fr-FR">${welcomeMessage}</Say>
+        <Dial timeout="30" timeLimit="${timeLimit}">
+          <Conference 
+            statusCallback="${process.env.FUNCTION_URL}/twilioConferenceWebhook"
+            statusCallbackMethod="POST"
+            statusCallbackEvent="start end join leave mute hold"
+            record="record-from-start"
+            recordingStatusCallback="${process.env.FUNCTION_URL}/twilioRecordingWebhook"
+            recordingStatusCallbackMethod="POST"
+            participantLabel="${participantLabel}"
+            sessionId="${sessionId}"
+            waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+            maxParticipants="2"
+            endConferenceOnExit="${participantType === 'provider'}"
+            beep="false"
+            startConferenceOnEnter="${participantType === 'provider'}"
+            trim="trim-silence"
+            recordingChannels="dual"
+          >
+            ${conferenceName}
+          </Conference>
+        </Dial>
+      </Response>
+    `.trim();
+  }
+
   /**
- * Génère le TwiML pour la conférence avec messages depuis templates
- */
-private generateConferenceTwiML(
-  conferenceName: string,
-  participantType: 'provider' | 'client',
-  timeLimit: number
-): string {
-  const welcomeMessage = participantType === 'provider' 
-    ? "Bonjour, vous allez être mis en relation avec votre client SOS Expat. Veuillez patienter."
-    : "Bonjour, vous allez être mis en relation avec votre expert SOS Expat. Veuillez patienter.";
-
-  const participantLabel = participantType === 'provider' ? 'provider' : 'client';
-
-  return `
-    <Response>
-      <Say voice="alice" language="fr-FR">${welcomeMessage}</Say>
-      <Dial timeout="30" timeLimit="${timeLimit}">
-        <Conference 
-          statusCallback="${process.env.FUNCTION_URL}/twilioConferenceWebhook"
-          statusCallbackMethod="POST"
-          statusCallbackEvent="start end join leave mute hold"
-          record="record-from-start"
-          recordingStatusCallback="${process.env.FUNCTION_URL}/twilioRecordingWebhook"
-          recordingStatusCallbackMethod="POST"
-          participantLabel="${participantLabel}"
-          waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
-          maxParticipants="2"
-          endConferenceOnExit="${participantType === 'provider'}"
-          beep="false"
-          startConferenceOnEnter="${participantType === 'provider'}"
-        >
-          ${conferenceName}
-        </Conference>
-      </Dial>
-    </Response>
-  `.trim();
-}
-
-  /**
-   * Gère les échecs d'appel avec notifications améliorées
+   * Gère les échecs d'appel avec notifications intelligentes
    */
   private async handleCallFailure(sessionId: string, reason: string): Promise<void> {
     try {
@@ -489,40 +622,59 @@ private generateConferenceTwiML(
       // Mettre à jour le statut
       await this.updateCallSessionStatus(sessionId, 'failed');
 
-      
-      // Notifier les participants avec gestion d'erreurs
+      // Déterminer la langue principale pour les notifications
+      const clientLanguage = callSession.metadata.clientLanguages?.[0] || 'fr';
+      const providerLanguage = callSession.metadata.providerLanguages?.[0] || 'fr';
+
+      // Notifier les participants avec messages personnalisés
       try {
-  if (reason === 'provider_no_answer' || reason === 'system_error') {
-    await messageManager.sendSmartMessage({
-      to: callSession.participants.client.phone,
-      templateId: `call_failure_${reason}_client`,
-      variables: {
-        providerName: 'votre expert'
-      }
-    });
-  }
+        const notificationPromises = [];
 
-  if (reason === 'client_no_answer' || reason === 'system_error') {
-    await messageManager.sendSmartMessage({
-      to: callSession.participants.provider.phone,
-      templateId: `call_failure_${reason}_provider`,
-      variables: {
-        clientName: 'le client'
-      }
-    });
-  }
-} catch (notificationError) {
-  await logError('TwilioCallManager:handleCallFailure:notification', notificationError);
-  // Ne pas faire échouer la fonction si les notifications échouent
-}
+        if (reason === 'provider_no_answer' || reason === 'system_error') {
+          notificationPromises.push(
+            messageManager.sendSmartMessage({
+              to: callSession.participants.client.phone,
+              templateId: `call_failure_${reason}_client`,
+              variables: {
+                providerName: 'votre expert',
+                serviceType: callSession.metadata.serviceType,
+                language: clientLanguage
+              }
+            })
+          );
+        }
 
-      // Rembourser le paiement
-      await this.refundPayment(sessionId, reason);
+        if (reason === 'client_no_answer' || reason === 'system_error') {
+          notificationPromises.push(
+            messageManager.sendSmartMessage({
+              to: callSession.participants.provider.phone,
+              templateId: `call_failure_${reason}_provider`,
+              variables: {
+                clientName: 'le client',
+                serviceType: callSession.metadata.serviceType,
+                language: providerLanguage
+              }
+            })
+          );
+        }
+
+        await Promise.allSettled(notificationPromises);
+
+      } catch (notificationError) {
+        await logError('TwilioCallManager:handleCallFailure:notification', notificationError);
+      }
+
+      // Rembourser automatiquement le paiement
+      await this.processRefund(sessionId, reason);
 
       await logCallRecord({
         callId: sessionId,
         status: `call_failed_${reason}`,
-        retryCount: 0
+        retryCount: 0,
+        additionalData: {
+          reason,
+          paymentIntentId: callSession.payment.intentId
+        }
       });
 
       console.log(`❌ Appel échoué: ${sessionId}, raison: ${reason}`);
@@ -533,7 +685,43 @@ private generateConferenceTwiML(
   }
 
   /**
-   * Gère la fin d'un appel avec notifications de succès
+   * Traite le remboursement avec intégration Stripe
+   */
+  private async processRefund(sessionId: string, reason: string): Promise<void> {
+    try {
+      const callSession = await this.getCallSession(sessionId);
+      if (!callSession?.payment.intentId) {
+        console.warn(`Pas de paiement à rembourser pour ${sessionId}`);
+        return;
+      }
+
+      // Utiliser StripeManager pour le remboursement
+      const refundResult = await stripeManager.refundPayment(
+        callSession.payment.intentId,
+        `Appel échoué: ${reason}`,
+        sessionId
+      );
+
+      if (refundResult.success) {
+        // Mettre à jour le statut du paiement dans la session
+        await this.db.collection('call_sessions').doc(sessionId).update({
+          'payment.status': 'refunded',
+          'payment.refundedAt': admin.firestore.Timestamp.now(),
+          'metadata.updatedAt': admin.firestore.Timestamp.now()
+        });
+
+        console.log(`💰 Remboursement traité avec succès: ${sessionId}`);
+      } else {
+        console.error(`❌ Échec du remboursement pour ${sessionId}:`, refundResult.error);
+      }
+
+    } catch (error) {
+      await logError('TwilioCallManager:processRefund', error);
+    }
+  }
+
+  /**
+   * Gère la fin d'un appel avec succès
    */
   async handleCallCompletion(sessionId: string, duration: number): Promise<void> {
     try {
@@ -546,36 +734,43 @@ private generateConferenceTwiML(
       // Mettre à jour le statut
       await this.updateCallSessionStatus(sessionId, 'completed');
 
-      // Envoyer les notifications de fin via MessageManager
-try {
-  const minutes = Math.floor(duration / 60);
-  const seconds = duration % 60;
-  
-  await Promise.all([
-    messageManager.sendSmartMessage({
-      to: callSession.participants.client.phone,
-      templateId: 'call_success_client',
-      variables: {
-        duration: minutes.toString(),
-        seconds: seconds.toString()
+      // Déterminer les langues pour les notifications
+      const clientLanguage = callSession.metadata.clientLanguages?.[0] || 'fr';
+      const providerLanguage = callSession.metadata.providerLanguages?.[0] || 'fr';
+
+      // Envoyer les notifications de succès
+      try {
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        
+        await Promise.allSettled([
+          messageManager.sendSmartMessage({
+            to: callSession.participants.client.phone,
+            templateId: 'call_success_client',
+            variables: {
+              duration: minutes.toString(),
+              seconds: seconds.toString(),
+              serviceType: callSession.metadata.serviceType,
+              language: clientLanguage
+            }
+          }),
+          messageManager.sendSmartMessage({
+            to: callSession.participants.provider.phone,
+            templateId: 'call_success_provider',
+            variables: {
+              duration: minutes.toString(),
+              seconds: seconds.toString(),
+              serviceType: callSession.metadata.serviceType,
+              language: providerLanguage
+            }
+          })
+        ]);
+      } catch (notificationError) {
+        await logError('TwilioCallManager:handleCallCompletion:notification', notificationError);
       }
-    }),
-    messageManager.sendSmartMessage({
-      to: callSession.participants.provider.phone,
-      templateId: 'call_success_provider',
-      variables: {
-        duration: minutes.toString(),
-        seconds: seconds.toString()
-      }
-    })
-  ]);
-} catch (notificationError) {
-  await logError('TwilioCallManager:handleCallCompletion:notification', notificationError);
-  // Continuer même si les notifications échouent
-}
 
       // Capturer le paiement si éligible
-      if (this.shouldCapturePayment(callSession)) {
+      if (this.shouldCapturePayment(callSession, duration)) {
         await this.capturePaymentForSession(sessionId);
       }
 
@@ -594,253 +789,249 @@ try {
   }
 
   /**
-   * Gère les déconnexions précoces
+   * Vérifie si l'appel doit être facturé avec critères stricts
    */
-  async handleEarlyDisconnection(sessionId: string, disconnectedParticipant: 'provider' | 'client', duration: number): Promise<void> {
-    try {
-      const callSession = await this.getCallSession(sessionId);
-      if (!callSession) {
-        console.warn(`Session non trouvée pour early disconnection: ${sessionId}`);
-        return;
-      }
+  shouldCapturePayment(session: CallSessionState, duration?: number): boolean {
+    const { provider, client } = session.participants;
+    const { startedAt, duration: sessionDuration } = session.conference;
 
-      const isEarlyDisconnection = duration < 120; // Moins de 2 minutes
-      const otherParticipant = disconnectedParticipant === 'provider' ? 'client' : 'provider';
+    // Utiliser la durée fournie ou celle de la session
+    const actualDuration = duration || sessionDuration || 0;
 
-      // Messages selon qui a raccroché et la durée
-      let messages = {
-        disconnected: '',
-        other: ''
-      };
-
-      if (isEarlyDisconnection) {
-        if (disconnectedParticipant === 'provider') {
-          messages = {
-            disconnected: `Votre appel s'est terminé prématurément (${duration}s). Si c'était involontaire, vous pouvez contacter le support.`,
-            other: `Le prestataire s'est déconnecté après ${duration} secondes. Vous ne serez pas facturé. Vous pouvez demander un autre expert.`
-          };
-        } else {
-          messages = {
-            disconnected: `Votre appel s'est terminé prématurément (${duration}s). Si c'était involontaire, vous pouvez nous contacter.`,
-            other: `Le client s'est déconnecté après ${duration} secondes. Vous recevrez une compensation minimale pour votre temps.`
-          };
-        }
-
-        // Remboursement automatique pour déconnexion précoce
-        await this.refundPayment(sessionId, `early_disconnection_${disconnectedParticipant}`);
-      } else {
-        // Déconnexion normale après plus de 2 minutes
-        if (disconnectedParticipant === 'provider') {
-          messages = {
-            disconnected: `Votre appel s'est terminé (${Math.floor(duration / 60)}min ${duration % 60}s). Merci pour votre service !`,
-            other: `Votre appel s'est terminé (${Math.floor(duration / 60)}min ${duration % 60}s). Merci ! Vous pouvez laisser un avis.`
-          };
-        } else {
-          messages = {
-            disconnected: `Votre appel s'est terminé (${Math.floor(duration / 60)}min ${duration % 60}s). Merci ! Vous pouvez laisser un avis.`,
-            other: `Appel terminé par le client (${Math.floor(duration / 60)}min ${duration % 60}s). Merci pour votre service !`
-          };
-        }
-
-        // Capturer le paiement pour un appel normal
-        if (this.shouldCapturePayment(callSession)) {
-          await this.capturePaymentForSession(sessionId);
-        }
-      }
-
-      // Envoyer les notifications
-      try {
-        const disconnectedPhone = callSession.participants[disconnectedParticipant].phone;
-        const otherPhone = callSession.participants[otherParticipant].phone;
-
-        await Promise.all([
-          this.sendNotificationCall(disconnectedPhone, messages.disconnected),
-          this.sendNotificationCall(otherPhone, messages.other)
-        ]);
-      } catch (notificationError) {
-        await logError('TwilioCallManager:handleEarlyDisconnection:notification', notificationError);
-      }
-
-      // Mettre à jour le statut selon la durée
-      const finalStatus = isEarlyDisconnection ? 'failed' : 'completed';
-      await this.updateCallSessionStatus(sessionId, finalStatus);
-
-      await logCallRecord({
-        callId: sessionId,
-        status: `${disconnectedParticipant}_disconnected_${isEarlyDisconnection ? 'early' : 'normal'}`,
-        retryCount: 0,
-        additionalData: { duration, disconnectedParticipant }
-      });
-
-      console.log(`📞 Déconnexion ${isEarlyDisconnection ? 'précoce' : 'normale'}: ${sessionId}, ${disconnectedParticipant}, ${duration}s`);
-
-    } catch (error) {
-      await logError('TwilioCallManager:handleEarlyDisconnection', error);
+    // Les deux participants doivent être connectés
+    if (provider.status !== 'connected' || client.status !== 'connected') {
+      console.log(`Paiement non capturé: participants non connectés (P:${provider.status}, C:${client.status})`);
+      return false;
     }
+
+    // La conférence doit avoir commencé
+    if (!startedAt) {
+      console.log('Paiement non capturé: conférence non démarrée');
+      return false;
+    }
+
+    // La durée doit être d'au moins 2 minutes
+    if (actualDuration < CALL_CONFIG.MIN_CALL_DURATION) {
+      console.log(`Paiement non capturé: durée insuffisante (${actualDuration}s < ${CALL_CONFIG.MIN_CALL_DURATION}s)`);
+      return false;
+    }
+
+    // Le paiement ne doit pas déjà être capturé
+    if (session.payment.status !== 'authorized') {
+      console.log(`Paiement non capturé: statut incorrect (${session.payment.status})`);
+      return false;
+    }
+
+    return true;
   }
 
   /**
-   * Gère les problèmes de paiement pendant l'appel
+   * Capture le paiement pour une session avec validation renforcée
    */
-  async handlePaymentIssue(sessionId: string, issueType: 'authorization_expired' | 'capture_failed' | 'insufficient_funds'): Promise<void> {
+  async capturePaymentForSession(sessionId: string): Promise<boolean> {
     try {
-      const callSession = await this.getCallSession(sessionId);
-      if (!callSession) {
-        console.warn(`Session non trouvée pour payment issue: ${sessionId}`);
-        return;
+      const session = await this.getCallSession(sessionId);
+      if (!session) {
+        console.warn(`Session non trouvée pour capture paiement: ${sessionId}`);
+        return false;
       }
 
-      const paymentMessages = {
-        authorization_expired: {
-          client: "Votre autorisation de paiement a expiré pendant l'appel. Veuillez mettre à jour votre mode de paiement.",
-          provider: "Un problème d'autorisation de paiement est survenu. Le client va être contacté pour régulariser."
-        },
-        capture_failed: {
-          client: "Un problème est survenu lors du traitement de votre paiement. Notre équipe va vous contacter sous 24h.",
-          provider: "Un problème de capture de paiement est survenu. Notre équipe finance va traiter votre rémunération manuellement."
-        },
-        insufficient_funds: {
-          client: "Fonds insuffisants détectés. Veuillez mettre à jour votre mode de paiement pour éviter ce problème.",
-          provider: "Un problème de fonds insuffisants du client a été détecté. Votre paiement sera traité par notre équipe finance."
-        }
-      };
-
-      // Notifier les deux parties
-      try {
-        await Promise.all([
-          this.sendNotificationCall(
-            callSession.participants.client.phone,
-            paymentMessages[issueType].client
-          ),
-          this.sendNotificationCall(
-            callSession.participants.provider.phone,
-            paymentMessages[issueType].provider
-          )
-        ]);
-      } catch (notificationError) {
-        await logError('TwilioCallManager:handlePaymentIssue:notification', notificationError);
+      if (!this.shouldCapturePayment(session)) {
+        console.log(`Conditions non remplies pour capture paiement: ${sessionId}`);
+        return false;
       }
 
-      // Marquer le paiement comme problématique
-      await this.saveWithRetry(() =>
-        this.db.collection('call_sessions').doc(sessionId).update({
-          'payment.status': 'failed',
-          'payment.failureReason': issueType,
-          'payment.failedAt': admin.firestore.Timestamp.now(),
-          'metadata.updatedAt': admin.firestore.Timestamp.now()
-        })
+      // Double vérification de sécurité
+      if (session.payment.status === 'captured') {
+        console.warn(`Paiement déjà capturé pour: ${sessionId}`);
+        return true;
+      }
+
+      // Utiliser StripeManager pour capturer le paiement
+      const captureResult = await stripeManager.capturePayment(
+        session.payment.intentId,
+        sessionId
       );
 
-      // Créer un ticket pour l'équipe finance
-      await this.createFinanceTicket(sessionId, issueType, callSession);
+      if (captureResult.success) {
+        // Mettre à jour le statut dans la session
+        await this.db.collection('call_sessions').doc(sessionId).update({
+          'payment.status': 'captured',
+          'payment.capturedAt': admin.firestore.Timestamp.now(),
+          'metadata.updatedAt': admin.firestore.Timestamp.now()
+        });
 
-      await logCallRecord({
-        callId: sessionId,
-        status: `payment_issue_${issueType}`,
-        retryCount: 0
-      });
+        // Créer une demande d'avis
+        await this.createReviewRequest(session);
 
-      console.log(`💳 Problème de paiement: ${sessionId}, type: ${issueType}`);
+        await logCallRecord({
+          callId: sessionId,
+          status: 'payment_captured',
+          retryCount: 0,
+          additionalData: {
+            amount: session.payment.amount,
+            duration: session.conference.duration
+          }
+        });
+
+        console.log(`💰 Paiement capturé: ${sessionId}, durée: ${session.conference.duration}s, montant: ${session.payment.amount}`);
+        return true;
+      } else {
+        console.error(`❌ Échec capture paiement pour ${sessionId}:`, captureResult.error);
+        return false;
+      }
 
     } catch (error) {
-      await logError('TwilioCallManager:handlePaymentIssue', error);
+      await logError('TwilioCallManager:capturePaymentForSession', error);
+      return false;
     }
   }
 
   /**
-   * Crée un ticket pour l'équipe finance
+   * Crée une demande d'avis après un appel réussi
    */
-  private async createFinanceTicket(sessionId: string, issueType: string, session: CallSessionState): Promise<void> {
+  private async createReviewRequest(session: CallSessionState): Promise<void> {
     try {
-      const ticket = {
-        type: 'payment_issue',
-        callSessionId: sessionId,
-        issueType,
-        amount: session.payment.amount,
+      const reviewRequest = {
         clientId: session.metadata.clientId,
         providerId: session.metadata.providerId,
-        paymentIntentId: session.payment.intentId,
+        callSessionId: session.id,
         callDuration: session.conference.duration || 0,
-        priority: issueType === 'insufficient_funds' ? 'high' : 'medium',
-        status: 'pending',
+        serviceType: session.metadata.serviceType,
+        providerType: session.metadata.providerType,
+        callAmount: session.payment.amount,
         createdAt: admin.firestore.Timestamp.now(),
-        assignedTo: null
+        status: 'pending',
+        // Données additionnelles pour l'analyse
+        callStartedAt: session.conference.startedAt,
+        callEndedAt: session.conference.endedAt,
+        bothConnected: session.participants.provider.status === 'connected' && 
+                      session.participants.client.status === 'connected',
+        requestId: session.metadata.requestId
       };
 
       await this.saveWithRetry(() =>
-        this.db.collection('finance_tickets').add(ticket)
+        this.db.collection('reviews_requests').add(reviewRequest)
       );
 
-      console.log(`🎫 Ticket finance créé pour: ${sessionId}`);
+      console.log(`📝 Demande d'avis créée pour: ${session.id}`);
 
     } catch (error) {
-      await logError('TwilioCallManager:createFinanceTicket', error);
+      await logError('TwilioCallManager:createReviewRequest', error);
     }
   }
 
   /**
-   * Envoie un appel de notification
+   * Annule une session d'appel
    */
-  private async sendNotificationCall(phoneNumber: string, message: string): Promise<void> {
+  async cancelCallSession(sessionId: string, reason: string, cancelledBy?: string): Promise<boolean> {
     try {
-      await this.twilioClient.calls.create({
-        to: phoneNumber,
-        from: process.env.TWILIO_PHONE_NUMBER!,
-        twiml: `<Response><Say voice="alice" language="fr-FR">${message}</Say></Response>`,
-        timeout: 20
-      });
-    } catch (error) {
-      console.warn(`Échec notification call vers ${phoneNumber}:`, error);
-      // Essayer SMS en fallback
-      try {
-        await this.twilioClient.messages.create({
-          to: phoneNumber,
-          from: process.env.TWILIO_PHONE_NUMBER!,
-          body: message
-        });
-      } catch (smsError) {
-        console.warn(`Échec SMS fallback vers ${phoneNumber}:`, smsError);
-      }
-    }
-  }
-
-  /**
-   * Rembourse le paiement avec gestion d'erreurs
-   */
-  private async refundPayment(sessionId: string, reason: string): Promise<void> {
-    try {
-      const callSession = await this.getCallSession(sessionId);
-      if (!callSession?.payment.intentId) {
-        console.warn(`Pas de paiement à rembourser pour ${sessionId}`);
-        return;
+      const session = await this.getCallSession(sessionId);
+      if (!session) {
+        console.warn(`Session non trouvée pour annulation: ${sessionId}`);
+        return false;
       }
 
-      // Marquer comme remboursé (la logique Stripe sera dans StripeManager)
+      // Annuler le timeout si il existe
+      const timeout = this.activeCalls.get(sessionId);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.activeCalls.delete(sessionId);
+      }
+
+      // Annuler les appels en cours si ils existent
+      await this.cancelActiveCallsForSession(session);
+
+      // Mettre à jour le statut
       await this.saveWithRetry(() =>
         this.db.collection('call_sessions').doc(sessionId).update({
-          'payment.status': 'refunded',
-          'payment.refundedAt': admin.firestore.Timestamp.now(),
-          'metadata.updatedAt': admin.firestore.Timestamp.now()
+          status: 'cancelled',
+          'metadata.updatedAt': admin.firestore.Timestamp.now(),
+          cancelledAt: admin.firestore.Timestamp.now(),
+          cancelledBy: cancelledBy || 'system',
+          cancellationReason: reason
         })
       );
 
-      console.log(`💰 Paiement marqué pour remboursement: ${sessionId}, raison: ${reason}`);
+      // Rembourser automatiquement
+      await this.processRefund(sessionId, `cancelled_${reason}`);
+
+      await logCallRecord({
+        callId: sessionId,
+        status: `cancelled_${reason}`,
+        retryCount: 0,
+        additionalData: {
+          cancelledBy: cancelledBy || 'system'
+        }
+      });
+
+      console.log(`🚫 Session annulée: ${sessionId}, raison: ${reason}`);
+      return true;
 
     } catch (error) {
-      await logError('TwilioCallManager:refundPayment', error);
+      await logError('TwilioCallManager:cancelCallSession', error);
+      return false;
     }
   }
 
   /**
-   * Utilitaire pour créer un délai avec Promise
+   * Annule les appels actifs pour une session
    */
+  private async cancelActiveCallsForSession(session: CallSessionState): Promise<void> {
+    try {
+      const promises: Promise<void>[] = [];
+
+      if (session.participants.provider.callSid) {
+        promises.push(this.cancelTwilioCall(session.participants.provider.callSid));
+      }
+
+      if (session.participants.client.callSid) {
+        promises.push(this.cancelTwilioCall(session.participants.client.callSid));
+      }
+
+      await Promise.allSettled(promises);
+
+    } catch (error) {
+      await logError('TwilioCallManager:cancelActiveCallsForSession', error);
+    }
+  }
+
+  /**
+   * Annule un appel Twilio spécifique
+   */
+  private async cancelTwilioCall(callSid: string): Promise<void> {
+    try {
+      await this.twilioClient.calls(callSid).update({ status: 'completed' });
+      console.log(`📞 Appel Twilio annulé: ${callSid}`);
+    } catch (error) {
+      console.warn(`Impossible d'annuler l'appel Twilio ${callSid}:`, error);
+    }
+  }
+
+  /**
+   * Récupère le nombre de sessions actives pour la gestion de la concurrence
+   */
+  private async getActiveSessionsCount(): Promise<number> {
+    try {
+      const snapshot = await this.db.collection('call_sessions')
+        .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting', 'both_connecting', 'active'])
+        .get();
+
+      return snapshot.size;
+    } catch (error) {
+      await logError('TwilioCallManager:getActiveSessionsCount', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Méthodes utilitaires
+   */
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Sauvegarde avec retry en cas d'échec
-   */
   private async saveWithRetry<T>(
     operation: () => Promise<T>, 
     maxRetries: number = 3, 
@@ -862,12 +1053,9 @@ try {
   }
 
   // =====================================================
-  // Méthodes existantes avec améliorations mineures
+  // Méthodes CRUD pour les sessions
   // =====================================================
 
-  /**
-   * Met à jour le statut de la session
-   */
   async updateCallSessionStatus(sessionId: string, status: CallSessionState['status']): Promise<void> {
     try {
       await this.saveWithRetry(() =>
@@ -882,9 +1070,6 @@ try {
     }
   }
 
-  /**
-   * Met à jour le CallSid d'un participant
-   */
   async updateParticipantCallSid(sessionId: string, participantType: 'provider' | 'client', callSid: string): Promise<void> {
     try {
       await this.saveWithRetry(() =>
@@ -899,9 +1084,6 @@ try {
     }
   }
 
-  /**
-   * Met à jour le statut d'un participant
-   */
   async updateParticipantStatus(
     sessionId: string, 
     participantType: 'provider' | 'client', 
@@ -909,7 +1091,7 @@ try {
     timestamp?: admin.firestore.Timestamp
   ): Promise<void> {
     try {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         [`participants.${participantType}.status`]: status,
         'metadata.updatedAt': admin.firestore.Timestamp.now()
       };
@@ -929,12 +1111,9 @@ try {
     }
   }
 
-  /**
-   * Met à jour les informations de la conférence
-   */
   async updateConferenceInfo(sessionId: string, updates: Partial<CallSessionState['conference']>): Promise<void> {
     try {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         'metadata.updatedAt': admin.firestore.Timestamp.now()
       };
 
@@ -951,9 +1130,6 @@ try {
     }
   }
 
-  /**
-   * Récupère une session d'appel
-   */
   async getCallSession(sessionId: string): Promise<CallSessionState | null> {
     try {
       const doc = await this.db.collection('call_sessions').doc(sessionId).get();
@@ -964,9 +1140,6 @@ try {
     }
   }
 
-  /**
-   * Trouve une session par conférence SID
-   */
   async findSessionByConferenceSid(conferenceSid: string): Promise<CallSessionState | null> {
     try {
       const snapshot = await this.db.collection('call_sessions')
@@ -981,9 +1154,6 @@ try {
     }
   }
 
-  /**
-   * Trouve une session par CallSid d'un participant
-   */
   async findSessionByCallSid(callSid: string): Promise<{ session: CallSessionState; participantType: 'provider' | 'client' } | null> {
     try {
       // Chercher dans les CallSid des providers
@@ -1020,170 +1190,17 @@ try {
   }
 
   /**
-   * Vérifie si l'appel doit être facturé avec critères stricts
+   * Ajouter à la queue d'appels
    */
-  shouldCapturePayment(session: CallSessionState): boolean {
-    const { provider, client } = session.participants;
-    const { startedAt, duration } = session.conference;
-
-    // Les deux participants doivent être connectés
-    if (provider.status !== 'connected' || client.status !== 'connected') {
-      console.log(`Paiement non capturé: participants non connectés (P:${provider.status}, C:${client.status})`);
-      return false;
-    }
-
-    // La conférence doit avoir commencé
-    if (!startedAt) {
-      console.log('Paiement non capturé: conférence non démarrée');
-      return false;
-    }
-
-    // La durée doit être d'au moins 120 secondes (2 minutes)
-    if (!duration || duration < 120) {
-      console.log(`Paiement non capturé: durée insuffisante (${duration}s < 120s)`);
-      return false;
-    }
-
-    // Le paiement ne doit pas déjà être capturé
-    if (session.payment.status !== 'authorized') {
-      console.log(`Paiement non capturé: statut incorrect (${session.payment.status})`);
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Capture le paiement pour une session avec validation renforcée
-   */
-  async capturePaymentForSession(sessionId: string): Promise<boolean> {
-    try {
-      const session = await this.getCallSession(sessionId);
-      if (!session) {
-        console.warn(`Session non trouvée pour capture paiement: ${sessionId}`);
-        return false;
-      }
-
-      if (!this.shouldCapturePayment(session)) {
-        console.log(`Conditions non remplies pour capture paiement: ${sessionId}`);
-        return false;
-      }
-
-      // Double vérification de sécurité
-      if (session.payment.status === 'captured') {
-        console.warn(`Paiement déjà capturé pour: ${sessionId}`);
-        return true;
-      }
-
-      // Marquer comme capturé (la logique Stripe sera dans StripeManager)
-      await this.saveWithRetry(() =>
-        this.db.collection('call_sessions').doc(sessionId).update({
-          'payment.status': 'captured',
-          'payment.capturedAt': admin.firestore.Timestamp.now(),
-          'metadata.updatedAt': admin.firestore.Timestamp.now()
-        })
-      );
-
-      // Créer une demande d'avis avec données complètes
-      await this.createReviewRequest(session);
-
-      await logCallRecord({
-        callId: sessionId,
-        status: 'payment_captured',
-        retryCount: 0,
-        additionalData: {
-          amount: session.payment.amount,
-          duration: session.conference.duration
-        }
-      });
-
-      console.log(`💰 Paiement capturé: ${sessionId}, durée: ${session.conference.duration}s, montant: ${session.payment.amount}`);
-      return true;
-
-    } catch (error) {
-      await logError('TwilioCallManager:capturePaymentForSession', error);
-      return false;
+  addToQueue(sessionId: string): void {
+    if (!this.callQueue.includes(sessionId)) {
+      this.callQueue.push(sessionId);
+      console.log(`📞 Session ${sessionId} ajoutée à la queue (${this.callQueue.length} en attente)`);
     }
   }
 
   /**
-   * Crée une demande d'avis après un appel réussi
-   */
-  private async createReviewRequest(session: CallSessionState): Promise<void> {
-    try {
-      const reviewRequest = {
-        clientId: session.metadata.clientId,
-        providerId: session.metadata.providerId,
-        callSessionId: session.id,
-        callDuration: session.conference.duration || 0,
-        serviceType: session.metadata.serviceType,
-        providerType: session.metadata.providerType,
-        callAmount: session.payment.amount,
-        createdAt: admin.firestore.Timestamp.now(),
-        status: 'pending',
-        // Données additionnelles pour l'analyse
-        callStartedAt: session.conference.startedAt,
-        callEndedAt: session.conference.endedAt,
-        bothConnected: session.participants.provider.status === 'connected' && 
-                      session.participants.client.status === 'connected'
-      };
-
-      await this.saveWithRetry(() =>
-        this.db.collection('reviews_requests').add(reviewRequest)
-      );
-
-      console.log(`📝 Demande d'avis créée pour: ${session.id}`);
-
-    } catch (error) {
-      await logError('TwilioCallManager:createReviewRequest', error);
-      // Ne pas faire échouer la capture de paiement si la création d'avis échoue
-    }
-  }
-
-  /**
-  
-
-      // Annuler les appels en cours si ils existent
-      await this.cancelActiveCallsForSession(session);
-
-      // Mettre à jour le statut
-      await this.saveWithRetry(() =>
-        this.db.collection('call_sessions').doc(sessionId).update({
-          status: 'cancelled',
-          'metadata.updatedAt': admin.firestore.Timestamp.now(),
-          cancelledAt: admin.firestore.Timestamp.now(),
-          cancelledBy: cancelledBy || 'system',
-          cancellationReason: reason
-        })
-      );
-
-      // Rembourser automatiquement
-      await this.refundPayment(sessionId, `cancelled_${reason}`);
-
-      await logCallRecord({
-        callId: sessionId,
-        status: `cancelled_${reason}`,
-        retryCount: 0,
-        additionalData: {
-          cancelledBy: cancelledBy || 'system'
-        }
-      });
-
-      console.log(`🚫 Session annulée: ${sessionId}, raison: ${reason}`);
-      return true;
-
-    } catch (error) {
-      await logError('TwilioCallManager:cancelCallSession', error);
-      return false;
-    }
-  }
-
-  /**
-  
- 
-
-  /**
-   * Obtient des statistiques détaillées sur les appels
+   * Obtenir des statistiques détaillées
    */
   async getCallStatistics(options: {
     startDate?: admin.firestore.Timestamp;
@@ -1200,11 +1217,9 @@ try {
     successRate: number;
     totalRevenue: number;
     averageRevenue: number;
-    providerStats: Record<string, number>;
-    failureReasons: Record<string, number>;
   }> {
     try {
-      let query = this.db.collection('call_sessions') as any;
+      let query = this.db.collection('call_sessions') as admin.firestore.Query;
 
       // Appliquer les filtres
       if (options.startDate) {
@@ -1231,9 +1246,7 @@ try {
         averageDuration: 0,
         successRate: 0,
         totalRevenue: 0,
-        averageRevenue: 0,
-        providerStats: {} as Record<string, number>,
-        failureReasons: {} as Record<string, number>
+        averageRevenue: 0
       };
 
       let totalDuration = 0;
@@ -1241,7 +1254,7 @@ try {
       let totalCapturedAmount = 0;
       let capturedPayments = 0;
 
-      snapshot.docs.forEach((doc: any) => {
+      snapshot.docs.forEach((doc) => {
         const session = doc.data() as CallSessionState;
         
         // Compter par statut
@@ -1262,7 +1275,6 @@ try {
             break;
           case 'failed':
             stats.failed++;
-            // Analyser les raisons d'échec (à partir des logs)
             break;
           case 'cancelled':
             stats.cancelled++;
@@ -1274,10 +1286,6 @@ try {
           totalCapturedAmount += session.payment.amount;
           capturedPayments++;
         }
-
-        // Statistiques par prestataire
-        const providerId = session.metadata.providerId;
-        stats.providerStats[providerId] = (stats.providerStats[providerId] || 0) + 1;
       });
 
       // Calculer les moyennes
@@ -1292,25 +1300,20 @@ try {
       await logError('TwilioCallManager:getCallStatistics', error);
       throw error;
     }
-}
-    
-  
+  }
 
   /**
-   * Nettoie les sessions anciennes selon les critères de rétention
+   * Nettoyage des sessions anciennes
    */
   async cleanupOldSessions(options: {
     olderThanDays?: number;
     keepCompletedDays?: number;
     batchSize?: number;
-  } = {}): Promise<{
-    deleted: number;
-    errors: number;
-  }> {
+  } = {}): Promise<{ deleted: number; errors: number }> {
     const {
-      olderThanDays = 90,      // Supprimer après 90 jours par défaut
-      keepCompletedDays = 30,   // Garder les complétés 30 jours
-      batchSize = 50           // Traiter par batch de 50
+      olderThanDays = 90,
+      keepCompletedDays = 30,
+      batchSize = 50
     } = options;
 
     try {
@@ -1335,7 +1338,7 @@ try {
       
       if (!failedSnapshot.empty) {
         const batch = this.db.batch();
-        failedSnapshot.docs.forEach((doc: any) => {
+        failedSnapshot.docs.forEach((doc) => {
           batch.delete(doc.ref);
         });
         
@@ -1359,7 +1362,7 @@ try {
       
       if (!completedSnapshot.empty) {
         const batch = this.db.batch();
-        completedSnapshot.docs.forEach((doc: any) => {
+        completedSnapshot.docs.forEach((doc) => {
           batch.delete(doc.ref);
         });
         
@@ -1380,77 +1383,6 @@ try {
       await logError('TwilioCallManager:cleanupOldSessions', error);
       return { deleted: 0, errors: 1 };
     }
-  }
-
-  /**
-   * Récupère les sessions en attente (pour recovery après redémarrage)
-   */
-  async getPendingSessions(): Promise<CallSessionState[]> {
-    try {
-      const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(
-        Date.now() - (5 * 60 * 1000)
-      );
-
-      const snapshot = await this.db.collection('call_sessions')
-        .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
-        .where('metadata.createdAt', '<=', fiveMinutesAgo)
-        .orderBy('metadata.createdAt', 'desc')
-        .limit(100)
-        .get();
-
-      return snapshot.docs.map(doc => doc.data() as CallSessionState);
-
-    } catch (error) {
-      await logError('TwilioCallManager:getPendingSessions', error);
-      return [];
-    }
-  }
-
-  /**
-   * Valide l'intégrité d'une session
-   */
-  validateSessionIntegrity(session: CallSessionState): {
-    isValid: boolean;
-    issues: string[];
-  } {
-    const issues: string[] = [];
-
-    // Vérifications de base
-    if (!session.id) issues.push('ID de session manquant');
-    if (!session.metadata.providerId) issues.push('ID prestataire manquant');
-    if (!session.metadata.clientId) issues.push('ID client manquant');
-    if (!session.payment.intentId) issues.push('ID intention de paiement manquant');
-
-    // Vérifications téléphones
-    try {
-      this.validatePhoneNumber(session.participants.provider.phone);
-    } catch (error) {
-      issues.push(`Téléphone prestataire invalide: ${error}`);
-    }
-
-    try {
-      this.validatePhoneNumber(session.participants.client.phone);
-    } catch (error) {
-      issues.push(`Téléphone client invalide: ${error}`);
-    }
-
-    // Vérifications logiques
-    if (session.participants.provider.phone === session.participants.client.phone) {
-      issues.push('Téléphones prestataire et client identiques');
-    }
-
-    if (session.payment.amount <= 0) {
-      issues.push('Montant de paiement invalide');
-    }
-
-    if (session.metadata.maxDuration <= 0) {
-      issues.push('Durée maximale invalide');
-    }
-
-    return {
-      isValid: issues.length === 0,
-      issues
-    };
   }
 }
 

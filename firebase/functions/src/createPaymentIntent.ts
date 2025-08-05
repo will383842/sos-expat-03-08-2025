@@ -3,7 +3,10 @@ import { stripeManager, StripePaymentData } from './StripeManager';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 
-// Interface pour les données de PaymentIntent
+// Rate limiting store (en production, utiliser Redis)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Interface stricte pour les données de PaymentIntent (correction de l'erreur any)
 interface PaymentIntentRequestData {
   amount: number;
   currency?: string;
@@ -19,11 +22,200 @@ interface PaymentIntentRequestData {
   metadata?: Record<string, string>;
 }
 
+// Interface pour les réponses d'erreur typées
+interface ErrorResponse {
+  success: false;
+  error: string;
+  code: string;
+  timestamp: string;
+  requestId?: string;
+}
+
+// Interface pour les réponses de succès typées
+interface SuccessResponse {
+  success: true;
+  clientSecret: string;
+  paymentIntentId: string;
+  amount: number;
+  currency: string;
+  serviceType: string;
+  status: string;
+  expiresAt: string;
+}
+
+// Configuration des limites de sécurité
+const SECURITY_LIMITS = {
+  RATE_LIMIT: {
+    MAX_REQUESTS: 5,
+    WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+    GLOBAL_MAX: 100, // Max global par minute
+  },
+  AMOUNT_LIMITS: {
+    MIN_AMOUNT: 500, // 5€ en centimes
+    MAX_AMOUNT: 50000, // 500€ en centimes
+    MAX_DAILY_USER: 200000, // 2000€ par jour par utilisateur
+  },
+  VALIDATION: {
+    MAX_METADATA_SIZE: 1000,
+    MAX_DESCRIPTION_LENGTH: 500,
+    ALLOWED_CURRENCIES: ['eur', 'usd', 'gbp'],
+    ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'] as const,
+  },
+} as const;
+
+/**
+ * Rate limiting function - Protection contre le spam
+ */
+function checkRateLimit(userId: string): { allowed: boolean; resetTime?: number } {
+  const now = Date.now();
+  const key = `payment_${userId}`;
+  const limit = rateLimitStore.get(key);
+
+  // Nettoyer les anciens enregistrements
+  if (limit && now > limit.resetTime) {
+    rateLimitStore.delete(key);
+  }
+
+  const currentLimit = rateLimitStore.get(key) || { 
+    count: 0, 
+    resetTime: now + SECURITY_LIMITS.RATE_LIMIT.WINDOW_MS 
+  };
+
+  if (currentLimit.count >= SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS) {
+    return { allowed: false, resetTime: currentLimit.resetTime };
+  }
+
+  currentLimit.count++;
+  rateLimitStore.set(key, currentLimit);
+  return { allowed: true };
+}
+
+/**
+ * Validation stricte des données métier
+ */
+async function validateBusinessLogic(
+  data: PaymentIntentRequestData,
+  db: admin.firestore.Firestore
+): Promise<{ valid: boolean; error?: string }> {
+  
+  // 1. Vérifier la disponibilité du prestataire en temps réel
+  try {
+    const providerDoc = await db.collection('users').doc(data.providerId).get();
+    const providerData = providerDoc.data();
+
+    if (!providerData) {
+      return { valid: false, error: 'Prestataire non trouvé' };
+    }
+
+    // Vérifier le statut du prestataire
+    if (providerData.status === 'suspended' || providerData.status === 'banned') {
+      return { valid: false, error: 'Prestataire non disponible' };
+    }
+
+    if (providerData.isAvailable === false) {
+      return { valid: false, error: 'Prestataire actuellement indisponible' };
+    }
+
+    // 2. Vérifier les tarifs du prestataire
+    const expectedAmount = providerData.price || (data.serviceType === 'lawyer_call' ? 4900 : 1900);
+    if (Math.abs(data.amount - expectedAmount) > 100) { // Tolérance de 1€
+      return { valid: false, error: 'Montant non conforme aux tarifs du prestataire' };
+    }
+
+    // 3. Vérifier la cohérence commission/prestataire
+    const expectedCommission = Math.round(expectedAmount * 0.20);
+    const expectedProviderAmount = expectedAmount - expectedCommission;
+    
+    if (Math.abs(data.commissionAmount - expectedCommission) > 10 ||
+        Math.abs(data.providerAmount - expectedProviderAmount) > 10) {
+      return { valid: false, error: 'Répartition des montants incorrecte' };
+    }
+
+    return { valid: true };
+
+  } catch (error) {
+    await logError('validateBusinessLogic', error);
+    return { valid: false, error: 'Erreur lors de la validation' };
+  }
+}
+
+/**
+ * Validation avancée des montants avec détection d'anomalies
+ */
+async function validateAmountSecurity(
+  amount: number,
+  userId: string,
+  db: admin.firestore.Firestore
+): Promise<{ valid: boolean; error?: string }> {
+  
+  // 1. Limites de base
+  if (amount < SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT) {
+    return { valid: false, error: `Montant minimum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT/100}€ requis` };
+  }
+
+  if (amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT) {
+    return { valid: false, error: `Montant maximum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT/100}€ dépassé` };
+  }
+
+  // 2. Limite journalière par utilisateur
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dailyPaymentsQuery = await db.collection('payments')
+      .where('clientId', '==', userId)
+      .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(today))
+      .where('status', 'in', ['succeeded', 'requires_capture', 'processing'])
+      .get();
+
+    const dailyTotal = dailyPaymentsQuery.docs.reduce((total, doc) => {
+      return total + (doc.data().amount || 0);
+    }, 0);
+
+    if (dailyTotal + amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER) {
+      return { valid: false, error: 'Limite journalière dépassée' };
+    }
+
+    return { valid: true };
+
+  } catch (error) {
+    await logError('validateAmountSecurity', error);
+    return { valid: false, error: 'Erreur lors de la validation sécuritaire' };
+  }
+}
+
+/**
+ * Sanitization des données d'entrée
+ */
+function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData {
+  return {
+    amount: Math.round(Number(data.amount)),
+    currency: (data.currency || 'eur').toLowerCase().trim(),
+    serviceType: data.serviceType,
+    providerId: data.providerId.trim(),
+    clientId: data.clientId.trim(),
+    clientEmail: data.clientEmail?.trim().toLowerCase(),
+    providerName: data.providerName?.trim().substring(0, 100),
+    description: data.description?.trim().substring(0, SECURITY_LIMITS.VALIDATION.MAX_DESCRIPTION_LENGTH),
+    commissionAmount: Math.round(Number(data.commissionAmount)),
+    providerAmount: Math.round(Number(data.providerAmount)),
+    callSessionId: data.callSessionId?.trim(),
+    metadata: data.metadata ? Object.fromEntries(
+      Object.entries(data.metadata)
+        .filter(([key, value]) => key.length <= 40 && value.length <= 100)
+        .slice(0, 10) // Max 10 metadata items
+    ) : {}
+  };
+}
+
 /**
  * Cloud Function sécurisée pour créer un PaymentIntent Stripe
- * Version production ready avec validations complètes
+ * Version production ready avec toutes les sécurisations
  */
 export const createPaymentIntent = onCall(async (request: CallableRequest<PaymentIntentRequestData>) => {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const startTime = Date.now();
+
   try {
     // ========================================
     // 1. VALIDATION DE L'AUTHENTIFICATION
@@ -31,13 +223,35 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
     if (!request.auth) {
       throw new HttpsError(
         'unauthenticated',
-        'L\'utilisateur doit être authentifié pour créer un paiement.'
+        'Authentification requise pour créer un paiement.'
       );
     }
 
+    const userId = request.auth.uid;
+
+    // ========================================
+    // 2. RATE LIMITING - PROTECTION SPAM
+    // ========================================
+    const rateLimitResult = checkRateLimit(userId);
+    if (!rateLimitResult.allowed) {
+      const waitTime = Math.ceil((rateLimitResult.resetTime! - Date.now()) / 60000);
+      throw new HttpsError(
+        'resource-exhausted',
+        `Trop de tentatives. Réessayez dans ${waitTime} minutes.`
+      );
+    }
+
+    // ========================================
+    // 3. SANITIZATION DES DONNÉES
+    // ========================================
+    const sanitizedData = sanitizeInput(request.data);
+
+    // ========================================
+    // 4. VALIDATION DES DONNÉES DE BASE
+    // ========================================
     const {
       amount,
-      currency = 'eur',
+      currency,
       serviceType,
       providerId,
       clientId,
@@ -48,12 +262,20 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
       providerAmount,
       callSessionId,
       metadata = {}
-    } = request.data;
+    } = sanitizedData;
+
+    // Validation de base
+    if (!amount || !serviceType || !providerId || !clientId || !commissionAmount || !providerAmount) {
+      throw new HttpsError(
+        'invalid-argument', 
+        'Données requises manquantes.'
+      );
+    }
 
     // ========================================
-    // 2. VALIDATION DES PERMISSIONS
+    // 5. VALIDATION DES PERMISSIONS
     // ========================================
-    if (request.auth.uid !== clientId) {
+    if (userId !== clientId) {
       throw new HttpsError(
         'permission-denied', 
         'Vous ne pouvez créer un paiement que pour votre propre compte.'
@@ -61,30 +283,27 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
     }
 
     // ========================================
-    // 3. VALIDATION DES DONNÉES DE BASE
+    // 6. VALIDATION DES ENUMS ET TYPES
     // ========================================
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      throw new HttpsError('invalid-argument', 'Montant manquant ou invalide.');
-    }
-
-    if (!serviceType || !providerId || !clientId) {
+    const safeCurrency = (currency ?? 'eur') as 'eur' | 'usd' | 'gbp';
+    if (!currency || !SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
       throw new HttpsError(
         'invalid-argument', 
-        'Données de service manquantes (serviceType, providerId, clientId).'
+        `Devise non supportée. Devises autorisées: ${SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.join(', ')}`
       );
     }
 
-    if (!commissionAmount || !providerAmount) {
+    if (!SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
       throw new HttpsError(
         'invalid-argument', 
-        'Montants de commission et prestataire requis.'
+        `Type de service invalide. Types autorisés: ${SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.join(', ')}`
       );
     }
 
     // ========================================
-    // 4. VALIDATION DE LA COHÉRENCE DES MONTANTS
+    // 7. VALIDATION DE LA COHÉRENCE DES MONTANTS
     // ========================================
-    if (commissionAmount + providerAmount !== amount) {
+    if (Math.abs(commissionAmount + providerAmount - amount) > 1) { // Tolérance 1 centime pour arrondis
       throw new HttpsError(
         'invalid-argument', 
         'La répartition des montants ne correspond pas au total.'
@@ -99,130 +318,64 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
     }
 
     // ========================================
-    // 5. VALIDATION DES LIMITES DE MONTANT
-    // ========================================
-    const MIN_AMOUNT = 500; // 5€
-    const MAX_AMOUNT = 50000; // 500€
-
-    if (amount < MIN_AMOUNT) {
-      throw new HttpsError(
-        'invalid-argument', 
-        `Montant minimum de ${MIN_AMOUNT/100}€ requis.`
-      );
-    }
-
-    if (amount > MAX_AMOUNT) {
-      throw new HttpsError(
-        'invalid-argument', 
-        `Montant maximum de ${MAX_AMOUNT/100}€ dépassé.`
-      );
-    }
-
-    // ========================================
-    // 6. VALIDATION DE LA DEVISE
-    // ========================================
-    const allowedCurrencies = ['eur', 'usd', 'gbp'];
-    if (!allowedCurrencies.includes(currency.toLowerCase())) {
-      throw new HttpsError(
-        'invalid-argument', 
-        `Devise non supportée. Devises autorisées: ${allowedCurrencies.join(', ')}`
-      );
-    }
-
-    // ========================================
-    // 7. VALIDATION DU TYPE DE SERVICE
-    // ========================================
-    const allowedServiceTypes = ['lawyer_call', 'expat_call'];
-    if (!allowedServiceTypes.includes(serviceType)) {
-      throw new HttpsError(
-        'invalid-argument', 
-        `Type de service invalide. Types autorisés: ${allowedServiceTypes.join(', ')}`
-      );
-    }
-
-    // ========================================
-    // 8. DÉTERMINATION DU TYPE DE PRESTATAIRE
-    // ========================================
-    const providerType = serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
-
-    // ========================================
-    // 9. VÉRIFICATION DES DOUBLONS
+    // 8. VALIDATION SÉCURITAIRE DES MONTANTS
     // ========================================
     const db = admin.firestore();
+    const amountValidation = await validateAmountSecurity(amount, userId, db);
+    if (!amountValidation.valid) {
+      throw new HttpsError('invalid-argument', amountValidation.error!);
+    }
+
+    // ========================================
+    // 9. VALIDATION BUSINESS LOGIC
+    // ========================================
+    const businessValidation = await validateBusinessLogic(sanitizedData, db);
+    if (!businessValidation.valid) {
+      throw new HttpsError('failed-precondition', businessValidation.error!);
+    }
+
+    // ========================================
+    // 10. VÉRIFICATION DES DOUBLONS (Idempotency Check)
+    // ========================================
+    const idempotencyKey = `payment_${userId}_${providerId}_${amount}_${Date.now()}`;
+    
     const existingPayments = await db.collection('payments')
       .where('clientId', '==', clientId)
       .where('providerId', '==', providerId)
+      .where('amount', '==', amount)
       .where('status', 'in', ['pending', 'requires_confirmation', 'requires_capture', 'processing'])
+      .where('createdAt', '>', admin.firestore.Timestamp.fromDate(new Date(Date.now() - 5 * 60 * 1000))) // 5 min
       .limit(1)
       .get();
 
     if (!existingPayments.empty) {
       throw new HttpsError(
         'already-exists', 
-        'Un paiement est déjà en cours pour cette combinaison client/prestataire.'
+        'Un paiement similaire est déjà en cours de traitement.'
       );
     }
 
     // ========================================
-    // 10. VÉRIFICATION DE L'EXISTENCE DES UTILISATEURS
+    // 11. CRÉATION DU PAIEMENT VIA STRIPEMANAGER
     // ========================================
-    const [providerDoc, clientDoc] = await Promise.all([
-      db.collection('users').doc(providerId).get(),
-      db.collection('users').doc(clientId).get()
-    ]);
-
-    if (!providerDoc.exists) {
-      throw new HttpsError('not-found', 'Prestataire non trouvé.');
-    }
-
-    if (!clientDoc.exists) {
-      throw new HttpsError('not-found', 'Client non trouvé.');
-    }
-
-    const providerData = providerDoc.data();
-    const clientData = clientDoc.data();
-
-    // ========================================
-    // 11. VÉRIFICATION DU STATUT DES COMPTES
-    // ========================================
-    if (clientData?.status === 'suspended' || clientData?.status === 'banned') {
-      throw new HttpsError('permission-denied', 'Votre compte est suspendu.');
-    }
-
-    if (providerData?.status === 'suspended' || providerData?.status === 'banned') {
-      throw new HttpsError('failed-precondition', 'Le prestataire n\'est pas disponible.');
-    }
-
-    if (providerData?.isAvailable === false) {
-      throw new HttpsError('failed-precondition', 'Le prestataire n\'est pas disponible actuellement.');
-    }
-
-    // ========================================
-    // 12. CRÉATION DU PAIEMENT VIA STRIPEMANAGER
-    // ========================================
-    console.log('🚀 Création PaymentIntent pour:', {
-      amount,
-      currency,
-      serviceType,
-      clientId,
-      providerId,
-      callSessionId
-    });
+    console.log(`[${requestId}] Création PaymentIntent - Service: ${serviceType}, Montant: ${amount}`);
 
     const stripePaymentData: StripePaymentData = {
       amount,
-      currency,
+      currency: safeCurrency,
       clientId,
       providerId,
       serviceType,
-      providerType,
+      providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
       commissionAmount,
       providerAmount,
       callSessionId,
       metadata: {
-        clientEmail: clientEmail || clientData?.email || '',
-        providerName: providerName || providerData?.displayName || '',
+        clientEmail: clientEmail || '',
+        providerName: providerName || '',
         description: description || `Service ${serviceType}`,
+        requestId,
+        idempotencyKey,
         ...metadata
       }
     };
@@ -230,17 +383,27 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
     const result = await stripeManager.createPaymentIntent(stripePaymentData);
 
     if (!result.success) {
+      // Log détaillé pour debug (sans exposer aux clients)
+      await logError('createPaymentIntent:stripe_error', {
+        requestId,
+        userId,
+        serviceType,
+        amount,
+        error: result.error
+      });
+
       throw new HttpsError(
         'internal',
-        `Erreur lors de la création du paiement: ${result.error}`
+        'Erreur lors de la création du paiement. Veuillez réessayer.'
       );
     }
 
     // ========================================
-    // 13. LOGGING ET AUDIT
+    // 12. LOGGING ET AUDIT SÉCURISÉ
     // ========================================
     await db.collection('payment_audit_logs').add({
       action: 'payment_intent_created',
+      requestId,
       paymentIntentId: result.paymentIntentId,
       clientId,
       providerId,
@@ -249,42 +412,47 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
       providerAmount,
       serviceType,
       callSessionId,
-      userAgent: request.rawRequest.headers['user-agent'] || 'unknown',
+      userAgent: request.rawRequest.headers['user-agent']?.substring(0, 200) || 'unknown',
       ipAddress: request.rawRequest.ip || 'unknown',
+      processingTime: Date.now() - startTime,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       environment: process.env.NODE_ENV || 'development'
     });
 
-    console.log('✅ PaymentIntent créé avec succès:', result.paymentIntentId);
+    console.log(`[${requestId}] PaymentIntent créé avec succès - Temps: ${Date.now() - startTime}ms`);
 
     // ========================================
-    // 14. RÉPONSE SÉCURISÉE
+    // 13. RÉPONSE SÉCURISÉE ET TYPÉE
     // ========================================
-    return {
+    const response: SuccessResponse = {
       success: true,
-      clientSecret: result.clientSecret,
-      paymentIntentId: result.paymentIntentId,
+      clientSecret: result.clientSecret!,
+      paymentIntentId: result.paymentIntentId!,
       amount,
-      currency,
+     currency: currency ?? "eur"
       serviceType,
-      status: 'requires_payment_method'
+      status: 'requires_payment_method',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h expiration
     };
 
-  } catch (error: any) {
+    return response;
+
+  } catch (error: unknown) {
     // ========================================
-    // 15. GESTION D'ERREURS COMPLÈTE
+    // 14. GESTION D'ERREURS SÉCURISÉE
     // ========================================
-    console.error('❌ Erreur création PaymentIntent:', error);
+    const processingTime = Date.now() - startTime;
     
-    // Logger l'erreur pour debug
+    // Log détaillé pour debug (jamais exposé aux clients)
     await logError('createPaymentIntent:error', {
-      error: error.message,
-      stack: error.stack,
+      requestId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      processingTime,
       requestData: {
         amount: request.data.amount,
         serviceType: request.data.serviceType,
-        clientId: request.data.clientId,
-        providerId: request.data.providerId
+        hasAuth: !!request.auth
       },
       userAuth: request.auth?.uid || 'not-authenticated'
     });
@@ -294,16 +462,19 @@ export const createPaymentIntent = onCall(async (request: CallableRequest<Paymen
       throw error;
     }
 
-    // Sinon, créer une nouvelle HttpsError générique
+    // Pour toute autre erreur, réponse générique sécurisée
+    const errorResponse: ErrorResponse = {
+      success: false,
+      error: 'Une erreur inattendue s\'est produite. Veuillez réessayer.',
+      code: 'INTERNAL_ERROR',
+      timestamp: new Date().toISOString(),
+      requestId
+    };
+
     throw new HttpsError(
       'internal',
-      'Une erreur inattendue s\'est produite lors de la création du paiement.',
-      {
-        originalError: error.message,
-        code: error.code,
-        type: error.type,
-        timestamp: new Date().toISOString()
-      }
+      errorResponse.error,
+      errorResponse
     );
   }
 });

@@ -168,10 +168,49 @@ export class MessageManager {
   }
 
   /**
+   * FONCTION MANQUANTE - Envoie un appel de notification
+   */
+  async sendNotificationCall(phoneNumber: string, message: string): Promise<boolean> {
+    try {
+      if (!twilioClient || !process.env.TWILIO_PHONE_NUMBER) {
+        throw new Error('Configuration Twilio manquante');
+      }
+
+      await twilioClient.calls.create({
+        to: phoneNumber,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        twiml: `<Response><Say voice="alice" language="fr-FR">${message}</Say></Response>`,
+        timeout: 20
+      });
+
+      console.log(`✅ Appel de notification envoyé vers ${phoneNumber}`);
+      return true;
+
+    } catch (error) {
+      console.warn(`❌ Échec notification call vers ${phoneNumber}:`, error);
+      
+      // Essayer SMS en fallback
+      try {
+        await this.sendSMSDirect(phoneNumber, message);
+        console.log(`✅ SMS fallback envoyé vers ${phoneNumber}`);
+        return true;
+      } catch (smsError) {
+        console.warn(`❌ Échec SMS fallback vers ${phoneNumber}:`, smsError);
+        await logError('MessageManager:sendNotificationCall:fallback', smsError);
+        return false;
+      }
+    }
+  }
+
+  /**
    * Méthodes privées pour envoi direct
    */
   private async sendWhatsAppDirect(to: string, message: string): Promise<boolean> {
     try {
+      if (!process.env.TWILIO_WHATSAPP_NUMBER) {
+        throw new Error('Numéro WhatsApp Twilio non configuré');
+      }
+
       await twilioClient.messages.create({
         body: message,
         from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
@@ -186,9 +225,13 @@ export class MessageManager {
 
   private async sendSMSDirect(to: string, message: string): Promise<boolean> {
     try {
+      if (!process.env.TWILIO_PHONE_NUMBER) {
+        throw new Error('Numéro SMS Twilio non configuré');
+      }
+
       await twilioClient.messages.create({
         body: message,
-        from: process.env.TWILIO_PHONE_NUMBER!,
+        from: process.env.TWILIO_PHONE_NUMBER,
         to: to
       });
       return true;

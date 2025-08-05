@@ -155,10 +155,45 @@ class MessageManager {
         }
     }
     /**
+     * FONCTION MANQUANTE - Envoie un appel de notification
+     */
+    async sendNotificationCall(phoneNumber, message) {
+        try {
+            if (!twilio_1.twilioClient || !process.env.TWILIO_PHONE_NUMBER) {
+                throw new Error('Configuration Twilio manquante');
+            }
+            await twilio_1.twilioClient.calls.create({
+                to: phoneNumber,
+                from: process.env.TWILIO_PHONE_NUMBER,
+                twiml: `<Response><Say voice="alice" language="fr-FR">${message}</Say></Response>`,
+                timeout: 20
+            });
+            console.log(`✅ Appel de notification envoyé vers ${phoneNumber}`);
+            return true;
+        }
+        catch (error) {
+            console.warn(`❌ Échec notification call vers ${phoneNumber}:`, error);
+            // Essayer SMS en fallback
+            try {
+                await this.sendSMSDirect(phoneNumber, message);
+                console.log(`✅ SMS fallback envoyé vers ${phoneNumber}`);
+                return true;
+            }
+            catch (smsError) {
+                console.warn(`❌ Échec SMS fallback vers ${phoneNumber}:`, smsError);
+                await (0, logError_1.logError)('MessageManager:sendNotificationCall:fallback', smsError);
+                return false;
+            }
+        }
+    }
+    /**
      * Méthodes privées pour envoi direct
      */
     async sendWhatsAppDirect(to, message) {
         try {
+            if (!process.env.TWILIO_WHATSAPP_NUMBER) {
+                throw new Error('Numéro WhatsApp Twilio non configuré');
+            }
             await twilio_1.twilioClient.messages.create({
                 body: message,
                 from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
@@ -173,6 +208,9 @@ class MessageManager {
     }
     async sendSMSDirect(to, message) {
         try {
+            if (!process.env.TWILIO_PHONE_NUMBER) {
+                throw new Error('Numéro SMS Twilio non configuré');
+            }
             await twilio_1.twilioClient.messages.create({
                 body: message,
                 from: process.env.TWILIO_PHONE_NUMBER,

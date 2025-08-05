@@ -33,283 +33,229 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.findCallSessionByCallSid = exports.twilioClientWebhook = exports.twilioWebhook = void 0;
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+exports.findCallSessionByCallSid = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
+const https_1 = require("firebase-functions/v2/https");
+const TwilioCallManager_1 = require("../TwilioCallManager");
 const logCallRecord_1 = require("../utils/logs/logCallRecord");
 const logError_1 = require("../utils/logs/logError");
-// Assurer que Firebase Admin est initialisé
-if (!admin.apps.length) {
-    admin.initializeApp();
+const admin = __importStar(require("firebase-admin"));
+/**
+ * Webhook unifié pour les événements d'appels Twilio
+ * Compatible avec le système TwilioCallManager moderne
+ */
+exports.twilioCallWebhook = (0, https_1.onRequest)(async (req, res) => {
+    try {
+        const body = req.body;
+        console.log('🔔 Call Webhook reçu:', {
+            event: body.CallStatus,
+            callSid: body.CallSid,
+            from: body.From,
+            to: body.To,
+            duration: body.CallDuration
+        });
+        // Trouver la session d'appel par CallSid
+        const sessionResult = await TwilioCallManager_1.twilioCallManager.findSessionByCallSid(body.CallSid);
+        if (!sessionResult) {
+            console.warn(`Session non trouvée pour CallSid: ${body.CallSid}`);
+            res.status(200).send('Session not found');
+            return;
+        }
+        const { session, participantType } = sessionResult;
+        const sessionId = session.id;
+        // Traiter les différents statuts d'appel
+        switch (body.CallStatus) {
+            case 'ringing':
+                await handleCallRinging(sessionId, participantType, body);
+                break;
+            case 'answered':
+            case 'in-progress':
+                await handleCallAnswered(sessionId, participantType, body);
+                break;
+            case 'completed':
+                await handleCallCompleted(sessionId, participantType, body);
+                break;
+            case 'failed':
+            case 'busy':
+            case 'no-answer':
+                await handleCallFailed(sessionId, participantType, body);
+                break;
+            default:
+                console.log(`Statut d'appel non géré: ${body.CallStatus}`);
+        }
+        res.status(200).send('OK');
+    }
+    catch (error) {
+        console.error('❌ Erreur webhook appel:', error);
+        await (0, logError_1.logError)('twilioCallWebhook:error', error);
+        res.status(500).send('Webhook error');
+    }
+});
+/**
+ * Gère le statut "ringing"
+ */
+async function handleCallRinging(sessionId, participantType, body) {
+    try {
+        console.log(`📞 ${participantType} en cours de sonnerie: ${sessionId}`);
+        await TwilioCallManager_1.twilioCallManager.updateParticipantStatus(sessionId, participantType, 'ringing');
+        await (0, logCallRecord_1.logCallRecord)({
+            callId: sessionId,
+            status: `${participantType}_ringing`,
+            retryCount: 0,
+            additionalData: {
+                callSid: body.CallSid,
+                timestamp: body.Timestamp
+            }
+        });
+    }
+    catch (error) {
+        await (0, logError_1.logError)('handleCallRinging', error);
+    }
 }
-const db = admin.firestore();
-// 📞 WEBHOOK 1: Pour les appels PRESTATAIRE
-exports.twilioWebhook = functions.https.onRequest(async (req, res) => {
+/**
+ * Gère le statut "answered"
+ */
+async function handleCallAnswered(sessionId, participantType, body) {
     try {
-        const { CallSid, CallStatus, AnsweredBy, CallDuration, From, To } = req.body;
-        console.log('🔔 Webhook Twilio reçu:', {
-            CallSid,
-            CallStatus,
-            AnsweredBy,
-            CallDuration,
-            From,
-            To
-        });
-        // Trouver la session d'appel correspondante par CallSid d'abord, puis par numéro
-        let callDoc = null;
-        let callId = '';
-        let callData = null;
-        // Méthode 1: Chercher par CallSid stocké
-        const callSessionsRef = db.collection('call_sessions');
-        let snapshot = await callSessionsRef
-            .where('twilioCallSid', '==', CallSid)
-            .limit(1)
-            .get();
-        if (!snapshot.empty) {
-            callDoc = snapshot.docs[0];
-            callId = callDoc.id;
-            callData = callDoc.data();
-        }
-        else {
-            // Méthode 2: Chercher par numéro de téléphone du prestataire
-            snapshot = await callSessionsRef
-                .where('providerPhone', '==', To)
-                .where('status', 'in', ['scheduled', 'provider_attempt_1', 'provider_attempt_2', 'provider_attempt_3', 'provider_connected'])
-                .orderBy('createdAt', 'desc')
-                .limit(1)
-                .get();
-            if (!snapshot.empty) {
-                callDoc = snapshot.docs[0];
-                callId = callDoc.id;
-                callData = callDoc.data();
-            }
-        }
-        if (!callDoc || !callData) {
-            console.log('❌ Aucune session d\'appel trouvée pour:', { To, CallSid });
-            res.status(200).send('No matching call session');
-            return;
+        console.log(`✅ ${participantType} a répondu: ${sessionId}`);
+        await TwilioCallManager_1.twilioCallManager.updateParticipantStatus(sessionId, participantType, 'connected', admin.firestore.Timestamp.fromDate(new Date()));
+        // Vérifier si les deux participants sont connectés
+        const session = await TwilioCallManager_1.twilioCallManager.getCallSession(sessionId);
+        if (session &&
+            session.participants.provider.status === 'connected' &&
+            session.participants.client.status === 'connected') {
+            await TwilioCallManager_1.twilioCallManager.updateCallSessionStatus(sessionId, 'active');
+            await (0, logCallRecord_1.logCallRecord)({
+                callId: sessionId,
+                status: 'both_participants_connected',
+                retryCount: 0
+            });
         }
         await (0, logCallRecord_1.logCallRecord)({
-            callId,
-            status: `provider_webhook_${CallStatus}`,
-            retryCount: callData.retryCount || 0,
+            callId: sessionId,
+            status: `${participantType}_answered`,
+            retryCount: 0,
             additionalData: {
-                CallSid,
-                AnsweredBy,
-                CallDuration: CallDuration || '0'
+                callSid: body.CallSid,
+                answeredBy: body.AnsweredBy
             }
         });
-        // ✅ PRESTATAIRE A RÉPONDU
-        if (CallStatus === 'answered' || (CallStatus === 'completed' && AnsweredBy === 'human')) {
-            console.log('✅ Prestataire a répondu:', callId);
-            await callDoc.ref.update({
-                status: 'connected',
-                providerCallSid: CallSid,
-                providerAnsweredAt: admin.firestore.Timestamp.now(),
-                providerCallDuration: CallDuration || '0'
-            });
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: 'provider_answered_confirmed',
-                retryCount: callData.retryCount || 0
-            });
-        }
-        // ❌ PRESTATAIRE N'A PAS RÉPONDU
-        else if (CallStatus === 'no-answer' || CallStatus === 'busy' || CallStatus === 'failed') {
-            console.log('❌ Prestataire n\'a pas répondu:', callId, CallStatus);
-            await callDoc.ref.update({
-                lastProviderAttemptStatus: CallStatus,
-                lastProviderAttemptAt: admin.firestore.Timestamp.now()
-            });
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: `provider_no_answer_${CallStatus}`,
-                retryCount: callData.retryCount || 0
-            });
-        }
-        // 📞 APPEL EN COURS
-        else if (CallStatus === 'ringing' || CallStatus === 'in-progress') {
-            console.log('📞 Appel prestataire en cours:', callId, CallStatus);
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: `provider_${CallStatus}`,
-                retryCount: callData.retryCount || 0
-            });
-        }
-        // 🔚 APPEL TERMINÉ
-        else if (CallStatus === 'completed') {
-            console.log('🔚 Appel prestataire terminé:', callId);
-            await callDoc.ref.update({
-                providerCallCompletedAt: admin.firestore.Timestamp.now(),
-                providerFinalCallDuration: CallDuration || '0'
-            });
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: 'provider_call_completed',
-                retryCount: callData.retryCount || 0,
-                additionalData: {
-                    providerDuration: CallDuration
-                }
-            });
-        }
-        res.status(200).send('OK');
     }
     catch (error) {
-        console.error('❌ Erreur webhook Twilio:', error);
-        await (0, logError_1.logError)('twilioWebhook:error', error);
-        res.status(500).send('Error processing webhook');
+        await (0, logError_1.logError)('handleCallAnswered', error);
     }
-});
-// 📞 WEBHOOK 2: Pour les appels CLIENT
-exports.twilioClientWebhook = functions.https.onRequest(async (req, res) => {
+}
+/**
+ * Gère le statut "completed"
+ */
+async function handleCallCompleted(sessionId, participantType, body) {
     try {
-        const { CallSid, CallStatus, AnsweredBy, CallDuration, From, To } = req.body;
-        console.log('🔔 Webhook Client Twilio reçu:', {
-            CallSid,
-            CallStatus,
-            AnsweredBy,
-            CallDuration,
-            From,
-            To
-        });
-        // Trouver la session d'appel correspondante
-        let callDoc = null;
-        let callId = '';
-        let callData = null;
-        const callSessionsRef = db.collection('call_sessions');
-        // Méthode 1: Chercher par CallSid stocké pour le client
-        let snapshot = await callSessionsRef
-            .where('clientCallSid', '==', CallSid)
-            .limit(1)
-            .get();
-        if (!snapshot.empty) {
-            callDoc = snapshot.docs[0];
-            callId = callDoc.id;
-            callData = callDoc.data();
-        }
-        else {
-            // Méthode 2: Chercher par numéro de téléphone du client avec statut approprié
-            snapshot = await callSessionsRef
-                .where('clientPhone', '==', To)
-                .where('status', 'in', ['provider_connected', 'client_attempt_1', 'client_attempt_2', 'client_attempt_3'])
-                .orderBy('createdAt', 'desc')
-                .limit(1)
-                .get();
-            if (!snapshot.empty) {
-                callDoc = snapshot.docs[0];
-                callId = callDoc.id;
-                callData = callDoc.data();
-                // Mettre à jour le CallSid client si pas encore fait
-                await callDoc.ref.update({
-                    clientCallSid: CallSid
-                });
-            }
-        }
-        if (!callDoc || !callData) {
-            console.log('❌ Aucune session d\'appel client trouvée pour:', { To, CallSid });
-            res.status(200).send('No matching client call session');
+        const duration = parseInt(body.CallDuration || '0');
+        console.log(`🏁 Appel ${participantType} terminé: ${sessionId}, durée: ${duration}s`);
+        await TwilioCallManager_1.twilioCallManager.updateParticipantStatus(sessionId, participantType, 'disconnected', admin.firestore.Timestamp.fromDate(new Date()));
+        // Récupérer la session pour déterminer le traitement approprié
+        const session = await TwilioCallManager_1.twilioCallManager.getCallSession(sessionId);
+        if (!session) {
+            console.warn(`Session non trouvée lors de la completion: ${sessionId}`);
             return;
         }
+        // Si c'est une déconnexion normale (durée suffisante)
+        if (duration >= 120) {
+            await TwilioCallManager_1.twilioCallManager.handleCallCompletion(sessionId, duration);
+        }
+        else {
+            // Déconnexion précoce
+            export async function handleEarlyDisconnection(sessionId, participantType, duration) {
+                console.log(`[Twilio] Déconnexion précoce - session: ${sessionId}, type: ${participantType}, durée: ${duration}s`);
+                // Tu peux ajouter une logique ici si besoin
+            }
+        }
         await (0, logCallRecord_1.logCallRecord)({
-            callId,
-            status: `client_webhook_${CallStatus}`,
-            retryCount: callData.clientRetryCount || 0,
+            callId: sessionId,
+            status: `${participantType}_call_completed`,
+            retryCount: 0,
+            duration: duration,
             additionalData: {
-                CallSid,
-                AnsweredBy,
-                CallDuration: CallDuration || '0'
+                callSid: body.CallSid,
+                duration: duration
             }
         });
-        // ✅ CLIENT A RÉPONDU
-        if (CallStatus === 'answered' || (CallStatus === 'completed' && AnsweredBy === 'human')) {
-            console.log('✅ Client a répondu:', callId);
-            await callDoc.ref.update({
-                clientStatus: 'connected',
-                clientCallSid: CallSid,
-                clientAnsweredAt: admin.firestore.Timestamp.now(),
-                clientCallDuration: CallDuration || '0',
-                fullStatus: 'both_connected'
-            });
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: 'client_answered_confirmed',
-                retryCount: callData.clientRetryCount || 0
-            });
-        }
-        // ❌ CLIENT N'A PAS RÉPONDU
-        else if (CallStatus === 'no-answer' || CallStatus === 'busy' || CallStatus === 'failed') {
-            console.log('❌ Client n\'a pas répondu:', callId, CallStatus);
-            await callDoc.ref.update({
-                lastClientAttemptStatus: CallStatus,
-                lastClientAttemptAt: admin.firestore.Timestamp.now()
-            });
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: `client_no_answer_${CallStatus}`,
-                retryCount: callData.clientRetryCount || 0
-            });
-        }
-        // 📞 APPEL EN COURS
-        else if (CallStatus === 'ringing' || CallStatus === 'in-progress') {
-            console.log('📞 Appel client en cours:', callId, CallStatus);
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: `client_${CallStatus}`,
-                retryCount: callData.clientRetryCount || 0
-            });
-        }
-        // 🔚 APPEL TERMINÉ
-        else if (CallStatus === 'completed') {
-            console.log('🔚 Appel terminé:', callId);
-            await callDoc.ref.update({
-                callCompletedAt: admin.firestore.Timestamp.now(),
-                finalCallDuration: CallDuration || '0'
-            });
-            await (0, logCallRecord_1.logCallRecord)({
-                callId,
-                status: 'call_completed',
-                retryCount: callData.clientRetryCount || 0,
-                additionalData: {
-                    totalDuration: CallDuration
-                }
-            });
-        }
-        res.status(200).send('OK');
     }
     catch (error) {
-        console.error('❌ Erreur webhook Client Twilio:', error);
-        await (0, logError_1.logError)('twilioClientWebhook:error', error);
-        res.status(500).send('Error processing webhook');
+        await (0, logError_1.logError)('handleCallCompleted', error);
     }
+}
+/**
+ * Gère les échecs d'appel
+ */
+async function handleCallFailed(sessionId, participantType, body) {
+    try {
+        console.log(`❌ Appel ${participantType} échoué: ${sessionId}, raison: ${body.CallStatus}`);
+        await TwilioCallManager_1.twilioCallManager.updateParticipantStatus(sessionId, participantType, body.CallStatus === 'no-answer' ? 'no_answer' : 'disconnected');
+        // Déterminer la raison de l'échec pour le traitement approprié
+        let failureReason = 'system_error';
+        if (body.CallStatus === 'no-answer') {
+            failureReason = `${participantType}_no_answer`;
+        }
+        else if (body.CallStatus === 'busy') {
+            failureReason = `${participantType}_busy`;
+        }
+        else if (body.CallStatus === 'failed') {
+            failureReason = `${participantType}_failed`;
+        }
+        // Utiliser la logique de gestion d'échec du TwilioCallManager
+        await TwilioCallManager_1.twilioCallManager.handleCallFailure(sessionId, failureReason);
+        await (0, logCallRecord_1.logCallRecord)({
+            callId: sessionId,
+            status: `${participantType}_call_failed`,
+            retryCount: 0,
+            errorMessage: `Call failed: ${body.CallStatus}`,
+            additionalData: {
+                callSid: body.CallSid,
+                failureReason: body.CallStatus
+            }
+        });
+    }
+    catch (error) {
+        await (0, logError_1.logError)('handleCallFailed', error);
+    }
+}
+/**
+ * Webhook pour les événements de conférence (délégué au système moderne)
+ */
+exports.twilioConferenceWebhook = (0, https_1.onRequest)(async (req, res) => {
+    // Rediriger vers le webhook de conférence moderne
+    const { twilioConferenceWebhook: modernWebhook } = await Promise.resolve().then(() => __importStar(require('./TwilioConferenceWebhook')));
+    return modernWebhook(req, res);
 });
-// 🛠️ FONCTION UTILITAIRE: Recherche de session par CallSid (améliorée)
+/**
+ * Webhook pour les événements d'enregistrement (délégué au système moderne)
+ */
+exports.twilioRecordingWebhook = (0, https_1.onRequest)(async (req, res) => {
+    // Rediriger vers le webhook d'enregistrement moderne
+    const { twilioRecordingWebhook: modernWebhook } = await Promise.resolve().then(() => __importStar(require('./TwilioRecordingWebhook')));
+    return modernWebhook(req, res);
+});
+/**
+ * Fonction utilitaire pour recherche de session (compatible avec l'ancien système)
+ */
 const findCallSessionByCallSid = async (callSid) => {
-    const db = admin.firestore();
-    // Chercher dans les CallSid prestataire
-    let snapshot = await db.collection('call_sessions')
-        .where('providerCallSid', '==', callSid)
-        .limit(1)
-        .get();
-    if (!snapshot.empty) {
-        return { doc: snapshot.docs[0], type: 'provider' };
+    try {
+        const result = await TwilioCallManager_1.twilioCallManager.findSessionByCallSid(callSid);
+        if (result) {
+            return {
+                doc: {
+                    id: result.session.id,
+                    data: () => result.session
+                },
+                type: result.participantType
+            };
+        }
+        return null;
     }
-    // Chercher dans les CallSid client
-    snapshot = await db.collection('call_sessions')
-        .where('clientCallSid', '==', callSid)
-        .limit(1)
-        .get();
-    if (!snapshot.empty) {
-        return { doc: snapshot.docs[0], type: 'client' };
+    catch (error) {
+        console.error('Error finding call session:', error);
+        return null;
     }
-    // Chercher dans le CallSid principal (twilioCallSid)
-    snapshot = await db.collection('call_sessions')
-        .where('twilioCallSid', '==', callSid)
-        .limit(1)
-        .get();
-    if (!snapshot.empty) {
-        return { doc: snapshot.docs[0], type: 'main' };
-    }
-    return null;
 };
 exports.findCallSessionByCallSid = findCallSessionByCallSid;
 //# sourceMappingURL=twilioWebhooks.js.map

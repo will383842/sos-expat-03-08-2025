@@ -1,5 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle, CreditCard, Lock, User, Calendar, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { functions } from '../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
 
 // Types
 interface Provider {
@@ -67,289 +75,471 @@ const LoadingSpinner = ({ size = 'medium', color = 'red' }) => {
   );
 };
 
+// Style moderne pour Stripe CardElement
+const cardStyle = {
+  style: {
+    base: {
+      fontSize: '18px',
+      color: '#1a202c',
+      letterSpacing: '0.025em',
+      fontFamily: '"SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace',
+      fontWeight: '500',
+      '::placeholder': { 
+        color: '#a0aec0',
+        fontWeight: '400'
+      },
+      iconColor: '#4F46E5',
+    },
+    invalid: { 
+      color: '#e53e3e',
+      iconColor: '#e53e3e'
+    },
+    complete: {
+      color: '#38a169',
+      iconColor: '#38a169'
+    }
+  },
+};
+
+// Composant interne pour le formulaire de paiement avec Stripe
+const PaymentForm: React.FC<{
+  user: any;
+  provider: Provider;
+  service: ServiceData;
+  onSuccess: (paymentIntentId: string) => void;
+  onError: (error: string) => void;
+  isProcessing: boolean;
+  setIsProcessing: (processing: boolean) => void;
+}> = ({ user, provider, service, onSuccess, onError, isProcessing, setIsProcessing }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handlePaymentSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    if (!stripe || !elements || !user?.uid) {
+      onError('Configuration de paiement invalide');
+      return;
+    }
+
+    setIsProcessing(true);
+    onError('');
+
+    try {
+      // 1. Créer le PaymentIntent via Firebase Function
+      const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
+      const paymentResponse: any = await createPaymentIntent({
+        amount: service.amount * 100, // Convertir en centimes
+        currency: 'eur',
+        providerId: provider.id,
+        customerId: user.uid,
+        serviceType: service.serviceType,
+      });
+
+      const clientSecret = paymentResponse.data.clientSecret;
+
+      // 2. Confirmer le paiement avec Stripe
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Élément de carte non trouvé');
+      }
+
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+            email: user.email,
+          },
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erreur de paiement');
+      }
+
+      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+        throw new Error('Le paiement a échoué');
+      }
+
+      // 3. Programmer l'appel via Firebase Function
+      const createAndScheduleCall = httpsCallable(functions, 'createAndScheduleCall');
+      await createAndScheduleCall({
+        providerId: provider.id,
+        clientId: user.uid,
+        providerPhone: provider.phoneNumber || provider.phone,
+        clientPhone: service.clientPhone || user.phone,
+        providerType: provider.role,
+        serviceType: service.serviceType,
+        amount: service.amount,
+        duration: service.duration,
+        paymentIntentId: paymentIntent.id,
+      });
+
+      onSuccess(paymentIntent.id);
+
+    } catch (error: any) {
+      console.error('Erreur lors du paiement:', error);
+      onError(error.message || 'Une erreur est survenue lors du paiement');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handlePaymentSubmit} className="space-y-6">
+      {/* Stripe Card Element avec style moderne */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="flex items-center space-x-2">
+            <CreditCard className="w-4 h-4 text-blue-600" />
+            <span>Informations de carte bancaire</span>
+          </div>
+        </label>
+        <div className="relative">
+          <div className="p-5 border-2 border-gray-200 rounded-xl bg-gradient-to-br from-white via-gray-50 to-white shadow-inner focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/20 focus-within:shadow-lg transition-all duration-300">
+            <CardElement options={cardStyle} />
+          </div>
+          {/* Icônes de cartes acceptées */}
+          <div className="absolute -bottom-3 right-3 flex space-x-1 bg-white px-2 py-1 rounded-full shadow-sm border">
+            <div className="w-6 h-4 bg-gradient-to-r from-blue-600 to-blue-700 rounded text-white text-xs flex items-center justify-center font-bold">V</div>
+            <div className="w-6 h-4 bg-gradient-to-r from-red-500 to-orange-500 rounded text-white text-xs flex items-center justify-center font-bold">M</div>
+            <div className="w-6 h-4 bg-gradient-to-r from-green-600 to-teal-600 rounded text-white text-xs flex items-center justify-center font-bold">A</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Détail du paiement avec design amélioré */}
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100 backdrop-blur-sm rounded-xl p-5 border border-gray-200">
+        <h4 className="font-bold text-gray-900 mb-4 text-base flex items-center">
+          <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+          Détail du paiement
+        </h4>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600">Client</span>
+            <span className="font-semibold text-gray-900">{user?.firstName} {user?.lastName}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600">Expert</span>
+            <div className="flex items-center space-x-2">
+              <img 
+                src={provider.avatar || provider.profilePhoto} 
+                className="w-6 h-6 rounded-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.fullName)}&size=50`;
+                }}
+              />
+              <span className="font-semibold text-gray-900">{provider.fullName}</span>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600">Service</span>
+            <span className="font-medium text-gray-800">{service.serviceType === 'lawyer_call' ? 'Consultation Avocat' : 'Consultation Expatrié'}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600">Durée</span>
+            <span className="font-medium text-gray-800">{service.duration} minutes</span>
+          </div>
+          <div className="border-t border-gray-300 pt-3 mt-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Frais de service</span>
+              <span className="font-medium text-gray-800">{service.commissionAmount.toFixed(2)} €</span>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-gray-600">Consultation</span>
+              <span className="font-medium text-gray-800">{service.providerAmount.toFixed(2)} €</span>
+            </div>
+          </div>
+          <div className="border-t-2 border-gray-400 pt-3 mt-3">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-bold text-gray-900">Total</span>
+              <span className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
+                {service.amount.toFixed(2)} €
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bouton de paiement moderne */}
+      <button
+        type="submit"
+        disabled={!stripe || isProcessing}
+        className={`w-full py-5 rounded-xl font-bold text-white text-lg transition-all duration-300 transform relative overflow-hidden ${
+          (!stripe || isProcessing)
+            ? 'bg-gray-400 cursor-not-allowed opacity-60'
+            : 'bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:to-pink-700 hover:scale-105 active:scale-95 shadow-xl hover:shadow-red-500/30'
+        }`}
+      >
+        {/* Effet de brillance */}
+        {!isProcessing && stripe && (
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 translate-x-[-100%] hover:translate-x-[100%] transition-transform duration-1000"></div>
+        )}
+        
+        {isProcessing ? (
+          <div className="flex items-center justify-center space-x-3">
+            <LoadingSpinner size="small" color="white" />
+            <span>Traitement sécurisé...</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center space-x-3">
+            <Lock className="w-6 h-6" />
+            <span>Payer {service.amount}€ et lancer la consultation</span>
+          </div>
+        )}
+      </button>
+
+      {/* Informations légales */}
+      <div className="space-y-2 text-xs text-gray-500 text-center">
+        <p>
+          En validant ce paiement, vous acceptez nos{' '}
+          <button type="button" className="text-blue-600 underline font-medium">
+            conditions générales
+          </button>
+        </p>
+        <p className="text-green-600 font-medium">
+          ✓ Remboursement intégral si la mise en relation échoue
+        </p>
+      </div>
+
+      {/* Badge de sécurité */}
+      <div className="flex items-center justify-center">
+        <div className="flex items-center space-x-2 bg-gradient-to-r from-green-50 to-blue-50 px-3 py-2 rounded-full border border-green-200/50">
+          <Shield className="w-4 h-4 text-green-600" />
+          <span className="text-xs font-bold text-gray-700">Paiement sécurisé par Stripe</span>
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+        </div>
+      </div>
+    </form>
+  );
+};
+
 const CallCheckout: React.FC<CallCheckoutProps> = ({ 
   selectedProvider, 
   serviceData, 
   onGoBack 
 }) => {
-  // États du composant
-  const [provider] = useState<Provider>(selectedProvider);
-  const [service] = useState<ServiceData>(serviceData);
-
-  const [currentStep, setCurrentStep] = useState<StepType>('payment');
-  const [callProgress, setCallProgress] = useState<number>(0);
-  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
-  const [clientSecret, setClientSecret] = useState<string>('mock_client_secret');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [callId] = useState<string>('call_' + Date.now());
-
-  // États pour le formulaire de carte personnalisé
-  const [formData, setFormData] = useState({
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    cardholderName: ''
-  });
-  const [formErrors, setFormErrors] = useState({});
-  const [focusedField, setFocusedField] = useState('');
-  const [showCvv, setShowCvv] = useState(false);
-  const [useCustomForm, setUseCustomForm] = useState(true);
-  const [stripeElementsReady, setStripeElementsReady] = useState(true);
-
-  // Simulation de la fonction initiateCall
-  const initiateCall = async ({ callId, clientId, providerId }) => {
-    console.log('🚀 Initiation de l\'appel avec:', { 
-      callId, 
-      clientId, 
-      providerId,
-      providerName: provider.fullName,
-      serviceAmount: service.amount,
-      serviceDuration: service.duration
-    });
-    
-    // Simulation de la création de la session d'appel et programmation
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log(`✅ Session d'appel créée pour ${provider.fullName} - ${service.amount}€ pendant ${service.duration}min`);
-        resolve({ success: true, sessionId: 'session_' + Date.now() });
-      }, 1000);
-    });
-  };
-
-  // Formatage du numéro de carte
-  const formatCardNumber = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
-  };
-
-  // Formatage de la date d'expiration
-  const formatExpiryDate = (value) => {
-    const v = value.replace(/\D/g, '');
-    if (v.length >= 2) {
-      return v.substring(0, 2) + '/' + v.substring(2, 4);
-    }
-    return v;
-  };
-
-  // Détection du type de carte
-  const getCardType = (number) => {
-    const cleanNumber = number.replace(/\s/g, '');
-    if (cleanNumber.match(/^4/)) return 'visa';
-    if (cleanNumber.match(/^5/)) return 'mastercard';
-    if (cleanNumber.match(/^3[47]/)) return 'amex';
-    return 'generic';
-  };
-
-  // Validation des champs du formulaire personnalisé
-  const validateField = (name, value) => {
-    const newErrors = { ...formErrors };
-    
-    switch (name) {
-      case 'cardNumber':
-        const cleanNumber = value.replace(/\s/g, '');
-        if (!cleanNumber) {
-          newErrors.cardNumber = 'Numéro de carte requis';
-        } else if (cleanNumber.length < 13 || cleanNumber.length > 19) {
-          newErrors.cardNumber = 'Numéro de carte invalide';
-        } else {
-          delete newErrors.cardNumber;
-        }
-        break;
-      
-      case 'expiryDate':
-        if (!value) {
-          newErrors.expiryDate = 'Date d\'expiration requise';
-        } else if (!/^\d{2}\/\d{2}$/.test(value)) {
-          newErrors.expiryDate = 'Format invalide (MM/AA)';
-        } else {
-          const [month, year] = value.split('/');
-          const currentYear = new Date().getFullYear() % 100;
-          const currentMonth = new Date().getMonth() + 1;
-          
-          if (parseInt(month) < 1 || parseInt(month) > 12) {
-            newErrors.expiryDate = 'Mois invalide';
-          } else if (parseInt(year) < currentYear || (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
-            newErrors.expiryDate = 'Carte expirée';
-          } else {
-            delete newErrors.expiryDate;
-          }
-        }
-        break;
-      
-      case 'cvv':
-        if (!value) {
-          newErrors.cvv = 'CVV requis';
-        } else if (!/^\d{3,4}$/.test(value)) {
-          newErrors.cvv = 'CVV invalide (3-4 chiffres)';
-        } else {
-          delete newErrors.cvv;
-        }
-        break;
-      
-      case 'cardholderName':
-        if (!value.trim()) {
-          newErrors.cardholderName = 'Nom du titulaire requis';
-        } else if (value.trim().length < 2) {
-          newErrors.cardholderName = 'Nom trop court';
-        } else {
-          delete newErrors.cardholderName;
-        }
-        break;
-    }
-    
-    setFormErrors(newErrors);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    let formattedValue = value;
-
-    if (name === 'cardNumber') {
-      formattedValue = formatCardNumber(value);
-    } else if (name === 'expiryDate') {
-      formattedValue = formatExpiryDate(value);
-    } else if (name === 'cvv') {
-      formattedValue = value.replace(/\D/g, '').substring(0, 4);
-    } else if (name === 'cardholderName') {
-      formattedValue = value.toUpperCase();
-    }
-
-    setFormData({ ...formData, [name]: formattedValue });
-    validateField(name, formattedValue);
-  };
-
-  const cardType = getCardType(formData.cardNumber);
-  const isCustomFormValid = Object.keys(formErrors).length === 0 && 
-                           formData.cardNumber && 
-                           formData.expiryDate && 
-                           formData.cvv && 
-                           formData.cardholderName;
-
-  const getCardIcon = (type) => {
-    switch (type) {
-      case 'visa':
-        return (
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-2 py-1 rounded text-xs font-bold">
-            VISA
-          </div>
-        );
-      case 'mastercard':
-        return (
-          <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-bold">
-            MC
-          </div>
-        );
-      case 'amex':
-        return (
-          <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-2 py-1 rounded text-xs font-bold">
-            AMEX
-          </div>
-        );
-      default:
-        return <CreditCard className="w-4 h-4 text-gray-400" />;
-    }
-  };
-
-  // Simulation du paiement - VERSION MISE À JOUR
-  const handlePaymentSubmit = async (event) => {
-    event.preventDefault();
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      // Simulation du traitement du paiement
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // ✅ NE GARDE QUE initiateCall - suppression de notifyAfterPayment
-      console.log(`💳 Paiement validé pour ${provider.fullName} - ${service.amount}€, initiation de l'appel...`);
-      
-      // Simulation d'un user.uid
-      const mockUserId = 'user_' + Date.now();
-      
-      // ✅ SEUL APPEL : initiateCall (crée la session + programme l'appel)
-      await initiateCall({ 
-        callId, 
-        clientId: mockUserId,
-        providerId: provider.id
-      });
-
-      setPaymentIntentId('pi_mock_payment_intent');
-      setCurrentStep('calling');
-      setCallProgress(1);
-      setIsProcessing(false);
-      
-      console.log(`✅ Appel programmé avec succès pour ${provider.fullName} dans 5 minutes`);
-      
-    } catch (error) {
-      console.error('❌ Erreur lors du traitement:', error);
-      setError('Erreur lors du traitement du paiement');
-      setIsProcessing(false);
-    }
-  };
-
-  const handleCallCompleted = (success: boolean) => {
-    setCurrentStep('completed');
-    // Transition automatique vers la page de fin d'appel
-  };
-
+  const { user } = useAuth();
+  
+  // 🔧 FONCTION HANDLEGOBACK DÉFINIE EN PREMIER
   const handleGoBack = () => {
     if (onGoBack) {
       onGoBack();
     } else {
-      alert('Retour à la liste des experts');
+      // Fallback - redirection vers la page d'accueil
+      window.location.href = '/';
     }
   };
 
-  // Simulation de la progression d'appel
+  // 🔍 RÉCUPÉRATION DES DONNÉES DEPUIS PLUSIEURS SOURCES
+  const getProviderFromSources = () => {
+    // 1. Props (priorité haute)
+    if (selectedProvider && selectedProvider.id) {
+      console.log('✅ Provider trouvé via props:', selectedProvider);
+      return selectedProvider;
+    }
+
+    // 2. SessionStorage (priorité moyenne)
+    try {
+      const savedProvider = sessionStorage.getItem('selectedProvider');
+      if (savedProvider) {
+        const providerData = JSON.parse(savedProvider);
+        if (providerData && providerData.id) {
+          console.log('✅ Provider trouvé via sessionStorage:', providerData);
+          return providerData;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erreur parsing sessionStorage provider:', error);
+    }
+
+    // 3. Location state (priorité basse)
+    try {
+      const locationState = (window as any).history?.state?.usr;
+      if (locationState?.selectedProvider?.id) {
+        console.log('✅ Provider trouvé via location state:', locationState.selectedProvider);
+        return locationState.selectedProvider;
+      }
+    } catch (error) {
+      console.error('❌ Erreur récupération location state:', error);
+    }
+
+    console.warn('⚠️ Aucun provider trouvé dans toutes les sources');
+    return null;
+  };
+
+  const getServiceFromSources = () => {
+    // 1. Props (priorité haute)
+    if (serviceData && serviceData.amount) {
+      console.log('✅ Service trouvé via props:', serviceData);
+      return serviceData;
+    }
+
+    // 2. SessionStorage (priorité moyenne)
+    try {
+      const savedService = sessionStorage.getItem('serviceData');
+      if (savedService) {
+        const serviceInfo = JSON.parse(savedService);
+        if (serviceInfo && serviceInfo.amount) {
+          console.log('✅ Service trouvé via sessionStorage:', serviceInfo);
+          return serviceInfo;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erreur parsing sessionStorage service:', error);
+    }
+
+    // 3. Reconstruction depuis provider (fallback)
+    const provider = getProviderFromSources();
+    if (provider && provider.price) {
+      const reconstructedService = {
+        providerId: provider.id,
+        serviceType: (provider.role || provider.type) === 'lawyer' ? 'lawyer_call' : 'expat_call',
+        providerRole: provider.role || provider.type,
+        amount: provider.price,
+        duration: provider.duration || 20,
+        clientPhone: user?.phone || '',
+        commissionAmount: Math.round(provider.price * 0.2),
+        providerAmount: Math.round(provider.price * 0.8)
+      };
+      console.log('✅ Service reconstruit depuis provider:', reconstructedService);
+      return reconstructedService;
+    }
+
+    console.warn('⚠️ Aucun service trouvé dans toutes les sources');
+    return null;
+  };
+
+  // 🔍 AJOUT DE LOGS POUR DEBUG
+  useEffect(() => {
+    console.log('CallCheckout - Props reçues:', {
+      selectedProvider,
+      serviceData,
+      user: user ? { uid: user.uid, firstName: user.firstName } : null
+    });
+  }, [selectedProvider, serviceData, user]);
+
+  // 🔒 RÉCUPÉRATION SÉCURISÉE DES DONNÉES
+  const provider = getProviderFromSources();
+  const service = getServiceFromSources();
+
+  // 🚨 EARLY RETURN SI DONNÉES MANQUANTES
+  if (!provider || !service) {
+    console.error('CallCheckout - Données manquantes:', { provider, service });
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center max-w-lg mx-4">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Erreur de chargement</h2>
+          <p className="text-gray-600 mb-6">
+            Les données de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.
+          </p>
+          <div className="space-y-3">
+            <Button 
+              onClick={() => window.location.href = '/experts'}
+              fullWidth
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Retour à la sélection d'experts
+            </Button>
+            <Button 
+              onClick={handleGoBack}
+              fullWidth
+              className="bg-gray-600 hover:bg-gray-700"
+            >
+              Retour
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const [currentStep, setCurrentStep] = useState<StepType>('payment');
+  const [callProgress, setCallProgress] = useState<number>(0);
+  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [callId] = useState<string>('call_' + Date.now());
+
+  // Gestion de la progression d'appel
   useEffect(() => {
     if (currentStep === 'calling' && callProgress < 5) {
       const timer = setTimeout(() => {
         setCallProgress(prev => prev + 1);
+        
+        // Transition automatique vers "completed" après progression complète
+        if (callProgress === 4) {
+          setTimeout(() => {
+            setCurrentStep('completed');
+          }, 5000);
+        }
       }, 3000);
+      
       return () => clearTimeout(timer);
     }
   }, [currentStep, callProgress]);
 
-  const isLawyer = provider.role === 'lawyer';
+  const handlePaymentSuccess = (paymentIntentId: string) => {
+    setPaymentIntentId(paymentIntentId);
+    setCurrentStep('calling');
+    setCallProgress(1);
+    console.log(`✅ Paiement réussi, appel programmé avec ${provider.fullName}`);
+  };
+
+  const handlePaymentError = (errorMessage: string) => {
+    setError(errorMessage);
+  };
+
+  const isLawyer = provider?.role === 'lawyer';
   const stepTitles: Record<StepType, string> = {
     payment: 'Paiement sécurisé',
     calling: 'Mise en relation en cours',
-    completed: 'Appel terminé'
+    completed: 'Consultation terminée'
   };
   
   const stepDescriptions: Record<StepType, string> = {
-    payment: 'Autorisez le paiement pour lancer l\'appel',
-    calling: 'Connexion avec votre expert',
+    payment: 'Autorisez le paiement pour lancer la consultation',
+    calling: 'Connexion avec votre expert en cours',
     completed: 'Merci d\'avoir utilisé nos services'
   };
 
-  if (isLoading) {
+  // Vérification de l'utilisateur connecté
+  if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <LoadingSpinner size="large" color="red" />
-        <p className="mt-4 text-gray-600 text-sm">Chargement des informations...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center max-w-lg mx-4">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Connexion requise</h2>
+          <p className="text-gray-600 mb-6">
+            Vous devez être connecté pour accéder au paiement et lancer une consultation.
+          </p>
+          <div className="space-y-3">
+            <Button 
+              onClick={() => window.location.href = '/login'}
+              fullWidth
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Se connecter
+            </Button>
+            <Button 
+              onClick={handleGoBack}
+              fullWidth
+              className="bg-gray-600 hover:bg-gray-700"
+            >
+              Retour
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100">
-      <div className="max-w-sm mx-auto px-4 py-6">
-        {/* Header Mobile */}
+      <div className="max-w-md mx-auto px-4 py-6">
+        {/* Header */}
         <div className="mb-6">
           <button
             onClick={handleGoBack}
@@ -369,55 +559,57 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
           </div>
         </div>
 
-        {/* Provider Info - Mobile optimized */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-4 mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
+        {/* Provider Info avec photo visible */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-5 mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="relative flex-shrink-0">
               <img
-                src={provider.avatar || provider.profilePhoto}
-                alt={`Photo de profil de ${provider.fullName}`}
-                className="w-12 h-12 rounded-xl object-cover"
+                src={provider?.avatar || provider?.profilePhoto}
+                alt={`Photo de profil de ${provider?.fullName || 'Expert'}`}
+                className="w-16 h-16 rounded-xl object-cover ring-2 ring-white shadow-lg"
                 onError={(e) => {
-                  // Fallback en cas d'erreur de chargement d'image
-                  console.warn(`Erreur de chargement de l'image pour ${provider.fullName}`);
-                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.fullName)}&size=150&background=random`;
+                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(provider?.fullName || 'Expert')}&size=150&background=4F46E5&color=fff`;
                 }}
               />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
             </div>
             
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-gray-900 truncate">
-                {provider.fullName}
+              <h3 className="text-base font-bold text-gray-900 truncate">
+                {provider?.fullName || 'Expert non défini'}
               </h3>
-              <div className="flex items-center space-x-2 text-xs">
-                <span className={`px-2 py-0.5 rounded-full font-medium ${
+              <div className="flex items-center space-x-2 text-sm mt-1">
+                <span className={`px-3 py-1 rounded-full font-medium text-xs ${
                   isLawyer 
                     ? 'bg-blue-100 text-blue-800' 
                     : 'bg-green-100 text-green-800'
                 }`}>
-                  {isLawyer ? 'Avocat certifié' : 'Expatrié expert'}
+                  {isLawyer ? 'Avocat certifié' : 'Expert expatriation'}
                 </span>
-                <span className="text-gray-600">{provider.country}</span>
+                <span className="text-gray-600 text-sm">{provider?.country || 'Non spécifié'}</span>
               </div>
-              <div className="flex items-center space-x-1 text-xs text-gray-500 mt-1">
-                <Clock size={12} />
-                <span>{service.duration} min</span>
+              <div className="flex items-center space-x-2 text-sm text-gray-500 mt-2">
+                <Clock size={14} />
+                <span>{service?.duration || 0} minutes</span>
+                <span>•</span>
+                <span className="text-green-600 font-medium">Disponible maintenant</span>
               </div>
             </div>
             
-            <div className="text-right">
-              <div className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                €{service.amount}
+            <div className="text-right flex-shrink-0">
+              <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
+                {service?.amount || 0}€
               </div>
-              <div className="text-xs text-gray-500">
-                {service.duration} minutes
+              <div className="text-xs text-gray-500 font-medium">
+                {service?.duration || 0} min
               </div>
             </div>
           </div>
         </div>
 
-        {/* Step Content */}
+        {/* Main Content */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-white/20">
           {currentStep === 'payment' && (
             <div className="p-6">
@@ -425,303 +617,84 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                 <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
                   <CreditCard className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-lg font-bold text-gray-900">Carte bancaire</h4>
+                <h4 className="text-lg font-bold text-gray-900">Paiement par carte</h4>
               </div>
 
-              {useCustomForm ? (
-                // Formulaire personnalisé mobile first
-                <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                  {/* Numéro de carte */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center space-x-2">
-                      <span>Numéro de carte</span>
-                      {formData.cardNumber && !formErrors.cardNumber && (
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      )}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        name="cardNumber"
-                        value={formData.cardNumber}
-                        onChange={handleInputChange}
-                        onFocus={() => setFocusedField('cardNumber')}
-                        onBlur={() => setFocusedField('')}
-                        placeholder="1234 5678 9012 3456"
-                        maxLength="19"
-                        className={`w-full px-4 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base font-mono ${
-                          formErrors.cardNumber ? 'border-red-400 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                        } ${focusedField === 'cardNumber' ? 'transform scale-105 shadow-xl' : 'shadow-md'}`}
-                      />
-                      <div className="absolute right-3 top-3">
-                        {getCardIcon(cardType)}
-                      </div>
-                    </div>
-                    {formErrors.cardNumber && (
-                      <div className="flex items-center mt-2 text-red-500 text-sm">
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        {formErrors.cardNumber}
-                      </div>
-                    )}
+              {/* Affichage des erreurs */}
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
+                    <span className="text-sm text-red-700">{error}</span>
                   </div>
-
-                  {/* Date et CVV */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        <span>Expiration</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          name="expiryDate"
-                          value={formData.expiryDate}
-                          onChange={handleInputChange}
-                          onFocus={() => setFocusedField('expiryDate')}
-                          onBlur={() => setFocusedField('')}
-                          placeholder="MM/AA"
-                          maxLength="5"
-                          className={`w-full px-3 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base font-mono ${
-                            formErrors.expiryDate ? 'border-red-400' : 'border-gray-200'
-                          }`}
-                        />
-                        <Calendar className="absolute right-2 top-3 w-4 h-4 text-gray-400" />
-                      </div>
-                      {formErrors.expiryDate && (
-                        <div className="text-red-500 text-xs mt-1">{formErrors.expiryDate}</div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        <span>CVV</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showCvv ? "text" : "password"}
-                          name="cvv"
-                          value={formData.cvv}
-                          onChange={handleInputChange}
-                          onFocus={() => setFocusedField('cvv')}
-                          onBlur={() => setFocusedField('')}
-                          placeholder="123"
-                          maxLength="4"
-                          className={`w-full px-3 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base font-mono ${
-                            formErrors.cvv ? 'border-red-400' : 'border-gray-200'
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCvv(!showCvv)}
-                          className="absolute right-2 top-3 text-gray-400 hover:text-gray-600"
-                        >
-                          {showCvv ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      {formErrors.cvv && (
-                        <div className="text-red-500 text-xs mt-1">{formErrors.cvv}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Nom du titulaire */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <span>Nom du titulaire</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        name="cardholderName"
-                        value={formData.cardholderName}
-                        onChange={handleInputChange}
-                        onFocus={() => setFocusedField('cardholderName')}
-                        onBlur={() => setFocusedField('')}
-                        placeholder="JEAN DUPONT"
-                        className={`w-full px-4 py-3 bg-white/70 backdrop-blur-sm border-2 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-base ${
-                          formErrors.cardholderName ? 'border-red-400' : 'border-gray-200'
-                        }`}
-                      />
-                      <User className="absolute right-3 top-3 w-4 h-4 text-gray-400" />
-                    </div>
-                    {formErrors.cardholderName && (
-                      <div className="flex items-center mt-2 text-red-500 text-sm">
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        {formErrors.cardholderName}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setUseCustomForm(false)}
-                    className="text-blue-600 text-sm underline"
-                  >
-                    Utiliser Stripe Elements (simulé)
-                  </button>
-                </form>
-              ) : (
-                // Stripe Elements simulé
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Informations de carte
-                    </label>
-                    <div className="border-2 border-gray-200 rounded-xl p-4 bg-white/70 backdrop-blur-sm focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/20 transition-all">
-                      <div className="text-gray-500 text-sm">
-                        [Simulation Stripe Elements]<br />
-                        Numéro de carte: 4242 4242 4242 4242<br />
-                        Expiration: 12/34 | CVV: 123
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setUseCustomForm(true)}
-                    className="text-blue-600 text-sm underline"
-                  >
-                    Utiliser un formulaire personnalisé
-                  </button>
                 </div>
               )}
 
-              {/* Détail du paiement - Mobile optimized */}
-              <div className="mt-6 bg-gray-50/80 backdrop-blur-sm rounded-xl p-4">
-                <h4 className="font-bold text-gray-900 mb-3 text-sm">Détail du paiement</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Service</span>
-                    <span className="font-medium">{service.serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Frais de mise en relation</span>
-                    <span className="font-medium">{service.commissionAmount.toFixed(2)} €</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Montant consultation</span>
-                    <span className="font-medium">{service.providerAmount.toFixed(2)} €</span>
-                  </div>
-                  <div className="border-t border-gray-200 pt-2 mt-2">
-                    <div className="flex justify-between font-bold">
-                      <span>Total</span>
-                      <span className="text-red-600">{service.amount.toFixed(2)} €</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bouton de paiement - Mobile optimized */}
-              <div className="mt-6">
-                <button
-                  onClick={handlePaymentSubmit}
-                  disabled={(useCustomForm ? !isCustomFormValid : !stripeElementsReady) || isProcessing}
-                  className={`relative w-full py-4 rounded-xl font-bold text-white text-base transition-all duration-300 transform overflow-hidden ${
-                    ((useCustomForm ? isCustomFormValid : stripeElementsReady) && !isProcessing)
-                      ? 'bg-gradient-to-r from-red-500 via-red-600 to-pink-600 hover:from-red-600 hover:to-pink-700 hover:scale-105 active:scale-95 shadow-lg hover:shadow-red-500/25'
-                      : 'bg-gray-400 cursor-not-allowed opacity-60'
-                  }`}
-                >
-                  {isProcessing ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <LoadingSpinner size="small" color="white" />
-                      <span>Traitement...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center space-x-2">
-                      <Lock className="w-5 h-5" />
-                      <span>Autoriser le paiement</span>
-                    </div>
-                  )}
-                </button>
-
-                {/* Informations légales - Mobile optimized */}
-                <div className="mt-4 space-y-2 text-xs text-gray-500 text-center">
-                  <p>
-                    En autorisant ce paiement, vous acceptez nos{' '}
-                    <button className="text-blue-600 underline font-medium">
-                      conditions générales
-                    </button>
-                  </p>
-                  <p className="text-green-600 font-medium">
-                    ✓ Aucun débit sans mise en relation réussie
-                  </p>
-                  <p className="font-bold text-gray-700">
-                    Prix: {service.amount}€ pour {service.duration} minutes
-                  </p>
-                </div>
-
-                {/* Badge de sécurité */}
-                <div className="mt-4 flex items-center justify-center">
-                  <div className="flex items-center space-x-2 bg-gradient-to-r from-green-50 to-blue-50 px-3 py-2 rounded-full border border-green-200/50">
-                    <Shield className="w-4 h-4 text-green-600" />
-                    <span className="text-xs font-bold text-gray-700">Sécurisé par Stripe</span>
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  </div>
-                </div>
-              </div>
+              {/* Formulaire de paiement Stripe */}
+              <Elements stripe={stripePromise}>
+                <PaymentForm
+                  user={user}
+                  provider={provider}
+                  service={service}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                  isProcessing={isProcessing}
+                  setIsProcessing={setIsProcessing}
+                />
+              </Elements>
             </div>
           )}
 
           {currentStep === 'calling' && (
             <div className="p-6 text-center">
-              <div className="animate-pulse mb-6">
-                <Phone size={40} className={`mx-auto ${isLawyer ? 'text-blue-600' : 'text-green-600'} mb-4`} />
+              <div className="mb-6">
+                <Phone size={40} className={`mx-auto ${isLawyer ? 'text-blue-600' : 'text-green-600'} mb-4 animate-pulse`} />
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                  {isLawyer ? 'Appel avocat en cours...' : 'Appel expatrié en cours...'}
+                  Mise en relation en cours
                 </h2>
                 <p className="text-gray-600 text-sm">
                   {callProgress < 3 
-                    ? `Nous contactons ${provider.fullName}. Veuillez patienter.` 
+                    ? `Nous contactons ${provider?.fullName}...` 
                     : callProgress === 3 
-                      ? `${provider.fullName} a répondu! Nous vous appelons...` 
+                      ? `${provider?.fullName} a accepté! Préparation de votre appel...` 
                       : callProgress === 4 
-                        ? `Connexion établie avec ${provider.fullName}!` 
-                        : `Appel en cours avec ${provider.fullName}...`}
+                        ? `Connexion établie avec ${provider?.fullName}!` 
+                        : `Consultation en cours avec ${provider?.fullName}...`}
                 </p>
-                <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
-                    ⏰ L'appel avec {provider.fullName} sera initié dans 5 minutes après validation du paiement
-                  </p>
-                </div>
               </div>
               
               <div className="space-y-3 mb-6">
-                {callProgress < 3 && (
-                  <div className="bg-yellow-100 rounded-lg p-3 flex items-center text-sm">
-                    <Clock className="w-4 h-4 text-yellow-600 mr-2" />
-                    <span className="text-yellow-800">Session créée - Appel avec {provider.fullName} programmé dans 5 minutes</span>
-                  </div>
-                )}
+                <div className="bg-green-100 rounded-lg p-3 flex items-center text-sm">
+                  <Check className="w-4 h-4 text-green-600 mr-2" />
+                  <span className="text-green-800">Paiement confirmé</span>
+                </div>
                 
-                {callProgress === 3 && (
+                {callProgress >= 2 && (
                   <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
                     <Phone className="w-4 h-4 text-blue-600 mr-2" />
-                    <span className="text-blue-800">Préparation de l'appel avec {provider.fullName}...</span>
+                    <span className="text-blue-800">{provider?.fullName} a été contacté(e)</span>
                   </div>
                 )}
                 
                 {callProgress >= 4 && (
-                  <div className="bg-green-100 rounded-lg p-3 flex items-center text-sm">
-                    <Check className="w-4 h-4 text-green-600 mr-2" />
-                    <span className="text-green-800">Vous allez être mis en relation avec {provider.fullName} dans quelques minutes</span>
+                  <div className="bg-purple-100 rounded-lg p-3 flex items-center text-sm">
+                    <Clock className="w-4 h-4 text-purple-600 mr-2" />
+                    <span className="text-purple-800">Consultation en cours...</span>
                   </div>
                 )}
               </div>
               
-              <div className="mt-4">
-                {callProgress < 5 ? (
-                  <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${isLawyer ? 'border-blue-600' : 'border-green-600'} mx-auto`}></div>
-                ) : (
-                  <div className="flex justify-center">
-                    <div className="bg-gray-200 w-full max-w-xs h-3 rounded-full overflow-hidden">
-                      <div className="bg-green-500 h-full flex items-center justify-center text-xs text-white" style={{ width: '80%' }}>
-                        {Math.floor(service.duration * 0.8)}:00 / {service.duration}:00
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="flex justify-center">
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${isLawyer ? 'border-blue-600' : 'border-green-600'}`}></div>
               </div>
+
+              {paymentIntentId && (
+                <div className="mt-6 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600">
+                    ID de transaction: <code className="bg-gray-200 px-1 rounded">{paymentIntentId}</code>
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -732,117 +705,81 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                   <Check size={32} className="text-green-600" />
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  Appel avec {provider.fullName} terminé
+                  Consultation terminée
                 </h2>
                 <p className="text-gray-600 text-sm">
-                  Merci d'avoir utilisé nos services pour votre consultation avec {provider.fullName}. Votre avis nous intéresse !
+                  Votre consultation avec {provider?.fullName} s'est terminée avec succès.
                 </p>
+                
+                {/* Résumé */}
+                <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-3">Résumé de la consultation</h4>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Expert:</span>
+                      <span className="font-medium">{provider?.fullName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Durée:</span>
+                      <span className="font-medium">{service?.duration} minutes</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Montant:</span>
+                      <span className="font-medium text-green-600">{service?.amount}€</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Date:</span>
+                      <span className="font-medium">{new Date().toLocaleDateString('fr-FR')}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-3">
                 <Button 
-                  onClick={() => alert(`Redirection vers la page d'évaluation de ${provider.fullName}`)}
+                  onClick={() => window.location.href = `/evaluation/${provider?.id}`}
                   fullWidth
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Évaluer {provider.fullName}
+                  ⭐ Évaluer {provider?.fullName}
+                </Button>
+                <Button 
+                  onClick={() => window.location.href = `/receipt/${paymentIntentId}`}
+                  fullWidth
+                  className="bg-gray-600 hover:bg-gray-700"
+                >
+                  📄 Télécharger le reçu
                 </Button>
                 <Button 
                   onClick={handleGoBack}
                   fullWidth
-                  className="bg-gray-600 hover:bg-gray-700"
+                  className="bg-red-600 hover:bg-red-700"
                 >
-                  Retour à l'accueil
+                  🏠 Retour à l'accueil
                 </Button>
               </div>
             </div>
           )}
         </div>
 
+        {/* Messages informatifs */}
         {currentStep === 'payment' && (
           <div className="mt-4 bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl p-4">
             <div className="flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <div>
                 <h4 className="font-semibold text-blue-900 text-sm">Paiement sécurisé</h4>
                 <p className="text-sm text-blue-800 mt-1">
-                  Votre paiement est traité de manière sécurisée.
-                  Vous ne serez débité que si la mise en relation téléphonique réussit.
-                  <br />
-                  <strong>L'appel sera initié automatiquement 5 minutes après le paiement.</strong>
+                  Vos données de paiement sont protégées par le chiffrement SSL.
+                  L'appel sera lancé automatiquement après confirmation du paiement.
                 </p>
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Styles CSS pour les animations personnalisées */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%) skewX(-12deg); }
-          100% { transform: translateX(200%) skewX(-12deg); }
-        }
-        
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-        
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-      `}</style>
     </div>
   );
 };
 
-// Exemple d'utilisation avec des données par défaut pour la démo
-const defaultProvider: Provider = {
-  id: '1',
-  fullName: 'avocat 1',
-  firstName: 'Avocat',
-  lastName: '1',
-  role: 'lawyer',
-  country: 'Autriche',
-  currentCountry: 'Autriche',
-  avatar: `https://ui-avatars.com/api/?name=avocat+1&size=150&background=4F46E5&color=fff`,
-  profilePhoto: `https://ui-avatars.com/api/?name=avocat+1&size=150&background=4F46E5&color=fff`,
-  email: 'avocat1@example.com',
-  phone: '+33612345678',
-  languagesSpoken: ['fr', 'de']
-};
-
-const defaultServiceData: ServiceData = {
-  providerId: '1',
-  serviceType: 'lawyer_call',
-  providerRole: 'lawyer',
-  amount: 49,
-  duration: 20,
-  clientPhone: '+33612345678',
-  commissionAmount: 9,
-  providerAmount: 40
-};
-
-// Export avec des props par défaut pour la démo
-export default () => (
-  <CallCheckout 
-    selectedProvider={defaultProvider}
-    serviceData={defaultServiceData}
-    onGoBack={() => console.log('Retour à la liste des experts')}
-  />
-);
+export default CallCheckout;

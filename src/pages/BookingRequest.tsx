@@ -209,6 +209,31 @@ const countries = [
   'Zimbabwe'
 ];
 
+// Dans BookingRequest.tsx, ajoutez cette fonction
+const notifyProviderOfCallRequest = async (providerId: string, requestData: any) => {
+  try {
+    // Simulation ou appel à votre API de notification
+    console.log('Notification envoyée au prestataire:', providerId, requestData);
+    
+    // Si vous avez Firebase Functions, appelez-la ici :
+    // const notifyProvider = httpsCallable(functions, 'notifyProviderOfCallRequest');
+    // await notifyProvider({ providerId, requestData });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Erreur notification prestataire:', error);
+    throw error;
+  }
+};
+
+// Dans la fonction handleSubmit, remplacez l'appel par :
+try {
+  await notifyProviderOfCallRequest(selectedProvider.id, requestData);
+} catch (error) {
+  console.warn('Notification prestataire échouée (non bloquant):', error);
+  // Ne pas faire échouer le processus pour une notification
+}
+
 interface Provider {
   id: string;
   name: string;

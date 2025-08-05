@@ -2,7 +2,15 @@ import { db, FieldValue } from './firebase';
 import { CallRecordData } from './types';
 import { logError } from './logError';
 
-export async function logCallRecord(data: CallRecordData) {
+// ✅ UNE SEULE fonction qui gère les deux cas
+export async function logCallRecord(data: {
+  callId: string;
+  status: string;
+  retryCount: number;
+  additionalData?: Record<string, any>;
+  duration?: number;
+  errorMessage?: string;
+}) {
   try {
     const {
       callId,

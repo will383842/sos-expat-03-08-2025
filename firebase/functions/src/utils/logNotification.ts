@@ -1,4 +1,4 @@
-mport { db, FieldValue } from './firebase';
+import { db, FieldValue } from './firebase';
 import { NotificationLogData } from './types';
 
 export async function logNotification(data: NotificationLogData) {

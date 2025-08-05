@@ -1,7 +1,8 @@
 import * as admin from 'firebase-admin';
 import twilio from 'twilio';
-import { logError } from '../utils/logError';
-import { logCallRecord } from '../utils/logCallRecord';
+import { logError } from './utils/logError';
+import { logCallRecord } from './utils/logCallRecord';
+import { messageManager } from './MessageManager';
 
 export interface CallSessionState {
   id: string;
@@ -435,41 +436,44 @@ export class TwilioCallManager {
   /**
    * Génère le TwiML pour la conférence avec améliorations
    */
-  private generateConferenceTwiML(
-    conferenceName: string,
-    participantType: 'provider' | 'client',
-    timeLimit: number
-  ): string {
-    const welcomeMessage = participantType === 'provider' 
-      ? "Bonjour, vous allez être mis en relation avec votre client SOS Expat. Veuillez patienter."
-      : "Bonjour, vous allez être mis en relation avec votre expert SOS Expat. Veuillez patienter.";
+  /**
+ * Génère le TwiML pour la conférence avec messages depuis templates
+ */
+private generateConferenceTwiML(
+  conferenceName: string,
+  participantType: 'provider' | 'client',
+  timeLimit: number
+): string {
+  const welcomeMessage = participantType === 'provider' 
+    ? "Bonjour, vous allez être mis en relation avec votre client SOS Expat. Veuillez patienter."
+    : "Bonjour, vous allez être mis en relation avec votre expert SOS Expat. Veuillez patienter.";
 
-    const participantLabel = participantType === 'provider' ? 'provider' : 'client';
+  const participantLabel = participantType === 'provider' ? 'provider' : 'client';
 
-    return `
-      <Response>
-        <Say voice="alice" language="fr-FR">${welcomeMessage}</Say>
-        <Dial timeout="30" timeLimit="${timeLimit}">
-          <Conference 
-            statusCallback="${process.env.FUNCTION_URL}/twilioConferenceWebhook"
-            statusCallbackMethod="POST"
-            statusCallbackEvent="start end join leave mute hold"
-            record="record-from-start"
-            recordingStatusCallback="${process.env.FUNCTION_URL}/twilioRecordingWebhook"
-            recordingStatusCallbackMethod="POST"
-            participantLabel="${participantLabel}"
-            waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
-            maxParticipants="2"
-            endConferenceOnExit="${participantType === 'provider'}"
-            beep="false"
-            startConferenceOnEnter="${participantType === 'provider'}"
-          >
-            ${conferenceName}
-          </Conference>
-        </Dial>
-      </Response>
-    `.trim();
-  }
+  return `
+    <Response>
+      <Say voice="alice" language="fr-FR">${welcomeMessage}</Say>
+      <Dial timeout="30" timeLimit="${timeLimit}">
+        <Conference 
+          statusCallback="${process.env.FUNCTION_URL}/twilioConferenceWebhook"
+          statusCallbackMethod="POST"
+          statusCallbackEvent="start end join leave mute hold"
+          record="record-from-start"
+          recordingStatusCallback="${process.env.FUNCTION_URL}/twilioRecordingWebhook"
+          recordingStatusCallbackMethod="POST"
+          participantLabel="${participantLabel}"
+          waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+          maxParticipants="2"
+          endConferenceOnExit="${participantType === 'provider'}"
+          beep="false"
+          startConferenceOnEnter="${participantType === 'provider'}"
+        >
+          ${conferenceName}
+        </Conference>
+      </Dial>
+    </Response>
+  `.trim();
+}
 
   /**
    * Gère les échecs d'appel avec notifications améliorées
@@ -485,41 +489,32 @@ export class TwilioCallManager {
       // Mettre à jour le statut
       await this.updateCallSessionStatus(sessionId, 'failed');
 
-      // Messages personnalisés selon la raison
-      const messages = {
-        provider_no_answer: {
-          client: "Le prestataire n'a pas répondu à nos appels. Vous ne serez pas débité. Nous vous remboursons automatiquement.",
-          provider: "Vous avez manqué un appel client SOS Expat. La session a été annulée. Pensez à être disponible pour vos prochains créneaux."
-        },
-        client_no_answer: {
-          client: "Nous n'avons pas pu vous joindre après plusieurs tentatives. L'appel a été annulé et vous ne serez pas débité.",
-          provider: "Le client n'a pas répondu à nos appels. L'appel est annulé. Vous serez payé pour votre disponibilité selon nos conditions."
-        },
-        system_error: {
-          client: "Un problème technique a empêché l'établissement de l'appel. Vous ne serez pas débité. Notre équipe technique a été notifiée.",
-          provider: "Un problème technique a empêché l'établissement de l'appel. Notre équipe technique a été notifiée. Merci pour votre compréhension."
-        }
-      };
-
+      
       // Notifier les participants avec gestion d'erreurs
       try {
-        if (reason === 'provider_no_answer' || reason === 'system_error') {
-          await this.sendNotificationCall(
-            callSession.participants.client.phone,
-            messages[reason as keyof typeof messages].client
-          );
-        }
-
-        if (reason === 'client_no_answer' || reason === 'system_error') {
-          await this.sendNotificationCall(
-            callSession.participants.provider.phone,
-            messages[reason as keyof typeof messages].provider
-          );
-        }
-      } catch (notificationError) {
-        await logError('TwilioCallManager:handleCallFailure:notification', notificationError);
-        // Ne pas faire échouer la fonction si les notifications échouent
+  if (reason === 'provider_no_answer' || reason === 'system_error') {
+    await messageManager.sendSmartMessage({
+      to: callSession.participants.client.phone,
+      templateId: `call_failure_${reason}_client`,
+      variables: {
+        providerName: 'votre expert'
       }
+    });
+  }
+
+  if (reason === 'client_no_answer' || reason === 'system_error') {
+    await messageManager.sendSmartMessage({
+      to: callSession.participants.provider.phone,
+      templateId: `call_failure_${reason}_provider`,
+      variables: {
+        clientName: 'le client'
+      }
+    });
+  }
+} catch (notificationError) {
+  await logError('TwilioCallManager:handleCallFailure:notification', notificationError);
+  // Ne pas faire échouer la fonction si les notifications échouent
+}
 
       // Rembourser le paiement
       await this.refundPayment(sessionId, reason);
@@ -551,28 +546,33 @@ export class TwilioCallManager {
       // Mettre à jour le statut
       await this.updateCallSessionStatus(sessionId, 'completed');
 
-      // Messages de fin d'appel
-      const completionMessages = {
-        client: `Votre appel SOS Expat est terminé (${Math.floor(duration / 60)}min ${duration % 60}s). Merci ! Vous pouvez laisser un avis sur votre expérience.`,
-        provider: `Appel client terminé avec succès (${Math.floor(duration / 60)}min ${duration % 60}s). Merci pour votre service ! Le paiement sera traité sous 24h.`
-      };
-
-      // Envoyer les notifications de fin
-      try {
-        await Promise.all([
-          this.sendNotificationCall(
-            callSession.participants.client.phone,
-            completionMessages.client
-          ),
-          this.sendNotificationCall(
-            callSession.participants.provider.phone,
-            completionMessages.provider
-          )
-        ]);
-      } catch (notificationError) {
-        await logError('TwilioCallManager:handleCallCompletion:notification', notificationError);
-        // Continuer même si les notifications échouent
+      // Envoyer les notifications de fin via MessageManager
+try {
+  const minutes = Math.floor(duration / 60);
+  const seconds = duration % 60;
+  
+  await Promise.all([
+    messageManager.sendSmartMessage({
+      to: callSession.participants.client.phone,
+      templateId: 'call_success_client',
+      variables: {
+        duration: minutes.toString(),
+        seconds: seconds.toString()
       }
+    }),
+    messageManager.sendSmartMessage({
+      to: callSession.participants.provider.phone,
+      templateId: 'call_success_provider',
+      variables: {
+        duration: minutes.toString(),
+        seconds: seconds.toString()
+      }
+    })
+  ]);
+} catch (notificationError) {
+  await logError('TwilioCallManager:handleCallCompletion:notification', notificationError);
+  // Continuer même si les notifications échouent
+}
 
       // Capturer le paiement si éligible
       if (this.shouldCapturePayment(callSession)) {
@@ -1141,22 +1141,7 @@ export class TwilioCallManager {
   }
 
   /**
-   * Annule une session d'appel avec nettoyage complet
-   */
-  async cancelCallSession(sessionId: string, reason: string, cancelledBy?: string): Promise<boolean> {
-    try {
-      const session = await this.getCallSession(sessionId);
-      if (!session) {
-        console.warn(`Session non trouvée pour annulation: ${sessionId}`);
-        return false;
-      }
-
-      // Vérifier si l'annulation est possible
-      const cancellableStatuses = ['pending', 'provider_connecting', 'client_connecting'];
-      if (!cancellableStatuses.includes(session.status)) {
-        console.warn(`Session ${sessionId} ne peut pas être annulée (statut: ${session.status})`);
-        return false;
-      }
+  
 
       // Annuler les appels en cours si ils existent
       await this.cancelActiveCallsForSession(session);
@@ -1194,35 +1179,8 @@ export class TwilioCallManager {
   }
 
   /**
-   * Annule les appels actifs pour une session
-   */
-  private async cancelActiveCallsForSession(session: CallSessionState): Promise<void> {
-    const callsToCancel = [];
-
-    if (session.participants.provider.callSid) {
-      callsToCancel.push({
-        sid: session.participants.provider.callSid,
-        type: 'provider'
-      });
-    }
-
-    if (session.participants.client.callSid) {
-      callsToCancel.push({
-        sid: session.participants.client.callSid,
-        type: 'client'
-      });
-    }
-
-    for (const call of callsToCancel) {
-      try {
-        await this.twilioClient.calls(call.sid).update({ status: 'completed' });
-        console.log(`📞 Appel ${call.type} annulé: ${call.sid}`);
-      } catch (error) {
-        console.warn(`Échec annulation appel ${call.type} ${call.sid}:`, error);
-        // Continuer même si l'annulation échoue
-      }
-    }
-  }
+  
+ 
 
   /**
    * Obtient des statistiques détaillées sur les appels
@@ -1283,7 +1241,7 @@ export class TwilioCallManager {
       let totalCapturedAmount = 0;
       let capturedPayments = 0;
 
-      snapshot.docs.forEach(doc => {
+      snapshot.docs.forEach((doc: any) => {
         const session = doc.data() as CallSessionState;
         
         // Compter par statut
@@ -1335,21 +1293,7 @@ export class TwilioCallManager {
       throw error;
     }
 }
-      public async cancelCallSession(sessionId: string): Promise<void> {
-    const sessionRef = admin.firestore().collection('call_sessions').doc(sessionId);
-    const sessionDoc = await sessionRef.get();
-    if (!sessionDoc.exists) {
-      throw new Error(`Aucune session trouvée avec l'ID : ${sessionId}`);
-    }
-
-    await sessionRef.update({
-      status: 'cancelled',
-      cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    logger.info(`Session ${sessionId} annulée avec succès.`);
-  }
-
+    
   
 
   /**
@@ -1391,7 +1335,7 @@ export class TwilioCallManager {
       
       if (!failedSnapshot.empty) {
         const batch = this.db.batch();
-        failedSnapshot.docs.forEach(doc => {
+        failedSnapshot.docs.forEach((doc: any) => {
           batch.delete(doc.ref);
         });
         
@@ -1415,7 +1359,7 @@ export class TwilioCallManager {
       
       if (!completedSnapshot.empty) {
         const batch = this.db.batch();
-        completedSnapshot.docs.forEach(doc => {
+        completedSnapshot.docs.forEach((doc: any) => {
           batch.delete(doc.ref);
         });
         

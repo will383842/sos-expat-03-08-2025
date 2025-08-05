@@ -227,12 +227,13 @@ const notifyProviderOfCallRequest = async (providerId: string, requestData: any)
 };
 
 // Dans la fonction handleSubmit, remplacez l'appel par :
-try {
-  await notifyProviderOfCallRequest(selectedProvider.id, requestData);
-} catch (error) {
-  console.warn('Notification prestataire échouée (non bloquant):', error);
-  // Ne pas faire échouer le processus pour une notification
-}
+(async () => {
+  try {
+    await notifyProviderOfCallRequest(selectedProvider.id, requestData);
+  } catch (error) {
+    console.warn("Notification prestataire échouée (non bloquant):", error);
+  }
+})();
 
 interface Provider {
   id: string;

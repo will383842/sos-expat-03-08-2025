@@ -1,18 +1,7 @@
 import { scheduleCallSequence } from '../callScheduler';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall } from 'firebase-functions/v2/https';
-
-// WhatsApp
-import { notifyProviderWhatsApp } from '../messages/whatsapp/notifyProviderWhatsApp';
-import { notifyClientWhatsApp } from '../messages/whatsapp/notifyClientWhatsApp';
-
-// SMS
-import { notifyProviderSMS } from '../messages/sms/notifyProviderSMS';
-import { notifyClientSMS } from '../messages/sms/notifyClientSMS';
-
-// VOICE
-import { notifyProviderVoice } from '../messages/voice/notifyProviderVoice';
-import { notifyClientVoice } from '../messages/voice/notifyClientVoice';
+import { messageManager } from '../MessageManager';
 
 const db = getFirestore();
 
@@ -34,26 +23,32 @@ export async function notifyAfterPaymentInternal(callId: string) {
     language: Array.isArray(callData.clientLanguages) ? callData.clientLanguages[0] : 'fr',
   };
 
-  try {
-    // ✅ Envoi des messages au prestataire
-    await Promise.all([
-      notifyProviderWhatsApp(provider.phoneNumber, messagePayload),
-      notifyProviderSMS(provider.phoneNumber, messagePayload),
-      notifyProviderVoice(provider.phoneNumber, `SOS Expat : un client vous appelle bientôt. Titre : ${callData.title}. Langue : ${messagePayload.language}.`)
-    ]);
+try {
+  // Envoi des notifications au prestataire
+  await messageManager.sendSmartMessage({
+    to: provider.phoneNumber,
+    templateId: 'provider_notification',
+    variables: {
+      requestTitle: callData.title || 'Consultation',
+      language: messagePayload.language
+    }
+  });
 
-    // ✅ Envoi des messages au client
-    await Promise.all([
-      notifyClientWhatsApp(client.phoneNumber, messagePayload),
-      notifyClientSMS(client.phoneNumber, messagePayload),
-      notifyClientVoice(client.phoneNumber, `SOS Expat : nous avons notifié le prestataire. Vous serez bientôt appelé.`)
-    ]);
+  // Envoi des notifications au client
+  await messageManager.sendSmartMessage({
+    to: client.phoneNumber,
+    templateId: 'client_notification',
+    variables: {
+      requestTitle: callData.title || 'Consultation',
+      language: messagePayload.language
+    }
+  });
 
-    console.log(`✅ Notifications envoyées pour callId: ${callId}`);
-  } catch (error) {
-    console.error(`❌ Erreur lors de l'envoi des notifications pour callId ${callId}:`, error);
-    throw error;
-  }
+  console.log(`✅ Notifications envoyées via MessageManager pour callId: ${callId}`);
+} catch (error) {
+  console.error(`❌ Erreur lors de l'envoi des notifications pour callId ${callId}:`, error);
+  throw error;
+}
 
   // 🔁 Déclenche l'appel vocal entre client et prestataire dans 5 minutes
   await scheduleCallSequence(callData.sessionId || callId);

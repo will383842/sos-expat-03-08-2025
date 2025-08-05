@@ -5,7 +5,6 @@ import twilio from 'twilio';
 import Stripe from 'stripe';
 import * as nodemailer from 'nodemailer';
 import { scheduleCallSequence } from './callScheduler';
-import { logError } from './utils/logError';
 // import { notifyAfterPayment } from './notifications/notifyAfterPayment'; // Temporairement commenté
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -39,7 +38,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 });
 
 // Initialiser le service d'email (exemple avec Gmail/SMTP)
-const emailTransporter = nodemailer.createTransporter({
+const emailTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER || 'notifications@sosexpats.com',
@@ -796,6 +795,7 @@ export const scheduledFirestoreExport = onSchedule(
     }
   }
 );
-
+// Export de la fonction d'initialisation des templates
+export { initializeMessageTemplates } from './initializeMessageTemplates';
 // Export de la fonction notifyAfterPayment (temporairement commenté)
 // export { notifyAfterPayment } from './notifications/notifyAfterPayment';

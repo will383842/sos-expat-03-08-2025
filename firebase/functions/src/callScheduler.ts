@@ -153,7 +153,6 @@ export const resumePendingCalls = async (): Promise<void> => {
     console.log(`🔄 Récupération de ${pendingSessions.size} sessions d'appel en attente`);
 
     const resumePromises = pendingSessions.docs.map(async (doc) => {
-      const session = doc.data() as CallSessionState;
       const sessionId = doc.id;
 
       try {

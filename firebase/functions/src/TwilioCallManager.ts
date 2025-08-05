@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
-import twilio from 'twilio';
+// 🔧 CHANGEMENT : Import conditionnel de Twilio
+import type { Twilio } from 'twilio'; // Type seulement
 import { logError } from './utils/logs/logError';
 import { logCallRecord } from './utils/logs/logCallRecord';
 import { messageManager } from './MessageManager';
@@ -68,23 +69,48 @@ const CALL_CONFIG = {
 } as const;
 
 export class TwilioCallManager {
-  private twilioClient: twilio.Twilio;
+  private twilioClient: Twilio | null = null; // 🔧 CHANGEMENT : Nullable
   private db: admin.firestore.Firestore;
   private activeCalls = new Map<string, NodeJS.Timeout>();
   private callQueue: string[] = [];
   private isProcessingQueue = false;
 
   constructor() {
-    this.validateEnvironment();
-    
-    this.twilioClient = twilio(
-      process.env.TWILIO_ACCOUNT_SID!,
-      process.env.TWILIO_AUTH_TOKEN!
-    );
+    // 🔧 CHANGEMENT : Ne plus valider/initialiser Twilio ici
     this.db = admin.firestore();
 
     // Démarrer le processeur de queue
     this.startQueueProcessor();
+  }
+
+  /**
+   * 🔧 NOUVEAU : Initialisation lazy de Twilio
+   */
+  private async initializeTwilio(): Promise<Twilio> {
+    if (this.twilioClient) {
+      return this.twilioClient;
+    }
+
+    // Valider l'environnement au moment de l'utilisation
+    this.validateEnvironment();
+
+    try {
+      // 🔧 CHANGEMENT : Import dynamique de Twilio
+      const twilioModule = await import('twilio');
+      const twilio = twilioModule.default;
+      
+      this.twilioClient = twilio(
+        process.env.TWILIO_ACCOUNT_SID!,
+        process.env.TWILIO_AUTH_TOKEN!
+      );
+
+      console.log('✅ Twilio client initialisé avec succès');
+      return this.twilioClient;
+
+    } catch (error) {
+      await logError('TwilioCallManager:initializeTwilio', error);
+      throw new Error('Impossible d\'initialiser Twilio');
+    }
   }
 
   /**
@@ -429,6 +455,9 @@ export class TwilioCallManager {
       try {
         console.log(`📞 Tentative ${attempt}/${maxRetries} pour ${participantType} - ${sessionId}`);
 
+        // 🔧 CHANGEMENT : Initialiser Twilio ici
+        const twilioClient = await this.initializeTwilio();
+
         // Incrémenter le compteur de tentatives
         await this.incrementAttemptCount(sessionId, participantType);
 
@@ -439,7 +468,7 @@ export class TwilioCallManager {
         });
 
         // Créer l'appel avec configuration optimisée
-        const call = await this.twilioClient.calls.create({
+        const call = await twilioClient.calls.create({
           to: phoneNumber,
           from: process.env.TWILIO_PHONE_NUMBER!,
           twiml: this.generateConferenceTwiML(
@@ -610,7 +639,6 @@ export class TwilioCallManager {
 
   /**
    * Gère les déconnexions précoces avec logique différenciée
-   * 🔧 NOUVELLE MÉTHODE PUBLIQUE pour corriger l'erreur
    */
   async handleEarlyDisconnection(sessionId: string, participantType: string, duration: number): Promise<void> {
     try {
@@ -650,7 +678,6 @@ export class TwilioCallManager {
 
   /**
    * Gère les échecs d'appel avec notifications intelligentes
-   * 🔧 CHANGÉ DE PRIVATE À PUBLIC pour corriger l'erreur
    */
   async handleCallFailure(sessionId: string, reason: string): Promise<void> {
     try {
@@ -1042,7 +1069,8 @@ export class TwilioCallManager {
    */
   private async cancelTwilioCall(callSid: string): Promise<void> {
     try {
-      await this.twilioClient.calls(callSid).update({ status: 'completed' });
+      const twilioClient = await this.initializeTwilio();
+      await twilioClient.calls(callSid).update({ status: 'completed' });
       console.log(`📞 Appel Twilio annulé: ${callSid}`);
     } catch (error) {
       console.warn(`Impossible d'annuler l'appel Twilio ${callSid}:`, error);
@@ -1427,7 +1455,7 @@ export class TwilioCallManager {
   }
 }
 
-// Instance singleton avec gestion d'erreur d'initialisation
+// 🔧 CHANGEMENT : Instance singleton avec lazy loading
 let twilioCallManagerInstance: TwilioCallManager | null = null;
 
 export const twilioCallManager = (() => {

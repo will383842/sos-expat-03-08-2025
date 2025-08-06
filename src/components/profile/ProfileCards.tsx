@@ -442,16 +442,16 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   }, []);
 
-  // Enhanced profile view handler with analytics
+  // 🔧 CORRECTION PRINCIPALE - Enhanced profile view handler avec navigation state corrigée
   const handleViewProfile = useCallback((provider: Provider) => {
     try {
       // Analytics tracking for AI optimization
       if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
-  window.gtag('event', 'view_provider', {
-    provider_id: provider.id,
-    provider_type: provider.type,
-    provider_country: provider.country,
-    is_online: provider.isOnline,
+        window.gtag('event', 'view_provider', {
+          provider_id: provider.id,
+          provider_type: provider.type,
+          provider_country: provider.country,
+          is_online: provider.isOnline,
         });
       }
 
@@ -460,37 +460,69 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         return;
       }
 
-      // Rich provider data for navigation
-      const providerData = {
-        id: provider.id,
-        name: provider.name,
-        firstName: provider.firstName,
-        lastName: provider.lastName,
-        type: provider.type,
+      // ✅ CORRECTION : Créer serviceData compatible avec CallCheckoutWrapper
+      const serviceData = {
+        type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call' as 'lawyer_call' | 'expat_call',
+        providerType: provider.type,
+        price: provider.price,
+        duration: `${provider.duration} min`,
+        languages: [...provider.languages],
         country: provider.country,
-        countryCode: provider.countryCode,
-        languages: provider.languages,
-        specialties: provider.specialties,
+        specialties: [...provider.specialties],
+        isOnline: provider.isOnline,
         rating: provider.rating,
         reviewCount: provider.reviewCount,
-        yearsOfExperience: provider.yearsOfExperience,
-        isOnline: provider.isOnline,
-        avatar: provider.avatar,
         description: provider.description,
-        price: provider.price,
-        duration: provider.duration,
         responseTime: provider.responseTime,
         successRate: provider.successRate,
-        certifications: provider.certifications,
-        slug: provider.slug,
+        certifications: provider.certifications ? [...provider.certifications] : []
       };
+
+      // ✅ CORRECTION : Navigation avec les noms de propriétés corrects
+      const navigationTarget = provider.isOnline ? '/paiement' : `/provider/${provider.slug || provider.id}`;
       
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('selectedProvider', JSON.stringify(providerData));
+      // Pour les providers en ligne, naviguer directement vers le checkout avec les bonnes props
+      if (provider.isOnline) {
+        navigate(navigationTarget, { 
+          state: { 
+            selectedProvider: provider,  // ✅ Nom correct attendu par CallCheckoutWrapper
+            serviceData: serviceData      // ✅ Nom correct attendu par CallCheckoutWrapper
+          },
+          replace: false 
+        });
+      } else {
+        // Pour les providers hors ligne, naviguer vers le profil avec les mêmes props
+        navigate(navigationTarget, { 
+          state: { 
+            selectedProvider: provider,  // ✅ Cohérence des noms
+            serviceData: serviceData      // ✅ Cohérence des noms
+          },
+          replace: false 
+        });
       }
-      navigate(`/provider/${provider.slug || provider.id}`, { replace: false });
+      
+      // 🔧 AMÉLIORATION : Garder sessionStorage comme fallback mais pas comme méthode principale
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+          sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+        } catch (storageError) {
+          console.warn('[ProfileCards] SessionStorage fallback failed:', storageError);
+        }
+      }
+      
     } catch (error) {
       console.error('[ProfileCards] Navigation error:', error);
+      
+      // 🔧 FALLBACK SÉCURISÉ : Si navigation échoue, au moins essayer le sessionStorage
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+          navigate(`/provider/${provider.slug || provider.id}`, { replace: false });
+        }
+      } catch (fallbackError) {
+        console.error('[ProfileCards] Fallback navigation failed:', fallbackError);
+      }
     }
   }, [onProviderClick, navigate]);
 

@@ -308,7 +308,7 @@ const Providers: React.FC = () => {
     });
   }, [providers, searchTerm, selectedType, selectedCountry, onlineOnly, sortBy]);
 
-  // Handle provider selection
+  // 🔧 CORRECTION PRINCIPALE - Handle provider selection avec les bons noms de propriétés
   const handleCallProvider = useCallback((provider: Provider) => {
     const slug = createSlug(provider.name);
     const mainLanguage = provider.languages.length > 0 ? createSlug(provider.languages[0]) : 'francais';
@@ -317,10 +317,24 @@ const Providers: React.FC = () => {
     
     const seoUrl = `/${role}/${countrySlug}/${mainLanguage}/${slug}-${provider.id}`;
     
+    // ✅ CORRECTION : Utilisation des noms de propriétés attendus par CallCheckoutWrapper
     navigate(seoUrl, { 
       state: { 
-        providerId: provider.id,
-        providerData: provider 
+        selectedProvider: provider, // ✅ Utilise "selectedProvider" au lieu de "providerData"
+        serviceData: {              // ✅ Utilise "serviceData" au lieu de "booking" ou autre
+          type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
+          providerType: provider.type,
+          price: provider.price,
+          duration: CONFIG.CONSULTATION_DURATION[provider.type],
+          languages: provider.languages,
+          country: provider.country,
+          specialties: provider.specialties,
+          // Données supplémentaires utiles pour le checkout
+          isOnline: provider.isOnline,
+          rating: provider.rating,
+          reviewCount: provider.reviewCount,
+          description: provider.description
+        }
       } 
     });
     

@@ -275,6 +275,53 @@ interface Provider {
   expatriationYear?: string;
 }
 
+// 🔧 INTERFACES STANDARDISÉES POUR LE PASSAGE DE DONNÉES
+interface StandardizedServiceData {
+  title: string;
+  description: string;
+  clientDetails: {
+    firstName: string;
+    lastName: string;
+    nationality: string;
+    currentCountry: string;
+    phone: string;
+    whatsapp?: string;
+    languages: string[];
+    languagesDetails: Array<{ code: string; name: string }>;
+  };
+  serviceInfo: {
+    type: 'lawyer_call' | 'expat_call';
+    price: number;
+    duration: number;
+    requestId?: string;
+  };
+  metadata: {
+    ip: string;
+    userAgent: string;
+    createdAt: Date;
+  };
+}
+
+interface StandardizedProviderData {
+  id: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  type: 'lawyer' | 'expat';
+  country: string;
+  avatar: string;
+  price: number;
+  duration: number;
+  rating?: number;
+  reviewCount?: number;
+  languages?: string[];
+  languagesSpoken?: string[];
+  specialties?: string[];
+  currentCountry?: string;
+  email?: string;
+  phone?: string;
+}
+
 const BookingRequest: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
@@ -474,7 +521,7 @@ const BookingRequest: React.FC = () => {
       
       const notificationData: NotificationData = {
         type: 'provider_booking_request',
-        recipientEmail: requestData.providerEmail || 'provider@example.com', // À récupérer du profil prestataire
+        recipientEmail: requestData.providerEmail || 'provider@example.com',
         recipientPhone: requestData.providerPhone,
         recipientName: requestData.providerName,
         emailSubject: `Nouvelle demande de consultation - ${requestData.title}`,
@@ -501,9 +548,108 @@ const BookingRequest: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Erreur lors de l\'envoi de notification au prestataire:', error);
-      // Ne pas faire échouer le processus si la notification échoue
       return { success: false, error };
     }
+  };
+
+  // 🔧 FONCTION STANDARDISÉE POUR PRÉPARER LES DONNÉES
+  const prepareStandardizedData = (formData: any, provider: Provider, user: any): {
+    selectedProvider: StandardizedProviderData;
+    serviceData: StandardizedServiceData;
+    bookingRequest: BookingRequestData; // Pour backward compatibility
+  } => {
+    
+    // 🔧 DONNÉES PROVIDER STANDARDISÉES
+    const selectedProvider: StandardizedProviderData = {
+      id: provider.id,
+      name: provider.name,
+      firstName: provider.firstName,
+      lastName: provider.lastName,
+      type: provider.type,
+      country: provider.country,
+      avatar: provider.avatar,
+      price: provider.price,
+      duration: provider.duration,
+      rating: provider.rating,
+      reviewCount: provider.reviewCount,
+      languages: provider.languages,
+      languagesSpoken: provider.languagesSpoken,
+      specialties: provider.specialties,
+      currentCountry: provider.currentCountry,
+      email: provider.email,
+      phone: provider.phone
+    };
+
+    // 🔧 DONNÉES SERVICE STANDARDISÉES
+    const serviceData: StandardizedServiceData = {
+      title: sanitizeInput(formData.title),
+      description: sanitizeInput(formData.description),
+      clientDetails: {
+        firstName: sanitizeInput(formData.firstName),
+        lastName: sanitizeInput(formData.lastName),
+        nationality: sanitizeInput(formData.nationality),
+        currentCountry: sanitizeInput(
+          formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry
+        ),
+        phone: `${formData.phoneCountryCode}${formData.phoneNumber.replace(/\s+/g, '')}`,
+        whatsapp: formData.whatsappNumber ? `${formData.whatsappCountryCode}${formData.whatsappNumber.replace(/\s+/g, '')}` : undefined,
+        languages: languagesSpoken.map(lang => lang.code),
+        languagesDetails: languagesSpoken.map(lang => ({
+          code: lang.code,
+          name: lang.name
+        }))
+      },
+      serviceInfo: {
+        type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
+        price: provider.price,
+        duration: provider.duration,
+        requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      },
+      metadata: {
+        ip: window.location.hostname,
+        userAgent: navigator.userAgent,
+        createdAt: new Date()
+      }
+    };
+
+    // 🔧 DONNÉES LEGACY POUR BACKWARD COMPATIBILITY
+    const bookingRequest: BookingRequestData = {
+      clientPhone: serviceData.clientDetails.phone,
+      clientId: user?.id,
+      clientName: `${serviceData.clientDetails.firstName} ${serviceData.clientDetails.lastName}`,
+      clientFirstName: serviceData.clientDetails.firstName,
+      clientLastName: serviceData.clientDetails.lastName,
+      clientNationality: serviceData.clientDetails.nationality,
+      clientCurrentCountry: serviceData.clientDetails.currentCountry,
+      clientWhatsapp: serviceData.clientDetails.whatsapp || '',
+      providerId: selectedProvider.id,
+      providerName: selectedProvider.name,
+      providerType: selectedProvider.type,
+      providerCountry: selectedProvider.country,
+      providerAvatar: selectedProvider.avatar,
+      providerRating: selectedProvider.rating,
+      providerReviewCount: selectedProvider.reviewCount,
+      providerLanguages: selectedProvider.languages,
+      providerSpecialties: selectedProvider.specialties,
+      title: serviceData.title,
+      description: serviceData.description,
+      clientLanguages: serviceData.clientDetails.languages,
+      clientLanguagesDetails: serviceData.clientDetails.languagesDetails,
+      price: serviceData.serviceInfo.price,
+      duration: serviceData.serviceInfo.duration,
+      status: 'pending',
+      createdAt: serviceData.metadata.createdAt,
+      ip: serviceData.metadata.ip,
+      userAgent: serviceData.metadata.userAgent,
+      providerEmail: selectedProvider.email,
+      providerPhone: selectedProvider.phone
+    };
+
+    return {
+      selectedProvider,
+      serviceData,
+      bookingRequest
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -631,63 +777,64 @@ const BookingRequest: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const requestData: BookingRequestData = {
-        clientPhone: `${formData.phoneCountryCode}${formData.phoneNumber.replace(/\s+/g, '')}`,
-        clientId: user?.id,
-        clientName: sanitizeInput(`${user?.firstName || ''} ${user?.lastName || ''}`),
-        clientFirstName: sanitizeInput(formData.firstName),
-        clientLastName: sanitizeInput(formData.lastName),
-        clientNationality: sanitizeInput(formData.nationality),
-        clientCurrentCountry: sanitizeInput(
-          formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry
-        ),
-        clientWhatsapp: formData.whatsappNumber ? `${formData.whatsappCountryCode}${formData.whatsappNumber.replace(/\s+/g, '')}` : '',
-        providerId: provider.id,
-        providerName: provider.name,
-        providerType: provider.type,
-        providerCountry: provider.country,
-        providerAvatar: provider.avatar,
-        providerRating: provider.rating,
-        providerReviewCount: provider.reviewCount,
-        providerLanguages: provider.languages,
-        providerSpecialties: provider.specialties,
-        title: sanitizeInput(formData.title),
-        description: sanitizeInput(formData.description),
-        clientLanguages: languagesSpoken.map(lang => lang.code),
-        clientLanguagesDetails: languagesSpoken.map(lang => ({
-          code: lang.code,
-          name: lang.name
-        })),
-        price: provider.price,
-        duration: provider.duration,
-        status: 'pending',
-        createdAt: new Date(),
-        ip: window.location.hostname,
-        userAgent: navigator.userAgent
-      };
+      // 🔧 PRÉPARATION DES DONNÉES STANDARDISÉES
+      const { selectedProvider, serviceData, bookingRequest } = prepareStandardizedData(formData, provider, user);
+
+      console.log('🚀 Données standardisées préparées:', {
+        selectedProvider: selectedProvider.id,
+        serviceData: serviceData.title,
+        price: serviceData.serviceInfo.price
+      });
 
       // Sauvegarder la demande dans Firestore
       if (user) {
         try {
-          await createBookingRequest(requestData);
+          await createBookingRequest(bookingRequest);
           console.log('✅ Demande de réservation sauvegardée dans Firestore');
         } catch (error) {
           console.error('❌ Erreur lors de la sauvegarde:', error);
         }
       }
 
-      // Sauvegarder en sessionStorage pour le checkout
-      sessionStorage.setItem('bookingRequest', JSON.stringify(requestData));
+      // 🔧 SAUVEGARDE MULTIPLE POUR COMPATIBILITÉ
+      try {
+        // Méthode 1: sessionStorage (backward compatibility)
+        sessionStorage.setItem('bookingRequest', JSON.stringify(bookingRequest));
+        
+        // Méthode 2: sessionStorage standardisé
+        sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
+        sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+        
+        console.log('💾 Données sauvegardées dans sessionStorage (multiple formats)');
+      } catch (storageError) {
+        console.warn('⚠️ Erreur sessionStorage (non bloquant):', storageError);
+      }
 
       // Envoyer la notification au prestataire (non bloquant)
       try {
-        await notifyProviderOfRequest(provider.id, requestData);
+        await notifyProviderOfRequest(provider.id, bookingRequest);
       } catch (notificationError) {
         console.warn("⚠️ Échec de l'envoi de notification au prestataire (non bloquant):", notificationError);
       }
 
-      // Rediriger vers le checkout
-      navigate(`/call-checkout/${provider.id}`);
+      // 🔧 NAVIGATION STANDARDISÉE AVEC LOCATION.STATE
+      console.log('🧭 Navigation vers le checkout avec données standardisées...');
+      
+      navigate('/paiement', {
+        state: {
+          // ✅ NOMS STANDARDISÉS ATTENDUS PAR CallCheckoutWrapper
+          selectedProvider: selectedProvider,
+          serviceData: serviceData,
+          
+          // ✅ DONNÉES SUPPLÉMENTAIRES POUR FLEXIBILITÉ
+          bookingRequest: bookingRequest,
+          
+          // ✅ MÉTADONNÉES DE NAVIGATION
+          navigationSource: 'booking_request',
+          timestamp: new Date().toISOString(),
+          formProgress: formProgress
+        }
+      });
       
     } catch (error) {
       console.error('❌ Erreur lors de la soumission:', error);

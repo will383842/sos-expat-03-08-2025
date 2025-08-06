@@ -287,8 +287,10 @@ const SOSCall: React.FC = () => {
     }
   };
 
+  // 🔧 CORRECTION PRINCIPALE : Fonction handleProviderClick corrigée
   const handleProviderClick = (provider: Provider) => {
-    const providerData = {
+    // ✅ Structurer les données selon les noms attendus par CallCheckoutWrapper
+    const selectedProvider = {
       id: provider.id,
       name: provider.name,
       firstName: provider.firstName || provider.name.split(' ')[0],
@@ -308,9 +310,30 @@ const SOSCall: React.FC = () => {
       responseTime: '< 5 minutes',
       successRate: 95
     };
+
+    // ✅ Créer les données de service selon le format attendu
+    const serviceData = {
+      type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      title: `Consultation ${provider.type === 'lawyer' ? 'juridique' : 'expatriation'}`,
+      description: `Consultation d'urgence avec ${provider.name}`,
+      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
+      price: provider.price,
+      currency: 'EUR',
+      isUrgent: true,
+      urgencyLevel: 'high' as const,
+      languages: provider.languages,
+      country: provider.country,
+      providerId: provider.id,
+      providerName: provider.name,
+      sessionType: 'immediate',
+      category: provider.type === 'lawyer' ? 'legal' : 'expat'
+    };
     
-    sessionStorage.setItem('selectedProvider', JSON.stringify(providerData));
+    // ✅ Sauvegarder pour compatibilité avec d'autres composants
+    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
+    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
     
+    // ✅ Navigation avec les BONS noms de propriétés
     const slug = provider.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
     const mainLanguage = provider.languages[0].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
     const countrySlug = provider.country.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
@@ -318,13 +341,90 @@ const SOSCall: React.FC = () => {
     
     const seoUrl = `/${role}/${countrySlug}/${mainLanguage}/${slug}-${provider.id}`;
     
-    navigate(seoUrl, { 
-      state: { 
-        providerId: provider.id,
-        providerData: provider 
-      } 
-    });
+    // Si c'est un appel d'urgence et que le provider est en ligne, aller directement au paiement
+    if (provider.isOnline && window.location.pathname.includes('sos-appel')) {
+      navigate('/paiement', { 
+        state: { 
+          selectedProvider,  // ✅ BON nom de propriété
+          serviceData        // ✅ BON nom de propriété
+        },
+        replace: false
+      });
+    } else {
+      // Sinon aller sur le profil détaillé
+      navigate(seoUrl, { 
+        state: { 
+          providerId: provider.id,
+          selectedProvider,  // ✅ Cohérent aussi ici
+          serviceData        // ✅ Cohérent aussi ici
+        } 
+      });
+    }
+    
     window.scrollTo(0, 0);
+  };
+
+  // 🔧 CORRECTION : Fonction handleDirectCall pour les boutons "Contacter maintenant"
+  const handleDirectCall = (provider: Provider, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (!provider.isOnline) {
+      // Si offline, aller vers le profil
+      handleProviderClick(provider);
+      return;
+    }
+
+    // ✅ Même logique que handleProviderClick mais navigation directe vers paiement
+    const selectedProvider = {
+      id: provider.id,
+      name: provider.name,
+      firstName: provider.firstName || provider.name.split(' ')[0],
+      lastName: provider.lastName || provider.name.split(' ')[1],
+      type: provider.type,
+      country: provider.country,
+      languages: provider.languages,
+      specialties: provider.specialties,
+      rating: provider.rating,
+      reviewCount: provider.reviewCount,
+      yearsOfExperience: provider.yearsOfExperience,
+      isOnline: provider.isOnline,
+      avatar: provider.avatar,
+      description: provider.description,
+      price: provider.price,
+      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
+      responseTime: '< 5 minutes',
+      successRate: 95
+    };
+
+    const serviceData = {
+      type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      title: `Consultation ${provider.type === 'lawyer' ? 'juridique' : 'expatriation'} - URGENCE`,
+      description: `Appel d'urgence immédiat avec ${provider.name}`,
+      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
+      price: provider.price,
+      currency: 'EUR',
+      isUrgent: true,
+      urgencyLevel: 'urgent' as const,
+      languages: provider.languages,
+      country: provider.country,
+      providerId: provider.id,
+      providerName: provider.name,
+      sessionType: 'immediate',
+      category: provider.type === 'lawyer' ? 'legal' : 'expat'
+    };
+
+    // ✅ Sauvegarder et naviguer avec les BONS noms
+    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
+    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+    
+    navigate('/paiement', { 
+      state: { 
+        selectedProvider,  // ✅ BON nom de propriété
+        serviceData,       // ✅ BON nom de propriété
+        fromUrgentCall: true
+      },
+      replace: false
+    });
   };
 
   const truncateText = (text: string, maxLength: number): { text: string; isTruncated: boolean } => {
@@ -684,10 +784,7 @@ const SOSCall: React.FC = () => {
 
                             <div className="mt-auto pt-4">
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProviderClick(provider);
-                                }}
+                                onClick={(e) => handleDirectCall(provider, e)}
                                 className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl ${
                                   provider.isOnline
                                     ? provider.type === 'lawyer' 
@@ -860,10 +957,7 @@ const SOSCall: React.FC = () => {
 
                           <div className="mt-auto pt-4">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleProviderClick(provider);
-                              }}
+                              onClick={(e) => handleDirectCall(provider, e)}
                               className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl ${
                                 provider.isOnline
                                   ? provider.type === 'lawyer' 

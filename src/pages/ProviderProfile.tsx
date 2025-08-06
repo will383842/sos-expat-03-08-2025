@@ -231,9 +231,11 @@ const ProviderProfile: React.FC = () => {
         // 3. Si on a des données dans l'état de navigation, les utiliser comme fallback
         if (!providerData && location.state) {
           const state = location.state as any;
-          if (state.providerData) {
-            const navData = state.providerData;
-            
+          
+          // ✅ Utiliser selectedProvider ou providerData selon ce qui est disponible
+          const navData = state.selectedProvider || state.providerData;
+          
+          if (navData) {
             providerData = {
               uid: navData.id || '',
               id: navData.id || '',
@@ -498,11 +500,53 @@ const ProviderProfile: React.FC = () => {
     updateSEOMetadata();
   }, [updateSEOMetadata]);
 
+  // 🔧 CORRECTION PRINCIPALE : Fonction handleBookCall avec les bons noms de propriétés
   const handleBookCall = useCallback(() => {
     if (!provider) return;
 
     const currentOnlineStatus = onlineStatus.isOnline;
 
+    // ✅ Structurer les données selon les noms attendus par CallCheckoutWrapper
+    const selectedProvider = {
+      id: provider.uid,
+      name: provider.fullName,
+      firstName: provider.firstName,
+      lastName: provider.lastName,
+      type: provider.type,
+      country: provider.country,
+      languages: provider.languages,
+      specialties: provider.specialties,
+      rating: provider.rating,
+      reviewCount: provider.reviewCount,
+      yearsOfExperience: provider.yearsOfExperience,
+      isOnline: currentOnlineStatus,
+      avatar: provider.profilePhoto,
+      description: provider.description,
+      price: provider.price,
+      duration: provider.duration,
+      responseTime: provider.responseTime,
+      successRate: provider.successRate
+    };
+
+    // ✅ Créer les données de service selon le format attendu
+    const serviceData = {
+      type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      title: `Consultation ${provider.type === 'lawyer' ? 'juridique' : 'expatriation'}`,
+      description: `Consultation avec ${provider.fullName}`,
+      duration: provider.duration,
+      price: provider.price,
+      currency: 'EUR',
+      isUrgent: false,
+      urgencyLevel: 'normal' as const,
+      languages: provider.languages,
+      country: provider.country,
+      providerId: provider.uid,
+      providerName: provider.fullName,
+      sessionType: 'scheduled',
+      category: provider.type === 'lawyer' ? 'legal' : 'expat'
+    };
+
+    // ✅ Logger l'événement analytics
     if (user) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
@@ -514,58 +558,33 @@ const ProviderProfile: React.FC = () => {
           providerOnlineStatus: currentOnlineStatus
         }
       });
-      
-      const providerData = {
-        id: provider.uid,
-        name: provider.fullName,
-        firstName: provider.firstName,
-        lastName: provider.lastName,
-        type: provider.type,
-        country: provider.country,
-        languages: provider.languages,
-        specialties: provider.specialties,
-        rating: provider.rating,
-        reviewCount: provider.reviewCount,
-        yearsOfExperience: provider.yearsOfExperience,
-        isOnline: currentOnlineStatus,
-        avatar: provider.profilePhoto,
-        description: provider.description,
-        price: provider.price,
-        duration: provider.duration,
-        responseTime: provider.responseTime,
-        successRate: provider.successRate
-      };
-      
-      sessionStorage.setItem('selectedProvider', JSON.stringify(providerData));
-      navigate(`/booking-request/${provider.uid}`);
-      window.scrollTo(0, 0);
-    } else {
-      const providerData = {
-        id: provider.uid,
-        name: provider.fullName,
-        firstName: provider.firstName,
-        lastName: provider.lastName,
-        type: provider.type,
-        country: provider.country,
-        languages: provider.languages,
-        specialties: provider.specialties,
-        rating: provider.rating,
-        reviewCount: provider.reviewCount,
-        yearsOfExperience: provider.yearsOfExperience,
-        isOnline: currentOnlineStatus,
-        avatar: provider.profilePhoto,
-        description: provider.description,
-        price: provider.price,
-        duration: provider.duration,
-        responseTime: provider.responseTime,
-        successRate: provider.successRate
-      };
-      
-      sessionStorage.setItem('selectedProvider', JSON.stringify(providerData));
-      const redirectUrl = `/booking-request/${provider.uid}`;
-      navigate(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
-      window.scrollTo(0, 0);
     }
+    
+    // ✅ Sauvegarder pour compatibilité avec d'autres composants
+    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
+    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+    
+    if (user) {
+      // ✅ Si connecté, aller vers le checkout avec les BONS noms de propriétés
+      navigate('/paiement', {
+        state: {
+          selectedProvider,  // ✅ BON nom de propriété
+          serviceData        // ✅ BON nom de propriété
+        },
+        replace: false
+      });
+    } else {
+      // ✅ Si non connecté, redirection vers login puis checkout
+      const redirectUrl = `/paiement`;
+      navigate(`/login?redirect=${encodeURIComponent(redirectUrl)}`, {
+        state: {
+          selectedProvider,  // ✅ Passer les données pour après login
+          serviceData        // ✅ Passer les données pour après login
+        }
+      });
+    }
+    
+    window.scrollTo(0, 0);
   }, [provider, user, navigate, onlineStatus.isOnline]);
 
   const shareProfile = useCallback((platform: string) => {
@@ -963,7 +982,7 @@ const ProviderProfile: React.FC = () => {
                   >
                     <Phone size={24} />
                     <span>
-                      {onlineStatus.isOnline ? 'APPELER MAINTENANT' : 'NON DISPONIBLE'}
+                      {onlineStatus.isOnline ? 'RÉSERVER MAINTENANT' : 'NON DISPONIBLE'}
                     </span>
                     {/* ✅ Indicateur visuel dynamique */}
                     {onlineStatus.isOnline && (

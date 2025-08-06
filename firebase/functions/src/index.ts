@@ -112,8 +112,6 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
 // Export du client Twilio pour compatibility
 export { twilioClient };
 
-
-
 // Interface pour les données de notification
 interface NotificationData {
   type: string;
@@ -242,7 +240,8 @@ export const sendEmail = onCall(
         error
       );
     }
-  });
+  }
+);
 
 // ====== FONCTION CLOUD POUR PUSH NOTIFICATIONS ======
 interface PushNotificationData {

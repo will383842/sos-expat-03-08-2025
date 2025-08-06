@@ -368,7 +368,9 @@ const defaultTemplates: Omit<MessageTemplate, 'createdAt' | 'updatedAt'>[] = [
   }
 ];
 
-export const initializeMessageTemplates = onCall(async (request) => {
+export const initializeMessageTemplates = onCall(
+  { cors: true },
+  async (request) => {
   try {
     // Vérifier que l'utilisateur est admin
     if (!request.auth) {

@@ -391,7 +391,7 @@ const defaultTemplates = [
         isActive: true
     }
 ];
-exports.initializeMessageTemplates = (0, https_1.onCall)(async (request) => {
+exports.initializeMessageTemplates = (0, https_1.onCall)({ cors: true }, async (request) => {
     try {
         // Vérifier que l'utilisateur est admin
         if (!request.auth) {

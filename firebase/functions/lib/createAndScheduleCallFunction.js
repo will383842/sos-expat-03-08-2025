@@ -9,9 +9,11 @@ const logError_1 = require("./utils/logs/logError");
  */
 exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
     // ✅ Configuration CORS
-    cors: true,
-    // Optionnel: limiter les domaines autorisés
-    // cors: ['http://localhost:5177', 'https://your-domain.com'],
+    cors: [
+        /localhost:\d+/,
+        /127\.0\.0\.1:\d+/,
+        /firebase\.com$/,
+    ],
 }, async (request) => {
     var _a;
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

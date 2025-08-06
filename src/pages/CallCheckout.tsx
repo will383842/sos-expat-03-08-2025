@@ -60,8 +60,9 @@ interface User {
   fullName?: string;
 }
 
+// 🔧 FIX: Interface corrigée - backend attend maintenant des CENTIMES
 interface PaymentIntentData {
-  amount: number; // 🔧 FIX: EN CENTIMES maintenant
+  amount: number; // 🔧 EN CENTIMES maintenant (4900 pour 49€)
   currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
@@ -69,8 +70,8 @@ interface PaymentIntentData {
   clientEmail?: string;
   providerName?: string;
   description?: string;
-  commissionAmount: number; // 🔧 FIX: EN CENTIMES
-  providerAmount: number; // 🔧 FIX: EN CENTIMES
+  commissionAmount: number; // 🔧 EN CENTIMES
+  providerAmount: number; // 🔧 EN CENTIMES
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -79,7 +80,7 @@ interface PaymentIntentResponse {
   success: boolean;
   clientSecret: string;
   paymentIntentId: string;
-  amount: number;
+  amount: number; // EN CENTIMES dans la réponse
   currency: string;
   serviceType: string;
   status: string;
@@ -94,7 +95,7 @@ interface CreateAndScheduleCallData {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // 🔧 FIX: EN CENTIMES
+  amount: number; // 🔧 EN CENTIMES
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
@@ -216,19 +217,32 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       setIsProcessing(true);
 
-      // 🔧 FIX CRITIQUE: Conversion CORRECTE en centimes pour Stripe
+      // 🔧 FIX CRITIQUE: Conversion EN CENTIMES avant d'envoyer au backend
       const amountInCents = Math.round(service.amount * 100);
       const commissionInCents = Math.round(service.commissionAmount * 100);
       const providerAmountInCents = Math.round(service.providerAmount * 100);
 
-      // 🔧 FIX: Validation des montants minimum
+      // 🔧 FIX: Validation des montants minimum côté frontend
       if (amountInCents < 500) { // 5€ minimum pour Stripe
         onError('Le montant minimum est de 5€ pour une transaction sécurisée.');
         return;
       }
 
+      if (amountInCents > 50000) { // 500€ maximum 
+        onError('Le montant maximum est de 500€ par transaction.');
+        return;
+      }
+
       // 🔧 FIX: Validation de la cohérence des montants
-      if (Math.abs(amountInCents - (commissionInCents + providerAmountInCents)) > 1) {
+      const calculatedTotal = commissionInCents + providerAmountInCents;
+      if (Math.abs(amountInCents - calculatedTotal) > 1) { // Tolérance 1 centime
+        console.error('Erreur cohérence montants:', {
+          amountInCents,
+          commissionInCents,
+          providerAmountInCents,
+          calculatedTotal,
+          difference: Math.abs(amountInCents - calculatedTotal)
+        });
         onError('Erreur dans la répartition des montants. Veuillez réessayer.');
         return;
       }
@@ -239,7 +253,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       
       // 🔧 FIX CRITIQUE: Envoyer les montants EN CENTIMES à la Cloud Function
       const paymentData: PaymentIntentData = {
-        amount: amountInCents, // 4900 (centimes) pour 49€
+        amount: amountInCents,           // 4900 (centimes) pour 49€
         commissionAmount: commissionInCents, // 980 (centimes) pour 9.80€
         providerAmount: providerAmountInCents, // 3920 (centimes) pour 39.20€
         currency: 'eur',
@@ -253,33 +267,37 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         metadata: {
           providerType: provider.role || provider.type || 'expat',
           duration: service.duration.toString(),
-          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          originalAmountEuros: service.amount.toString(), // Pour référence
+          originalCommissionEuros: service.commissionAmount.toString(),
+          originalProviderAmountEuros: service.providerAmount.toString()
         }
       };
 
-      // 🔍 DEBUG CORRIGÉ
-      console.log('💳 === DÉBUT DEBUG PAYMENT (CORRIGÉ) ===');
-      console.log('💰 Montants originaux (en €):', {
+      // 🔍 DEBUG DÉTAILLÉ
+      console.log('💳 === FRONTEND - CORRECTION APPLIQUÉE ===');
+      console.log('💰 Montants originaux (interface utilisateur en €):', {
         serviceAmount: service.amount,
         commission: service.commissionAmount,
-        provider: service.providerAmount
+        provider: service.providerAmount,
+        total: service.amount
       });
-      console.log('💰 Montants convertis (en centimes):', {
-        amountInCents,
-        commissionInCents,
-        providerAmountInCents,
-        total_coherent: (commissionInCents + providerAmountInCents) === amountInCents
+      console.log('💰 Conversion pour backend (en centimes):', {
+        amountInCents: `${amountInCents} centimes (${amountInCents/100}€)`,
+        commissionInCents: `${commissionInCents} centimes (${commissionInCents/100}€)`,
+        providerAmountInCents: `${providerAmountInCents} centimes (${providerAmountInCents/100}€)`,
+        total_coherent: calculatedTotal === amountInCents
       });
-      console.log('✅ Validation Stripe:', {
+      console.log('✅ Validation locale:', {
         minimum_respecte: amountInCents >= 500,
-        coherence_totale: Math.abs(amountInCents - (commissionInCents + providerAmountInCents)) <= 1
+        maximum_respecte: amountInCents <= 50000,
+        coherence_totale: Math.abs(amountInCents - calculatedTotal) <= 1
       });
-      console.log('📤 Données envoyées (EN CENTIMES):', paymentData);
-      console.log('💳 === FIN DEBUG PAYMENT ===');
+      console.log('📤 Données envoyées au backend:', paymentData);
 
       console.log('📤 Envoi de la requête createPaymentIntent...');
       const paymentResponse = await createPaymentIntent(paymentData);
-      console.log('📥 Réponse reçue:', paymentResponse);
+      console.log('📥 Réponse reçue:', paymentResponse.data);
 
       const clientSecret = paymentResponse.data.clientSecret;
       if (!clientSecret) {
@@ -352,7 +370,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         providerLanguages: provider.languagesSpoken || provider.languages || ['fr']
       };
 
-      console.log('📞 Données d\'appel:', callData);
+      console.log('📞 Données d\'appel (montants en centimes):', callData);
       await createAndScheduleCall(callData);
       console.log('✅ Appel programmé avec succès');
 
@@ -373,6 +391,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       if (error instanceof Error) {
         if (error.message.includes('Montant minimum')) {
           errorMessage = 'Le montant minimum pour une consultation est de 5€.';
+        } else if (error.message.includes('Montant maximum')) {
+          errorMessage = 'Le montant maximum pour une consultation est de 500€.';
         } else if (error.message.includes('invalid-argument')) {
           errorMessage = 'Données de paiement invalides. Veuillez vérifier vos informations.';
         } else if (error.message.includes('network')) {

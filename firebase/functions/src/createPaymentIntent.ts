@@ -10,7 +10,6 @@ const isDevelopment = process.env.NODE_ENV === 'development' ||
                      process.env.NODE_ENV === 'dev' || 
                      !process.env.NODE_ENV; // Par défaut = dev
 const isProduction = process.env.NODE_ENV === 'production';
-// Configuration pour test/staging incluse dans les conditions ternaires ci-dessous
 
 // Variable de bypass d'urgence (à utiliser avec EXTRÊME précaution)
 const BYPASS_MODE = process.env.BYPASS_SECURITY === 'true';
@@ -25,7 +24,7 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 // 📋 INTERFACES ET TYPES
 // =========================================
 interface PaymentIntentRequestData {
-  amount: number; // 🔧 FIX: DÉJÀ EN CENTIMES depuis le frontend
+  amount: number; // 🔧 FIX: MAINTENANT EN CENTIMES depuis le frontend
   currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
@@ -33,8 +32,8 @@ interface PaymentIntentRequestData {
   clientEmail?: string;
   providerName?: string;
   description?: string;
-  commissionAmount: number; // 🔧 FIX: DÉJÀ EN CENTIMES
-  providerAmount: number; // 🔧 FIX: DÉJÀ EN CENTIMES
+  commissionAmount: number; // 🔧 FIX: EN CENTIMES
+  providerAmount: number; // 🔧 FIX: EN CENTIMES
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -51,7 +50,7 @@ interface SuccessResponse {
   success: true;
   clientSecret: string;
   paymentIntentId: string;
-  amount: number;
+  amount: number; // EN CENTIMES dans la réponse (cohérent avec Stripe)
   currency: string;
   serviceType: string;
   status: string;
@@ -71,17 +70,17 @@ const SECURITY_LIMITS = {
     GLOBAL_MAX: isDevelopment ? 10000 : (isProduction ? 1000 : 2000),
   },
   AMOUNT_LIMITS: {
-    // 🔧 FIX: Limites EN CENTIMES (pas d'euros)
+    // 🔧 FIX: Limites EN CENTIMES (cohérent avec Stripe)
     MIN_AMOUNT: 500, // 5€ en centimes
-    MAX_AMOUNT: 50000, // 500€ en centimes (pas 2000€)
+    MAX_AMOUNT: 50000, // 500€ en centimes 
     MAX_DAILY_USER: 200000, // 2000€ par jour par utilisateur EN CENTIMES
   },
   VALIDATION: {
     MAX_METADATA_SIZE: isDevelopment ? 10000 : (isProduction ? 3000 : 5000),
     MAX_DESCRIPTION_LENGTH: isDevelopment ? 5000 : (isProduction ? 1500 : 2000),
-    // Tolérance pour cohérence des montants
+    // Tolérance pour cohérence des montants EN CENTIMES
     AMOUNT_COHERENCE_TOLERANCE: isDevelopment ? 50 : (isProduction ? 5 : 10), // 🔧 FIX: EN CENTIMES
-    // Tolérance pour validation business
+    // Tolérance pour validation business EN CENTIMES
     BUSINESS_AMOUNT_TOLERANCE: isDevelopment ? 5000 : (isProduction ? 1500 : 2500), // 🔧 FIX: EN CENTIMES
     ALLOWED_CURRENCIES: ['eur', 'usd', 'gbp'],
     ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'] as const,
@@ -145,7 +144,7 @@ function checkRateLimit(userId: string): { allowed: boolean; resetTime?: number 
 }
 
 /**
- * Validation business logic adaptée à l'environnement
+ * 🔧 FIX: Validation business logic - montants EN CENTIMES
  */
 async function validateBusinessLogic(
   data: PaymentIntentRequestData,
@@ -230,17 +229,17 @@ async function validateBusinessLogic(
 }
 
 /**
- * Validation sécuritaire des montants adaptée
+ * 🔧 FIX: Validation sécuritaire des montants - REÇOIT DES CENTIMES
  */
 async function validateAmountSecurity(
-  amount: number,
+  amount: number, // ✅ REÇOIT MAINTENANT DES CENTIMES
   userId: string,
   db: admin.firestore.Firestore
 ): Promise<{ valid: boolean; error?: string }> {
   
   logSecurityEvent('amount_validation_start', { amount, userId });
   
-  // 🔧 FIX: Limites EN CENTIMES
+  // 🔧 FIX: Limites EN CENTIMES - comparaisons directes
   if (amount < SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT) {
     return { 
       valid: false, 
@@ -270,7 +269,7 @@ async function validateAmountSecurity(
       // 🔧 FIX: Calcul en centimes cohérent
       const dailyTotalCents = dailyPaymentsQuery.docs.reduce((total, doc) => {
         const paymentAmount = doc.data().amount || 0;
-        // Assumer que les montants stockés sont en centimes (nouveau système)
+        // ✅ Assumer que les montants stockés sont en centimes (nouveau système)
         return total + paymentAmount;
       }, 0);
 
@@ -297,12 +296,12 @@ async function validateAmountSecurity(
 }
 
 /**
- * Vérification des doublons adaptée
+ * 🔧 FIX: Vérification des doublons - montants EN CENTIMES
  */
 async function checkDuplicatePayments(
   clientId: string, 
   providerId: string, 
-  amount: number, 
+  amount: number, // EN CENTIMES
   db: admin.firestore.Firestore
 ): Promise<boolean> {
   
@@ -318,7 +317,7 @@ async function checkDuplicatePayments(
     const existingPayments = await db.collection('payments')
       .where('clientId', '==', clientId)
       .where('providerId', '==', providerId)
-      .where('amount', '==', amount)
+      .where('amount', '==', amount) // Comparaison en centimes
       .where('status', 'in', ['pending', 'requires_confirmation', 'requires_capture', 'processing'])
       .where('createdAt', '>', admin.firestore.Timestamp.fromDate(new Date(Date.now() - windowMs)))
       .limit(1)
@@ -330,6 +329,7 @@ async function checkDuplicatePayments(
       clientId, 
       providerId, 
       amount, 
+      amountInEuros: amount / 100,
       windowMs, 
       hasDuplicate 
     });
@@ -342,15 +342,14 @@ async function checkDuplicatePayments(
 }
 
 /**
- * Validation cohérence des montants
+ * 🔧 FIX: Validation cohérence des montants - TOUS EN CENTIMES
  */
 function validateAmountCoherence(
-  amount: number, 
-  commissionAmount: number, 
-  providerAmount: number
+  amount: number,           // EN CENTIMES
+  commissionAmount: number, // EN CENTIMES
+  providerAmount: number    // EN CENTIMES
 ): { valid: boolean; error?: string; difference: number } {
   
-  // 🔧 FIX: Calculs EN CENTIMES (pas de division/multiplication par 100)
   const totalCalculated = Math.round(commissionAmount + providerAmount);
   const amountRounded = Math.round(amount);
   const difference = Math.abs(totalCalculated - amountRounded);
@@ -358,11 +357,15 @@ function validateAmountCoherence(
   
   logSecurityEvent('amount_coherence_check', {
     amount: amountRounded,
+    amountInEuros: amountRounded / 100,
     commission: commissionAmount,
+    commissionInEuros: commissionAmount / 100,
     provider: providerAmount,
+    providerInEuros: providerAmount / 100,
     total_calculated: totalCalculated,
     difference,
-    tolerance
+    tolerance,
+    toleranceInEuros: tolerance / 100
   });
   
   if (difference > tolerance) {
@@ -377,7 +380,7 @@ function validateAmountCoherence(
 }
 
 /**
- * Sanitization des données adaptée
+ * 🔧 FIX: Sanitization des données - PAS DE CONVERSION (déjà en centimes)
  */
 function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData {
   const maxNameLength = isDevelopment ? 500 : 200;
@@ -386,8 +389,8 @@ function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData
   const maxMetaValueLength = isDevelopment ? 500 : 200;
 
   return {
-    // 🔧 FIX: Pas de multiplication par 100 - les montants sont déjà en centimes
-    amount: Math.round(Number(data.amount)),
+    // 🔧 FIX: PAS de conversion - les montants sont déjà en centimes depuis le frontend
+    amount: Math.round(Number(data.amount)), // Arrondir seulement
     currency: (data.currency || 'eur').toLowerCase().trim(),
     serviceType: data.serviceType,
     providerId: data.providerId.trim(),
@@ -395,8 +398,8 @@ function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData
     clientEmail: data.clientEmail?.trim().toLowerCase(),
     providerName: data.providerName?.trim().substring(0, maxNameLength),
     description: data.description?.trim().substring(0, maxDescLength),
-    commissionAmount: Math.round(Number(data.commissionAmount)),
-    providerAmount: Math.round(Number(data.providerAmount)),
+    commissionAmount: Math.round(Number(data.commissionAmount)), // Arrondir seulement
+    providerAmount: Math.round(Number(data.providerAmount)), // Arrondir seulement
     callSessionId: data.callSessionId?.trim(),
     metadata: data.metadata ? Object.fromEntries(
       Object.entries(data.metadata)
@@ -407,13 +410,19 @@ function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData
 }
 
 /**
- * Logging adapté à l'environnement
+ * Logging adapté à l'environnement avec informations détaillées
  */
 function logSecurityEvent(event: string, data: any) {
   const timestamp = new Date().toISOString();
   
   if (isDevelopment) {
-    console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
+    console.log(`🔧 [DEV-${timestamp}] ${event}:`, {
+      ...data,
+      // Ajouter conversions euros pour lisibilité en dev
+      ...(data.amount && { amountEuros: data.amount / 100 }),
+      ...(data.commissionAmount && { commissionEuros: data.commissionAmount / 100 }),
+      ...(data.providerAmount && { providerEuros: data.providerAmount / 100 })
+    });
   } else if (isProduction) {
     // En production: données sensibles masquées
     const sanitizedData = {
@@ -466,13 +475,16 @@ export const createPaymentIntent = onCall(
 
       const userId = request.auth.uid;
 
-      // Debug: Log des données reçues (adapté à l'environnement)
+      // 🔧 FIX: Debug des données reçues (montants maintenant en centimes)
       logSecurityEvent('payment_data_received', {
         amount: request.data.amount,
+        amountInEuros: request.data.amount / 100,
         serviceType: request.data.serviceType,
         providerId: request.data.providerId?.substring(0, 10) + '...',
         commissionAmount: request.data.commissionAmount,
-        providerAmount: request.data.providerAmount
+        commissionInEuros: request.data.commissionAmount / 100,
+        providerAmount: request.data.providerAmount,
+        providerInEuros: request.data.providerAmount / 100
       });
 
       // ========================================
@@ -496,14 +508,15 @@ export const createPaymentIntent = onCall(
         original_amount: request.data.amount,
         sanitized_amount: sanitizedData.amount,
         original_commission: request.data.commissionAmount,
-        sanitized_commission: sanitizedData.commissionAmount
+        sanitized_commission: sanitizedData.commissionAmount,
+        coherent: Math.abs(sanitizedData.amount - (sanitizedData.commissionAmount + sanitizedData.providerAmount)) <= 1
       });
 
       // ========================================
       // 4. VALIDATION DES DONNÉES DE BASE
       // ========================================
       const {
-        amount,
+        amount,              // ✅ DÉJÀ EN CENTIMES depuis le frontend
         currency,
         serviceType,
         providerId,
@@ -511,8 +524,8 @@ export const createPaymentIntent = onCall(
         clientEmail,
         providerName,
         description,
-        commissionAmount,
-        providerAmount,
+        commissionAmount,    // ✅ DÉJÀ EN CENTIMES
+        providerAmount,      // ✅ DÉJÀ EN CENTIMES
         callSessionId,
         metadata = {}
       } = sanitizedData;
@@ -520,7 +533,7 @@ export const createPaymentIntent = onCall(
       // Validation de base avec logs détaillés
       if (!amount || typeof amount !== 'number' || amount <= 0) {
         logSecurityEvent('validation_error', { field: 'amount', value: amount, type: typeof amount });
-        throw new HttpsError('invalid-argument', `Montant invalide: ${amount}`);
+        throw new HttpsError('invalid-argument', `Montant invalide: ${amount} centimes (${amount/100}€)`);
       }
 
       if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
@@ -616,20 +629,21 @@ export const createPaymentIntent = onCall(
       // ========================================
       logSecurityEvent('stripe_payment_creation_start', {
         amount,
+        amountInEuros: amount / 100,
         serviceType,
         providerId: providerId.substring(0, 10) + '...'
       });
 
-      // 🔧 FIX: Données pour StripeManager - montants déjà EN CENTIMES
+      // 🔧 FIX: Données pour StripeManager - montants DÉJÀ EN CENTIMES
       const stripePaymentData: StripePaymentData = {
-        amount, // DÉJÀ EN CENTIMES
+        amount,           // DÉJÀ EN CENTIMES
         currency: safeCurrency,
         clientId,
         providerId,
         serviceType,
         providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
         commissionAmount, // DÉJÀ EN CENTIMES
-        providerAmount, // DÉJÀ EN CENTIMES
+        providerAmount,   // DÉJÀ EN CENTIMES
         callSessionId,
         metadata: {
           clientEmail: clientEmail || '',
@@ -637,9 +651,32 @@ export const createPaymentIntent = onCall(
           description: description || `Service ${serviceType}`,
           requestId,
           environment: process.env.NODE_ENV || 'development',
+          // Ajouter des références en euros pour debug
+          originalAmountEuros: (amount / 100).toString(),
+          originalCommissionEuros: (commissionAmount / 100).toString(),
+          originalProviderAmountEuros: (providerAmount / 100).toString(),
           ...metadata
         }
       };
+
+      // 🔍 DEBUG FINAL BACKEND
+      console.log('💳 === BACKEND - DONNÉES FINALES ===');
+      console.log('📥 Données reçues (EN CENTIMES):', {
+        amount: `${amount} centimes (${amount/100}€)`,
+        commission: `${commissionAmount} centimes (${commissionAmount/100}€)`,
+        provider: `${providerAmount} centimes (${providerAmount/100}€)`,
+        coherent: Math.abs(amount - (commissionAmount + providerAmount)) <= 1
+      });
+      console.log('✅ Validations passées:', {
+        minimum_respecte: amount >= SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT,
+        maximum_respecte: amount <= SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT,
+        coherence_totale: coherenceResult.valid
+      });
+      console.log('📤 Envoi vers StripeManager:', {
+        amount,
+        commissionAmount,
+        providerAmount
+      });
 
       const result = await stripeManager.createPaymentIntent(stripePaymentData);
 
@@ -654,6 +691,7 @@ export const createPaymentIntent = onCall(
           userId,
           serviceType,
           amount,
+          amountInEuros: amount / 100,
           error: result.error
         });
 
@@ -672,9 +710,12 @@ export const createPaymentIntent = onCall(
         paymentIntentId: result.paymentIntentId,
         clientId,
         providerId,
-        amount,
-        commissionAmount,
-        providerAmount,
+        amount, // EN CENTIMES
+        amountInEuros: amount / 100, // Pour référence humaine
+        commissionAmount, // EN CENTIMES
+        commissionAmountInEuros: commissionAmount / 100,
+        providerAmount, // EN CENTIMES
+        providerAmountInEuros: providerAmount / 100,
         serviceType,
         callSessionId,
         environment: process.env.NODE_ENV || 'development',
@@ -686,7 +727,9 @@ export const createPaymentIntent = onCall(
 
       logSecurityEvent('payment_intent_created_success', {
         paymentIntentId: result.paymentIntentId,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
+        amountProcessed: amount,
+        amountInEuros: amount / 100
       });
 
       // ========================================
@@ -696,7 +739,7 @@ export const createPaymentIntent = onCall(
         success: true,
         clientSecret: result.clientSecret!,
         paymentIntentId: result.paymentIntentId!,
-        amount,
+        amount, // EN CENTIMES (cohérent avec Stripe)
         currency: currency || "eur",
         serviceType,
         status: 'requires_payment_method',
@@ -715,7 +758,9 @@ export const createPaymentIntent = onCall(
         requestId,
         error: error instanceof Error ? error.message : 'Unknown error',
         processingTime,
-        environment: process.env.NODE_ENV
+        environment: process.env.NODE_ENV,
+        receivedAmount: request.data?.amount,
+        receivedAmountEuros: request.data?.amount ? request.data.amount / 100 : 'unknown'
       });
 
       // Log détaillé pour debug
@@ -726,6 +771,7 @@ export const createPaymentIntent = onCall(
         processingTime,
         requestData: {
           amount: request.data.amount,
+          amountInEuros: request.data.amount / 100,
           serviceType: request.data.serviceType,
           hasAuth: !!request.auth
         },

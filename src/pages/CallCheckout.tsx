@@ -62,20 +62,28 @@ interface User {
 
 interface PaymentIntentData {
   amount: number;
-  currency: string;
+  currency?: string;
+  serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
   clientId: string;
-  serviceType: string;
+  clientEmail?: string;
+  providerName?: string;
+  description?: string;
   commissionAmount: number;
   providerAmount: number;
+  callSessionId?: string;
+  metadata?: Record<string, string>;
 }
 
 interface PaymentIntentResponse {
-  data: {
-    clientSecret: string;
-    paymentIntentId: string;
-    status: string;
-  };
+  success: boolean;
+  clientSecret: string;
+  paymentIntentId: string;
+  amount: number;
+  currency: string;
+  serviceType: string;
+  status: string;
+  expiresAt: string;
 }
 
 interface CreateAndScheduleCallData {
@@ -209,18 +217,65 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       // 1. Créer le PaymentIntent via Firebase Function
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
-      const paymentResponse = await createPaymentIntent({
-        amount: service.amount * 100, // Convertir en centimes
+      
+      // 🔧 FIX: Construire les données exactement comme attendu par la Cloud Function
+      const paymentData: PaymentIntentData = {
+        amount: service.amount, // ❌ PAS de conversion en centimes ici (la Cloud Function le fait)
         currency: 'eur',
+        serviceType: service.serviceType,
         providerId: provider.id,
         clientId: user.uid,
-        serviceType: service.serviceType,
-        commissionAmount: Math.round(service.commissionAmount * 100),
-        providerAmount: Math.round(service.providerAmount * 100),
-      });
+        clientEmail: user.email || '', // ✅ Champ ajouté
+        providerName: provider.fullName || provider.name || '', // ✅ Champ ajouté
+        description: `Consultation ${service.serviceType === 'lawyer_call' ? 'avocat' : 'expatriation'}`, // ✅ Champ ajouté
+        commissionAmount: service.commissionAmount, // ❌ PAS de conversion en centimes
+        providerAmount: service.providerAmount, // ❌ PAS de conversion en centimes
+        callSessionId: undefined, // ✅ Optionnel mais spécifié
+        metadata: {
+          providerType: provider.role || provider.type || 'expat',
+          duration: service.duration.toString(),
+          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+        }
+      };
 
-      console.log("🧪 paymentResponse reçu :", paymentResponse);
+      // 🔍 DEBUG: Log des données envoyées
+      console.log('💳 === DÉBUT DEBUG PAYMENT ===');
+      console.log('💰 Service data original:', service);
+      console.log('👤 Provider data:', {
+        id: provider.id,
+        name: provider.fullName || provider.name,
+        role: provider.role || provider.type
+      });
+      console.log('🙋 User data:', {
+        uid: user.uid,
+        email: user.email,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+      });
+      console.log('📤 Données envoyées à createPaymentIntent:', paymentData);
+      console.log('🔢 Vérifications des types:', {
+        amount: `${paymentData.amount} (${typeof paymentData.amount})`,
+        providerId: `${paymentData.providerId} (${typeof paymentData.providerId})`,
+        clientId: `${paymentData.clientId} (${typeof paymentData.clientId})`,
+        serviceType: `${paymentData.serviceType} (${typeof paymentData.serviceType})`,
+        commissionAmount: `${paymentData.commissionAmount} (${typeof paymentData.commissionAmount})`,
+        providerAmount: `${paymentData.providerAmount} (${typeof paymentData.providerAmount})`
+      });
+      console.log('💰 Cohérence des montants:', {
+        total_demandé: paymentData.amount,
+        commission_plus_provider: paymentData.commissionAmount + paymentData.providerAmount,
+        différence: Math.abs(paymentData.amount - (paymentData.commissionAmount + paymentData.providerAmount)),
+        cohérent: Math.abs(paymentData.amount - (paymentData.commissionAmount + paymentData.providerAmount)) < 0.01
+      });
+      console.log('💳 === FIN DEBUG PAYMENT ===');
+
+      console.log('📤 Envoi de la requête createPaymentIntent...');
+      const paymentResponse = await createPaymentIntent(paymentData);
+      console.log('📥 Réponse complète reçue:', paymentResponse);
+
       const clientSecret = paymentResponse.data.clientSecret;
+      if (!clientSecret) {
+        throw new Error('ClientSecret manquant dans la réponse');
+      }
 
       // 2. Confirmer le paiement avec Stripe
       const cardElement = elements.getElement(CardElement);
@@ -228,6 +283,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         throw new Error('Élément de carte non trouvé');
       }
 
+      console.log('🔒 Confirmation du paiement avec Stripe...');
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardElement,
@@ -239,12 +295,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       });
 
       if (error) {
-        throw new Error(error.message || 'Erreur de paiement');
+        throw new Error(error.message || 'Erreur de paiement Stripe');
       }
 
       if (!paymentIntent) {
-        throw new Error("Le paiement a échoué (pas de PaymentIntent)");
+        throw new Error("Le paiement a échoué (pas de PaymentIntent retourné)");
       }
+
+      console.log('💳 Statut du paiement:', paymentIntent.status);
 
       // ✅ CORRECTION: Traiter requires_capture comme un SUCCÈS
       if (paymentIntent.status === 'succeeded') {
@@ -269,9 +327,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }
 
       // 3. Programmer l'appel via Firebase Function
+      console.log('📞 Programmation de l\'appel...');
       const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
         httpsCallable(functions, 'createAndScheduleCall');
-      await createAndScheduleCall({
+      
+      const callData = {
         providerId: provider.id,
         clientId: user.uid,
         providerPhone: provider.phoneNumber || provider.phone || '',
@@ -281,15 +341,40 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         amount: service.amount,
         duration: service.duration,
         paymentIntentId: paymentIntent.id,
-      });
+      };
+
+      console.log('📞 Données d\'appel:', callData);
+      await createAndScheduleCall(callData);
+      console.log('✅ Appel programmé avec succès');
 
       onSuccess(paymentIntent.id);
 
     } catch (error: unknown) {
-      console.error('❌ Erreur lors du paiement:', error);
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Une erreur est survenue lors du paiement';
+      console.error('❌ Erreur détaillée lors du paiement:', {
+        error,
+        service,
+        providerId: provider.id,
+        userId: user.uid,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 🔧 FIX: Messages d'erreur plus spécifiques
+      let errorMessage = 'Une erreur est survenue lors du paiement';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('validation')) {
+          errorMessage = 'Données de paiement invalides. Veuillez vérifier vos informations.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.';
+        } else if (error.message.includes('amount')) {
+          errorMessage = 'Montant de paiement invalide.';
+        } else if (error.message.includes('FirebaseError')) {
+          errorMessage = `Erreur du serveur: ${error.message}`;
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       onError(errorMessage);
     } finally {
       setIsProcessing(false);

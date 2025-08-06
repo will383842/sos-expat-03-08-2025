@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, limit, onSnapshot } from 'firebase/firestore';
@@ -73,7 +74,7 @@ const DEFAULT_AVATAR = '/default-avatar.png';
 // Composant pour une carte de profil
 const ProfileCard: React.FC<{ 
   provider: Provider; 
-  onProfileClick: (id: string) => void;
+  onProfileClick: (provider: Provider) => void;
   getLanguageLabel: (lang: string) => string;
   isUserConnected: boolean;
 }> = React.memo(({ provider, onProfileClick, getLanguageLabel, isUserConnected }) => {
@@ -85,9 +86,9 @@ const ProfileCard: React.FC<{
   }, []);
 
   const handleClick = useCallback(() => {
-    // Toujours aller directement au profil, connecté ou non
-    onProfileClick(provider.id);
-  }, [provider.id, onProfileClick]);
+    // ✅ CORRECTION : Navigation vers le profil avec données
+    onProfileClick(provider);
+  }, [provider, onProfileClick]);
 
   const truncateText = (text: string, maxLength: number): { text: string; isTruncated: boolean } => {
     if (text.length <= maxLength) {
@@ -160,21 +161,18 @@ const ProfileCard: React.FC<{
           }`}></div>
         </div>
 
-        {/* Status badge - ALWAYS show online/offline status */}
-        {isUserConnected && (
-          <div className="absolute bottom-4 left-4">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm transition-all duration-300 ${
-              provider.isOnline ? 'bg-green-500' : 'bg-gray-500'
-            }`}>
-              <span className={`inline-block w-2 h-2 rounded-full mr-1 transition-all duration-300 ${
-                provider.isOnline ? 'bg-white animate-pulse' : 'bg-gray-300'
-              }`} aria-hidden="true" />
-              {provider.isOnline ? 'En ligne' : 'Hors ligne'}
-            </span>
-          </div>
-        )}
+        {/* Status badge - Show online/offline status */}
+        <div className="absolute bottom-4 left-4">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm transition-all duration-300 ${
+            provider.isOnline ? 'bg-green-500' : 'bg-gray-500'
+          }`}>
+            <span className={`inline-block w-2 h-2 rounded-full mr-1 transition-all duration-300 ${
+              provider.isOnline ? 'bg-white animate-pulse' : 'bg-gray-300'
+            }`} aria-hidden="true" />
+            {provider.isOnline ? 'En ligne' : 'Hors ligne'}
+          </span>
+        </div>
       </div>
-      
       
       <div className="p-4">
         <h3 className="text-lg font-bold text-gray-900 mb-2 truncate">
@@ -276,12 +274,12 @@ const ProfileCard: React.FC<{
           {provider.isOnline ? (
             <>
               <Phone className="w-4 h-4 inline mr-2" />
-              Appeler maintenant
+              Voir le profil
             </>
           ) : (
             <>
-              <span className="text-sm mr-2">💬</span>
-              Contacter
+              <span className="text-sm mr-2">👤</span>
+              Voir le profil
             </>
           )}
         </button>
@@ -296,6 +294,7 @@ ProfileCard.displayName = 'ProfileCard';
 const ProfileCarousel: React.FC = () => {
   const { language } = useApp();
   const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [onlineProviders, setOnlineProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -307,10 +306,8 @@ const ProfileCarousel: React.FC = () => {
 
   // Fonction pour obtenir le label de langue
   const getLanguageLabel = useCallback((language: string): string => {
-    // Retourne le nom complet de la langue, pas le code ISO
     const fullLanguageName = LANGUAGE_MAP[language] || language;
     
-    // Si c'est un code ISO de 2 lettres, on essaie de le convertir
     if (fullLanguageName.length === 2) {
       const isoToLanguage: Record<string, string> = {
         'EN': 'Anglais',
@@ -332,10 +329,43 @@ const ProfileCarousel: React.FC = () => {
     return fullLanguageName;
   }, []);
 
-  // Gestion de la navigation vers un profil
-  const handleProfileClick = useCallback((providerId: string) => {
-    window.location.href = `/provider/${providerId}`;
-  }, []);
+  // ✅ CORRECTION PRINCIPALE : Navigation vers le profil avec URL SEO
+  const handleProfileClick = useCallback((provider: Provider) => {
+    console.log('🔗 Navigation vers le profil de:', provider.name);
+    
+    // Générer URL SEO standardisée compatible avec ProviderProfile.tsx
+    const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
+    const countrySlug = provider.country
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, '-');
+    const nameSlug = provider.name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, '-');
+    
+    // URL compatible avec ProviderProfile.tsx
+    const seoUrl = `/${typeSlug}/${countrySlug}/francais/${nameSlug}-${provider.id}`;
+    
+    console.log('🔗 URL générée:', seoUrl);
+    
+    // Sauvegarder pour compatibilité
+    try {
+      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+    } catch (error) {
+      console.warn('⚠️ Erreur sessionStorage:', error);
+    }
+    
+    // Navigation avec données dans le state
+    navigate(seoUrl, {
+      state: {
+        selectedProvider: provider,
+        navigationSource: 'home_carousel'
+      }
+    });
+  }, [navigate]);
 
   // Transformation des données Firestore
   const transformProviderData = useCallback(async (doc: any): Promise<Provider | null> => {
@@ -446,7 +476,7 @@ const ProfileCarousel: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
-      console.log('🔍 Début du chargement initial des profils (accès public)...');
+      console.log('🔍 Début du chargement initial des profils...');
 
       const sosProfilesQuery = query(
         collection(db, 'sos_profiles'),
@@ -493,7 +523,7 @@ const ProfileCarousel: React.FC = () => {
   // Configuration de l'écoute en temps réel
   const setupRealtimeListeners = useCallback(() => {
     if (!isUserConnected) {
-      console.log('ℹ️ Utilisateur non connecté, pas de listeners temps réel (mode économique)');
+      console.log('ℹ️ Utilisateur non connecté, pas de listeners temps réel');
       return () => {};
     }
 
@@ -664,7 +694,7 @@ const ProfileCarousel: React.FC = () => {
         </div>
       </div>
       
-      {/* Styles pour l'animation - RESTAURÉ */}
+      {/* Styles pour l'animation */}
       <style jsx>{`
         @keyframes scroll-left {
           0% { transform: translateX(0); }

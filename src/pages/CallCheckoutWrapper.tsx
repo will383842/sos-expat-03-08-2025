@@ -378,4 +378,133 @@ const CallCheckoutWrapper: React.FC = () => {
     
     const commissionRate = 0.20;
     const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
-    const provider
+    const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
+    
+    return {
+      providerId: bookingData.providerId || Math.random().toString(36),
+      serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      providerRole: providerRole as 'lawyer' | 'expat',
+      amount: baseAmount,
+      duration: duration,
+      clientPhone: bookingData.clientPhone || '',
+      commissionAmount: commissionAmount,
+      providerAmount: providerAmount
+    };
+  };
+
+  /**
+   * 🔧 NOUVEAU: Crée un provider par défaut si aucune donnée
+   */
+  const createDefaultProvider = (providerId: string): Provider => {
+    return {
+      id: providerId,
+      fullName: 'Expert Consultant',
+      name: 'Expert Consultant',
+      firstName: '',
+      lastName: '',
+      role: 'expat',
+      type: 'expat',
+      country: 'France',
+      currentCountry: 'France',
+      avatar: '/default-avatar.png',
+      profilePhoto: '/default-avatar.png',
+      email: '',
+      phone: '',
+      phoneNumber: '',
+      whatsapp: '',
+      whatsAppNumber: '',
+      languagesSpoken: ['fr'],
+      languages: ['fr'],
+      preferredLanguage: 'fr',
+      price: 19,
+      duration: 30,
+      rating: 5.0,
+      reviewCount: 0,
+      specialties: [],
+      isActive: true,
+      isApproved: true
+    };
+  };
+
+  const handleGoBack = (): void => {
+    // Essayer de retourner à la page précédente
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // 🔧 FIX: Navigation cohérente avec les autres fichiers
+      navigate('/');
+    }
+  };
+
+  // Loading state
+  if (state.isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center max-w-lg mx-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Chargement</h2>
+          <p className="text-gray-600">
+            Préparation de votre consultation...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (state.error || !state.provider || !state.serviceData) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center max-w-lg mx-4">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Données manquantes</h2>
+          <p className="text-gray-600 mb-6">
+            {state.error || 'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.'}
+          </p>
+          
+          {/* Debug info en développement */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-6 p-4 bg-gray-100 rounded-lg text-left">
+              <h3 className="font-semibold text-gray-800 mb-2">Debug Info:</h3>
+              <div className="text-xs text-gray-600 space-y-1">
+                <div>Provider ID: {providerId || 'Non fourni'}</div>
+                <div>Provider Data: {state.provider ? '✅ Trouvé' : '❌ Manquant'}</div>
+                <div>Service Data: {state.serviceData ? '✅ Trouvé' : '❌ Manquant'}</div>
+                <div>Location State: {location.state ? '✅ Présent' : '❌ Vide'}</div>
+                <div>SessionStorage Provider: {sessionStorage.getItem('selectedProvider') ? '✅ Présent' : '❌ Vide'}</div>
+                <div>SessionStorage Service: {sessionStorage.getItem('serviceData') ? '✅ Présent' : '❌ Vide'}</div>
+                <div>SessionStorage Booking: {sessionStorage.getItem('bookingRequest') ? '✅ Présent' : '❌ Vide'}</div>
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
+            >
+              Retour à l'accueil
+            </button>
+            <button
+              onClick={handleGoBack}
+              className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
+            >
+              Retour
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Success - render CallCheckout with data
+  return (
+    <CallCheckout
+      selectedProvider={state.provider}
+      serviceData={state.serviceData}
+      onGoBack={handleGoBack}
+    />
+  );
+};
+
+export default CallCheckoutWrapper;

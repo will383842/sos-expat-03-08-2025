@@ -287,143 +287,32 @@ const SOSCall: React.FC = () => {
     }
   };
 
-  // 🔧 CORRECTION PRINCIPALE : Fonction handleProviderClick corrigée
+  // ✅ CORRECTION PRINCIPALE : Navigation vers le profil au lieu du paiement
   const handleProviderClick = (provider: Provider) => {
-    // ✅ Structurer les données selon les noms attendus par CallCheckoutWrapper
-    const selectedProvider = {
-      id: provider.id,
-      name: provider.name,
-      firstName: provider.firstName || provider.name.split(' ')[0],
-      lastName: provider.lastName || provider.name.split(' ')[1],
-      type: provider.type,
-      country: provider.country,
-      languages: provider.languages,
-      specialties: provider.specialties,
-      rating: provider.rating,
-      reviewCount: provider.reviewCount,
-      yearsOfExperience: provider.yearsOfExperience,
-      isOnline: provider.isOnline,
-      avatar: provider.avatar,
-      description: provider.description,
-      price: provider.price,
-      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
-      responseTime: '< 5 minutes',
-      successRate: 95
-    };
-
-    // ✅ Créer les données de service selon le format attendu
-    const serviceData = {
-      type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-      title: `Consultation ${provider.type === 'lawyer' ? 'juridique' : 'expatriation'}`,
-      description: `Consultation d'urgence avec ${provider.name}`,
-      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
-      price: provider.price,
-      currency: 'EUR',
-      isUrgent: true,
-      urgencyLevel: 'high' as const,
-      languages: provider.languages,
-      country: provider.country,
-      providerId: provider.id,
-      providerName: provider.name,
-      sessionType: 'immediate',
-      category: provider.type === 'lawyer' ? 'legal' : 'expat'
-    };
+    console.log('🔗 Navigation vers le profil de:', provider.name);
     
-    // ✅ Sauvegarder pour compatibilité avec d'autres composants
-    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
-    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
-    
-    // ✅ Navigation avec les BONS noms de propriétés
-    const slug = provider.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
-    const mainLanguage = provider.languages[0].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
+    // Générer URL SEO standardisée
+    const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
     const countrySlug = provider.country.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
-    const role = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
+    const nameSlug = provider.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
     
-    const seoUrl = `/${role}/${countrySlug}/${mainLanguage}/${slug}-${provider.id}`;
+    const seoUrl = `/${typeSlug}/${countrySlug}/francais/${nameSlug}-${provider.id}`;
     
-    // Si c'est un appel d'urgence et que le provider est en ligne, aller directement au paiement
-    if (provider.isOnline && window.location.pathname.includes('sos-appel')) {
-      navigate('/paiement', { 
-        state: { 
-          selectedProvider,  // ✅ BON nom de propriété
-          serviceData        // ✅ BON nom de propriété
-        },
-        replace: false
-      });
-    } else {
-      // Sinon aller sur le profil détaillé
-      navigate(seoUrl, { 
-        state: { 
-          providerId: provider.id,
-          selectedProvider,  // ✅ Cohérent aussi ici
-          serviceData        // ✅ Cohérent aussi ici
-        } 
-      });
+    console.log('🔗 URL générée:', seoUrl);
+    
+    // Sauvegarder les données du provider
+    try {
+      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+    } catch (error) {
+      console.warn('⚠️ Erreur sessionStorage:', error);
     }
     
-    window.scrollTo(0, 0);
-  };
-
-  // 🔧 CORRECTION : Fonction handleDirectCall pour les boutons "Contacter maintenant"
-  const handleDirectCall = (provider: Provider, event: React.MouseEvent) => {
-    event.stopPropagation();
-    
-    if (!provider.isOnline) {
-      // Si offline, aller vers le profil
-      handleProviderClick(provider);
-      return;
-    }
-
-    // ✅ Même logique que handleProviderClick mais navigation directe vers paiement
-    const selectedProvider = {
-      id: provider.id,
-      name: provider.name,
-      firstName: provider.firstName || provider.name.split(' ')[0],
-      lastName: provider.lastName || provider.name.split(' ')[1],
-      type: provider.type,
-      country: provider.country,
-      languages: provider.languages,
-      specialties: provider.specialties,
-      rating: provider.rating,
-      reviewCount: provider.reviewCount,
-      yearsOfExperience: provider.yearsOfExperience,
-      isOnline: provider.isOnline,
-      avatar: provider.avatar,
-      description: provider.description,
-      price: provider.price,
-      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
-      responseTime: '< 5 minutes',
-      successRate: 95
-    };
-
-    const serviceData = {
-      type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-      title: `Consultation ${provider.type === 'lawyer' ? 'juridique' : 'expatriation'} - URGENCE`,
-      description: `Appel d'urgence immédiat avec ${provider.name}`,
-      duration: provider.duration || (provider.type === 'lawyer' ? 20 : 30),
-      price: provider.price,
-      currency: 'EUR',
-      isUrgent: true,
-      urgencyLevel: 'urgent' as const,
-      languages: provider.languages,
-      country: provider.country,
-      providerId: provider.id,
-      providerName: provider.name,
-      sessionType: 'immediate',
-      category: provider.type === 'lawyer' ? 'legal' : 'expat'
-    };
-
-    // ✅ Sauvegarder et naviguer avec les BONS noms
-    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
-    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
-    
-    navigate('/paiement', { 
+    // ✅ TOUJOURS naviguer vers le profil (suppression de la logique agressive)
+    navigate(seoUrl, { 
       state: { 
-        selectedProvider,  // ✅ BON nom de propriété
-        serviceData,       // ✅ BON nom de propriété
-        fromUrgentCall: true
-      },
-      replace: false
+        selectedProvider: provider,
+        navigationSource: 'sos_call'
+      }
     });
   };
 
@@ -784,26 +673,18 @@ const SOSCall: React.FC = () => {
 
                             <div className="mt-auto pt-4">
                               <button
-                                onClick={(e) => handleDirectCall(provider, e)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProviderClick(provider);
+                                }}
                                 className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl ${
-                                  provider.isOnline
-                                    ? provider.type === 'lawyer' 
-                                      ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50' 
-                                      : 'bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:to-purple-900 shadow-purple-500/30 hover:shadow-purple-500/50'
-                                    : 'bg-gradient-to-r from-gray-500 via-gray-600 to-gray-700 hover:from-gray-600 hover:to-gray-800 shadow-gray-500/30'
+                                  provider.type === 'lawyer' 
+                                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50' 
+                                    : 'bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:to-purple-900 shadow-purple-500/30 hover:shadow-purple-500/50'
                                 } hover:shadow-2xl`}
                               >
-                                {provider.isOnline ? (
-                                  <>
-                                    <Phone className="w-5 h-5" />
-                                    <span>Contacter maintenant</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="text-xl">👤</span>
-                                    <span>Voir le profil</span>
-                                  </>
-                                )}
+                                <span className="text-xl">👤</span>
+                                <span>Voir le profil</span>
                               </button>
                             </div>
                           </div>
@@ -957,26 +838,18 @@ const SOSCall: React.FC = () => {
 
                           <div className="mt-auto pt-4">
                             <button
-                              onClick={(e) => handleDirectCall(provider, e)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleProviderClick(provider);
+                              }}
                               className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl ${
-                                provider.isOnline
-                                  ? provider.type === 'lawyer' 
-                                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50' 
-                                    : 'bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:to-purple-900 shadow-purple-500/30 hover:shadow-purple-500/50'
-                                  : 'bg-gradient-to-r from-gray-500 via-gray-600 to-gray-700 hover:from-gray-600 hover:to-gray-800 shadow-gray-500/30'
+                                provider.type === 'lawyer' 
+                                  ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50' 
+                                  : 'bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:to-purple-900 shadow-purple-500/30 hover:shadow-purple-500/50'
                               } hover:shadow-2xl`}
                             >
-                              {provider.isOnline ? (
-                                <>
-                                  <Phone className="w-5 h-5" />
-                                  <span>Contacter maintenant</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-xl">👤</span>
-                                  <span>Voir le profil</span>
-                                </>
-                              )}
+                              <span className="text-xl">👤</span>
+                              <span>Voir le profil</span>
                             </button>
                           </div>
                         </div>

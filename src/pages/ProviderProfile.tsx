@@ -500,53 +500,23 @@ const ProviderProfile: React.FC = () => {
     updateSEOMetadata();
   }, [updateSEOMetadata]);
 
-  // 🔧 CORRECTION PRINCIPALE : Fonction handleBookCall avec les bons noms de propriétés
+  // 🔧 CORRECTION PRINCIPALE : Fonction handleBookCall avec navigation vers BookingRequest
   const handleBookCall = useCallback(() => {
     if (!provider) return;
 
-    const currentOnlineStatus = onlineStatus.isOnline;
+    console.log('🔗 Navigation vers BookingRequest pour:', provider.fullName);
+    
+    // Analytics tracking
+    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('event', 'book_call_click', {
+        provider_id: provider.uid,
+        provider_type: provider.type,
+        provider_country: provider.country,
+        is_online: onlineStatus.isOnline,
+      });
+    }
 
-    // ✅ Structurer les données selon les noms attendus par CallCheckoutWrapper
-    const selectedProvider = {
-      id: provider.uid,
-      name: provider.fullName,
-      firstName: provider.firstName,
-      lastName: provider.lastName,
-      type: provider.type,
-      country: provider.country,
-      languages: provider.languages,
-      specialties: provider.specialties,
-      rating: provider.rating,
-      reviewCount: provider.reviewCount,
-      yearsOfExperience: provider.yearsOfExperience,
-      isOnline: currentOnlineStatus,
-      avatar: provider.profilePhoto,
-      description: provider.description,
-      price: provider.price,
-      duration: provider.duration,
-      responseTime: provider.responseTime,
-      successRate: provider.successRate
-    };
-
-    // ✅ Créer les données de service selon le format attendu
-    const serviceData = {
-      type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-      title: `Consultation ${provider.type === 'lawyer' ? 'juridique' : 'expatriation'}`,
-      description: `Consultation avec ${provider.fullName}`,
-      duration: provider.duration,
-      price: provider.price,
-      currency: 'EUR',
-      isUrgent: false,
-      urgencyLevel: 'normal' as const,
-      languages: provider.languages,
-      country: provider.country,
-      providerId: provider.uid,
-      providerName: provider.fullName,
-      sessionType: 'scheduled',
-      category: provider.type === 'lawyer' ? 'legal' : 'expat'
-    };
-
-    // ✅ Logger l'événement analytics
+    // Logger l'événement
     if (user) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
@@ -555,31 +525,33 @@ const ProviderProfile: React.FC = () => {
           providerId: provider.uid,
           providerType: provider.type,
           providerName: provider.fullName,
-          providerOnlineStatus: currentOnlineStatus
+          providerOnlineStatus: onlineStatus.isOnline
         }
       });
     }
     
-    // ✅ Sauvegarder pour compatibilité avec d'autres composants
-    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
-    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+    // ✅ Sauvegarder le provider pour BookingRequest
+    try {
+      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+    } catch (error) {
+      console.warn('⚠️ Erreur sessionStorage:', error);
+    }
     
     if (user) {
-      // ✅ Si connecté, aller vers le checkout avec les BONS noms de propriétés
-      navigate('/paiement', {
+      // ✅ CORRECTION : Navigation vers BookingRequest au lieu du paiement
+      navigate(`/booking-request/${provider.uid}`, {
         state: {
-          selectedProvider,  // ✅ BON nom de propriété
-          serviceData        // ✅ BON nom de propriété
-        },
-        replace: false
+          selectedProvider: provider,
+          navigationSource: 'provider_profile'
+        }
       });
     } else {
-      // ✅ Si non connecté, redirection vers login puis checkout
-      const redirectUrl = `/paiement`;
+      // Si non connecté, redirection vers login puis BookingRequest
+      const redirectUrl = `/booking-request/${provider.uid}`;
       navigate(`/login?redirect=${encodeURIComponent(redirectUrl)}`, {
         state: {
-          selectedProvider,  // ✅ Passer les données pour après login
-          serviceData        // ✅ Passer les données pour après login
+          selectedProvider: provider,
+          navigationSource: 'provider_profile'
         }
       });
     }
@@ -736,32 +708,7 @@ const ProviderProfile: React.FC = () => {
         />
       )}
       
-      {/* ✅ PANNEAU DE DEBUG - Visible en développement */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-20 right-4 bg-black/90 text-white p-4 rounded-lg text-xs max-w-sm z-50">
-          <h3 className="font-bold mb-2">🔄 Debug Real-time Status</h3>
-          <div className="space-y-1">
-            <div>Provider ID: <span className="text-green-400">{realProviderId || 'N/A'}</span></div>
-            <div>Current isOnline: <span className={onlineStatus.isOnline ? 'text-green-400' : 'text-red-400'}>{String(onlineStatus.isOnline)}</span></div>
-            <div>Listener Active: <span className={onlineStatus.listenerActive ? 'text-green-400' : 'text-red-400'}>{String(onlineStatus.listenerActive)}</span></div>
-            <div>Last Update: <span className="text-blue-400">{onlineStatus.lastUpdate?.toLocaleTimeString() || 'N/A'}</span></div>
-            <div>Connection Attempts: <span className="text-yellow-400">{onlineStatus.connectionAttempts}</span></div>
-          </div>
-          {debugHistory.length > 0 && (
-            <div className="mt-3 pt-2 border-t border-gray-600">
-              <h4 className="font-bold mb-1">Recent Changes:</h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {debugHistory.slice(-5).map((change, i) => (
-                  <div key={i} className="text-xs">
-                    <div className="text-gray-400">{new Date(change.timestamp).toLocaleTimeString()}</div>
-                    <div>{change.field}: <span className="text-red-400">{String(change.oldValue)}</span> → <span className="text-green-400">{String(change.newValue)}</span></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+
 
       {/* SVG pattern for half stars */}
       <svg width="0" height="0" className="hidden">
@@ -959,21 +906,12 @@ const ProviderProfile: React.FC = () => {
                       <span className="text-gray-600">Appels réalisés</span>
                       <span className="font-medium">{provider.totalCalls || 0}</span>
                     </div>
-                    {/* ✅ Debug info en développement */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Listener</span>
-                        <span className={onlineStatus.listenerActive ? 'text-green-600' : 'text-red-600'}>
-                          {onlineStatus.listenerActive ? '✓ Actif' : '✗ Inactif'}
-                        </span>
-                      </div>
-                    )}
+                    {/* ✅ Debug info en développement - SUPPRIMÉ */}
                   </div>
                   
-                  {/* ✅ Bouton d'appel avec statut temps réel ultra-réactif */}
+                  {/* ✅ CORRECTION : Bouton qui va vers BookingRequest avec couleurs conditionnelles */}
                   <button
                     onClick={handleBookCall}
-                    disabled={!onlineStatus.isOnline}
                     className={`w-full py-4 px-4 rounded-lg font-bold text-lg transition-all duration-500 flex items-center justify-center space-x-3 ${
                       onlineStatus.isOnline
                         ? 'bg-green-600 text-white hover:bg-green-700 transform hover:scale-105 shadow-lg hover:shadow-xl border-2 border-green-500'
@@ -1003,11 +941,6 @@ const ProviderProfile: React.FC = () => {
                     ) : (
                       <div className="text-red-600">
                         ❌ Expert actuellement hors ligne
-                        {onlineStatus.lastUpdate && (
-                          <div className="text-gray-500 text-xs mt-1">
-                            Dernier statut : {onlineStatus.lastUpdate.toLocaleTimeString()}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>

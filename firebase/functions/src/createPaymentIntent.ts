@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Star, MapPin, Phone, ChevronLeft, ChevronRight, Globe, Search, ArrowDown, ArrowUp, Filter, X } from 'lucide-react';
+import { Star, MapPin, Phone, ChevronLeft, ChevronRight, Globe, Search, ArrowDown, ArrowUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, onSnapshot, limit, where, orderBy } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -120,9 +120,6 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
   // Navigation states
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  
-  // Mobile filter toggle
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   // Debounced search for performance
   const debouncedSearchTerm = useDebounce(searchTerm, DEBOUNCE_DELAY);
@@ -530,7 +527,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         result.push(
           <Star 
             key={i} 
-            size={14} 
+            size={16} 
             aria-hidden="true"
             fill="currentColor"
             className="text-yellow-400"
@@ -542,7 +539,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         result.push(
           <Star 
             key="half" 
-            size={14} 
+            size={16} 
             aria-hidden="true"
             fill="currentColor"
             className="text-yellow-400 opacity-50"
@@ -555,7 +552,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         result.push(
           <Star 
             key={`empty-${i}`} 
-            size={14} 
+            size={16} 
             aria-hidden="true"
             className="text-gray-300"
           />
@@ -572,8 +569,8 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         className="flex items-center gap-1"
       >
         {stars}
-        <span className="text-xs text-gray-600 ml-1">
-          {rating.toFixed(1)} ({reviewCount})
+        <span className="sr-only">
+          {rating.toFixed(1)} étoiles sur 5, {reviewCount} avis
         </span>
       </div>
     );
@@ -589,7 +586,6 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
     setSortOrder('desc');
     setCurrentPage(1);
     setCurrentIndex(0);
-    setShowMobileFilters(false);
   }, []);
 
   // Display providers with pagination
@@ -601,7 +597,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
     return filteredProviders;
   }, [mode, filteredProviders, currentPage, itemsPerPage]);
 
-  // ✨ UX PARFAIT - AI and SEO optimized provider card avec design mobile-first
+  // AI and SEO optimized provider card
   const ProviderCard = React.memo(({ 
     provider, 
     isCarousel = false 
@@ -649,14 +645,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         role="button"
         tabIndex={0}
         aria-label={`Contacter ${provider.name}, ${provider.type === 'lawyer' ? 'avocat' : 'expert expatriation'} en ${provider.country}`}
-        className={`
-          group relative bg-white rounded-2xl shadow-sm hover:shadow-xl 
-          border border-gray-100 hover:border-gray-200 
-          transition-all duration-300 ease-out hover:scale-[1.02] cursor-pointer
-          overflow-hidden flex flex-col
-          ${isCarousel ? 'min-h-[440px] max-h-[440px]' : 'min-h-[520px] max-h-[520px]'}
-          w-full
-        `}
+        className="provider-card"
         data-provider-id={provider.id}
         data-provider-type={provider.type}
         data-provider-country={provider.country}
@@ -668,544 +657,280 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(cardSchema) }}
         />
         
-        {/* ✨ Header Section avec indicateur de statut ultra-visible */}
-        <div className="relative p-4 pb-2">
-          {/* Avatar avec statut en ligne */}
-          <div className="relative mx-auto w-20 h-20 mb-3">
-            <img
-              src={provider.avatar}
-              alt={`Photo de profil de ${provider.name}`}
-              loading={priority === 'high' ? 'eager' : 'lazy'}
-              decoding="async"
-              width={80}
-              height={80}
-              sizes={IMAGE_SIZES}
-              itemProp="image"
-              className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                if (target.src !== DEFAULT_AVATAR) {
-                  target.src = DEFAULT_AVATAR;
-                }
-              }}
-            />
-            
-            {/* ✨ Indicateur de statut ultra-visible avec animation */}
-            <div className={`
-              absolute -bottom-1 -right-1 w-7 h-7 rounded-full border-3 border-white
-              flex items-center justify-center text-white text-xs font-bold
-              transition-all duration-500 shadow-lg
-              ${provider.isOnline 
-                ? 'bg-green-500 animate-pulse' 
-                : 'bg-red-500'
+        <div className="provider-image-container">
+          <img
+            src={provider.avatar}
+            alt={`Photo de profil de ${provider.name}, ${provider.type === 'lawyer' ? 'avocat' : 'expert expatriation'} en ${provider.country}`}
+            loading={priority === 'high' ? 'eager' : 'lazy'}
+            decoding="async"
+            width={isCarousel ? 110 : 192}
+            height={isCarousel ? 110 : 192}
+            sizes={IMAGE_SIZES}
+            itemProp="image"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              if (target.src !== DEFAULT_AVATAR) {
+                target.src = DEFAULT_AVATAR;
               }
-            `}>
-              {provider.isOnline ? '●' : '●'}
-            </div>
+            }}
+          />
+          
+          <div className="status-badge" aria-label={`Statut: ${provider.isOnline ? 'en ligne' : 'hors ligne'}`}>
+            <span itemProp="availability">
+              {provider.isOnline ? 'En ligne' : 'Hors ligne'}
+            </span>
           </div>
           
-          {/* Badges de type et statut */}
-          <div className="flex justify-center gap-2 mb-3">
-            <span className={`
-              px-3 py-1 rounded-full text-xs font-semibold
-              ${provider.type === 'lawyer' 
-                ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                : 'bg-purple-100 text-purple-700 border border-purple-200'
-              }
-            `}>
+          <div className="type-badge" aria-label={`Type: ${provider.type === 'lawyer' ? 'avocat' : 'expert expatriation'}`}>
+            <span itemProp="serviceType">
               {provider.type === 'lawyer' ? 'Avocat' : 'Expert'}
             </span>
-            
-            <span className={`
-              px-3 py-1 rounded-full text-xs font-bold border-2
-              ${provider.isOnline 
-                ? 'bg-green-50 text-green-700 border-green-300' 
-                : 'bg-red-50 text-red-600 border-red-300'
-              }
-            `}>
-              {provider.isOnline ? 'EN LIGNE' : 'HORS LIGNE'}
-            </span>
-          </div>
-          
-          {/* Nom et localisation */}
-          <div className="text-center mb-3">
-            <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2" itemProp="name">
-              {provider.name}
-            </h3>
-            
-            <div className="flex items-center justify-center text-gray-600 text-sm" itemProp="areaServed">
-              <MapPin size={14} className="mr-1 flex-shrink-0" aria-hidden="true" />
-              <span className="truncate">{provider.country}</span>
-            </div>
           </div>
         </div>
         
-        {/* ✨ Content Section - flex-grow pour même hauteur */}
-        <div className="px-4 flex-grow flex flex-col">
-          {/* Rating */}
-          <div className="flex justify-center mb-3" itemProp="aggregateRating" itemScope itemType="http://schema.org/AggregateRating">
+        <div className="provider-content">
+          <h3 itemProp="name">{provider.name}</h3>
+          
+          <div className="location" itemProp="areaServed">
+            <MapPin size={16} aria-hidden="true" />
+            <span>{provider.country}</span>
+          </div>
+          
+          <div className="rating-container" itemProp="aggregateRating" itemScope itemType="http://schema.org/AggregateRating">
             <StarRating rating={provider.rating} reviewCount={provider.reviewCount} />
             <span itemProp="ratingValue" className="sr-only">{provider.rating}</span>
             <span itemProp="reviewCount" className="sr-only">{provider.reviewCount}</span>
+            <span className="rating-text">
+              {provider.rating.toFixed(1)} ({provider.reviewCount})
+            </span>
           </div>
           
-          {/* Languages */}
-          <div className="flex flex-wrap justify-center gap-1 mb-3" itemProp="availableLanguage">
-            {provider.languages.slice(0, 2).map((lang) => (
-              <span key={lang} className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-gray-700 text-xs">
-                <Globe size={10} className="mr-1" aria-hidden="true" />
+          <div className="languages" itemProp="availableLanguage">
+            {provider.languages.slice(0, isCarousel ? 2 : 3).map((lang) => (
+              <span key={lang} className="language-tag">
+                <Globe size={10} aria-hidden="true" />
                 {lang}
               </span>
             ))}
-            {provider.languages.length > 2 && (
-              <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-gray-600 text-xs">
-                +{provider.languages.length - 2}
-              </span>
-            )}
           </div>
           
-          {/* Description - flexible height */}
-          <div className="flex-grow flex items-start mb-4">
-            <p className="text-sm text-gray-600 text-center line-clamp-3 leading-relaxed" itemProp="description">
-              {provider.description}
-            </p>
-          </div>
+          <p className="description" itemProp="description">
+            {provider.description}
+          </p>
           
-          {/* Prix et expérience */}
-          <div className="flex justify-between items-center text-sm text-gray-600 mb-4">
-            <div className="text-center">
-              <div className="text-xs text-gray-500">Expérience</div>
-              <div className="font-semibold">{provider.yearsOfExperience} ans</div>
-            </div>
-            <div className="text-center" itemProp="offers" itemScope itemType="http://schema.org/Offer">
-              <div className="text-xs text-gray-500">Prix</div>
-              <div className="font-bold text-lg text-red-600" itemProp="price">
+          <div className="pricing" itemProp="offers" itemScope itemType="http://schema.org/Offer">
+            <div className="price-info">
+              <div className="price" itemProp="price">
                 {provider.price}€
                 <span itemProp="priceCurrency" className="sr-only">EUR</span>
               </div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500">Durée</div>
-              <div className="font-semibold">{provider.duration} min</div>
+              <div className="duration">{provider.duration} min</div>
             </div>
           </div>
-        </div>
-        
-        {/* ✨ Footer Section - CTA Button */}
-        <div className="p-4 pt-0">
+          
           <button
-            className={`
-              w-full py-3 px-4 rounded-xl font-bold text-sm
-              transition-all duration-300 ease-out transform hover:scale-105
-              focus:outline-none focus:ring-4 focus:ring-opacity-50
-              flex items-center justify-center space-x-2
-              ${provider.isOnline 
-                ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl focus:ring-green-500 border-2 border-green-500' 
-                : 'bg-gray-600 hover:bg-gray-700 text-white shadow-md hover:shadow-lg focus:ring-gray-500 border-2 border-gray-500'
-              }
-            `}
+            className="cta-button"
             onClick={(e) => {
               e.stopPropagation();
               handleViewProfile(provider);
             }}
-            aria-label={`Voir le profil de ${provider.name}`}
+            aria-label={provider.isOnline 
+              ? `Voir le profil de ${provider.name}` 
+              : `Voir le profil de ${provider.name}`
+            }
           >
-            <Phone size={16} aria-hidden="true" />
-            <span>Voir le profil</span>
-            {provider.isOnline && (
-              <div className="flex space-x-1">
-                <div className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></div>
-                <div className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse delay-75"></div>
-                <div className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse delay-150"></div>
-              </div>
-            )}
+            <Phone size={18} aria-hidden="true" />
+            Voir le profil
           </button>
         </div>
       </article>
     );
   });
 
-  // ✨ Performance-optimized loading skeleton avec dimensions fixes
+  // Performance-optimized loading skeleton
   const LoadingSkeleton = React.memo(({ count = 6 }: { count?: number }) => (
     <>
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className={`
-          bg-white rounded-2xl shadow-sm border border-gray-100
-          overflow-hidden animate-pulse
-          ${mode === 'carousel' ? 'min-h-[440px] max-h-[440px]' : 'min-h-[520px] max-h-[520px]'}
-          w-full
-        `} aria-hidden="true">
-          <div className="p-4">
-            {/* Avatar skeleton */}
-            <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-3"></div>
-            
-            {/* Badges skeleton */}
-            <div className="flex justify-center gap-2 mb-3">
-              <div className="w-16 h-6 bg-gray-200 rounded-full"></div>
-              <div className="w-20 h-6 bg-gray-200 rounded-full"></div>
-            </div>
-            
-            {/* Name and location skeleton */}
-            <div className="text-center mb-3">
-              <div className="w-32 h-5 bg-gray-200 rounded mx-auto mb-2"></div>
-              <div className="w-24 h-4 bg-gray-200 rounded mx-auto"></div>
-            </div>
-            
-            {/* Rating skeleton */}
-            <div className="w-20 h-4 bg-gray-200 rounded mx-auto mb-3"></div>
-            
-            {/* Languages skeleton */}
-            <div className="flex justify-center gap-1 mb-3">
-              <div className="w-16 h-6 bg-gray-200 rounded"></div>
-              <div className="w-14 h-6 bg-gray-200 rounded"></div>
-            </div>
-            
-            {/* Description skeleton */}
-            <div className="space-y-2 mb-4">
-              <div className="w-full h-3 bg-gray-200 rounded"></div>
-              <div className="w-4/5 h-3 bg-gray-200 rounded mx-auto"></div>
-              <div className="w-3/4 h-3 bg-gray-200 rounded mx-auto"></div>
-            </div>
-            
-            {/* Stats skeleton */}
-            <div className="flex justify-between mb-4">
-              <div className="text-center">
-                <div className="w-12 h-3 bg-gray-200 rounded mb-1"></div>
-                <div className="w-8 h-4 bg-gray-200 rounded"></div>
-              </div>
-              <div className="text-center">
-                <div className="w-8 h-3 bg-gray-200 rounded mb-1"></div>
-                <div className="w-12 h-5 bg-gray-200 rounded"></div>
-              </div>
-              <div className="text-center">
-                <div className="w-10 h-3 bg-gray-200 rounded mb-1"></div>
-                <div className="w-12 h-4 bg-gray-200 rounded"></div>
-              </div>
-            </div>
-            
-            {/* Button skeleton */}
-            <div className="w-full h-12 bg-gray-200 rounded-xl"></div>
+        <div key={index} className="skeleton-card" aria-hidden="true">
+          <div className="skeleton-image"></div>
+          <div className="skeleton-content">
+            <div className="skeleton-title"></div>
+            <div className="skeleton-location"></div>
+            <div className="skeleton-rating"></div>
+            <div className="skeleton-description"></div>
+            <div className="skeleton-button"></div>
           </div>
         </div>
       ))}
     </>
   ));
 
-  // ✨ Mobile Filter Component
-  const MobileFilters = React.memo(() => (
-    <div className={`
-      fixed inset-0 z-50 bg-black bg-opacity-50 transition-opacity duration-300
-      ${showMobileFilters ? 'opacity-100' : 'opacity-0 pointer-events-none'}
-    `} onClick={() => setShowMobileFilters(false)}>
-      <div className={`
-        fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto
-        transform transition-transform duration-300 ease-out
-        ${showMobileFilters ? 'translate-y-0' : 'translate-y-full'}
-      `} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900">Filtres</h3>
-          <button
-            onClick={() => setShowMobileFilters(false)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div>
-        
-        {/* Filter Content */}
-        <div className="space-y-6">
-          {/* Type Filter */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Type d'expert</h4>
-            <div className="grid grid-cols-3 gap-2">
-              {['all', 'lawyer', 'expat'].map((filterType) => (
-                <button
-                  key={filterType}
-                  onClick={() => setActiveFilter(filterType as 'all' | 'lawyer' | 'expat')}
-                  className={`
-                    py-2 px-3 rounded-lg text-sm font-medium transition-all
-                    ${activeFilter === filterType
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }
-                  `}
-                >
-                  {filterType === 'all' ? 'Tous' : filterType === 'lawyer' ? 'Avocats' : 'Experts'}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Search */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Recherche</h4>
-            <div className="relative">
-              <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="search"
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              />
-            </div>
-          </div>
-          
-          {/* Country Filter */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Pays</h4>
-            <select
-              value={selectedCountry}
-              onChange={(e) => setSelectedCountry(e.target.value)}
-              className="w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            >
-              <option value="all">Tous les pays</option>
-              {availableCountries.map(country => (
-                <option key={country} value={country}>{country}</option>
-              ))}
-            </select>
-          </div>
-          
-          {/* Language Filter */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Langues</h4>
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            >
-              <option value="all">Toutes les langues</option>
-              {availableLanguages.map(lang => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
-          </div>
-          
-          {/* Online Only */}
-          <div>
-            <label className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                checked={onlineOnly}
-                onChange={(e) => setOnlineOnly(e.target.checked)}
-                className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
-              />
-              <span className="font-medium text-gray-900">En ligne uniquement</span>
-            </label>
-          </div>
-          
-          {/* Sort */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Trier par</h4>
-            <div className="flex space-x-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'rating' | 'price' | 'experience')}
-                className="flex-1 py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              >
-                <option value="rating">Note</option>
-                <option value="price">Prix</option>
-                <option value="experience">Expérience</option>
-              </select>
-              <button
-                onClick={toggleSortOrder}
-                className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                {sortOrder === 'asc' ? <ArrowUp size={20} /> : <ArrowDown size={20} />}
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        {/* Actions */}
-        <div className="flex space-x-3 mt-8">
-          <button
-            onClick={resetFilters}
-            className="flex-1 py-3 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-          >
-            Réinitialiser
-          </button>
-          <button
-            onClick={() => setShowMobileFilters(false)}
-            className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-          >
-            Appliquer
-          </button>
-        </div>
-      </div>
-    </div>
-  ));
-
-  // Main render - Grid mode with perfect mobile-first UX
+  // Main render - Grid mode with full 2025 optimization
   if (mode === 'grid') {
     return (
       <Suspense fallback={<LoadingSkeleton />}>
         <section 
-          className={`${className} w-full`}
+          className={className}
           aria-label={ariaLabel || 'Liste des prestataires disponibles'}
           data-testid={testId || 'providers-grid'}
           role="main"
         >
           {showFilters && (
-            <>
-              {/* ✨ Desktop Filters */}
-              <div className="hidden lg:block mb-8">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  {/* Primary filters */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <div className="flex flex-wrap gap-2">
-                      {['all', 'lawyer', 'expat'].map((filterType) => (
-                        <button
-                          key={filterType}
-                          onClick={() => setActiveFilter(filterType as 'all' | 'lawyer' | 'expat')}
-                          className={`
-                            py-2 px-4 rounded-lg text-sm font-medium transition-all
-                            ${activeFilter === filterType
-                              ? 'bg-red-600 text-white shadow-md'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }
-                          `}
-                        >
-                          {filterType === 'all' ? 'Tous' : filterType === 'lawyer' ? 'Avocats' : 'Experts'}
-                        </button>
-                      ))}
-                    </div>
-                    
-                    <button
-                      onClick={resetFilters}
-                      className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                    >
-                      Réinitialiser
-                    </button>
-                  </div>
-                  
-                  {/* Advanced filters */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    {/* Search */}
-                    <div className="lg:col-span-2">
-                      <div className="relative">
-                        <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="search"
-                          placeholder="Rechercher un prestataire..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Country */}
-                    <select
-                      value={selectedCountry}
-                      onChange={(e) => setSelectedCountry(e.target.value)}
-                      className="py-2 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
-                    >
-                      <option value="all">Tous les pays</option>
-                      {availableCountries.map(country => (
-                        <option key={country} value={country}>{country}</option>
-                      ))}
-                    </select>
-                    
-                    {/* Language */}
-                    <select
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="py-2 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
-                    >
-                      <option value="all">Toutes les langues</option>
-                      {availableLanguages.map(lang => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
-                    
-                    {/* Sort and Online */}
-                    <div className="flex space-x-2">
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as 'rating' | 'price' | 'experience')}
-                        className="flex-1 py-2 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
-                      >
-                        <option value="rating">Note</option>
-                        <option value="price">Prix</option>
-                        <option value="experience">Expérience</option>
-                      </select>
-                      <button
-                        onClick={toggleSortOrder}
-                        className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        {sortOrder === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Online filter */}
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={onlineOnly}
-                        onChange={(e) => setOnlineOnly(e.target.checked)}
-                        className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                      />
-                      <span className="text-sm text-gray-700">Afficher uniquement les experts en ligne</span>
-                    </label>
-                    
-                    {/* Results count */}
-                    <div className="text-sm text-gray-600">
-                      {filteredProviders.length} expert{filteredProviders.length > 1 ? 's' : ''} trouvé{filteredProviders.length > 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* ✨ Mobile Filter Button */}
-              <div className="lg:hidden mb-6">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    {filteredProviders.length} expert{filteredProviders.length > 1 ? 's' : ''}
-                  </div>
+            <div 
+              className="filters-container" 
+              role="search" 
+              aria-label="Filtrer les prestataires"
+            >
+              {/* Primary filters with enhanced accessibility */}
+              <div className="primary-filters">
+                <div 
+                  role="tablist" 
+                  aria-label="Types de prestataires"
+                  className="filter-tabs"
+                >
                   <button
-                    onClick={() => setShowMobileFilters(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    role="tab"
+                    aria-selected={activeFilter === 'all'}
+                    aria-controls="providers-list"
+                    onClick={() => setActiveFilter('all')}
+                    className={`filter-tab ${activeFilter === 'all' ? 'active' : ''}`}
                   >
-                    <Filter size={16} />
-                    <span>Filtres</span>
+                    Tous
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={activeFilter === 'lawyer'}
+                    aria-controls="providers-list"
+                    onClick={() => setActiveFilter('lawyer')}
+                    className={`filter-tab ${activeFilter === 'lawyer' ? 'active' : ''}`}
+                  >
+                    Avocats
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={activeFilter === 'expat'}
+                    aria-controls="providers-list"
+                    onClick={() => setActiveFilter('expat')}
+                    className={`filter-tab ${activeFilter === 'expat' ? 'active' : ''}`}
+                  >
+                    Experts
                   </button>
                 </div>
               </div>
-              
-              {/* Mobile Filters Modal */}
-              <MobileFilters />
-            </>
-          )}
 
-          {/* Error State */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-8">
-              <div className="flex items-center justify-center space-x-3">
-                <div className="text-red-600">
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
+              {/* Advanced filters with mobile-first design */}
+              <div className="advanced-filters" role="toolbar" aria-label="Filtres avancés">
+                <div className="search-container">
+                  <Search size={20} aria-hidden="true" className="search-icon" />
+                  <input
+                    type="search"
+                    placeholder="Rechercher un prestataire, pays, spécialité..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Rechercher des prestataires"
+                    className="search-input"
+                    autoComplete="off"
+                    spellCheck="false"
+                  />
                 </div>
-                <div>
-                  <p className="text-red-800 font-medium">{error}</p>
-                  <button 
-                    onClick={loadProviders}
-                    className="text-red-600 hover:text-red-800 text-sm font-medium underline mt-1"
+
+                <select
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                  aria-label="Filtrer par pays"
+                  className="country-select"
+                >
+                  <option value="all">Tous les pays</option>
+                  {availableCountries.map(country => (
+                    <option key={country} value={country}>{country}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  aria-label="Filtrer par langue"
+                  className="language-select"
+                >
+                  <option value="all">Toutes les langues</option>
+                  {availableLanguages.map(lang => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+
+                <label className="checkbox-container">
+                  <input
+                    type="checkbox"
+                    checked={onlineOnly}
+                    onChange={(e) => setOnlineOnly(e.target.checked)}
+                    className="online-checkbox"
+                  />
+                  <span className="checkbox-label">En ligne uniquement</span>
+                </label>
+
+                <div className="sort-container">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'rating' | 'price' | 'experience')}
+                    aria-label="Trier par"
+                    className="sort-select"
                   >
-                    Réessayer
+                    <option value="rating">Note</option>
+                    <option value="price">Prix</option>
+                    <option value="experience">Expérience</option>
+                  </select>
+                  <button
+                    onClick={toggleSortOrder}
+                    aria-label={`Ordre de tri: ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`}
+                    className="sort-order-btn"
+                  >
+                    {sortOrder === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
                   </button>
                 </div>
+
+                <button
+                  onClick={resetFilters}
+                  className="reset-filters-btn"
+                  aria-label="Réinitialiser tous les filtres"
+                >
+                  Réinitialiser
+                </button>
               </div>
             </div>
           )}
 
-          {/* ✨ Providers Grid - Mobile First avec dimensions fixes */}
+          {error && (
+            <div 
+              role="alert" 
+              aria-live="polite"
+              className="error-container"
+            >
+              <p className="error-message">{error}</p>
+              <button 
+                onClick={loadProviders}
+                className="retry-button"
+                aria-label="Réessayer le chargement"
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
+
+          {/* Results summary for AI and screen readers */}
+          <div className="results-summary" aria-live="polite">
+            {!isLoading && (
+              <p className="sr-only">
+                {filteredProviders.length} prestataire{filteredProviders.length > 1 ? 's' : ''} trouvé{filteredProviders.length > 1 ? 's' : ''}
+                {activeFilter !== 'all' && ` de type ${activeFilter === 'lawyer' ? 'avocat' : 'expert'}`}
+                {selectedCountry !== 'all' && ` en ${selectedCountry}`}
+                {onlineOnly && ' en ligne'}
+              </p>
+            )}
+          </div>
+
           <div 
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            id="providers-list"
+            className="providers-grid"
             role="tabpanel"
             aria-labelledby="filter-tabs"
           >
@@ -1219,18 +944,15 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 />
               ))
             ) : (
-              <div className="col-span-full flex items-center justify-center py-16">
-                <div className="text-center max-w-md">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Search size={32} className="text-gray-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun expert trouvé</h3>
-                  <p className="text-gray-600 mb-6">
-                    Aucun expert ne correspond à vos critères de recherche.
+              <div className="no-results" role="status">
+                <div className="no-results-content">
+                  <h3>Aucun prestataire trouvé</h3>
+                  <p>
+                    Aucun prestataire ne correspond à vos critères de recherche.
                   </p>
                   <button 
                     onClick={resetFilters}
-                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                    className="reset-button"
                   >
                     Réinitialiser les filtres
                   </button>
@@ -1239,24 +961,35 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
             )}
           </div>
 
-          {/* ✨ Enhanced Pagination */}
+          {/* Enhanced pagination with mobile optimization */}
           {totalPages > 1 && (
-            <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-gray-600">
-                Affichage {((currentPage - 1) * itemsPerPage) + 1} à {Math.min(currentPage * itemsPerPage, filteredProviders.length)} sur {filteredProviders.length} experts
+            <nav 
+              aria-label="Navigation des pages de prestataires" 
+              role="navigation"
+              className="pagination-container"
+            >
+              <div className="pagination-info">
+                <span className="sr-only">
+                  Page {currentPage} sur {totalPages}
+                </span>
+                <span aria-live="polite" className="pagination-summary">
+                  Affichage {((currentPage - 1) * itemsPerPage) + 1} à {Math.min(currentPage * itemsPerPage, filteredProviders.length)} sur {filteredProviders.length} prestataires
+                </span>
               </div>
               
-              <nav className="flex items-center space-x-2">
+              <div className="pagination-buttons">
                 <button
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Page précédente"
+                  className="pagination-btn prev-btn"
                 >
-                  <ChevronLeft size={16} />
-                  <span className="hidden sm:inline">Précédent</span>
+                  <ChevronLeft size={16} aria-hidden="true" />
+                  <span className="btn-text">Précédent</span>
                 </button>
                 
-                <div className="flex space-x-1">
+                {/* Smart pagination for mobile */}
+                <div className="page-numbers">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let page;
                     if (totalPages <= 5) {
@@ -1273,11 +1006,9 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          currentPage === page
-                            ? 'bg-red-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-50 border border-gray-300'
-                        }`}
+                        aria-current={currentPage === page ? 'page' : undefined}
+                        aria-label={`Page ${page}`}
+                        className={`page-btn ${currentPage === page ? 'active' : ''}`}
                       >
                         {page}
                       </button>
@@ -1288,86 +1019,207 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 <button
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Page suivante"
+                  className="pagination-btn next-btn"
                 >
-                  <span className="hidden sm:inline">Suivant</span>
-                  <ChevronRight size={16} />
+                  <span className="btn-text">Suivant</span>
+                  <ChevronRight size={16} aria-hidden="true" />
                 </button>
-              </nav>
-            </div>
+              </div>
+            </nav>
           )}
         </section>
       </Suspense>
     );
   }
 
-  // ✨ Carousel mode with enhanced mobile support
+  // Carousel mode with enhanced mobile support
   return (
     <Suspense fallback={<LoadingSkeleton count={3} />}>
       <section 
-        className={`${className} w-full`}
+        className={className}
         aria-label={ariaLabel || 'Carrousel des prestataires disponibles'}
         data-testid={testId || 'providers-carousel'}
         role="region"
       >
         {showFilters && (
-          <div className="flex justify-center mb-8">
-            <div className="inline-flex bg-white rounded-2xl shadow-sm border border-gray-100 p-1">
-              {['all', 'lawyer', 'expat'].map((filterType) => (
-                <button
-                  key={filterType}
-                  onClick={() => setActiveFilter(filterType as 'all' | 'lawyer' | 'expat')}
-                  className={`
-                    py-2 px-6 rounded-xl text-sm font-medium transition-all
-                    ${activeFilter === filterType
-                      ? 'bg-red-600 text-white shadow-md'
-                      : 'text-gray-700 hover:bg-gray-50'
-                    }
-                  `}
-                >
-                  {filterType === 'all' ? 'Tous' : filterType === 'lawyer' ? 'Avocats' : 'Experts'}
-                </button>
-              ))}
+          <div className="carousel-filters">
+            <div 
+              role="tablist" 
+              aria-label="Types de prestataires"
+              className="carousel-filter-tabs"
+            >
+              <button
+                role="tab"
+                aria-selected={activeFilter === 'all'}
+                onClick={() => setActiveFilter('all')}
+                className={`carousel-tab ${activeFilter === 'all' ? 'active' : ''}`}
+              >
+                Tous
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeFilter === 'lawyer'}
+                onClick={() => setActiveFilter('lawyer')}
+                className={`carousel-tab ${activeFilter === 'lawyer' ? 'active' : ''}`}
+              >
+                Avocats
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeFilter === 'expat'}
+                onClick={() => setActiveFilter('expat')}
+                className={`carousel-tab ${activeFilter === 'expat' ? 'active' : ''}`}
+              >
+                Experts
+              </button>
             </div>
           </div>
         )}
 
-        {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-8 text-center">
-            <p className="text-red-800 mb-2">{error}</p>
-            <button 
-              onClick={loadProviders}
-              className="text-red-600 hover:text-red-800 text-sm font-medium underline"
-            >
-              Réessayer
-            </button>
+          <div 
+            role="alert" 
+            aria-live="polite"
+            className="carousel-error"
+          >
+            <p>{error}</p>
+            <button onClick={loadProviders}>Réessayer</button>
           </div>
         )}
 
-        {/* ✨ Enhanced Carousel */}
-        <div className="relative">
-          <div className="overflow-hidden">
-            <div
-              className="flex transition-transform duration-500 ease-out"
-              style={{ 
-                transform: `translateX(-${currentIndex * (100 / CAROUSEL_VISIBLE_ITEMS)}%)`,
-              }}
-            >
-              {isLoading ? (
-                Array.from({ length: CAROUSEL_VISIBLE_ITEMS }, (_, index) => (
-                  <div key={index} className="w-full sm:w-1/2 lg:w-1/3 px-3 flex-shrink-0">
-                    <LoadingSkeleton count={1} />
-                  </div>
-                ))
-              ) : displayProviders.length > 0 ? (
-                displayProviders.map((provider, index) => (
-                  <div 
-                    key={provider.id} 
-                    className="w-full sm:w-1/2 lg:w-1/3 px-3 flex-shrink-0"
-                  >
-                    <ProviderCard 
-                      provider={provider} 
-                      isCarousel={true}
-                    />
-                  </div>
+        {/* Enhanced carousel with touch support */}
+        <div 
+          className="carousel-container"
+          role="region"
+          aria-label="Carrousel des prestataires"
+          aria-live="polite"
+        >
+          <div
+            className="carousel-track"
+            style={{ 
+              transform: `translateX(-${currentIndex * (100 / CAROUSEL_VISIBLE_ITEMS)}%)`,
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const currentX = moveEvent.touches[0].clientX;
+                const diffX = startX - currentX;
+                
+                if (Math.abs(diffX) > 50) {
+                  if (diffX > 0) {
+                    handleNext();
+                  } else {
+                    handlePrev();
+                  }
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              
+              document.addEventListener('touchmove', handleTouchMove, { passive: true });
+              document.addEventListener('touchend', handleTouchEnd);
+            }}
+          >
+            {isLoading ? (
+              Array.from({ length: CAROUSEL_VISIBLE_ITEMS }, (_, index) => (
+                <div key={index} className="carousel-item">
+                  <LoadingSkeleton count={1} />
+                </div>
+              ))
+            ) : displayProviders.length > 0 ? (
+              displayProviders.map((provider, index) => (
+                <div 
+                  key={provider.id} 
+                  className="carousel-item"
+                  aria-label={`Prestataire ${index + 1} sur ${displayProviders.length}`}
+                >
+                  <ProviderCard 
+                    provider={provider} 
+                    isCarousel={true}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="carousel-empty" role="status">
+                <div className="empty-content">
+                  <p>Aucun prestataire trouvé</p>
+                  <button onClick={resetFilters}>
+                    Réinitialiser les filtres
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Enhanced navigation controls */}
+          {displayProviders.length > CAROUSEL_VISIBLE_ITEMS && (
+            <>
+              <button
+                onClick={handlePrev}
+                aria-label="Voir les prestataires précédents"
+                className="carousel-nav prev-nav"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handlePrev();
+                  }
+                }}
+              >
+                <ChevronLeft size={24} aria-hidden="true" />
+              </button>
+                
+              <button
+                onClick={handleNext}
+                aria-label="Voir les prestataires suivants"
+                className="carousel-nav next-nav"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleNext();
+                  }
+                }}
+              >
+                <ChevronRight size={24} aria-hidden="true" />
+              </button>
+
+              {/* Carousel indicators */}
+              <div className="carousel-indicators" role="tablist" aria-label="Indicateurs du carrousel">
+                {Array.from({ 
+                  length: Math.max(1, Math.ceil(displayProviders.length - CAROUSEL_VISIBLE_ITEMS + 1)) 
+                }, (_, i) => (
+                  <button
+                    key={i}
+                    role="tab"
+                    aria-selected={currentIndex === i}
+                    aria-label={`Aller à la page ${i + 1} du carrousel`}
+                    onClick={() => setCurrentIndex(i)}
+                    className={`indicator ${currentIndex === i ? 'active' : ''}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Carousel summary for screen readers */}
+        <div className="sr-only" aria-live="polite">
+          Affichage de {Math.min(CAROUSEL_VISIBLE_ITEMS, displayProviders.length)} prestataires sur {displayProviders.length}
+        </div>
+      </section>
+    </Suspense>
+  );
+};
+
+// Enhanced export with display name for debugging
+ProfileCards.displayName = 'ProfileCards';
+
+export default React.memo(ProfileCards);

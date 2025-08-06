@@ -273,6 +273,8 @@ interface Provider {
   currentPresenceCountry?: string;
   graduationYear?: string;
   expatriationYear?: string;
+  email?: string;
+  phone?: string;
 }
 
 // 🔧 INTERFACES STANDARDISÉES POUR LE PASSAGE DE DONNÉES
@@ -553,7 +555,11 @@ const BookingRequest: React.FC = () => {
   };
 
   // 🔧 FONCTION STANDARDISÉE POUR PRÉPARER LES DONNÉES
-  const prepareStandardizedData = (formData: any, provider: Provider, user: any): {
+  const prepareStandardizedData = (
+    formData: typeof formData, 
+    provider: Provider, 
+    user: { id?: string; firstName?: string; lastName?: string } | null
+  ): {
     selectedProvider: StandardizedProviderData;
     serviceData: StandardizedServiceData;
     bookingRequest: BookingRequestData; // Pour backward compatibility
@@ -796,16 +802,16 @@ const BookingRequest: React.FC = () => {
         }
       }
 
-      // 🔧 SAUVEGARDE MULTIPLE POUR COMPATIBILITÉ
+      // 🔧 SAUVEGARDE DANS SESSIONSTORAGE POUR CALL-CHECKOUT
       try {
-        // Méthode 1: sessionStorage (backward compatibility)
+        // Pour call-checkout, nous devons sauvegarder les données dans le bon format
         sessionStorage.setItem('bookingRequest', JSON.stringify(bookingRequest));
-        
-        // Méthode 2: sessionStorage standardisé
         sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
+        
+        // Données supplémentaires pour flexibilité
         sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
         
-        console.log('💾 Données sauvegardées dans sessionStorage (multiple formats)');
+        console.log('💾 Données sauvegardées dans sessionStorage pour call-checkout');
       } catch (storageError) {
         console.warn('⚠️ Erreur sessionStorage (non bloquant):', storageError);
       }
@@ -817,24 +823,10 @@ const BookingRequest: React.FC = () => {
         console.warn("⚠️ Échec de l'envoi de notification au prestataire (non bloquant):", notificationError);
       }
 
-      // 🔧 NAVIGATION STANDARDISÉE AVEC LOCATION.STATE
-      console.log('🧭 Navigation vers le checkout avec données standardisées...');
+      // 🔧 NAVIGATION VERS CALL-CHECKOUT AVEC PROVIDER ID
+      console.log(`🧭 Navigation vers call-checkout/${providerId}...`);
       
-      navigate('/paiement', {
-        state: {
-          // ✅ NOMS STANDARDISÉS ATTENDUS PAR CallCheckoutWrapper
-          selectedProvider: selectedProvider,
-          serviceData: serviceData,
-          
-          // ✅ DONNÉES SUPPLÉMENTAIRES POUR FLEXIBILITÉ
-          bookingRequest: bookingRequest,
-          
-          // ✅ MÉTADONNÉES DE NAVIGATION
-          navigationSource: 'booking_request',
-          timestamp: new Date().toISOString(),
-          formProgress: formProgress
-        }
-      });
+      navigate(`/call-checkout/${providerId}`);
       
     } catch (error) {
       console.error('❌ Erreur lors de la soumission:', error);

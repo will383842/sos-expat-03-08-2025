@@ -72,8 +72,8 @@ class StripeManager {
         if (amount < 500) { // 5€ minimum EN CENTIMES
             throw new Error('Montant minimum de 5€ requis');
         }
-        if (amount > 50000) { // 500€ maximum EN CENTIMES
-            throw new Error('Montant maximum de 500€ dépassé');
+        if (amount > 200000) { // 2000€ maximum EN CENTIMES
+            throw new Error('Montant maximum de 2000€ dépassé');
         }
         // Validation de la répartition EN CENTIMES
         if (Math.abs(commissionAmount + providerAmount - amount) > 1) { // Tolérance 1 centime pour arrondis

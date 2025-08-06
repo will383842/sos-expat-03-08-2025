@@ -73,16 +73,25 @@ const PaymentSuccess: React.FC = () => {
     [paidServiceType, providerRole]
   );
 
-  // Get provider info from storage
+  // ✅ CORRECTION - Récupérer les données depuis les sources correctes
   const getProviderFromStorage = useCallback((): ProviderInfo | null => {
     try {
+      // ✅ Essayer d'abord selectedProvider (nom correct)
       const savedProvider = sessionStorage.getItem('selectedProvider');
-      const savedRequest = sessionStorage.getItem('bookingRequest');
-      
       if (savedProvider) {
-        return JSON.parse(savedProvider);
+        const providerData = JSON.parse(savedProvider);
+        return {
+          id: providerData.id,
+          name: providerData.name,
+          type: providerData.type,
+          price: providerData.price,
+          duration: providerData.duration,
+          role: providerData.type
+        };
       }
       
+      // ✅ Essayer ensuite bookingRequest
+      const savedRequest = sessionStorage.getItem('bookingRequest');
       if (savedRequest) {
         const requestData = JSON.parse(savedRequest);
         return {
@@ -94,14 +103,29 @@ const PaymentSuccess: React.FC = () => {
           role: requestData.providerType
         };
       }
+
+      // ✅ Fallback - ancien format pour compatibilité
+      const legacyProvider = sessionStorage.getItem('providerData');
+      if (legacyProvider) {
+        const providerData = JSON.parse(legacyProvider);
+        return {
+          id: providerData.id || providerId,
+          name: providerData.name,
+          type: providerData.type,
+          price: providerData.price,
+          duration: providerData.duration,
+          role: providerData.type
+        };
+      }
     } catch (error) {
       console.error('Error parsing provider data:', error);
     }
     return null;
-  }, []);
+  }, [providerId]);
 
   // Initialize service data
   const initializeServiceData = useCallback(() => {
+    // ✅ Prioriser les paramètres URL (plus fiables)
     const urlAmount = searchParams.get('amount');
     const urlServiceType = searchParams.get('serviceType') || searchParams.get('service');
     const urlDuration = searchParams.get('duration');
@@ -118,10 +142,15 @@ const PaymentSuccess: React.FC = () => {
       setProviderAmount(urlProviderAmount ? parseFloat(urlProviderAmount) : 0);
       setProviderRole(urlProviderRole || '');
       setTimeRemaining((urlDuration ? parseInt(urlDuration) : 0) * 60);
+      console.log('✅ Données récupérées depuis URL params:', {
+        amount: parseFloat(urlAmount),
+        serviceType: urlServiceType,
+        duration: urlDuration
+      });
       return;
     }
     
-    // Try to get from storage
+    // ✅ Essayer de récupérer depuis storage avec les bons noms
     const providerInfo = getProviderFromStorage();
     if (providerInfo) {
       const price = providerInfo.price || (providerInfo.type === 'lawyer' ? 49 : 19);
@@ -135,10 +164,17 @@ const PaymentSuccess: React.FC = () => {
       setTimeRemaining(duration * 60);
       setPlatformFee(commission);
       setProviderAmount(price - commission);
+      
+      console.log('✅ Données récupérées depuis storage:', {
+        provider: providerInfo.name,
+        price,
+        duration,
+        type: providerInfo.type
+      });
       return;
     }
     
-    // Fallback to defaults
+    // ✅ Fallback vers les défauts
     const fallbackProvider = PROVIDER_DEFAULTS[providerId as keyof typeof PROVIDER_DEFAULTS];
     if (fallbackProvider) {
       const commission = fallbackProvider.role === 'lawyer' ? COMMISSION_RATES.lawyer : COMMISSION_RATES.expat;
@@ -150,6 +186,8 @@ const PaymentSuccess: React.FC = () => {
       setTimeRemaining(fallbackProvider.duration * 60);
       setPlatformFee(commission);
       setProviderAmount(fallbackProvider.price - commission);
+      
+      console.log('✅ Données récupérées depuis fallback:', fallbackProvider);
     }
   }, [searchParams, providerId, getProviderFromStorage]);
 

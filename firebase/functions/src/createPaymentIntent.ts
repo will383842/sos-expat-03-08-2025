@@ -25,7 +25,7 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 // 📋 INTERFACES ET TYPES
 // =========================================
 interface PaymentIntentRequestData {
-  amount: number;
+  amount: number; // 🔧 FIX: DÉJÀ EN CENTIMES depuis le frontend
   currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
@@ -33,8 +33,8 @@ interface PaymentIntentRequestData {
   clientEmail?: string;
   providerName?: string;
   description?: string;
-  commissionAmount: number;
-  providerAmount: number;
+  commissionAmount: number; // 🔧 FIX: DÉJÀ EN CENTIMES
+  providerAmount: number; // 🔧 FIX: DÉJÀ EN CENTIMES
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -71,19 +71,18 @@ const SECURITY_LIMITS = {
     GLOBAL_MAX: isDevelopment ? 10000 : (isProduction ? 1000 : 2000),
   },
   AMOUNT_LIMITS: {
-    // Limites de base saines pour tous les environnements
-    MIN_AMOUNT: 100, // 1€ en centimes
-  MAX_AMOUNT: 100000, // 1000€ en centimes
-  MAX_DAILY_USER: 200000, // 2000€ par jour par utilisateur (EN CENTIMES)
-    
+    // 🔧 FIX: Limites EN CENTIMES (pas d'euros)
+    MIN_AMOUNT: 500, // 5€ en centimes
+    MAX_AMOUNT: 50000, // 500€ en centimes (pas 2000€)
+    MAX_DAILY_USER: 200000, // 2000€ par jour par utilisateur EN CENTIMES
   },
   VALIDATION: {
     MAX_METADATA_SIZE: isDevelopment ? 10000 : (isProduction ? 3000 : 5000),
     MAX_DESCRIPTION_LENGTH: isDevelopment ? 5000 : (isProduction ? 1500 : 2000),
     // Tolérance pour cohérence des montants
-    AMOUNT_COHERENCE_TOLERANCE: isDevelopment ? 0.50 : (isProduction ? 0.05 : 0.10),
+    AMOUNT_COHERENCE_TOLERANCE: isDevelopment ? 50 : (isProduction ? 5 : 10), // 🔧 FIX: EN CENTIMES
     // Tolérance pour validation business
-    BUSINESS_AMOUNT_TOLERANCE: isDevelopment ? 50 : (isProduction ? 15 : 25),
+    BUSINESS_AMOUNT_TOLERANCE: isDevelopment ? 5000 : (isProduction ? 1500 : 2500), // 🔧 FIX: EN CENTIMES
     ALLOWED_CURRENCIES: ['eur', 'usd', 'gbp'],
     ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'] as const,
   },
@@ -181,14 +180,14 @@ async function validateBusinessLogic(
       return { valid: true };
     }
 
-    // Validation des tarifs avec tolérance adaptée
-    const expectedAmount = providerData.price || (data.serviceType === 'lawyer_call' ? 49 : 19);
+    // 🔧 FIX: Validation des tarifs avec montants EN CENTIMES
+    const expectedAmountCents = (providerData.price || (data.serviceType === 'lawyer_call' ? 49 : 19)) * 100;
     const tolerance = SECURITY_LIMITS.VALIDATION.BUSINESS_AMOUNT_TOLERANCE;
-    const difference = Math.abs(data.amount - expectedAmount);
+    const difference = Math.abs(data.amount - expectedAmountCents);
     
     if (difference > tolerance) {
       logSecurityEvent('business_amount_anomaly', { 
-        expected: expectedAmount,
+        expected: expectedAmountCents,
         received: data.amount,
         difference,
         tolerance,
@@ -196,28 +195,28 @@ async function validateBusinessLogic(
       });
       
       // En production, bloquer seulement si très éloigné
-      if (isProduction && difference > 100) { // 100€ d'écart = suspect
+      if (isProduction && difference > 10000) { // 100€ d'écart EN CENTIMES = suspect
         return { valid: false, error: 'Montant très éloigné du tarif standard' };
       }
     }
 
-    // Vérification cohérence commission/prestataire
-    const expectedCommission = Math.round(expectedAmount * 0.20 * 100) / 100;
-    const expectedProviderAmount = Math.round((expectedAmount - expectedCommission) * 100) / 100;
+    // 🔧 FIX: Vérification cohérence commission/prestataire EN CENTIMES
+    const expectedCommissionCents = Math.round(expectedAmountCents * 0.20);
+    const expectedProviderAmountCents = expectedAmountCents - expectedCommissionCents;
     
-    const commissionDiff = Math.abs(data.commissionAmount - expectedCommission);
-    const providerDiff = Math.abs(data.providerAmount - expectedProviderAmount);
+    const commissionDiff = Math.abs(data.commissionAmount - expectedCommissionCents);
+    const providerDiff = Math.abs(data.providerAmount - expectedProviderAmountCents);
     
-    if (commissionDiff > 5 || providerDiff > 5) { // Tolérance 5€
+    if (commissionDiff > 500 || providerDiff > 500) { // Tolérance 5€ EN CENTIMES
       logSecurityEvent('commission_split_anomaly', {
-        expectedCommission,
+        expectedCommission: expectedCommissionCents,
         receivedCommission: data.commissionAmount,
-        expectedProvider: expectedProviderAmount,
+        expectedProvider: expectedProviderAmountCents,
         receivedProvider: data.providerAmount
       });
       
       // Bloquer seulement si très incohérent
-      if (isProduction && (commissionDiff > 20 || providerDiff > 20)) {
+      if (isProduction && (commissionDiff > 2000 || providerDiff > 2000)) { // 20€ EN CENTIMES
         return { valid: false, error: 'Répartition des montants très incohérente' };
       }
     }
@@ -241,18 +240,18 @@ async function validateAmountSecurity(
   
   logSecurityEvent('amount_validation_start', { amount, userId });
   
-  // 1. Limites de base
+  // 🔧 FIX: Limites EN CENTIMES
   if (amount < SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT) {
     return { 
       valid: false, 
-      error: `Montant minimum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT}€ requis` 
+      error: `Montant minimum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT / 100}€ requis` 
     };
   }
 
   if (amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT) {
     return { 
       valid: false, 
-      error: `Montant maximum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT}€ dépassé` 
+      error: `Montant maximum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT / 100}€ dépassé` 
     };
   }
 
@@ -268,24 +267,23 @@ async function validateAmountSecurity(
         .where('status', 'in', ['succeeded', 'requires_capture', 'processing'])
         .get();
 
-      // Gestion hybride centimes/euros pour les montants sauvegardés
-      const dailyTotal = dailyPaymentsQuery.docs.reduce((total, doc) => {
+      // 🔧 FIX: Calcul en centimes cohérent
+      const dailyTotalCents = dailyPaymentsQuery.docs.reduce((total, doc) => {
         const paymentAmount = doc.data().amount || 0;
-        // Si le montant est > 1000, c'est probablement en centimes
-        const amountInEuros = paymentAmount > 1000 ? paymentAmount / 100 : paymentAmount;
-        return total + amountInEuros;
+        // Assumer que les montants stockés sont en centimes (nouveau système)
+        return total + paymentAmount;
       }, 0);
 
       logSecurityEvent('daily_limit_check', { 
-        dailyTotal, 
-        newAmount: amount, 
-        limit: SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER 
+        dailyTotalCents, 
+        newAmountCents: amount, 
+        limitCents: SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER 
       });
 
-      if (dailyTotal + amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER) {
+      if (dailyTotalCents + amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER) {
         return { 
           valid: false, 
-          error: `Limite journalière dépassée (${Math.round(dailyTotal + amount)}€/${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER}€)` 
+          error: `Limite journalière dépassée (${Math.round((dailyTotalCents + amount) / 100)}€/${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER / 100}€)` 
         };
       }
     } catch (error) {
@@ -352,8 +350,9 @@ function validateAmountCoherence(
   providerAmount: number
 ): { valid: boolean; error?: string; difference: number } {
   
-  const totalCalculated = Math.round((commissionAmount + providerAmount) * 100) / 100;
-  const amountRounded = Math.round(amount * 100) / 100;
+  // 🔧 FIX: Calculs EN CENTIMES (pas de division/multiplication par 100)
+  const totalCalculated = Math.round(commissionAmount + providerAmount);
+  const amountRounded = Math.round(amount);
   const difference = Math.abs(totalCalculated - amountRounded);
   const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
   
@@ -369,7 +368,7 @@ function validateAmountCoherence(
   if (difference > tolerance) {
     return {
       valid: false,
-      error: `Incohérence montants: ${difference.toFixed(2)}€ d'écart (tolérance: ${tolerance.toFixed(2)}€)`,
+      error: `Incohérence montants: ${(difference / 100).toFixed(2)}€ d'écart (tolérance: ${(tolerance / 100).toFixed(2)}€)`,
       difference
     };
   }
@@ -387,7 +386,8 @@ function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData
   const maxMetaValueLength = isDevelopment ? 500 : 200;
 
   return {
-    amount: Math.round(Number(data.amount) * 100) / 100,
+    // 🔧 FIX: Pas de multiplication par 100 - les montants sont déjà en centimes
+    amount: Math.round(Number(data.amount)),
     currency: (data.currency || 'eur').toLowerCase().trim(),
     serviceType: data.serviceType,
     providerId: data.providerId.trim(),
@@ -395,8 +395,8 @@ function sanitizeInput(data: PaymentIntentRequestData): PaymentIntentRequestData
     clientEmail: data.clientEmail?.trim().toLowerCase(),
     providerName: data.providerName?.trim().substring(0, maxNameLength),
     description: data.description?.trim().substring(0, maxDescLength),
-    commissionAmount: Math.round(Number(data.commissionAmount) * 100) / 100,
-    providerAmount: Math.round(Number(data.providerAmount) * 100) / 100,
+    commissionAmount: Math.round(Number(data.commissionAmount)),
+    providerAmount: Math.round(Number(data.providerAmount)),
     callSessionId: data.callSessionId?.trim(),
     metadata: data.metadata ? Object.fromEntries(
       Object.entries(data.metadata)
@@ -576,7 +576,7 @@ export const createPaymentIntent = onCall(
       const coherenceResult = validateAmountCoherence(amount, commissionAmount, providerAmount);
       if (!coherenceResult.valid) {
         // En production: bloquer, en dev: juste logger et continuer si pas trop éloigné
-        if (isProduction || coherenceResult.difference > 1.0) {
+        if (isProduction || coherenceResult.difference > 100) { // 1€ EN CENTIMES
           throw new HttpsError('invalid-argument', coherenceResult.error!);
         } else {
           logSecurityEvent('amount_coherence_warning_accepted', coherenceResult);
@@ -620,15 +620,16 @@ export const createPaymentIntent = onCall(
         providerId: providerId.substring(0, 10) + '...'
       });
 
+      // 🔧 FIX: Données pour StripeManager - montants déjà EN CENTIMES
       const stripePaymentData: StripePaymentData = {
-        amount,
+        amount, // DÉJÀ EN CENTIMES
         currency: safeCurrency,
         clientId,
         providerId,
         serviceType,
         providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
-        commissionAmount,
-        providerAmount,
+        commissionAmount, // DÉJÀ EN CENTIMES
+        providerAmount, // DÉJÀ EN CENTIMES
         callSessionId,
         metadata: {
           clientEmail: clientEmail || '',

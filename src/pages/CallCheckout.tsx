@@ -61,7 +61,7 @@ interface User {
 }
 
 interface PaymentIntentData {
-  amount: number; // EN CENTIMES maintenant
+  amount: number; // 🔧 FIX: EN CENTIMES maintenant
   currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
@@ -69,8 +69,8 @@ interface PaymentIntentData {
   clientEmail?: string;
   providerName?: string;
   description?: string;
-  commissionAmount: number; // EN CENTIMES
-  providerAmount: number; // EN CENTIMES
+  commissionAmount: number; // 🔧 FIX: EN CENTIMES
+  providerAmount: number; // 🔧 FIX: EN CENTIMES
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -94,7 +94,7 @@ interface CreateAndScheduleCallData {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // EN CENTIMES
+  amount: number; // 🔧 FIX: EN CENTIMES
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
@@ -216,7 +216,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       setIsProcessing(true);
 
-      // 🔧 FIX CRITIQUE: Conversion en centimes pour Stripe
+      // 🔧 FIX CRITIQUE: Conversion CORRECTE en centimes pour Stripe
       const amountInCents = Math.round(service.amount * 100);
       const commissionInCents = Math.round(service.commissionAmount * 100);
       const providerAmountInCents = Math.round(service.providerAmount * 100);
@@ -237,27 +237,27 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
       
-      // 🔧 FIX: Envoyer les montants en CENTIMES à la Cloud Function
+      // 🔧 FIX CRITIQUE: Envoyer les montants EN CENTIMES à la Cloud Function
       const paymentData: PaymentIntentData = {
-  amount: Math.round(service.amount * 100), // 4900 (centimes)
-  commissionAmount: Math.round(service.commissionAmount * 100), // 980 (centimes)
-  providerAmount: Math.round(service.providerAmount * 100), // 3920 (centimes)
-  currency: 'eur',
-  serviceType: service.serviceType,
-  providerId: provider.id,
-  clientId: user.uid,
-  clientEmail: user.email || '',
-  providerName: provider.fullName || provider.name || '',
-  description: `Consultation ${service.serviceType === 'lawyer_call' ? 'avocat' : 'expatriation'}`,
-  callSessionId: undefined,
-  metadata: {
-    providerType: provider.role || provider.type || 'expat',
-    duration: service.duration.toString(),
-    clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
-  }
-};
+        amount: amountInCents, // 4900 (centimes) pour 49€
+        commissionAmount: commissionInCents, // 980 (centimes) pour 9.80€
+        providerAmount: providerAmountInCents, // 3920 (centimes) pour 39.20€
+        currency: 'eur',
+        serviceType: service.serviceType,
+        providerId: provider.id,
+        clientId: user.uid,
+        clientEmail: user.email || '',
+        providerName: provider.fullName || provider.name || '',
+        description: `Consultation ${service.serviceType === 'lawyer_call' ? 'avocat' : 'expatriation'}`,
+        callSessionId: undefined,
+        metadata: {
+          providerType: provider.role || provider.type || 'expat',
+          duration: service.duration.toString(),
+          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+        }
+      };
 
-      // 🔍 DEBUG amélioré
+      // 🔍 DEBUG CORRIGÉ
       console.log('💳 === DÉBUT DEBUG PAYMENT (CORRIGÉ) ===');
       console.log('💰 Montants originaux (en €):', {
         serviceAmount: service.amount,

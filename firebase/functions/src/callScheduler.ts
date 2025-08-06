@@ -30,7 +30,7 @@ interface CreateCallParams {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // EN CENTIMES
+  amount: number; // 🔧 FIX: EN CENTIMES
   delayMinutes?: number;
   requestId?: string;
   clientLanguages?: string[];
@@ -435,6 +435,14 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       throw new Error('Montant maximum de 500€ dépassé');
     }
 
+    // 🔧 FIX: Validation cohérence service/montant EN CENTIMES
+    const expectedAmountCents = params.serviceType === 'lawyer_call' ? 4900 : 1900; // 49€ ou 19€
+    const tolerance = 1000; // 10€ de tolérance en centimes
+    
+    if (Math.abs(params.amount - expectedAmountCents) > tolerance) {
+      console.warn(`⚠️ Montant inhabituel: ${params.amount} centimes pour ${params.serviceType} (attendu: ${expectedAmountCents} centimes)`);
+    }
+
     // Créer la session via le TwilioCallManager
     const callSession = await twilioCallManager.createCallSession({
       sessionId,
@@ -445,7 +453,7 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       serviceType: params.serviceType,
       providerType: params.providerType,
       paymentIntentId: params.paymentIntentId,
-      amount: params.amount, // EN CENTIMES
+      amount: params.amount, // 🔧 FIX: EN CENTIMES
       requestId: params.requestId,
       clientLanguages: params.clientLanguages,
       providerLanguages: params.providerLanguages
@@ -471,11 +479,15 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
         serviceType: params.serviceType,
         amount: params.amount,
         amountInEuros: params.amount / 100,
-        delayMinutes: delayMinutes
+        delayMinutes: delayMinutes,
+        expectedAmountCents,
+        amountDifferenceFromExpected: params.amount - expectedAmountCents
       }
     });
 
     console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes`);
+    console.log(`💰 Validation montant: ${params.amount} centimes (${params.amount/100}€) pour ${params.serviceType}`);
+    
     return callSession;
 
   } catch (error) {
@@ -606,7 +618,7 @@ export const cleanupOldSessions = async (olderThanDays: number = 30): Promise<vo
 };
 
 /**
- * Fonction pour obtenir des statistiques sur les appels
+ * 🔧 FIX: Fonction pour obtenir des statistiques sur les appels avec montants EN CENTIMES
  */
 export const getCallStatistics = async (periodDays: number = 7): Promise<{
   scheduler: SchedulerStats;
@@ -617,6 +629,10 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
     cancelled: number;
     averageDuration: number;
     successRate: number;
+    totalRevenueCents: number; // EN CENTIMES
+    totalRevenueEuros: number; // EN EUROS pour affichage
+    averageAmountCents: number; // EN CENTIMES
+    averageAmountEuros: number; // EN EUROS pour affichage
   };
 }> => {
   try {
@@ -629,6 +645,26 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
       twilioCallManager.getCallStatistics({ startDate })
     ]);
 
+    // 🔧 FIX: Calculs de revenus EN CENTIMES
+    let totalRevenueCents = 0;
+    let completedCallsWithRevenue = 0;
+
+    // Récupérer les sessions complétées avec revenus
+    const completedSessionsQuery = await db.collection('call_sessions')
+      .where('metadata.createdAt', '>=', startDate)
+      .where('status', '==', 'completed')
+      .where('payment.status', '==', 'captured')
+      .get();
+
+    completedSessionsQuery.docs.forEach(doc => {
+      const session = doc.data() as CallSessionState;
+      // Assumer que les montants dans payment sont EN CENTIMES (nouveau système)
+      totalRevenueCents += session.payment.amount || 0;
+      completedCallsWithRevenue++;
+    });
+
+    const averageAmountCents = completedCallsWithRevenue > 0 ? totalRevenueCents / completedCallsWithRevenue : 0;
+
     return {
       scheduler: schedulerStats,
       calls: {
@@ -637,7 +673,11 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
         failed: callStats.failed,
         cancelled: callStats.cancelled,
         averageDuration: callStats.averageDuration,
-        successRate: callStats.successRate
+        successRate: callStats.successRate,
+        totalRevenueCents,
+        totalRevenueEuros: totalRevenueCents / 100,
+        averageAmountCents,
+        averageAmountEuros: averageAmountCents / 100
       }
     };
 

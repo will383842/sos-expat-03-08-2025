@@ -381,6 +381,12 @@ const createAndScheduleCall = async (params) => {
         if (params.amount > 50000) { // 500€ maximum
             throw new Error('Montant maximum de 500€ dépassé');
         }
+        // 🔧 FIX: Validation cohérence service/montant EN CENTIMES
+        const expectedAmountCents = params.serviceType === 'lawyer_call' ? 4900 : 1900; // 49€ ou 19€
+        const tolerance = 1000; // 10€ de tolérance en centimes
+        if (Math.abs(params.amount - expectedAmountCents) > tolerance) {
+            console.warn(`⚠️ Montant inhabituel: ${params.amount} centimes pour ${params.serviceType} (attendu: ${expectedAmountCents} centimes)`);
+        }
         // Créer la session via le TwilioCallManager
         const callSession = await TwilioCallManager_1.twilioCallManager.createCallSession({
             sessionId,
@@ -391,7 +397,7 @@ const createAndScheduleCall = async (params) => {
             serviceType: params.serviceType,
             providerType: params.providerType,
             paymentIntentId: params.paymentIntentId,
-            amount: params.amount, // EN CENTIMES
+            amount: params.amount, // 🔧 FIX: EN CENTIMES
             requestId: params.requestId,
             clientLanguages: params.clientLanguages,
             providerLanguages: params.providerLanguages
@@ -415,10 +421,13 @@ const createAndScheduleCall = async (params) => {
                 serviceType: params.serviceType,
                 amount: params.amount,
                 amountInEuros: params.amount / 100,
-                delayMinutes: delayMinutes
+                delayMinutes: delayMinutes,
+                expectedAmountCents,
+                amountDifferenceFromExpected: params.amount - expectedAmountCents
             }
         });
         console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes`);
+        console.log(`💰 Validation montant: ${params.amount} centimes (${params.amount / 100}€) pour ${params.serviceType}`);
         return callSession;
     }
     catch (error) {
@@ -532,7 +541,7 @@ const cleanupOldSessions = async (olderThanDays = 30) => {
 };
 exports.cleanupOldSessions = cleanupOldSessions;
 /**
- * Fonction pour obtenir des statistiques sur les appels
+ * 🔧 FIX: Fonction pour obtenir des statistiques sur les appels avec montants EN CENTIMES
  */
 const getCallStatistics = async (periodDays = 7) => {
     try {
@@ -541,6 +550,22 @@ const getCallStatistics = async (periodDays = 7) => {
             callSchedulerManager.getStats(),
             TwilioCallManager_1.twilioCallManager.getCallStatistics({ startDate })
         ]);
+        // 🔧 FIX: Calculs de revenus EN CENTIMES
+        let totalRevenueCents = 0;
+        let completedCallsWithRevenue = 0;
+        // Récupérer les sessions complétées avec revenus
+        const completedSessionsQuery = await db.collection('call_sessions')
+            .where('metadata.createdAt', '>=', startDate)
+            .where('status', '==', 'completed')
+            .where('payment.status', '==', 'captured')
+            .get();
+        completedSessionsQuery.docs.forEach(doc => {
+            const session = doc.data();
+            // Assumer que les montants dans payment sont EN CENTIMES (nouveau système)
+            totalRevenueCents += session.payment.amount || 0;
+            completedCallsWithRevenue++;
+        });
+        const averageAmountCents = completedCallsWithRevenue > 0 ? totalRevenueCents / completedCallsWithRevenue : 0;
         return {
             scheduler: schedulerStats,
             calls: {
@@ -549,7 +574,11 @@ const getCallStatistics = async (periodDays = 7) => {
                 failed: callStats.failed,
                 cancelled: callStats.cancelled,
                 averageDuration: callStats.averageDuration,
-                successRate: callStats.successRate
+                successRate: callStats.successRate,
+                totalRevenueCents,
+                totalRevenueEuros: totalRevenueCents / 100,
+                averageAmountCents,
+                averageAmountEuros: averageAmountCents / 100
             }
         };
     }

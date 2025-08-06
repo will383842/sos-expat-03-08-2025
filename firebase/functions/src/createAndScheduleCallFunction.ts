@@ -11,7 +11,7 @@ interface CreateAndScheduleCallRequest {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // EN CENTIMES maintenant
+  amount: number; // 🔧 FIX: EN CENTIMES maintenant
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
@@ -56,7 +56,7 @@ export const createAndScheduleCallHTTPS = onCall(
         serviceType,
         providerType,
         paymentIntentId,
-        amount, // EN CENTIMES
+        amount, // 🔧 FIX: EN CENTIMES
         delayMinutes = 5,
         clientLanguages,
         providerLanguages
@@ -118,6 +118,15 @@ export const createAndScheduleCallHTTPS = onCall(
         );
       }
 
+      // 🔧 FIX: Validation cohérence montant/service
+      const expectedAmountCents = serviceType === 'lawyer_call' ? 4900 : 1900; // 49€ ou 19€ en centimes
+      const tolerance = 500; // 5€ de tolérance en centimes
+      
+      if (Math.abs(amount - expectedAmountCents) > tolerance) {
+        console.warn(`⚠️ Montant inhabituel: reçu ${amount} centimes, attendu ${expectedAmountCents} centimes`);
+        // Ne pas bloquer mais logger pour audit
+      }
+
       // ========================================
       // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE
       // ========================================
@@ -144,10 +153,17 @@ export const createAndScheduleCallHTTPS = onCall(
       }
 
       // ========================================
-      // 7. CRÉATION ET PLANIFICATION DE L'APPEL
+      // 7. VALIDATION DU DÉLAI
+      // ========================================
+      const validDelayMinutes = Math.min(Math.max(delayMinutes, 0), 10); // Entre 0 et 10 minutes
+
+      // ========================================
+      // 8. CRÉATION ET PLANIFICATION DE L'APPEL
       // ========================================
       console.log(`[${requestId}] Création appel - Client: ${clientId}, Provider: ${providerId}`);
       console.log(`[${requestId}] Montant: ${amount} centimes (${amount/100}€)`);
+      console.log(`[${requestId}] Service: ${serviceType}, Provider: ${providerType}`);
+      console.log(`[${requestId}] Délai: ${validDelayMinutes} minutes`);
 
       const callSession = await createAndScheduleCall({
         providerId,
@@ -157,31 +173,35 @@ export const createAndScheduleCallHTTPS = onCall(
         serviceType,
         providerType,
         paymentIntentId,
-        amount, // EN CENTIMES
-        delayMinutes: Math.min(Math.max(delayMinutes, 0), 10), // Entre 0 et 10 minutes
+        amount, // 🔧 FIX: Déjà EN CENTIMES
+        delayMinutes: validDelayMinutes,
         requestId,
-        clientLanguages,
-        providerLanguages
+        clientLanguages: clientLanguages || ['fr'],
+        providerLanguages: providerLanguages || ['fr']
       });
 
       console.log(`[${requestId}] Appel créé avec succès - Session: ${callSession.id}`);
 
       // ========================================
-      // 8. RÉPONSE DE SUCCÈS
+      // 9. RÉPONSE DE SUCCÈS
       // ========================================
       return {
         success: true,
         sessionId: callSession.id,
         status: callSession.status,
-        scheduledFor: new Date(Date.now() + (delayMinutes * 60 * 1000)).toISOString(),
-        message: `Appel programmé dans ${delayMinutes} minutes`,
-        amount: amount / 100, // Convertir en euros pour l'affichage
-        amountInCents: amount // Garder aussi en centimes pour référence
+        scheduledFor: new Date(Date.now() + (validDelayMinutes * 60 * 1000)).toISOString(),
+        message: `Appel programmé dans ${validDelayMinutes} minutes`,
+        amount: amount / 100, // 🔧 FIX: Convertir en euros pour l'affichage
+        amountInCents: amount, // Garder aussi en centimes pour référence
+        serviceType,
+        providerType,
+        requestId,
+        paymentIntentId
       };
 
     } catch (error: unknown) {
       // ========================================
-      // 9. GESTION D'ERREURS
+      // 10. GESTION D'ERREURS
       // ========================================
       await logError('createAndScheduleCallFunction:error', {
         requestId,
@@ -191,9 +211,11 @@ export const createAndScheduleCallHTTPS = onCall(
           providerId: request.data.providerId,
           serviceType: request.data.serviceType,
           amount: request.data.amount,
+          amountInEuros: request.data.amount / 100,
           hasAuth: !!request.auth
         },
-        userAuth: request.auth?.uid || 'not-authenticated'
+        userAuth: request.auth?.uid || 'not-authenticated',
+        timestamp: new Date().toISOString()
       });
 
       // Si c'est déjà une HttpsError, la relancer telle quelle

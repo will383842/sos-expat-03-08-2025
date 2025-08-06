@@ -8,15 +8,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
 });
 
+// 🔧 FIX: Interface corrigée - tous les montants sont EN CENTIMES
 export interface StripePaymentData {
-  amount: number;
+  amount: number; // EN CENTIMES
   currency?: string;
   clientId: string;
   providerId: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
-  commissionAmount: number;
-  providerAmount: number;
+  commissionAmount: number; // EN CENTIMES
+  providerAmount: number; // EN CENTIMES
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -45,27 +46,27 @@ export class StripeManager {
   }
 
   /**
-   * Valide les données de paiement
+   * 🔧 FIX: Valide les données de paiement - MONTANTS EN CENTIMES
    */
   private validatePaymentData(data: StripePaymentData): void {
     const { amount, commissionAmount, providerAmount, clientId, providerId } = data;
 
-    // Validation des montants
+    // Validation des montants EN CENTIMES
     if (!amount || amount <= 0) {
       throw new Error('Montant invalide');
     }
 
-    if (amount < 500) { // 5€ minimum
+    if (amount < 500) { // 5€ minimum EN CENTIMES
       throw new Error('Montant minimum de 5€ requis');
     }
 
-    if (amount > 50000) { // 500€ maximum
+    if (amount > 50000) { // 500€ maximum EN CENTIMES
       throw new Error('Montant maximum de 500€ dépassé');
     }
 
-    // Validation de la répartition
-    if (commissionAmount + providerAmount !== amount) {
-      throw new Error('La répartition des montants ne correspond pas au total');
+    // Validation de la répartition EN CENTIMES
+    if (Math.abs(commissionAmount + providerAmount - amount) > 1) { // Tolérance 1 centime pour arrondis
+      throw new Error(`La répartition des montants ne correspond pas au total. Total: ${amount}, Commission: ${commissionAmount}, Provider: ${providerAmount}`);
     }
 
     if (commissionAmount < 0 || providerAmount < 0) {
@@ -80,10 +81,18 @@ export class StripeManager {
     if (clientId === providerId) {
       throw new Error('Le client et le prestataire ne peuvent pas être identiques');
     }
+
+    console.log('✅ StripeManager - Validation des montants réussie:', {
+      amount,
+      amountInEuros: amount / 100,
+      commissionAmount,
+      providerAmount,
+      coherent: Math.abs(commissionAmount + providerAmount - amount) <= 1
+    });
   }
 
   /**
-   * Crée un PaymentIntent avec validation complète
+   * 🔧 FIX: Crée un PaymentIntent avec montants EN CENTIMES
    */
   async createPaymentIntent(data: StripePaymentData): Promise<PaymentResult> {
     try {
@@ -99,9 +108,16 @@ export class StripeManager {
       // Vérifier que les utilisateurs existent
       await this.validateUsers(data.clientId, data.providerId);
 
-      // Créer le PaymentIntent
-      const paymentIntent = await stripe.paymentIntents.create({
+      console.log('💳 Création PaymentIntent Stripe:', {
         amount: data.amount,
+        amountInEuros: data.amount / 100,
+        currency: data.currency || 'eur',
+        serviceType: data.serviceType
+      });
+
+      // 🔧 FIX: Créer le PaymentIntent avec les montants EN CENTIMES (Stripe attend des centimes)
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: data.amount, // Déjà en centimes
         currency: data.currency || 'eur',
         capture_method: 'manual', // Capture différée obligatoire
         metadata: {
@@ -109,18 +125,27 @@ export class StripeManager {
           providerId: data.providerId,
           serviceType: data.serviceType,
           providerType: data.providerType,
-          commissionAmount: data.commissionAmount.toString(),
-          providerAmount: data.providerAmount.toString(),
+          commissionAmount: data.commissionAmount.toString(), // En centimes
+          providerAmount: data.providerAmount.toString(), // En centimes
+          commissionAmountEuros: (data.commissionAmount / 100).toFixed(2), // Pour référence humaine
+          providerAmountEuros: (data.providerAmount / 100).toFixed(2), // Pour référence humaine
           callSessionId: data.callSessionId || '',
           environment: process.env.NODE_ENV || 'development',
           ...data.metadata
         },
-        description: `Service ${data.serviceType} - ${data.providerType}`,
+        description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount/100}€`,
         statement_descriptor: 'SOS EXPAT',
         receipt_email: await this.getClientEmail(data.clientId)
       });
 
-      // Sauvegarder dans Firestore
+      console.log('✅ PaymentIntent Stripe créé:', {
+        id: paymentIntent.id,
+        amount: paymentIntent.amount,
+        amountInEuros: paymentIntent.amount / 100,
+        status: paymentIntent.status
+      });
+
+      // Sauvegarder dans Firestore avec montants EN CENTIMES
       await this.savePaymentRecord(paymentIntent, data);
 
       return {
@@ -148,7 +173,7 @@ export class StripeManager {
       // Récupérer le PaymentIntent
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       
-      if ((paymentIntent.status as string) === 'requires_capture') {
+      if ((paymentIntent.status as string) !== 'requires_capture') {
         throw new Error(`Impossible de capturer le paiement. Statut actuel: ${paymentIntent.status}`);
       }
 
@@ -159,6 +184,12 @@ export class StripeManager {
           throw new Error('Conditions de capture non remplies');
         }
       }
+
+      console.log('💰 Capture du paiement:', {
+        paymentIntentId,
+        amount: paymentIntent.amount,
+        amountInEuros: paymentIntent.amount / 100
+      });
 
       // Capturer le paiement
       const capturedPayment = await stripe.paymentIntents.capture(paymentIntentId);
@@ -175,10 +206,17 @@ export class StripeManager {
           additionalData: {
             paymentIntentId,
             amount: capturedPayment.amount,
+            amountInEuros: capturedPayment.amount / 100,
             currency: capturedPayment.currency
           }
         });
       }
+
+      console.log('✅ Paiement capturé avec succès:', {
+        id: capturedPayment.id,
+        amount: capturedPayment.amount,
+        amountInEuros: capturedPayment.amount / 100
+      });
 
       return {
         success: true,
@@ -201,7 +239,7 @@ export class StripeManager {
     paymentIntentId: string, 
     reason: string, 
     sessionId?: string,
-    amount?: number
+    amount?: number // EN CENTIMES si spécifié
   ): Promise<PaymentResult> {
     try {
       this.validateConfiguration();
@@ -214,21 +252,31 @@ export class StripeManager {
         if ((paymentIntent.status as string) === 'requires_capture') {
           await stripe.paymentIntents.cancel(paymentIntentId);
           await this.updatePaymentStatus(paymentIntentId, 'canceled');
+          console.log('✅ Paiement annulé (non capturé):', paymentIntentId);
           return { success: true, paymentIntentId };
         }
         
         throw new Error(`Impossible de rembourser. Statut: ${paymentIntent.status}`);
       }
 
+      console.log('💰 Remboursement du paiement:', {
+        paymentIntentId,
+        originalAmount: paymentIntent.amount,
+        refundAmount: amount || paymentIntent.amount,
+        amountInEuros: (amount || paymentIntent.amount) / 100,
+        reason
+      });
+
       // Créer le remboursement
       const refund = await stripe.refunds.create({
         payment_intent: paymentIntentId,
-        amount: amount, // Remboursement partiel si spécifié
+        amount: amount, // Remboursement partiel si spécifié (EN CENTIMES)
         reason: 'requested_by_customer',
         metadata: {
           refundReason: reason,
           sessionId: sessionId || '',
-          environment: process.env.NODE_ENV || 'development'
+          environment: process.env.NODE_ENV || 'development',
+          refundAmountEuros: ((amount || paymentIntent.amount) / 100).toString()
         }
       });
 
@@ -237,6 +285,7 @@ export class StripeManager {
         refundId: refund.id,
         refundReason: reason,
         refundAmount: refund.amount,
+        refundAmountEuros: refund.amount / 100,
         refundedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
@@ -250,10 +299,17 @@ export class StripeManager {
             paymentIntentId,
             refundId: refund.id,
             refundAmount: refund.amount,
+            refundAmountEuros: refund.amount / 100,
             refundReason: reason
           }
         });
       }
+
+      console.log('✅ Remboursement effectué avec succès:', {
+        refundId: refund.id,
+        amount: refund.amount,
+        amountInEuros: refund.amount / 100
+      });
 
       return {
         success: true,
@@ -292,10 +348,19 @@ export class StripeManager {
           retryCount: 0,
           additionalData: {
             paymentIntentId,
-            cancelReason: reason
+            cancelReason: reason,
+            amount: canceledPayment.amount,
+            amountInEuros: canceledPayment.amount / 100
           }
         });
       }
+
+      console.log('✅ Paiement annulé:', {
+        id: canceledPayment.id,
+        reason,
+        amount: canceledPayment.amount,
+        amountInEuros: canceledPayment.amount / 100
+      });
 
       return {
         success: true,
@@ -417,17 +482,20 @@ export class StripeManager {
   }
 
   /**
-   * Sauvegarde l'enregistrement de paiement
+   * 🔧 FIX: Sauvegarde l'enregistrement de paiement avec montants EN CENTIMES
    */
   private async savePaymentRecord(paymentIntent: Stripe.PaymentIntent, data: StripePaymentData): Promise<void> {
     const paymentRecord = {
       stripePaymentIntentId: paymentIntent.id,
       clientId: data.clientId,
       providerId: data.providerId,
-      amount: data.amount,
+      amount: data.amount, // EN CENTIMES
+      amountInEuros: data.amount / 100, // Pour référence humaine
       currency: data.currency || 'eur',
-      commissionAmount: data.commissionAmount,
-      providerAmount: data.providerAmount,
+      commissionAmount: data.commissionAmount, // EN CENTIMES
+      commissionAmountEuros: data.commissionAmount / 100,
+      providerAmount: data.providerAmount, // EN CENTIMES
+      providerAmountEuros: data.providerAmount / 100,
       serviceType: data.serviceType,
       providerType: data.providerType,
       callSessionId: data.callSessionId || null,
@@ -440,6 +508,12 @@ export class StripeManager {
     };
 
     await this.db.collection('payments').doc(paymentIntent.id).set(paymentRecord);
+    
+    console.log('✅ Enregistrement paiement sauvegardé en DB:', {
+      id: paymentIntent.id,
+      amount: data.amount,
+      amountInEuros: data.amount / 100
+    });
   }
 
   /**
@@ -455,10 +529,12 @@ export class StripeManager {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       ...additionalData
     });
+
+    console.log(`📝 Statut paiement mis à jour: ${paymentIntentId} -> ${status}`);
   }
 
   /**
-   * Récupère les statistiques de paiement
+   * 🔧 FIX: Récupère les statistiques de paiement avec montants EN CENTIMES
    */
   async getPaymentStatistics(options: {
     startDate?: admin.firestore.Timestamp;
@@ -466,13 +542,15 @@ export class StripeManager {
     providerId?: string;
     serviceType?: string;
   } = {}): Promise<{
-    totalAmount: number;
-    totalCommission: number;
-    totalProviderAmount: number;
+    totalAmount: number; // EN CENTIMES
+    totalAmountEuros: number; // EN EUROS pour lisibilité
+    totalCommission: number; // EN CENTIMES
+    totalProviderAmount: number; // EN CENTIMES
     paymentCount: number;
     successfulPayments: number;
     refundedPayments: number;
-    averageAmount: number;
+    averageAmount: number; // EN CENTIMES
+    averageAmountEuros: number; // EN EUROS pour lisibilité
   }> {
     try {
       let query = this.db.collection('payments') as any;
@@ -492,9 +570,9 @@ export class StripeManager {
 
       const snapshot = await query.get();
 
-      let totalAmount = 0;
-      let totalCommission = 0;
-      let totalProviderAmount = 0;
+      let totalAmount = 0; // EN CENTIMES
+      let totalCommission = 0; // EN CENTIMES
+      let totalProviderAmount = 0; // EN CENTIMES
       let successfulPayments = 0;
       let refundedPayments = 0;
 
@@ -502,9 +580,9 @@ export class StripeManager {
         const payment = doc.data();
         
         if (payment.status === 'succeeded' || payment.status === 'captured') {
-          totalAmount += payment.amount;
-          totalCommission += payment.commissionAmount;
-          totalProviderAmount += payment.providerAmount;
+          totalAmount += payment.amount; // Déjà en centimes
+          totalCommission += payment.commissionAmount; // Déjà en centimes
+          totalProviderAmount += payment.providerAmount; // Déjà en centimes
           successfulPayments++;
         }
         
@@ -513,14 +591,18 @@ export class StripeManager {
         }
       });
 
+      const averageAmount = successfulPayments > 0 ? totalAmount / successfulPayments : 0;
+
       return {
         totalAmount,
+        totalAmountEuros: totalAmount / 100,
         totalCommission,
         totalProviderAmount,
         paymentCount: snapshot.size,
         successfulPayments,
         refundedPayments,
-        averageAmount: successfulPayments > 0 ? totalAmount / successfulPayments : 0
+        averageAmount,
+        averageAmountEuros: averageAmount / 100
       };
 
     } catch (error) {

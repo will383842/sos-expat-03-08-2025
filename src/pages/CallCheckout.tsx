@@ -61,7 +61,7 @@ interface User {
 }
 
 interface PaymentIntentData {
-  amount: number;
+  amount: number; // EN CENTIMES maintenant
   currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
@@ -69,8 +69,8 @@ interface PaymentIntentData {
   clientEmail?: string;
   providerName?: string;
   description?: string;
-  commissionAmount: number;
-  providerAmount: number;
+  commissionAmount: number; // EN CENTIMES
+  providerAmount: number; // EN CENTIMES
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -91,11 +91,13 @@ interface CreateAndScheduleCallData {
   clientId: string;
   providerPhone: string;
   clientPhone: string;
-  providerType: string;
-  serviceType: string;
-  amount: number;
-  duration: number;
+  serviceType: 'lawyer_call' | 'expat_call';
+  providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
+  amount: number; // EN CENTIMES
+  delayMinutes?: number;
+  clientLanguages?: string[];
+  providerLanguages?: string[];
 }
 
 type StepType = 'payment' | 'calling' | 'completed';
@@ -214,63 +216,70 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       setIsProcessing(true);
 
+      // 🔧 FIX CRITIQUE: Conversion en centimes pour Stripe
+      const amountInCents = Math.round(service.amount * 100);
+      const commissionInCents = Math.round(service.commissionAmount * 100);
+      const providerAmountInCents = Math.round(service.providerAmount * 100);
+
+      // 🔧 FIX: Validation des montants minimum
+      if (amountInCents < 500) { // 5€ minimum pour Stripe
+        onError('Le montant minimum est de 5€ pour une transaction sécurisée.');
+        return;
+      }
+
+      // 🔧 FIX: Validation de la cohérence des montants
+      if (Math.abs(amountInCents - (commissionInCents + providerAmountInCents)) > 1) {
+        onError('Erreur dans la répartition des montants. Veuillez réessayer.');
+        return;
+      }
+
       // 1. Créer le PaymentIntent via Firebase Function
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
       
-      // 🔧 FIX: Construire les données exactement comme attendu par la Cloud Function
+      // 🔧 FIX: Envoyer les montants en CENTIMES à la Cloud Function
       const paymentData: PaymentIntentData = {
-        amount: service.amount, // ❌ PAS de conversion en centimes ici (la Cloud Function le fait)
-        currency: 'eur',
-        serviceType: service.serviceType,
-        providerId: provider.id,
-        clientId: user.uid,
-        clientEmail: user.email || '', // ✅ Champ ajouté
-        providerName: provider.fullName || provider.name || '', // ✅ Champ ajouté
-        description: `Consultation ${service.serviceType === 'lawyer_call' ? 'avocat' : 'expatriation'}`, // ✅ Champ ajouté
-        commissionAmount: service.commissionAmount, // ❌ PAS de conversion en centimes
-        providerAmount: service.providerAmount, // ❌ PAS de conversion en centimes
-        callSessionId: undefined, // ✅ Optionnel mais spécifié
-        metadata: {
-          providerType: provider.role || provider.type || 'expat',
-          duration: service.duration.toString(),
-          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
-        }
-      };
+  amount: Math.round(service.amount * 100), // 4900 (centimes)
+  commissionAmount: Math.round(service.commissionAmount * 100), // 980 (centimes)
+  providerAmount: Math.round(service.providerAmount * 100), // 3920 (centimes)
+  currency: 'eur',
+  serviceType: service.serviceType,
+  providerId: provider.id,
+  clientId: user.uid,
+  clientEmail: user.email || '',
+  providerName: provider.fullName || provider.name || '',
+  description: `Consultation ${service.serviceType === 'lawyer_call' ? 'avocat' : 'expatriation'}`,
+  callSessionId: undefined,
+  metadata: {
+    providerType: provider.role || provider.type || 'expat',
+    duration: service.duration.toString(),
+    clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+  }
+};
 
-      // 🔍 DEBUG: Log des données envoyées
-      console.log('💳 === DÉBUT DEBUG PAYMENT ===');
-      console.log('💰 Service data original:', service);
-      console.log('👤 Provider data:', {
-        id: provider.id,
-        name: provider.fullName || provider.name,
-        role: provider.role || provider.type
+      // 🔍 DEBUG amélioré
+      console.log('💳 === DÉBUT DEBUG PAYMENT (CORRIGÉ) ===');
+      console.log('💰 Montants originaux (en €):', {
+        serviceAmount: service.amount,
+        commission: service.commissionAmount,
+        provider: service.providerAmount
       });
-      console.log('🙋 User data:', {
-        uid: user.uid,
-        email: user.email,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+      console.log('💰 Montants convertis (en centimes):', {
+        amountInCents,
+        commissionInCents,
+        providerAmountInCents,
+        total_coherent: (commissionInCents + providerAmountInCents) === amountInCents
       });
-      console.log('📤 Données envoyées à createPaymentIntent:', paymentData);
-      console.log('🔢 Vérifications des types:', {
-        amount: `${paymentData.amount} (${typeof paymentData.amount})`,
-        providerId: `${paymentData.providerId} (${typeof paymentData.providerId})`,
-        clientId: `${paymentData.clientId} (${typeof paymentData.clientId})`,
-        serviceType: `${paymentData.serviceType} (${typeof paymentData.serviceType})`,
-        commissionAmount: `${paymentData.commissionAmount} (${typeof paymentData.commissionAmount})`,
-        providerAmount: `${paymentData.providerAmount} (${typeof paymentData.providerAmount})`
+      console.log('✅ Validation Stripe:', {
+        minimum_respecte: amountInCents >= 500,
+        coherence_totale: Math.abs(amountInCents - (commissionInCents + providerAmountInCents)) <= 1
       });
-      console.log('💰 Cohérence des montants:', {
-        total_demandé: paymentData.amount,
-        commission_plus_provider: paymentData.commissionAmount + paymentData.providerAmount,
-        différence: Math.abs(paymentData.amount - (paymentData.commissionAmount + paymentData.providerAmount)),
-        cohérent: Math.abs(paymentData.amount - (paymentData.commissionAmount + paymentData.providerAmount)) < 0.01
-      });
+      console.log('📤 Données envoyées (EN CENTIMES):', paymentData);
       console.log('💳 === FIN DEBUG PAYMENT ===');
 
       console.log('📤 Envoi de la requête createPaymentIntent...');
       const paymentResponse = await createPaymentIntent(paymentData);
-      console.log('📥 Réponse complète reçue:', paymentResponse);
+      console.log('📥 Réponse reçue:', paymentResponse);
 
       const clientSecret = paymentResponse.data.clientSecret;
       if (!clientSecret) {
@@ -304,16 +313,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
       console.log('💳 Statut du paiement:', paymentIntent.status);
 
-      // ✅ CORRECTION: Traiter requires_capture comme un SUCCÈS
+      // ✅ Traitement des statuts de paiement
       if (paymentIntent.status === 'succeeded') {
         console.log("✅ Paiement réussi et débité immédiatement :", paymentIntent.id);
       } else if (paymentIntent.status === 'requires_capture') {
         console.log("✅ Paiement autorisé, fonds réservés :", paymentIntent.id);
         console.log("💰 Le débit aura lieu après la mise en relation réussie");
-        // ✅ C'est un SUCCÈS dans votre workflow de capture différée !
       } else if (paymentIntent.status === 'processing') {
         console.warn("⚠️ Paiement en cours de traitement :", paymentIntent.id);
-        // ✅ Également un succès, continuer
       } else if (paymentIntent.status === 'requires_action') {
         console.warn("⚠️ Action supplémentaire requise :", paymentIntent.id);
         throw new Error("Une authentification supplémentaire est requise pour ce paiement.");
@@ -322,7 +329,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       } else if (paymentIntent.status === 'canceled') {
         throw new Error("Le paiement a été annulé.");
       } else {
-        // Pour tous les autres statuts inattendus
         throw new Error(`Statut de paiement inattendu : ${paymentIntent.status}`);
       }
 
@@ -331,16 +337,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
         httpsCallable(functions, 'createAndScheduleCall');
       
-      const callData = {
+      // 🔧 FIX: Données d'appel avec montants en centimes
+      const callData: CreateAndScheduleCallData = {
         providerId: provider.id,
         clientId: user.uid,
         providerPhone: provider.phoneNumber || provider.phone || '',
         clientPhone: service.clientPhone || user.phone || '',
-        providerType: provider.role || provider.type || 'expat',
         serviceType: service.serviceType,
-        amount: service.amount,
-        duration: service.duration,
+        providerType: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
         paymentIntentId: paymentIntent.id,
+        amount: amountInCents, // 🔧 EN CENTIMES
+        delayMinutes: 5,
+        clientLanguages: ['fr'],
+        providerLanguages: provider.languagesSpoken || provider.languages || ['fr']
       };
 
       console.log('📞 Données d\'appel:', callData);
@@ -362,14 +371,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       let errorMessage = 'Une erreur est survenue lors du paiement';
       
       if (error instanceof Error) {
-        if (error.message.includes('validation')) {
+        if (error.message.includes('Montant minimum')) {
+          errorMessage = 'Le montant minimum pour une consultation est de 5€.';
+        } else if (error.message.includes('invalid-argument')) {
           errorMessage = 'Données de paiement invalides. Veuillez vérifier vos informations.';
         } else if (error.message.includes('network')) {
           errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.';
-        } else if (error.message.includes('amount')) {
-          errorMessage = 'Montant de paiement invalide.';
-        } else if (error.message.includes('FirebaseError')) {
-          errorMessage = `Erreur du serveur: ${error.message}`;
+        } else if (error.message.includes('unauthenticated')) {
+          errorMessage = 'Session expirée. Veuillez vous reconnecter.';
+        } else if (error.message.includes('permission-denied')) {
+          errorMessage = 'Permissions insuffisantes. Contactez le support.';
+        } else if (error.message.includes('resource-exhausted')) {
+          errorMessage = 'Trop de tentatives. Veuillez attendre avant de réessayer.';
         } else {
           errorMessage = error.message;
         }

@@ -361,17 +361,25 @@ const scheduleCallSequence = async (callSessionId, delayMinutes = SCHEDULER_CONF
 };
 exports.scheduleCallSequence = scheduleCallSequence;
 /**
- * Fonction pour créer et programmer un nouvel appel
+ * 🔧 FIX: Fonction pour créer et programmer un nouvel appel - MONTANT EN CENTIMES
  */
 const createAndScheduleCall = async (params) => {
     try {
         // Générer un ID unique si non fourni
         const sessionId = params.sessionId || `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
-        // Valider les paramètres obligatoires
+        console.log(`💰 Montant: ${params.amount} centimes (${params.amount / 100}€)`);
+        // 🔧 FIX: Valider les paramètres avec montants EN CENTIMES
         if (!params.providerId || !params.clientId || !params.providerPhone ||
             !params.clientPhone || !params.paymentIntentId || !params.amount) {
             throw new Error('Paramètres obligatoires manquants pour créer l\'appel');
+        }
+        // 🔧 FIX: Validation du montant EN CENTIMES
+        if (params.amount < 500) { // 5€ minimum
+            throw new Error('Montant minimum de 5€ requis');
+        }
+        if (params.amount > 50000) { // 500€ maximum
+            throw new Error('Montant maximum de 500€ dépassé');
         }
         // Créer la session via le TwilioCallManager
         const callSession = await TwilioCallManager_1.twilioCallManager.createCallSession({
@@ -383,7 +391,7 @@ const createAndScheduleCall = async (params) => {
             serviceType: params.serviceType,
             providerType: params.providerType,
             paymentIntentId: params.paymentIntentId,
-            amount: params.amount,
+            amount: params.amount, // EN CENTIMES
             requestId: params.requestId,
             clientLanguages: params.clientLanguages,
             providerLanguages: params.providerLanguages
@@ -406,6 +414,7 @@ const createAndScheduleCall = async (params) => {
             additionalData: {
                 serviceType: params.serviceType,
                 amount: params.amount,
+                amountInEuros: params.amount / 100,
                 delayMinutes: delayMinutes
             }
         });

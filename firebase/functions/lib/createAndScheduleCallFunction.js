@@ -5,7 +5,7 @@ const https_1 = require("firebase-functions/v2/https");
 const callScheduler_1 = require("./callScheduler");
 const logError_1 = require("./utils/logs/logError");
 /**
- * Cloud Function pour créer et programmer un appel
+ * 🔧 Cloud Function CORRIGÉE pour créer et programmer un appel
  */
 exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
     // ✅ Configuration CORS
@@ -28,7 +28,8 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // ========================================
         // 2. VALIDATION DES DONNÉES
         // ========================================
-        const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, delayMinutes = 5, clientLanguages, providerLanguages } = request.data;
+        const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, // EN CENTIMES
+        delayMinutes = 5, clientLanguages, providerLanguages } = request.data;
         // Vérification des champs obligatoires
         if (!providerId || !clientId || !providerPhone || !clientPhone ||
             !serviceType || !providerType || !paymentIntentId || !amount) {
@@ -52,15 +53,32 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             throw new https_1.HttpsError('invalid-argument', `Type de prestataire invalide. Types autorisés: ${allowedProviderTypes.join(', ')}`);
         }
         // ========================================
-        // 5. VALIDATION DES MONTANTS
+        // 5. 🔧 FIX: VALIDATION DES MONTANTS EN CENTIMES
         // ========================================
-        if (amount <= 0 || amount > 50000) { // Max 500€
+        if (amount <= 0 || amount > 50000) { // Max 500€ en centimes
             throw new https_1.HttpsError('invalid-argument', 'Montant invalide. Doit être entre 0.01€ et 500€.');
         }
+        if (amount < 500) { // 5€ minimum en centimes
+            throw new https_1.HttpsError('invalid-argument', 'Montant minimum de 5€ requis.');
+        }
         // ========================================
-        // 6. CRÉATION ET PLANIFICATION DE L'APPEL
+        // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE
+        // ========================================
+        const phoneRegex = /^\+[1-9]\d{8,14}$/;
+        if (!phoneRegex.test(providerPhone)) {
+            throw new https_1.HttpsError('invalid-argument', 'Numéro de téléphone prestataire invalide. Format requis: +33XXXXXXXXX');
+        }
+        if (!phoneRegex.test(clientPhone)) {
+            throw new https_1.HttpsError('invalid-argument', 'Numéro de téléphone client invalide. Format requis: +33XXXXXXXXX');
+        }
+        if (providerPhone === clientPhone) {
+            throw new https_1.HttpsError('invalid-argument', 'Les numéros du prestataire et du client doivent être différents.');
+        }
+        // ========================================
+        // 7. CRÉATION ET PLANIFICATION DE L'APPEL
         // ========================================
         console.log(`[${requestId}] Création appel - Client: ${clientId}, Provider: ${providerId}`);
+        console.log(`[${requestId}] Montant: ${amount} centimes (${amount / 100}€)`);
         const callSession = await (0, callScheduler_1.createAndScheduleCall)({
             providerId,
             clientId,
@@ -69,7 +87,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             serviceType,
             providerType,
             paymentIntentId,
-            amount,
+            amount, // EN CENTIMES
             delayMinutes: Math.min(Math.max(delayMinutes, 0), 10), // Entre 0 et 10 minutes
             requestId,
             clientLanguages,
@@ -77,19 +95,21 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         });
         console.log(`[${requestId}] Appel créé avec succès - Session: ${callSession.id}`);
         // ========================================
-        // 7. RÉPONSE DE SUCCÈS
+        // 8. RÉPONSE DE SUCCÈS
         // ========================================
         return {
             success: true,
             sessionId: callSession.id,
             status: callSession.status,
             scheduledFor: new Date(Date.now() + (delayMinutes * 60 * 1000)).toISOString(),
-            message: `Appel programmé dans ${delayMinutes} minutes`
+            message: `Appel programmé dans ${delayMinutes} minutes`,
+            amount: amount / 100, // Convertir en euros pour l'affichage
+            amountInCents: amount // Garder aussi en centimes pour référence
         };
     }
     catch (error) {
         // ========================================
-        // 8. GESTION D'ERREURS
+        // 9. GESTION D'ERREURS
         // ========================================
         await (0, logError_1.logError)('createAndScheduleCallFunction:error', {
             requestId,
@@ -98,6 +118,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             requestData: {
                 providerId: request.data.providerId,
                 serviceType: request.data.serviceType,
+                amount: request.data.amount,
                 hasAuth: !!request.auth
             },
             userAuth: ((_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid) || 'not-authenticated'

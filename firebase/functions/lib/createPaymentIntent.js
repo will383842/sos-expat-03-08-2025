@@ -33,1291 +33,621 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-const react_1 = __importStar(require("react"));
-const lucide_react_1 = require("lucide-react");
-const react_router_dom_1 = require("react-router-dom");
-const firestore_1 = require("firebase/firestore");
-const firebase_1 = require("../../config/firebase");
-const AppContext_1 = require("../../contexts/AppContext");
-const countryCoordinates_1 = require("../../utils/countryCoordinates");
-// 2025 Constants with performance optimization
-const DEFAULT_AVATAR = '/images/default-avatar.webp';
-const FIREBASE_COLLECTION = 'sos_profiles';
-const DEFAULT_ITEMS_PER_PAGE = 9;
-const DEFAULT_MAX_ITEMS = 100;
-const CAROUSEL_VISIBLE_ITEMS = 3;
-const DEBOUNCE_DELAY = 300;
-const IMAGE_SIZES = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
-// Performance optimization hook for debouncing
-const useDebounce = (value, delay) => {
-    const [debouncedValue, setDebouncedValue] = (0, react_1.useState)(value);
-    (0, react_1.useEffect)(() => {
-        const handler = setTimeout(() => {
-            setDebouncedValue(value);
-        }, delay);
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [value, delay]);
-    return debouncedValue;
+exports.createPaymentIntent = void 0;
+const https_1 = require("firebase-functions/v2/https");
+const StripeManager_1 = require("./StripeManager");
+const logError_1 = require("./utils/logs/logError");
+const admin = __importStar(require("firebase-admin"));
+// =========================================
+// 🌍 DÉTECTION D'ENVIRONNEMENT INTELLIGENTE
+// =========================================
+const isDevelopment = process.env.NODE_ENV === 'development' ||
+    process.env.NODE_ENV === 'dev' ||
+    !process.env.NODE_ENV; // Par défaut = dev
+const isProduction = process.env.NODE_ENV === 'production';
+// Variable de bypass d'urgence (à utiliser avec EXTRÊME précaution)
+const BYPASS_MODE = process.env.BYPASS_SECURITY === 'true';
+// Log de démarrage pour vérifier l'environnement
+console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}, Production: ${isProduction}, Bypass: ${BYPASS_MODE}`);
+// Rate limiting store (en production, utiliser Redis)
+const rateLimitStore = new Map();
+// =========================================
+// ⚙️ CONFIGURATION ADAPTÉE À L'ENVIRONNEMENT
+// =========================================
+const SECURITY_LIMITS = {
+    RATE_LIMIT: {
+        // Développement: Très permissif pour les tests
+        // Test/Staging: Modéré
+        // Production: Sécurisé mais raisonnable
+        MAX_REQUESTS: isDevelopment ? 1000 : (isProduction ? 25 : 100),
+        WINDOW_MS: isDevelopment ? 2 * 60 * 1000 : (isProduction ? 8 * 60 * 1000 : 5 * 60 * 1000), // 2min dev, 8min prod, 5min test
+        GLOBAL_MAX: isDevelopment ? 10000 : (isProduction ? 1000 : 2000),
+    },
+    AMOUNT_LIMITS: {
+        // 🔧 FIX: Limites EN CENTIMES (cohérent avec Stripe)
+        MIN_AMOUNT: 500, // 5€ en centimes
+        MAX_AMOUNT: 50000, // 500€ en centimes 
+        MAX_DAILY_USER: 200000, // 2000€ par jour par utilisateur EN CENTIMES
+    },
+    VALIDATION: {
+        MAX_METADATA_SIZE: isDevelopment ? 10000 : (isProduction ? 3000 : 5000),
+        MAX_DESCRIPTION_LENGTH: isDevelopment ? 5000 : (isProduction ? 1500 : 2000),
+        // Tolérance pour cohérence des montants EN CENTIMES
+        AMOUNT_COHERENCE_TOLERANCE: isDevelopment ? 50 : (isProduction ? 5 : 10), // 🔧 FIX: EN CENTIMES
+        // Tolérance pour validation business EN CENTIMES
+        BUSINESS_AMOUNT_TOLERANCE: isDevelopment ? 5000 : (isProduction ? 1500 : 2500), // 🔧 FIX: EN CENTIMES
+        ALLOWED_CURRENCIES: ['eur', 'usd', 'gbp'],
+        ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'],
+    },
+    DUPLICATES: {
+        // Fenêtre de vérification des doublons
+        WINDOW_MS: isDevelopment ? 30 * 1000 : (isProduction ? 5 * 60 * 1000 : 2 * 60 * 1000), // 30s dev, 5min prod, 2min test
+    }
 };
-const ProfileCards = ({ mode = 'carousel', filter = 'all', itemsPerPage = DEFAULT_ITEMS_PER_PAGE, maxItems = DEFAULT_MAX_ITEMS, onProviderClick, showFilters = true, className = '', ariaLabel, testId, priority = 'high', }) => {
-    const { language = 'fr' } = (0, AppContext_1.useApp)();
-    const navigate = (0, react_router_dom_1.useNavigate)();
-    // Core states with performance optimization
-    const [providers, setProviders] = (0, react_1.useState)([]);
-    const [filteredProviders, setFilteredProviders] = (0, react_1.useState)([]);
-    const [isLoading, setIsLoading] = (0, react_1.useState)(true);
-    const [error, setError] = (0, react_1.useState)(null);
-    // Filter states with AI-friendly structure
-    const [activeFilter, setActiveFilter] = (0, react_1.useState)(filter === 'providers-only' ? 'all' : filter);
-    const [searchTerm, setSearchTerm] = (0, react_1.useState)('');
-    const [selectedCountry, setSelectedCountry] = (0, react_1.useState)('all');
-    const [selectedLanguage, setSelectedLanguage] = (0, react_1.useState)('all');
-    const [onlineOnly, setOnlineOnly] = (0, react_1.useState)(false);
-    const [sortBy, setSortBy] = (0, react_1.useState)('rating');
-    const [sortOrder, setSortOrder] = (0, react_1.useState)('desc');
-    // Navigation states
-    const [currentIndex, setCurrentIndex] = (0, react_1.useState)(0);
-    const [currentPage, setCurrentPage] = (0, react_1.useState)(1);
-    // Debounced search for performance
-    const debouncedSearchTerm = useDebounce(searchTerm, DEBOUNCE_DELAY);
-    // Memoized filter options for AI indexing
-    const availableCountries = (0, react_1.useMemo)(() => Array.from(new Set(providers.map(p => p.country)))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b, language, { sensitivity: 'base' })), [providers, language]);
-    const availableLanguages = (0, react_1.useMemo)(() => Array.from(new Set(providers.flatMap(p => p.languages)))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b, language, { sensitivity: 'base' })), [providers, language]);
-    // Enhanced Firebase document transformation for AI compatibility
-    const transformFirestoreDoc = (0, react_1.useCallback)((doc) => {
-        var _a, _b;
-        try {
-            const data = doc.data();
-            if (!data || typeof data !== 'object') {
-                console.warn(`[ProfileCards] Invalid document data for ${doc.id}`);
-                return null;
+// =========================================
+// 🛡️ FONCTIONS DE SÉCURITÉ ADAPTÉES
+// =========================================
+/**
+ * Rate limiting avec configuration par environnement
+ */
+function checkRateLimit(userId) {
+    // Bypass complet en mode debug
+    if (BYPASS_MODE) {
+        logSecurityEvent('rate_limit_bypassed', { userId });
+        return { allowed: true };
+    }
+    // Nettoyage automatique du cache en développement
+    if (isDevelopment) {
+        const now = Date.now();
+        for (const [key, limit] of rateLimitStore.entries()) {
+            if (now > limit.resetTime) {
+                rateLimitStore.delete(key);
             }
-            // Enhanced validation with AI-friendly structure
-            const firstName = String(data.firstName || '').trim();
-            const lastName = String(data.lastName || '').trim();
-            const fullName = String(data.fullName || `${firstName} ${lastName}`).trim();
-            if (!fullName || fullName.length < 2) {
-                console.warn(`[ProfileCards] Invalid name for document ${doc.id}`);
-                return null;
-            }
-            const typeRaw = data.type;
-            if (typeRaw !== 'lawyer' && typeRaw !== 'expat') {
-                console.warn(`[ProfileCards] Invalid type for document ${doc.id}: ${typeRaw}`);
-                return null;
-            }
-            const country = String(data.currentPresenceCountry || data.country || '').trim();
-            if (!country || !(0, countryCoordinates_1.getCountryCoordinates)(country)) {
-                console.warn(`[ProfileCards] Invalid country for document ${doc.id}: ${country}`);
-                return null;
-            }
-            // Safe array extraction
-            const languages = Array.isArray(data.languages) && data.languages.length > 0
-                ? data.languages.filter((lang) => typeof lang === 'string' && lang.trim().length > 0)
-                : [language === 'fr' ? 'Français' : 'English'];
-            const specialties = Array.isArray(data.specialties)
-                ? data.specialties.filter((spec) => typeof spec === 'string' && spec.trim().length > 0)
-                : [];
-            const certifications = Array.isArray(data.certifications)
-                ? data.certifications.filter((cert) => typeof cert === 'string' && cert.trim().length > 0)
-                : [];
-            // Safe timestamp conversion
-            const createdAt = ((_a = data.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis) ? data.createdAt.toMillis() : (data.createdAt || Date.now());
-            const updatedAt = ((_b = data.updatedAt) === null || _b === void 0 ? void 0 : _b.toMillis) ? data.updatedAt.toMillis() : (data.updatedAt || Date.now());
-            // AI-optimized provider object with rich metadata
-            const provider = {
-                id: doc.id,
-                name: fullName,
-                fullName,
-                firstName: firstName || fullName.split(' ')[0] || '',
-                lastName: lastName || fullName.split(' ').slice(1).join(' ') || '',
-                type: typeRaw,
-                country,
-                countryCode: String(data.countryCode || '').trim(),
-                languages: Object.freeze(languages),
-                specialties: Object.freeze(specialties),
-                rating: Math.max(0, Math.min(5, Number(data.rating) || 4.5)),
-                reviewCount: Math.max(0, Number(data.reviewCount) || 0),
-                yearsOfExperience: Math.max(0, Number(data.yearsOfExperience) || Number(data.yearsAsExpat) || 0),
-                isOnline: Boolean(data.isOnline),
-                isApproved: data.isApproved !== false,
-                isVisible: data.isVisible !== false,
-                isActive: data.isActive !== false,
-                avatar: String(data.profilePhoto || data.photoURL || data.avatar || DEFAULT_AVATAR),
-                description: String(data.description || data.bio ||
-                    (typeRaw === 'lawyer'
-                        ? `Expert juridique en ${country} avec ${Number(data.yearsOfExperience) || 0} ans d'expérience`
-                        : `Expert expatriation en ${country} avec ${Number(data.yearsAsExpat) || 0} ans d'expérience`)),
-                price: Math.max(1, Number(data.price) || (typeRaw === 'lawyer' ? 49 : 19)),
-                duration: Math.max(1, Number(data.duration) || (typeRaw === 'lawyer' ? 20 : 30)),
-                createdAt: typeof createdAt === 'number' ? createdAt : Date.now(),
-                updatedAt: typeof updatedAt === 'number' ? updatedAt : Date.now(),
-                timezone: String(data.timezone || '').trim(),
-                responseTime: String(data.responseTime || '< 5 minutes'),
-                successRate: Math.max(0, Math.min(100, Number(data.successRate) || 95)),
-                certifications: Object.freeze(certifications),
-                slug: String(data.slug || fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-')),
-            };
-            return provider;
         }
-        catch (error) {
-            console.error(`[ProfileCards] Error transforming document ${doc.id}:`, error);
-            return null;
-        }
-    }, [language]);
-    // Enhanced Firebase query with 2025 optimization
-    const loadProviders = (0, react_1.useCallback)(() => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            // AI-optimized Firebase query with proper indexing
-            let firestoreQuery = (0, firestore_1.query)((0, firestore_1.collection)(firebase_1.db, FIREBASE_COLLECTION), (0, firestore_1.orderBy)('isOnline', 'desc'), (0, firestore_1.orderBy)('rating', 'desc'), (0, firestore_1.orderBy)('updatedAt', 'desc'), (0, firestore_1.limit)(maxItems));
-            // Enhanced filters for providers
-            if (filter === 'providers-only') {
-                firestoreQuery = (0, firestore_1.query)((0, firestore_1.collection)(firebase_1.db, FIREBASE_COLLECTION), (0, firestore_1.where)('isApproved', '==', true), (0, firestore_1.where)('isVisible', '==', true), (0, firestore_1.where)('isActive', '==', true), (0, firestore_1.orderBy)('isOnline', 'desc'), (0, firestore_1.orderBy)('rating', 'desc'), (0, firestore_1.limit)(maxItems));
-            }
-            const unsubscribe = (0, firestore_1.onSnapshot)(firestoreQuery, (snapshot) => {
-                const validProviders = [];
-                snapshot.docs.forEach((doc) => {
-                    const provider = transformFirestoreDoc(doc);
-                    if (provider) {
-                        validProviders.push(provider);
-                    }
-                });
-                // Performance optimization: freeze array
-                setProviders(Object.freeze(validProviders));
-                setIsLoading(false);
-                if (validProviders.length === 0 && !error) {
-                    setError('Aucun prestataire trouvé');
-                }
-            }, (firebaseError) => {
-                console.error('[ProfileCards] Firebase error:', firebaseError);
-                setError('Erreur de chargement des prestataires');
-                setProviders([]);
-                setIsLoading(false);
-            });
-            return unsubscribe;
-        }
-        catch (error) {
-            console.error('[ProfileCards] Query construction error:', error);
-            setError('Erreur de configuration');
-            setIsLoading(false);
-            return () => { };
-        }
-    }, [maxItems, filter, transformFirestoreDoc, error]);
-    // Effect with cleanup for memory optimization
-    (0, react_1.useEffect)(() => {
-        const unsubscribe = loadProviders();
-        return () => {
-            if (typeof unsubscribe === 'function') {
-                unsubscribe();
-            }
-        };
-    }, [loadProviders]);
-    // AI-optimized filtering with semantic search capabilities
-    const { filteredAndSortedProviders, totalPages } = (0, react_1.useMemo)(() => {
-        if (!providers.length) {
-            return { filteredAndSortedProviders: [], totalPages: 1 };
-        }
-        let filtered = [...providers];
-        // Base filters with AI-friendly logic
-        if (filter === 'providers-only') {
-            filtered = filtered.filter(provider => provider.type === 'expat' || (provider.type === 'lawyer' && provider.isApproved));
-        }
-        else if (activeFilter !== 'all') {
-            filtered = filtered.filter(provider => provider.type === activeFilter);
-        }
-        // Enhanced semantic search for AI compatibility
-        if (debouncedSearchTerm.trim()) {
-            const searchLower = debouncedSearchTerm.toLowerCase().trim();
-            const searchTerms = searchLower.split(' ').filter(Boolean);
-            filtered = filtered.filter(provider => {
-                const searchableContent = [
-                    provider.name,
-                    provider.fullName,
-                    provider.firstName,
-                    provider.lastName,
-                    provider.country,
-                    provider.description,
-                    ...provider.languages,
-                    ...provider.specialties,
-                    ...(provider.certifications || []),
-                    provider.type === 'lawyer' ? 'avocat juriste juridique droit' : 'expatrié expat immigration visa',
-                ].join(' ').toLowerCase();
-                // Multi-term search with relevance
-                return searchTerms.every(term => searchableContent.includes(term) ||
-                    // Fuzzy matching for typos
-                    searchableContent.includes(term.slice(0, -1)) ||
-                    searchableContent.includes(term + 's'));
-            });
-        }
-        // Geographic and language filters
-        if (selectedCountry !== 'all') {
-            filtered = filtered.filter(provider => provider.country === selectedCountry);
-        }
-        if (selectedLanguage !== 'all') {
-            filtered = filtered.filter(provider => provider.languages.includes(selectedLanguage));
-        }
-        if (onlineOnly) {
-            filtered = filtered.filter(provider => provider.isOnline);
-        }
-        // AI-friendly sorting with multiple criteria
-        filtered.sort((a, b) => {
-            // Priority to online providers
-            if (a.isOnline !== b.isOnline) {
-                return (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
-            }
-            const factor = sortOrder === 'asc' ? 1 : -1;
-            switch (sortBy) {
-                case 'rating': {
-                    const ratingDiff = (b.rating - a.rating) * factor;
-                    return ratingDiff !== 0 ? ratingDiff : (b.reviewCount - a.reviewCount);
-                }
-                case 'price':
-                    return (a.price - b.price) * factor;
-                case 'experience':
-                    return (b.yearsOfExperience - a.yearsOfExperience) * factor;
-                default:
-                    return 0;
-            }
+    }
+    const now = Date.now();
+    const key = `payment_${userId}`;
+    const limit = rateLimitStore.get(key);
+    // Nettoyer les anciens enregistrements
+    if (limit && now > limit.resetTime) {
+        rateLimitStore.delete(key);
+    }
+    const currentLimit = rateLimitStore.get(key) || {
+        count: 0,
+        resetTime: now + SECURITY_LIMITS.RATE_LIMIT.WINDOW_MS
+    };
+    if (currentLimit.count >= SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS) {
+        logSecurityEvent('rate_limit_exceeded', {
+            userId,
+            count: currentLimit.count,
+            limit: SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS
         });
-        const pages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+        return { allowed: false, resetTime: currentLimit.resetTime };
+    }
+    currentLimit.count++;
+    rateLimitStore.set(key, currentLimit);
+    return { allowed: true };
+}
+/**
+ * 🔧 FIX: Validation business logic - montants EN CENTIMES
+ */
+async function validateBusinessLogic(data, db) {
+    // Mode bypass complet
+    if (BYPASS_MODE) {
+        logSecurityEvent('business_validation_bypassed', { providerId: data.providerId });
+        return { valid: true };
+    }
+    try {
+        const providerDoc = await db.collection('users').doc(data.providerId).get();
+        const providerData = providerDoc.data();
+        if (!providerData) {
+            return { valid: false, error: 'Prestataire non trouvé' };
+        }
+        // Vérifications de statut (importantes dans tous les environnements)
+        if (providerData.status === 'suspended' || providerData.status === 'banned') {
+            return { valid: false, error: 'Prestataire non disponible' };
+        }
+        // Validation allégée en développement
+        if (isDevelopment) {
+            logSecurityEvent('business_validation_dev_mode', {
+                providerId: data.providerId,
+                amount: data.amount
+            });
+            return { valid: true };
+        }
+        // 🔧 FIX: Validation des tarifs avec montants EN CENTIMES
+        const expectedAmountCents = (providerData.price || (data.serviceType === 'lawyer_call' ? 49 : 19)) * 100;
+        const tolerance = SECURITY_LIMITS.VALIDATION.BUSINESS_AMOUNT_TOLERANCE;
+        const difference = Math.abs(data.amount - expectedAmountCents);
+        if (difference > tolerance) {
+            logSecurityEvent('business_amount_anomaly', {
+                expected: expectedAmountCents,
+                received: data.amount,
+                difference,
+                tolerance,
+                serviceType: data.serviceType
+            });
+            // En production, bloquer seulement si très éloigné
+            if (isProduction && difference > 10000) { // 100€ d'écart EN CENTIMES = suspect
+                return { valid: false, error: 'Montant très éloigné du tarif standard' };
+            }
+        }
+        // 🔧 FIX: Vérification cohérence commission/prestataire EN CENTIMES
+        const expectedCommissionCents = Math.round(expectedAmountCents * 0.20);
+        const expectedProviderAmountCents = expectedAmountCents - expectedCommissionCents;
+        const commissionDiff = Math.abs(data.commissionAmount - expectedCommissionCents);
+        const providerDiff = Math.abs(data.providerAmount - expectedProviderAmountCents);
+        if (commissionDiff > 500 || providerDiff > 500) { // Tolérance 5€ EN CENTIMES
+            logSecurityEvent('commission_split_anomaly', {
+                expectedCommission: expectedCommissionCents,
+                receivedCommission: data.commissionAmount,
+                expectedProvider: expectedProviderAmountCents,
+                receivedProvider: data.providerAmount
+            });
+            // Bloquer seulement si très incohérent
+            if (isProduction && (commissionDiff > 2000 || providerDiff > 2000)) { // 20€ EN CENTIMES
+                return { valid: false, error: 'Répartition des montants très incohérente' };
+            }
+        }
+        return { valid: true };
+    }
+    catch (error) {
+        await (0, logError_1.logError)('validateBusinessLogic', error);
+        return { valid: false, error: 'Erreur lors de la validation business' };
+    }
+}
+/**
+ * 🔧 FIX: Validation sécuritaire des montants - REÇOIT DES CENTIMES
+ */
+async function validateAmountSecurity(amount, // ✅ REÇOIT MAINTENANT DES CENTIMES
+userId, db) {
+    logSecurityEvent('amount_validation_start', { amount, userId });
+    // 🔧 FIX: Limites EN CENTIMES - comparaisons directes
+    if (amount < SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT) {
         return {
-            filteredAndSortedProviders: Object.freeze(filtered),
-            totalPages: pages
+            valid: false,
+            error: `Montant minimum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT / 100}€ requis`
         };
-    }, [
-        providers, filter, activeFilter, debouncedSearchTerm, selectedCountry,
-        selectedLanguage, onlineOnly, sortBy, sortOrder, itemsPerPage
-    ]);
-    // Update filtered providers with performance optimization
-    (0, react_1.useEffect)(() => {
-        setFilteredProviders(filteredAndSortedProviders);
-        // Smart page adjustment
-        if (currentPage > totalPages && totalPages > 0) {
-            setCurrentPage(1);
-        }
-    }, [filteredAndSortedProviders, totalPages, currentPage]);
-    // Mobile-optimized navigation handlers
-    const handlePrev = (0, react_1.useCallback)(() => {
-        setCurrentIndex(prevIndex => {
-            const maxIndex = Math.max(0, filteredProviders.length - CAROUSEL_VISIBLE_ITEMS);
-            return prevIndex === 0 ? maxIndex : Math.max(0, prevIndex - 1);
-        });
-    }, [filteredProviders.length]);
-    const handleNext = (0, react_1.useCallback)(() => {
-        setCurrentIndex(prevIndex => {
-            const maxIndex = Math.max(0, filteredProviders.length - CAROUSEL_VISIBLE_ITEMS);
-            return prevIndex >= maxIndex ? 0 : prevIndex + 1;
-        });
-    }, [filteredProviders.length]);
-    const handlePageChange = (0, react_1.useCallback)((page) => {
-        if (page >= 1 && page <= totalPages) {
-            setCurrentPage(page);
-            // Smooth scroll for better mobile UX
-            const element = document.querySelector('[data-testid="providers-grid"]');
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-    }, [totalPages]);
-    const toggleSortOrder = (0, react_1.useCallback)(() => {
-        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    }, []);
-    // 🔧 CORRECTION PRINCIPALE - Enhanced profile view handler avec navigation state corrigée
-    const handleViewProfile = (0, react_1.useCallback)((provider) => {
+    }
+    if (amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT) {
+        return {
+            valid: false,
+            error: `Montant maximum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT / 100}€ dépassé`
+        };
+    }
+    // 2. Limite journalière (désactivée en développement)
+    if (!isDevelopment) {
         try {
-            // Analytics tracking for AI optimization
-            if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
-                window.gtag('event', 'view_provider', {
-                    provider_id: provider.id,
-                    provider_type: provider.type,
-                    provider_country: provider.country,
-                    is_online: provider.isOnline,
-                });
-            }
-            if (onProviderClick) {
-                onProviderClick(provider);
-                return;
-            }
-            // ✅ CORRECTION : Créer serviceData compatible avec CallCheckoutWrapper
-            const serviceData = {
-                type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-                providerType: provider.type,
-                price: provider.price,
-                duration: `${provider.duration} min`,
-                languages: [...provider.languages],
-                country: provider.country,
-                specialties: [...provider.specialties],
-                isOnline: provider.isOnline,
-                rating: provider.rating,
-                reviewCount: provider.reviewCount,
-                description: provider.description,
-                responseTime: provider.responseTime,
-                successRate: provider.successRate,
-                certifications: provider.certifications ? [...provider.certifications] : []
-            };
-            // ✅ CORRECTION MAJEURE : TOUJOURS rediriger vers la page de profil
-            // La page de profil gère elle-même la logique de réservation avec son bouton "RÉSERVER MAINTENANT"
-            const navigationTarget = `/provider/${provider.slug || provider.id}`;
-            // ✅ Navigation vers la page de profil pour TOUS les providers (en ligne ou hors ligne)
-            navigate(navigationTarget, {
-                state: {
-                    selectedProvider: provider, // ✅ Nom correct attendu par ProviderProfile
-                    serviceData: serviceData // ✅ Nom correct pour compatibilité
-                },
-                replace: false
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dailyPaymentsQuery = await db.collection('payments')
+                .where('clientId', '==', userId)
+                .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(today))
+                .where('status', 'in', ['succeeded', 'requires_capture', 'processing'])
+                .get();
+            // 🔧 FIX: Calcul en centimes cohérent
+            const dailyTotalCents = dailyPaymentsQuery.docs.reduce((total, doc) => {
+                const paymentAmount = doc.data().amount || 0;
+                // ✅ Assumer que les montants stockés sont en centimes (nouveau système)
+                return total + paymentAmount;
+            }, 0);
+            logSecurityEvent('daily_limit_check', {
+                dailyTotalCents,
+                newAmountCents: amount,
+                limitCents: SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER
             });
-            // 🔧 AMÉLIORATION : Garder sessionStorage comme fallback mais pas comme méthode principale
-            if (typeof window !== 'undefined') {
-                try {
-                    sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
-                    sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
-                }
-                catch (storageError) {
-                    console.warn('[ProfileCards] SessionStorage fallback failed:', storageError);
-                }
+            if (dailyTotalCents + amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER) {
+                return {
+                    valid: false,
+                    error: `Limite journalière dépassée (${Math.round((dailyTotalCents + amount) / 100)}€/${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER / 100}€)`
+                };
             }
         }
         catch (error) {
-            console.error('[ProfileCards] Navigation error:', error);
-            // 🔧 FALLBACK SÉCURISÉ : Si navigation échoue, au moins essayer le sessionStorage
-            try {
-                if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
-                    navigate(`/provider/${provider.slug || provider.id}`, { replace: false });
-                }
-            }
-            catch (fallbackError) {
-                console.error('[ProfileCards] Fallback navigation failed:', fallbackError);
-            }
+            await (0, logError_1.logError)('validateAmountSecurity:dailyLimit', error);
+            // Ne pas bloquer si erreur de calcul, juste logger
+            logSecurityEvent('daily_limit_check_error', { error });
         }
-    }, [onProviderClick, navigate]);
-    // AI-optimized star rating component
-    const StarRating = react_1.default.memo(({ rating, reviewCount }) => {
-        const stars = (0, react_1.useMemo)(() => {
-            const result = [];
-            const fullStars = Math.floor(rating);
-            const hasHalfStar = rating % 1 >= 0.5;
-            for (let i = 0; i < fullStars; i++) {
-                result.push(key, { i }, size = { 16:  }, aria - hidden, "true", fill = "currentColor", className = "text-yellow-400"
-                    /  >
-                );
-            }
-            if (hasHalfStar) {
-                result.push(key, "half", size = { 16:  }, aria - hidden, "true", fill = "currentColor", className = "text-yellow-400 opacity-50"
-                    /  >
-                );
-            }
-            const emptyStars = 5 - Math.ceil(rating);
-            for (let i = 0; i < emptyStars; i++) {
-                result.push(key, {} `empty-${i}`);
-            }
-            size = { 16:  };
-            aria - hidden;
-            "true";
-            className = "text-gray-300"
-                /  >
-            ;
+    }
+    return { valid: true };
+}
+/**
+ * 🔧 FIX: Vérification des doublons - montants EN CENTIMES
+ */
+async function checkDuplicatePayments(clientId, providerId, amount, // EN CENTIMES
+db) {
+    // Bypass en mode debug
+    if (BYPASS_MODE) {
+        logSecurityEvent('duplicate_check_bypassed', { clientId, providerId, amount });
+        return false;
+    }
+    try {
+        const windowMs = SECURITY_LIMITS.DUPLICATES.WINDOW_MS;
+        const existingPayments = await db.collection('payments')
+            .where('clientId', '==', clientId)
+            .where('providerId', '==', providerId)
+            .where('amount', '==', amount) // Comparaison en centimes
+            .where('status', 'in', ['pending', 'requires_confirmation', 'requires_capture', 'processing'])
+            .where('createdAt', '>', admin.firestore.Timestamp.fromDate(new Date(Date.now() - windowMs)))
+            .limit(1)
+            .get();
+        const hasDuplicate = !existingPayments.empty;
+        logSecurityEvent('duplicate_check', {
+            clientId,
+            providerId,
+            amount,
+            amountInEuros: amount / 100,
+            windowMs,
+            hasDuplicate
         });
+        return hasDuplicate;
+    }
+    catch (error) {
+        await (0, logError_1.logError)('checkDuplicatePayments', error);
+        return false; // En cas d'erreur, ne pas bloquer
+    }
+}
+/**
+ * 🔧 FIX: Validation cohérence des montants - TOUS EN CENTIMES
+ */
+function validateAmountCoherence(amount, // EN CENTIMES
+commissionAmount, // EN CENTIMES
+providerAmount // EN CENTIMES
+) {
+    const totalCalculated = Math.round(commissionAmount + providerAmount);
+    const amountRounded = Math.round(amount);
+    const difference = Math.abs(totalCalculated - amountRounded);
+    const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
+    logSecurityEvent('amount_coherence_check', {
+        amount: amountRounded,
+        amountInEuros: amountRounded / 100,
+        commission: commissionAmount,
+        commissionInEuros: commissionAmount / 100,
+        provider: providerAmount,
+        providerInEuros: providerAmount / 100,
+        total_calculated: totalCalculated,
+        difference,
+        tolerance,
+        toleranceInEuros: tolerance / 100
     });
-    return result;
-}, [rating];
-return role = "img";
-aria - label;
-{
-    `Note ${rating.toFixed(1)} sur 5 basée sur ${reviewCount} avis`;
-}
-className = "flex items-center gap-1"
-    >
-        { stars }
-    < span;
-className = "sr-only" >
-    { rating, : .toFixed(1) };
-étoiles;
-sur;
-5, { reviewCount };
-avis
-    < /span>
-    < /div>;
-;
-;
-const resetFilters = (0, react_1.useCallback)(() => {
-    setActiveFilter('all');
-    setSearchTerm('');
-    setSelectedCountry('all');
-    setSelectedLanguage('all');
-    setOnlineOnly(false);
-    setSortBy('rating');
-    setSortOrder('desc');
-    setCurrentPage(1);
-    setCurrentIndex(0);
-}, []);
-// Display providers with pagination
-const displayProviders = (0, react_1.useMemo)(() => {
-    if (mode === 'grid') {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return filteredProviders.slice(startIndex, startIndex + itemsPerPage);
+    if (difference > tolerance) {
+        return {
+            valid: false,
+            error: `Incohérence montants: ${(difference / 100).toFixed(2)}€ d'écart (tolérance: ${(tolerance / 100).toFixed(2)}€)`,
+            difference
+        };
     }
-    return filteredProviders;
-}, [mode, filteredProviders, currentPage, itemsPerPage]);
-// AI and SEO optimized provider card
-const ProviderCard = react_1.default.memo(({ provider, isCarousel = false }) => {
-    const cardSchema = (0, react_1.useMemo)(() => ({
-        "@context": "https://schema.org",
-        "@type": provider.type === 'lawyer' ? "LegalService" : "Service",
-        "name": provider.name,
-        "description": provider.description,
-        "provider": {
-            "@type": "Person",
-            "name": provider.name,
-            "image": provider.avatar,
-            "jobTitle": provider.type === 'lawyer' ? 'Avocat' : 'Expert Expatriation',
-        },
-        "areaServed": provider.country,
-        "availableLanguage": provider.languages,
-        "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": provider.rating,
-            "reviewCount": provider.reviewCount,
-            "bestRating": 5,
-            "worstRating": 1
-        },
-        "offers": {
-            "@type": "Offer",
-            "price": provider.price,
-            "priceCurrency": "EUR",
-            "availability": provider.isOnline ? "InStock" : "OutOfStock"
+    return { valid: true, difference };
+}
+/**
+ * 🔧 FIX: Sanitization des données - PAS DE CONVERSION (déjà en centimes)
+ */
+function sanitizeInput(data) {
+    var _a, _b, _c, _d;
+    const maxNameLength = isDevelopment ? 500 : 200;
+    const maxDescLength = SECURITY_LIMITS.VALIDATION.MAX_DESCRIPTION_LENGTH;
+    const maxMetaKeyLength = isDevelopment ? 100 : 50;
+    const maxMetaValueLength = isDevelopment ? 500 : 200;
+    return {
+        // 🔧 FIX: PAS de conversion - les montants sont déjà en centimes depuis le frontend
+        amount: Math.round(Number(data.amount)), // Arrondir seulement
+        currency: (data.currency || 'eur').toLowerCase().trim(),
+        serviceType: data.serviceType,
+        providerId: data.providerId.trim(),
+        clientId: data.clientId.trim(),
+        clientEmail: (_a = data.clientEmail) === null || _a === void 0 ? void 0 : _a.trim().toLowerCase(),
+        providerName: (_b = data.providerName) === null || _b === void 0 ? void 0 : _b.trim().substring(0, maxNameLength),
+        description: (_c = data.description) === null || _c === void 0 ? void 0 : _c.trim().substring(0, maxDescLength),
+        commissionAmount: Math.round(Number(data.commissionAmount)), // Arrondir seulement
+        providerAmount: Math.round(Number(data.providerAmount)), // Arrondir seulement
+        callSessionId: (_d = data.callSessionId) === null || _d === void 0 ? void 0 : _d.trim(),
+        metadata: data.metadata ? Object.fromEntries(Object.entries(data.metadata)
+            .filter(([key, value]) => key.length <= maxMetaKeyLength && value.length <= maxMetaValueLength)
+            .slice(0, isDevelopment ? 20 : 10)) : {}
+    };
+}
+/**
+ * Logging adapté à l'environnement avec informations détaillées
+ */
+function logSecurityEvent(event, data) {
+    const timestamp = new Date().toISOString();
+    if (isDevelopment) {
+        console.log(`🔧 [DEV-${timestamp}] ${event}:`, Object.assign(Object.assign(Object.assign(Object.assign({}, data), (data.amount && { amountEuros: data.amount / 100 })), (data.commissionAmount && { commissionEuros: data.commissionAmount / 100 })), (data.providerAmount && { providerEuros: data.providerAmount / 100 })));
+    }
+    else if (isProduction) {
+        // En production: données sensibles masquées
+        const sanitizedData = Object.assign(Object.assign({}, data), { 
+            // Masquer les IDs sensibles
+            userId: data.userId ? data.userId.substring(0, 8) + '...' : undefined, clientId: data.clientId ? data.clientId.substring(0, 8) + '...' : undefined, providerId: data.providerId ? data.providerId.substring(0, 8) + '...' : undefined });
+        console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
+    }
+    else {
+        console.log(`🧪 [TEST-${timestamp}] ${event}:`, data);
+    }
+}
+// =========================================
+// 🚀 CLOUD FUNCTION PRINCIPALE
+// =========================================
+exports.createPaymentIntent = (0, https_1.onCall)({
+    cors: [
+        /localhost:\d+/,
+        /127\.0\.0\.1:\d+/,
+        /firebase\.com$/,
+    ],
+}, async (request) => {
+    var _a, _b, _c, _d, _e;
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const startTime = Date.now();
+    // Log de démarrage avec environnement
+    logSecurityEvent('payment_intent_start', {
+        requestId,
+        environment: process.env.NODE_ENV,
+        isDevelopment,
+        isProduction,
+        bypassMode: BYPASS_MODE
+    });
+    try {
+        // ========================================
+        // 1. VALIDATION DE L'AUTHENTIFICATION
+        // ========================================
+        if (!request.auth) {
+            throw new https_1.HttpsError('unauthenticated', 'Authentification requise pour créer un paiement.');
         }
-    }), [provider]);
-    return onClick = {}();
+        const userId = request.auth.uid;
+        // 🔧 FIX: Debug des données reçues (montants maintenant en centimes)
+        logSecurityEvent('payment_data_received', {
+            amount: request.data.amount,
+            amountInEuros: request.data.amount / 100,
+            serviceType: request.data.serviceType,
+            providerId: ((_a = request.data.providerId) === null || _a === void 0 ? void 0 : _a.substring(0, 10)) + '...',
+            commissionAmount: request.data.commissionAmount,
+            commissionInEuros: request.data.commissionAmount / 100,
+            providerAmount: request.data.providerAmount,
+            providerInEuros: request.data.providerAmount / 100
+        });
+        // ========================================
+        // 2. RATE LIMITING
+        // ========================================
+        const rateLimitResult = checkRateLimit(userId);
+        if (!rateLimitResult.allowed) {
+            const waitTime = Math.ceil((rateLimitResult.resetTime - Date.now()) / 60000);
+            throw new https_1.HttpsError('resource-exhausted', `Trop de tentatives. Réessayez dans ${waitTime} minutes.`);
+        }
+        // ========================================
+        // 3. SANITIZATION DES DONNÉES
+        // ========================================
+        const sanitizedData = sanitizeInput(request.data);
+        logSecurityEvent('data_sanitized', {
+            original_amount: request.data.amount,
+            sanitized_amount: sanitizedData.amount,
+            original_commission: request.data.commissionAmount,
+            sanitized_commission: sanitizedData.commissionAmount,
+            coherent: Math.abs(sanitizedData.amount - (sanitizedData.commissionAmount + sanitizedData.providerAmount)) <= 1
+        });
+        // ========================================
+        // 4. VALIDATION DES DONNÉES DE BASE
+        // ========================================
+        const { amount, // ✅ DÉJÀ EN CENTIMES depuis le frontend
+        currency, serviceType, providerId, clientId, clientEmail, providerName, description, commissionAmount, // ✅ DÉJÀ EN CENTIMES
+        providerAmount, // ✅ DÉJÀ EN CENTIMES
+        callSessionId, metadata = {} } = sanitizedData;
+        // Validation de base avec logs détaillés
+        if (!amount || typeof amount !== 'number' || amount <= 0) {
+            logSecurityEvent('validation_error', { field: 'amount', value: amount, type: typeof amount });
+            throw new https_1.HttpsError('invalid-argument', `Montant invalide: ${amount} centimes (${amount / 100}€)`);
+        }
+        if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
+            logSecurityEvent('validation_error', { field: 'serviceType', value: serviceType });
+            throw new https_1.HttpsError('invalid-argument', 'Type de service invalide');
+        }
+        if (!providerId || typeof providerId !== 'string' || providerId.length < 5) {
+            logSecurityEvent('validation_error', { field: 'providerId', value: providerId });
+            throw new https_1.HttpsError('invalid-argument', 'ID prestataire invalide');
+        }
+        if (!clientId || typeof clientId !== 'string' || clientId.length < 5) {
+            logSecurityEvent('validation_error', { field: 'clientId', value: clientId });
+            throw new https_1.HttpsError('invalid-argument', 'ID client invalide');
+        }
+        if (typeof commissionAmount !== 'number' || commissionAmount < 0) {
+            logSecurityEvent('validation_error', { field: 'commissionAmount', value: commissionAmount });
+            throw new https_1.HttpsError('invalid-argument', 'Montant commission invalide');
+        }
+        if (typeof providerAmount !== 'number' || providerAmount < 0) {
+            logSecurityEvent('validation_error', { field: 'providerAmount', value: providerAmount });
+            throw new https_1.HttpsError('invalid-argument', 'Montant prestataire invalide');
+        }
+        // ========================================
+        // 5. VALIDATION DES PERMISSIONS
+        // ========================================
+        if (userId !== clientId) {
+            logSecurityEvent('permission_denied', { userId, clientId });
+            throw new https_1.HttpsError('permission-denied', 'Vous ne pouvez créer un paiement que pour votre propre compte.');
+        }
+        // ========================================
+        // 6. VALIDATION DES ENUMS ET TYPES
+        // ========================================
+        const safeCurrency = (currency || 'eur');
+        if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(safeCurrency)) {
+            throw new https_1.HttpsError('invalid-argument', `Devise non supportée: ${currency}. Devises autorisées: ${SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.join(', ')}`);
+        }
+        // ========================================
+        // 7. VALIDATION DE LA COHÉRENCE DES MONTANTS
+        // ========================================
+        const coherenceResult = validateAmountCoherence(amount, commissionAmount, providerAmount);
+        if (!coherenceResult.valid) {
+            // En production: bloquer, en dev: juste logger et continuer si pas trop éloigné
+            if (isProduction || coherenceResult.difference > 100) { // 1€ EN CENTIMES
+                throw new https_1.HttpsError('invalid-argument', coherenceResult.error);
+            }
+            else {
+                logSecurityEvent('amount_coherence_warning_accepted', coherenceResult);
+            }
+        }
+        // ========================================
+        // 8. VALIDATION SÉCURITAIRE DES MONTANTS
+        // ========================================
+        const db = admin.firestore();
+        const amountValidation = await validateAmountSecurity(amount, userId, db);
+        if (!amountValidation.valid) {
+            throw new https_1.HttpsError('invalid-argument', amountValidation.error);
+        }
+        // ========================================
+        // 9. VALIDATION BUSINESS LOGIC
+        // ========================================
+        const businessValidation = await validateBusinessLogic(sanitizedData, db);
+        if (!businessValidation.valid) {
+            throw new https_1.HttpsError('failed-precondition', businessValidation.error);
+        }
+        // ========================================
+        // 10. VÉRIFICATION DES DOUBLONS
+        // ========================================
+        const hasDuplicate = await checkDuplicatePayments(clientId, providerId, amount, db);
+        if (hasDuplicate) {
+            throw new https_1.HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
+        }
+        // ========================================
+        // 11. CRÉATION DU PAIEMENT VIA STRIPEMANAGER
+        // ========================================
+        logSecurityEvent('stripe_payment_creation_start', {
+            amount,
+            amountInEuros: amount / 100,
+            serviceType,
+            providerId: providerId.substring(0, 10) + '...'
+        });
+        // 🔧 FIX: Données pour StripeManager - montants DÉJÀ EN CENTIMES
+        const stripePaymentData = {
+            amount, // DÉJÀ EN CENTIMES
+            currency: safeCurrency,
+            clientId,
+            providerId,
+            serviceType,
+            providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
+            commissionAmount, // DÉJÀ EN CENTIMES
+            providerAmount, // DÉJÀ EN CENTIMES
+            callSessionId,
+            metadata: Object.assign({ clientEmail: clientEmail || '', providerName: providerName || '', description: description || `Service ${serviceType}`, requestId, environment: process.env.NODE_ENV || 'development', 
+                // Ajouter des références en euros pour debug
+                originalAmountEuros: (amount / 100).toString(), originalCommissionEuros: (commissionAmount / 100).toString(), originalProviderAmountEuros: (providerAmount / 100).toString() }, metadata)
+        };
+        // 🔍 DEBUG FINAL BACKEND
+        console.log('💳 === BACKEND - DONNÉES FINALES ===');
+        console.log('📥 Données reçues (EN CENTIMES):', {
+            amount: `${amount} centimes (${amount / 100}€)`,
+            commission: `${commissionAmount} centimes (${commissionAmount / 100}€)`,
+            provider: `${providerAmount} centimes (${providerAmount / 100}€)`,
+            coherent: Math.abs(amount - (commissionAmount + providerAmount)) <= 1
+        });
+        console.log('✅ Validations passées:', {
+            minimum_respecte: amount >= SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT,
+            maximum_respecte: amount <= SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT,
+            coherence_totale: coherenceResult.valid
+        });
+        console.log('📤 Envoi vers StripeManager:', {
+            amount,
+            commissionAmount,
+            providerAmount
+        });
+        const result = await StripeManager_1.stripeManager.createPaymentIntent(stripePaymentData);
+        if (!result.success) {
+            logSecurityEvent('stripe_payment_creation_failed', {
+                error: result.error,
+                requestId
+            });
+            await (0, logError_1.logError)('createPaymentIntent:stripe_error', {
+                requestId,
+                userId,
+                serviceType,
+                amount,
+                amountInEuros: amount / 100,
+                error: result.error
+            });
+            throw new https_1.HttpsError('internal', 'Erreur lors de la création du paiement. Veuillez réessayer.');
+        }
+        // ========================================
+        // 12. LOGGING ET AUDIT SÉCURISÉ
+        // ========================================
+        await db.collection('payment_audit_logs').add({
+            action: 'payment_intent_created',
+            requestId,
+            paymentIntentId: result.paymentIntentId,
+            clientId,
+            providerId,
+            amount, // EN CENTIMES
+            amountInEuros: amount / 100, // Pour référence humaine
+            commissionAmount, // EN CENTIMES
+            commissionAmountInEuros: commissionAmount / 100,
+            providerAmount, // EN CENTIMES
+            providerAmountInEuros: providerAmount / 100,
+            serviceType,
+            callSessionId,
+            environment: process.env.NODE_ENV || 'development',
+            userAgent: ((_b = request.rawRequest.headers['user-agent']) === null || _b === void 0 ? void 0 : _b.substring(0, 200)) || 'unknown',
+            ipAddress: request.rawRequest.ip || 'unknown',
+            processingTime: Date.now() - startTime,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+        logSecurityEvent('payment_intent_created_success', {
+            paymentIntentId: result.paymentIntentId,
+            processingTime: Date.now() - startTime,
+            amountProcessed: amount,
+            amountInEuros: amount / 100
+        });
+        // ========================================
+        // 13. RÉPONSE SÉCURISÉE ET TYPÉE
+        // ========================================
+        const response = {
+            success: true,
+            clientSecret: result.clientSecret,
+            paymentIntentId: result.paymentIntentId,
+            amount, // EN CENTIMES (cohérent avec Stripe)
+            currency: currency || "eur",
+            serviceType,
+            status: 'requires_payment_method',
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        };
+        return response;
+    }
+    catch (error) {
+        // ========================================
+        // 14. GESTION D'ERREURS SÉCURISÉE
+        // ========================================
+        const processingTime = Date.now() - startTime;
+        logSecurityEvent('payment_intent_error', {
+            requestId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            processingTime,
+            environment: process.env.NODE_ENV,
+            receivedAmount: (_c = request.data) === null || _c === void 0 ? void 0 : _c.amount,
+            receivedAmountEuros: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.amount) ? request.data.amount / 100 : 'unknown'
+        });
+        // Log détaillé pour debug
+        await (0, logError_1.logError)('createPaymentIntent:error', {
+            requestId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            processingTime,
+            requestData: {
+                amount: request.data.amount,
+                amountInEuros: request.data.amount / 100,
+                serviceType: request.data.serviceType,
+                hasAuth: !!request.auth
+            },
+            userAuth: ((_e = request.auth) === null || _e === void 0 ? void 0 : _e.uid) || 'not-authenticated',
+            environment: process.env.NODE_ENV
+        });
+        // Si c'est déjà une HttpsError, la relancer telle quelle
+        if (error instanceof https_1.HttpsError) {
+            throw error;
+        }
+        // Pour toute autre erreur, réponse générique sécurisée
+        const errorResponse = {
+            success: false,
+            error: 'Une erreur inattendue s\'est produite. Veuillez réessayer.',
+            code: 'INTERNAL_ERROR',
+            timestamp: new Date().toISOString(),
+            requestId
+        };
+        throw new https_1.HttpsError('internal', errorResponse.error, errorResponse);
+    }
 });
-handleViewProfile(provider);
-onKeyDown = {}(e);
-{
-    if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleViewProfile(provider);
-    }
-}
-role = "button";
-tabIndex = { 0:  };
-aria - label;
-{
-    `Contacter ${provider.name}, ${provider.type === 'lawyer' ? 'avocat' : 'expert expatriation'} en ${provider.country}`;
-}
-className = "provider-card";
-data - provider - id;
-{
-    provider.id;
-}
-data - provider - type;
-{
-    provider.type;
-}
-data - provider - country;
-{
-    provider.country;
-}
-itemScope;
-itemType = { provider, : .type === 'lawyer' ? "http://schema.org/LegalService" : "http://schema.org/Service" }
-    >
-        type;
-"application/ld+json";
-dangerouslySetInnerHTML = {};
-{
-    __html: JSON.stringify(cardSchema);
-}
-/>
-    < div;
-className = "provider-image-container" >
-    src;
-{
-    provider.avatar;
-}
-alt = {} `Photo de profil de ${provider.name}, ${provider.type === 'lawyer' ? 'avocat' : 'expert expatriation'} en ${provider.country}`;
-loading = { priority } === 'high' ? 'eager' : 'lazy';
-decoding = "async";
-width = { isCarousel, 110: 192 };
-height = { isCarousel, 110: 192 };
-sizes = { IMAGE_SIZES };
-itemProp = "image";
-onError = {}(e);
-{
-    const target = e.target;
-    if (target.src !== DEFAULT_AVATAR) {
-        target.src = DEFAULT_AVATAR;
-    }
-}
-/>
-    < div;
-className = "status-badge";
-aria - label;
-{
-    `Statut: ${provider.isOnline ? 'en ligne' : 'hors ligne'}`;
-}
- >
-    itemProp;
-"availability" >
-    { provider, : .isOnline ? 'En ligne' : 'Hors ligne' }
-    < /span>
-    < /div>
-    < div;
-className = "type-badge";
-aria - label;
-{
-    `Type: ${provider.type === 'lawyer' ? 'avocat' : 'expert expatriation'}`;
-}
- >
-    itemProp;
-"serviceType" >
-    { provider, : .type === 'lawyer' ? 'Avocat' : 'Expert' }
-    < /span>
-    < /div>
-    < /div>
-    < div;
-className = "provider-content" >
-    itemProp;
-"name" > { provider, : .name } < /h3>
-    < div;
-className = "location";
-itemProp = "areaServed" >
-    size;
-{
-    16;
-}
-aria - hidden;
-"true" /  >
-    { provider, : .country } < /span>
-    < /div>
-    < div;
-className = "rating-container";
-itemProp = "aggregateRating";
-itemScope;
-itemType = "http://schema.org/AggregateRating" >
-    rating;
-{
-    provider.rating;
-}
-reviewCount = { provider, : .reviewCount } /  >
-    itemProp;
-"ratingValue";
-className = "sr-only" > { provider, : .rating } < /span>
-    < span;
-itemProp = "reviewCount";
-className = "sr-only" > { provider, : .reviewCount } < /span>
-    < span;
-className = "rating-text" >
-    { provider, : .rating.toFixed(1) }({ provider, : .reviewCount })
-    < /span>
-    < /div>
-    < div;
-className = "languages";
-itemProp = "availableLanguage" >
-    { provider, : .languages.slice(0, isCarousel ? 2 : 3).map((lang) => key = { lang }, className = "language-tag" >
-            size, { 10:  }, aria - hidden, "true" /  >
-            { lang }
-            < /span>) }
-    < /div>
-    < p;
-className = "description";
-itemProp = "description" >
-    { provider, : .description }
-    < /p>
-    < div;
-className = "pricing";
-itemProp = "offers";
-itemScope;
-itemType = "http://schema.org/Offer" >
-    className;
-"price-info" >
-    className;
-"price";
-itemProp = "price" >
-    { provider, : .price };
-itemProp;
-"priceCurrency";
-className = "sr-only" > EUR < /span>
-    < /div>
-    < div;
-className = "duration" > { provider, : .duration };
-min < /div>
-    < /div>
-    < /div>
-    < button;
-className = "cta-button";
-onClick = {}(e);
-{
-    e.stopPropagation();
-    handleViewProfile(provider);
-}
-aria - label;
-{
-    provider.isOnline
-        ? `Voir le profil de ${provider.name}`
-        : `Voir le profil de ${provider.name}`;
-}
-    >
-        size;
-{
-    18;
-}
-aria - hidden;
-"true" /  >
-    Voir;
-le;
-profil
-    < /button>
-    < /div>
-    < /article>;
-;
-;
-// Performance-optimized loading skeleton
-const LoadingSkeleton = react_1.default.memo(({ count = 6 }) => ({ Array, : .from({ length: count }, (_, index) => key = { index }, className = "skeleton-card", aria - hidden, "true" >
-        className, "skeleton-image" > /div>
-        < div, className = "skeleton-content" >
-        className, "skeleton-title" > /div>
-        < div, className = "skeleton-location" > /div>
-        < div, className = "skeleton-rating" > /div>
-        < div, className = "skeleton-description" > /div>
-        < div, className = "skeleton-button" > /div>
-        < /div>
-        < /div>) }));
-/>;
-;
-// Main render - Grid mode with full 2025 optimization
-if (mode === 'grid') {
-    return fallback = {} < LoadingSkeleton /  > ;
-}
- >
-    className;
-{
-    className;
-}
-aria - label;
-{
-    ariaLabel || 'Liste des prestataires disponibles';
-}
-data - testid;
-{
-    testId || 'providers-grid';
-}
-role = "main"
-    >
-        { showFilters } && className;
-"filters-container";
-role = "search";
-aria - label;
-"Filtrer les prestataires"
-    >
-        { /* Primary filters with enhanced accessibility */}
-    < div;
-className = "primary-filters" >
-    role;
-"tablist";
-aria - label;
-"Types de prestataires";
-className = "filter-tabs"
-    >
-        role;
-"tab";
-aria - selected;
-{
-    activeFilter === 'all';
-}
-aria - controls;
-"providers-list";
-onClick = {}();
-setActiveFilter('all');
-className = {} `filter-tab ${activeFilter === 'all' ? 'active' : ''}`;
-    >
-        Tous
-    < /button>
-    < button;
-role = "tab";
-aria - selected;
-{
-    activeFilter === 'lawyer';
-}
-aria - controls;
-"providers-list";
-onClick = {}();
-setActiveFilter('lawyer');
-className = {} `filter-tab ${activeFilter === 'lawyer' ? 'active' : ''}`;
-    >
-        Avocats
-    < /button>
-    < button;
-role = "tab";
-aria - selected;
-{
-    activeFilter === 'expat';
-}
-aria - controls;
-"providers-list";
-onClick = {}();
-setActiveFilter('expat');
-className = {} `filter-tab ${activeFilter === 'expat' ? 'active' : ''}`;
-    >
-        Experts
-    < /button>
-    < /div>
-    < /div>;
-{ /* Advanced filters with mobile-first design */ }
-className;
-"advanced-filters";
-role = "toolbar";
-aria - label;
-"Filtres avancés" >
-    className;
-"search-container" >
-    size;
-{
-    20;
-}
-aria - hidden;
-"true";
-className = "search-icon" /  >
-    type;
-"search";
-placeholder = "Rechercher un prestataire, pays, spécialité...";
-value = { searchTerm };
-onChange = {}(e);
-setSearchTerm(e.target.value);
-aria - label;
-"Rechercher des prestataires";
-className = "search-input";
-autoComplete = "off";
-spellCheck = "false"
-    /  >
-    /div>
-    < select;
-value = { selectedCountry };
-onChange = {}(e);
-setSelectedCountry(e.target.value);
-aria - label;
-"Filtrer par pays";
-className = "country-select"
-    >
-        value;
-"all" > Tous;
-les;
-pays < /option>;
-{
-    availableCountries.map(country => key = { country }, value = { country } > { country } < /option>);
-}
-/select>
-    < select;
-value = { selectedLanguage };
-onChange = {}(e);
-setSelectedLanguage(e.target.value);
-aria - label;
-"Filtrer par langue";
-className = "language-select"
-    >
-        value;
-"all" > Toutes;
-les;
-langues < /option>;
-{
-    availableLanguages.map(lang => key = { lang }, value = { lang } > { lang } < /option>);
-}
-/select>
-    < label;
-className = "checkbox-container" >
-    type;
-"checkbox";
-checked = { onlineOnly };
-onChange = {}(e);
-setOnlineOnly(e.target.checked);
-className = "online-checkbox"
-    /  >
-    className;
-"checkbox-label" > En;
-ligne;
-uniquement < /span>
-    < /label>
-    < div;
-className = "sort-container" >
-    value;
-{
-    sortBy;
-}
-onChange = {}(e);
-setSortBy(e.target.value);
-aria - label;
-"Trier par";
-className = "sort-select"
-    >
-        value;
-"rating" > Note < /option>
-    < option;
-value = "price" > Prix < /option>
-    < option;
-value = "experience" > Expérience < /option>
-    < /select>
-    < button;
-onClick = { toggleSortOrder };
-aria - label;
-{
-    `Ordre de tri: ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`;
-}
-className = "sort-order-btn"
-    >
-        { sortOrder } === 'asc' ? size : ;
-{
-    16;
-}
-/> : <ArrowDown size={16} / > ;
-/button>
-    < /div>
-    < button;
-onClick = { resetFilters };
-className = "reset-filters-btn";
-aria - label;
-"Réinitialiser tous les filtres"
-    >
-        Réinitialiser
-    < /button>
-    < /div>
-    < /div>;
-{
-    error && role;
-    "alert";
-    aria - live;
-    "polite";
-    className = "error-container"
-        >
-            className;
-    "error-message" > { error } < /p>
-        < button;
-    onClick = { loadProviders };
-    className = "retry-button";
-    aria - label;
-    "Réessayer le chargement"
-        >
-            Réessayer
-        < /button>
-        < /div>;
-}
-{ /* Results summary for AI and screen readers */ }
-className;
-"results-summary";
-aria - live;
-"polite" >
-    {};
-isLoading && className;
-"sr-only" >
-    { filteredProviders, : .length };
-prestataire;
-{
-    filteredProviders.length > 1 ? 's' : '';
-}
-trouvé;
-{
-    filteredProviders.length > 1 ? 's' : '';
-}
-{
-    activeFilter !== 'all' && ` de type ${activeFilter === 'lawyer' ? 'avocat' : 'expert'}`;
-}
-{
-    selectedCountry !== 'all' && ` en ${selectedCountry}`;
-}
-{
-    onlineOnly && ' en ligne';
-}
-/p>;
-/div>
-    < div;
-id = "providers-list";
-className = "providers-grid";
-role = "tabpanel";
-aria - labelledby;
-"filter-tabs"
-    >
-        {} > 0 ? (displayProviders.map((provider) => key = { provider, : .id }, provider = { provider }
-    /  >
-))
-    :
-;
-className = "no-results";
-role = "status" >
-    className;
-"no-results-content" >
-    Aucun;
-prestataire;
-trouvé < (/h3>);
-Aucun;
-prestataire;
-ne;
-correspond;
-à;
-vos;
-critères;
-de;
-recherche.
-    < /p>
-    < button;
-onClick = { resetFilters };
-className = "reset-button"
-    >
-        Réinitialiser;
-les;
-filtres
-    < /button>
-    < /div>
-    < /div>;
-/div>;
-{ /* Enhanced pagination with mobile optimization */ }
-{
-    totalPages > 1 && (aria - label);
-    "Navigation des pages de prestataires";
-    role = "navigation";
-    className = "pagination-container"
-        >
-            className;
-    "pagination-info" >
-        className;
-    "sr-only" >
-        Page;
-    {
-        currentPage;
-    }
-    sur;
-    {
-        totalPages;
-    }
-    /span>
-        < span;
-    aria - live;
-    "polite";
-    className = "pagination-summary" >
-        Affichage;
-    {
-        ((currentPage - 1) * itemsPerPage) + 1;
-    }
-    à;
-    {
-        Math.min(currentPage * itemsPerPage, filteredProviders.length);
-    }
-    sur;
-    {
-        filteredProviders.length;
-    }
-    prestataires
-        < /span>
-        < /div>
-        < div;
-    className = "pagination-buttons" >
-        onClick;
-    {
-        () => handlePageChange(Math.max(1, currentPage - 1));
-    }
-    disabled = { currentPage } === 1;
-}
-aria - label;
-"Page précédente";
-className = "pagination-btn prev-btn"
-    >
-        size;
-{
-    16;
-}
-aria - hidden;
-"true" /  >
-    className;
-"btn-text" > Précédent < /span>
-    < /button>;
-{ /* Smart pagination for mobile */ }
-className;
-"page-numbers" >
-    { Array, : .from({ length: Math.min(5, totalPages) }, (_, i) => {
-            let page;
-            if (totalPages <= 5) {
-                page = i + 1;
-            }
-            else if (currentPage <= 3) {
-                page = i + 1;
-            }
-            else if (currentPage >= totalPages - 2) {
-                page = totalPages - 4 + i;
-            }
-            else {
-                page = currentPage - 2 + i;
-            }
-            return key = { page };
-            onClick = {}();
-            handlePageChange(page);
-        }, aria - current, { currentPage } === page ? 'page' : undefined) };
-aria - label;
-{
-    `Page ${page}`;
-}
-className = {} `page-btn ${currentPage === page ? 'active' : ''}`;
-    >
-        { page }
-    < /button>;
-;
-/div>
-    < button;
-onClick = {}();
-handlePageChange(Math.min(totalPages, currentPage + 1));
-disabled = { currentPage } === totalPages;
-aria - label;
-"Page suivante";
-className = "pagination-btn next-btn"
-    >
-        className;
-"btn-text" > Suivant < /span>
-    < lucide_react_1.ChevronRight;
-size = { 16:  };
-aria - hidden;
-"true" /  >
-    /button>
-    < /div>
-    < /nav>;
-/section>
-    < /Suspense>;
-;
-// Carousel mode with enhanced mobile support
-return fallback = {} < LoadingSkeleton;
-count = { 3:  } /  > ;
- >
-    className;
-{
-    className;
-}
-aria - label;
-{
-    ariaLabel || 'Carrousel des prestataires disponibles';
-}
-data - testid;
-{
-    testId || 'providers-carousel';
-}
-role = "region"
-    >
-        { showFilters } && className;
-"carousel-filters" >
-    role;
-"tablist";
-aria - label;
-"Types de prestataires";
-className = "carousel-filter-tabs"
-    >
-        role;
-"tab";
-aria - selected;
-{
-    activeFilter === 'all';
-}
-onClick = {}();
-setActiveFilter('all');
-className = {} `carousel-tab ${activeFilter === 'all' ? 'active' : ''}`;
-    >
-        Tous
-    < /button>
-    < button;
-role = "tab";
-aria - selected;
-{
-    activeFilter === 'lawyer';
-}
-onClick = {}();
-setActiveFilter('lawyer');
-className = {} `carousel-tab ${activeFilter === 'lawyer' ? 'active' : ''}`;
-    >
-        Avocats
-    < /button>
-    < button;
-role = "tab";
-aria - selected;
-{
-    activeFilter === 'expat';
-}
-onClick = {}();
-setActiveFilter('expat');
-className = {} `carousel-tab ${activeFilter === 'expat' ? 'active' : ''}`;
-    >
-        Experts
-    < /button>
-    < /div>
-    < /div>;
-{
-    error && role;
-    "alert";
-    aria - live;
-    "polite";
-    className = "carousel-error"
-        >
-            { error } < /p>
-        < button;
-    onClick = { loadProviders } > Réessayer < /button>
-        < /div>;
-}
-{ /* Enhanced carousel with touch support */ }
-className;
-"carousel-container";
-role = "region";
-aria - label;
-"Carrousel des prestataires";
-aria - live;
-"polite"
-    >
-        className;
-"carousel-track";
-style = {};
-{
-    transform: `translateX(-${currentIndex * (100 / CAROUSEL_VISIBLE_ITEMS)}%)`,
-        transition;
-    'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-}
-onTouchStart = {}(e);
-{
-    const touch = e.touches[0];
-    const startX = touch.clientX;
-    const handleTouchMove = (moveEvent) => {
-        const currentX = moveEvent.touches[0].clientX;
-        const diffX = startX - currentX;
-        if (Math.abs(diffX) > 50) {
-            if (diffX > 0) {
-                handleNext();
-            }
-            else {
-                handlePrev();
-            }
-            document.removeEventListener('touchmove', handleTouchMove);
-            document.removeEventListener('touchend', handleTouchEnd);
-        }
-    };
-    const handleTouchEnd = () => {
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('touchend', handleTouchEnd);
-    };
-    document.addEventListener('touchmove', handleTouchMove, { passive: true });
-    document.addEventListener('touchend', handleTouchEnd);
-}
-    >
-        {
-            : .from({ length: CAROUSEL_VISIBLE_ITEMS }, (_, index) => key = { index }, className = "carousel-item" >
-                count, { 1:  } /  >
-                /div>),
-            displayProviders, : .length > 0 ? (displayProviders.map((provider, index) => key = { provider, : .id }, className = "carousel-item", aria - label, {} `Prestataire ${index + 1} sur ${displayProviders.length}`)) :  }
-    >
-        provider;
-{
-    provider;
-}
-isCarousel = { true:  }
-    /  >
-    /div>;
-className = "carousel-empty";
-role = "status" >
-    className;
-"empty-content" >
-    Aucun;
-prestataire;
-trouvé < /p>
-    < button;
-onClick = { resetFilters } >
-    Réinitialiser;
-les;
-filtres
-    < /button>
-    < /div>
-    < /div>;
-/div>;
-{ /* Enhanced navigation controls */ }
-{
-    displayProviders.length > CAROUSEL_VISIBLE_ITEMS && onClick;
-    {
-        handlePrev;
-    }
-    aria - label;
-    "Voir les prestataires précédents";
-    className = "carousel-nav prev-nav";
-    onKeyDown = {}(e);
-    {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handlePrev();
-        }
-    }
-}
-    >
-        size;
-{
-    24;
-}
-aria - hidden;
-"true" /  >
-    /button>
-    < button;
-onClick = { handleNext };
-aria - label;
-"Voir les prestataires suivants";
-className = "carousel-nav next-nav";
-onKeyDown = {}(e);
-{
-    if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleNext();
-    }
-}
-    >
-        size;
-{
-    24;
-}
-aria - hidden;
-"true" /  >
-    /button>;
-{ /* Carousel indicators */ }
-className;
-"carousel-indicators";
-role = "tablist";
-aria - label;
-"Indicateurs du carrousel" >
-    { Array, : .from({
-            length: Math.max(1, Math.ceil(displayProviders.length - CAROUSEL_VISIBLE_ITEMS + 1))
-        }, (_, i) => key = { i }, role = "tab", aria - selected, { currentIndex } === i) };
-aria - label;
-{
-    `Aller à la page ${i + 1} du carrousel`;
-}
-onClick = {}();
-setCurrentIndex(i);
-className = {} `indicator ${currentIndex === i ? 'active' : ''}`;
-/>;
-/div>
-    < />;
-/div>;
-{ /* Carousel summary for screen readers */ }
-className;
-"sr-only";
-aria - live;
-"polite" >
-    Affichage;
-de;
-{
-    Math.min(CAROUSEL_VISIBLE_ITEMS, displayProviders.length);
-}
-prestataires;
-sur;
-{
-    displayProviders.length;
-}
-/div>
-    < /section>
-    < /Suspense>;
-;
-;
-// Enhanced export with display name for debugging
-ProfileCards.displayName = 'ProfileCards';
-exports.default = react_1.default.memo(ProfileCards);
 //# sourceMappingURL=createPaymentIntent.js.map

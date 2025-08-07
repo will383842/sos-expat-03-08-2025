@@ -24,7 +24,14 @@ interface CreateAndScheduleCallRequest {
 export const createAndScheduleCallHTTPS = onCall(
   {
     memory: "128MiB",
-    timeoutSeconds: 30
+    timeoutSeconds: 30,
+    cors: [
+      'http://localhost:3000',
+      'http://localhost:5196',
+      'http://localhost:8080',
+      'https://sos-urgently-ac307.web.app',
+      'https://sos-urgently-ac307.firebaseapp.com'
+    ]
   },
   async (request: CallableRequest<CreateAndScheduleCallRequest>) => {
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

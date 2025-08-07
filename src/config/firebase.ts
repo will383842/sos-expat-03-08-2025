@@ -2,9 +2,10 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
+
 
 // Configuration Firebase depuis les variables d'environnement
 const firebaseConfig = {
@@ -34,20 +35,17 @@ const app = initializeApp(firebaseConfig);
 
 // Services Firebase exportés
 export const auth = getAuth(app);
-export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'us-central1');
+export { db };
 
 // Configuration de la persistance offline pour Firestore
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('⚠️ Plusieurs onglets ouverts, la persistance ne peut être activée que sur un seul onglet à la fois.');
-  } else if (err.code === 'unimplemented') {
-    console.warn('⚠️ Ce navigateur ne supporte pas la persistance offline.');
-  } else {
-    console.warn('⚠️ Erreur lors de l\'activation de la persistance:', err);
-  }
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(), // support multi-onglet
+  }),
 });
+
 
 console.log('🔥 Firebase initialisé avec succès');
 

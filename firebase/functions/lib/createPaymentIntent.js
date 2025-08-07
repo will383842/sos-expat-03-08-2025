@@ -47,7 +47,14 @@ const CPU_OPTIMIZED_CONFIG = {
     timeoutSeconds: 30,
     maxInstances: 10,
     minInstances: 0,
-    concurrency: 80
+    concurrency: 80,
+    cors: [
+        'http://localhost:3000',
+        'http://localhost:5196',
+        'http://localhost:8080',
+        'https://sos-urgently-ac307.web.app',
+        'https://sos-urgently-ac307.firebaseapp.com'
+    ]
 };
 // =========================================
 // 🌍 DÉTECTION D'ENVIRONNEMENT INTELLIGENTE (optimisée)

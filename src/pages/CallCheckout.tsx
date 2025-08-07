@@ -15,11 +15,11 @@ interface ServiceData {
   providerId: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerRole: 'lawyer' | 'expat';
-  amount: number;
+  amount: number; // 🔧 EN EUROS dans l'interface utilisateur
   duration: number;
   clientPhone: string;
-  commissionAmount: number;
-  providerAmount: number;
+  commissionAmount: number; // 🔧 EN EUROS dans l'interface utilisateur
+  providerAmount: number; // 🔧 EN EUROS dans l'interface utilisateur
 }
 
 interface User {
@@ -32,9 +32,9 @@ interface User {
   fullName?: string;
 }
 
-// 🔧 FIX: Interface corrigée - backend attend maintenant des CENTIMES
+// 🔧 FIX CRITIQUE: Interface corrigée - backend attend des EUROS maintenant
 interface PaymentIntentData {
-  amount: number; // 🔧 EN CENTIMES maintenant (4900 pour 49€)
+  amount: number; // 🔧 EN EUROS (49 pour 49€)
   currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
@@ -42,8 +42,8 @@ interface PaymentIntentData {
   clientEmail?: string;
   providerName?: string;
   description?: string;
-  commissionAmount: number; // 🔧 EN CENTIMES
-  providerAmount: number; // 🔧 EN CENTIMES
+  commissionAmount: number; // 🔧 EN EUROS
+  providerAmount: number; // 🔧 EN EUROS
   callSessionId?: string;
   metadata?: Record<string, string>;
 }
@@ -52,7 +52,7 @@ interface PaymentIntentResponse {
   success: boolean;
   clientSecret: string;
   paymentIntentId: string;
-  amount: number; // EN CENTIMES dans la réponse
+  amount: number; // EN CENTIMES dans la réponse (de Stripe)
   currency: string;
   serviceType: string;
   status: string;
@@ -67,7 +67,7 @@ interface CreateAndScheduleCallData {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // 🔧 EN CENTIMES
+  amount: number; // 🔧 EN EUROS (le backend convertira en centimes)
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
@@ -189,43 +189,47 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       setIsProcessing(true);
 
-      // Dans handlePaymentSubmit(), avant la création du PaymentIntent
-console.log('🔍 Validation IDs:', {
-  providerId: provider.id,
-  clientId: user.uid,
-  providerName: provider.name,
-  userName: `${user.firstName} ${user.lastName}`
-});
+      // 🔧 FIX CRITIQUE: Validation des IDs
+      console.log('🔍 Validation IDs:', {
+        providerId: provider.id,
+        clientId: user.uid,
+        providerName: provider.name,
+        userName: `${user.firstName} ${user.lastName}`
+      });
 
-if (provider.id === user.uid) {
-  onError('Erreur : vous ne pouvez pas vous programmer un appel avec vous-même');
-  return;
-}
-      // 🔧 FIX CRITIQUE: Conversion EN CENTIMES avant d'envoyer au backend
-      const amountInCents = Math.round(service.amount * 100);
-      const commissionInCents = Math.round(service.commissionAmount * 100);
-      const providerAmountInCents = Math.round(service.providerAmount * 100);
+      if (provider.id === user.uid) {
+        onError('Erreur : vous ne pouvez pas vous programmer un appel avec vous-même');
+        return;
+      }
 
-      // 🔧 FIX: Validation des montants minimum côté frontend
-      if (amountInCents < 500) { // 5€ minimum pour Stripe
+      // 🔧 FIX CRITIQUE: GARDER LES MONTANTS EN EUROS (PAS DE CONVERSION)
+      // Le backend createPaymentIntent.ts s'occupe maintenant de la conversion
+      const amountInEuros = service.amount; // Déjà en euros
+      const commissionInEuros = service.commissionAmount; // Déjà en euros
+      const providerAmountInEuros = service.providerAmount; // Déjà en euros
+
+      // 🔧 FIX: Validation des montants minimum côté frontend (en EUROS)
+      if (amountInEuros < 5) {
         onError('Le montant minimum est de 5€ pour une transaction sécurisée.');
         return;
       }
 
-      if (amountInCents > 50000) { // 500€ maximum 
+      if (amountInEuros > 500) {
         onError('Le montant maximum est de 500€ par transaction.');
         return;
       }
 
-      // 🔧 FIX: Validation de la cohérence des montants
-      const calculatedTotal = commissionInCents + providerAmountInCents;
-      if (Math.abs(amountInCents - calculatedTotal) > 1) { // Tolérance 1 centime
-        console.error('Erreur cohérence montants:', {
-          amountInCents,
-          commissionInCents,
-          providerAmountInCents,
+      // 🔧 FIX: Validation de la cohérence des montants (en EUROS)
+      const calculatedTotal = Math.round((commissionInEuros + providerAmountInEuros) * 100) / 100;
+      const amountRounded = Math.round(amountInEuros * 100) / 100;
+      
+      if (Math.abs(amountRounded - calculatedTotal) > 0.01) { // Tolérance 1 centime
+        console.error('Erreur cohérence montants (en euros):', {
+          amountInEuros: amountRounded,
+          commissionInEuros,
+          providerAmountInEuros,
           calculatedTotal,
-          difference: Math.abs(amountInCents - calculatedTotal)
+          difference: Math.abs(amountRounded - calculatedTotal)
         });
         onError('Erreur dans la répartition des montants. Veuillez réessayer.');
         return;
@@ -235,11 +239,11 @@ if (provider.id === user.uid) {
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
       
-      // 🔧 FIX CRITIQUE: Envoyer les montants EN CENTIMES à la Cloud Function
+      // 🔧 FIX CRITIQUE: Envoyer les montants EN EUROS à la Cloud Function
       const paymentData: PaymentIntentData = {
-        amount: amountInCents,           // ← EN CENTIMES au lieu de service.amount
-        commissionAmount: commissionInCents, // ← EN CENTIMES
-        providerAmount: providerAmountInCents, // ← EN CENTIMES
+        amount: amountInEuros,           // ← EN EUROS (backend convertira en centimes)
+        commissionAmount: commissionInEuros, // ← EN EUROS
+        providerAmount: providerAmountInEuros, // ← EN EUROS
         currency: 'eur',
         serviceType: service.serviceType,
         providerId: provider.id,
@@ -251,33 +255,28 @@ if (provider.id === user.uid) {
         metadata: {
           providerType: provider.role || provider.type || 'expat',
           duration: service.duration.toString(),
-          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-          originalAmountEuros: service.amount.toString(), // Pour référence
-          originalCommissionEuros: service.commissionAmount.toString(),
-          originalProviderAmountEuros: service.providerAmount.toString()
+          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
         }
       };
 
       // 🔍 DEBUG DÉTAILLÉ
-      console.log('💳 === FRONTEND - CORRECTION APPLIQUÉE ===');
-      console.log('💰 Montants originaux (interface utilisateur en €):', {
+      console.log('💳 === FRONTEND - DONNÉES ENVOYÉES AU BACKEND ===');
+      console.log('💰 Montants en EUROS (interface utilisateur):', {
         serviceAmount: service.amount,
         commission: service.commissionAmount,
         provider: service.providerAmount,
         total: service.amount
       });
-      console.log('💰 Conversion pour backend (en centimes):', {
-        amountInCents: `${amountInCents} centimes (${amountInCents/100}€)`,
-        commissionInCents: `${commissionInCents} centimes (${commissionInCents/100}€)`,
-        providerAmountInCents: `${providerAmountInCents} centimes (${providerAmountInCents/100}€)`,
-        total_coherent: calculatedTotal === amountInCents
+      console.log('📤 Données envoyées au backend (EN EUROS):', {
+        amount: paymentData.amount,
+        commissionAmount: paymentData.commissionAmount,
+        providerAmount: paymentData.providerAmount
       });
       console.log('✅ Validation locale:', {
-        minimum_respecte: amountInCents >= 500,
-        maximum_respecte: amountInCents <= 50000,
-        coherence_totale: Math.abs(amountInCents - calculatedTotal) <= 1
+        minimum_respecte: amountInEuros >= 5,
+        maximum_respecte: amountInEuros <= 500,
+        coherence_totale: Math.abs(amountRounded - calculatedTotal) <= 0.01
       });
-      console.log('📤 Données envoyées au backend:', paymentData);
 
       console.log('📤 Envoi de la requête createPaymentIntent...');
       const paymentResponse = await createPaymentIntent(paymentData);
@@ -339,7 +338,7 @@ if (provider.id === user.uid) {
       const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
         httpsCallable(functions, 'createAndScheduleCall');
       
-      // 🔧 FIX: Données d'appel avec montants en centimes
+      // 🔧 FIX: Données d'appel avec montants EN EUROS (le backend callScheduler les convertira si nécessaire)
       const callData: CreateAndScheduleCallData = {
         providerId: provider.id,
         clientId: user.uid,
@@ -348,13 +347,13 @@ if (provider.id === user.uid) {
         serviceType: service.serviceType,
         providerType: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
         paymentIntentId: paymentIntent.id,
-        amount: amountInCents, // ← EN CENTIMES au lieu de service.amount
+        amount: amountInEuros, // ← EN EUROS (le backend s'occupe de la conversion si nécessaire)
         delayMinutes: 5,
         clientLanguages: ['fr'],
         providerLanguages: provider.languagesSpoken || provider.languages || ['fr']
       };
 
-      console.log('📞 Données d\'appel (montants en centimes):', callData);
+      console.log('📞 Données d\'appel (montants en euros):', callData);
       await createAndScheduleCall(callData);
       console.log('✅ Appel programmé avec succès');
 
@@ -421,7 +420,7 @@ if (provider.id === user.uid) {
         </div>
       </div>
 
-      {/* Détail du paiement avec design amélioré */}
+      {/* Détail du paiement avec design amélioré - AFFICHAGE EN EUROS */}
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 backdrop-blur-sm rounded-xl p-5 border border-gray-200">
         <h4 className="font-bold text-gray-900 mb-4 text-base flex items-center">
           <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
@@ -445,8 +444,8 @@ if (provider.id === user.uid) {
                 alt="Avatar expert"
               />
               <span className="font-semibold text-gray-900">
-              {provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert'}
-            </span>
+                {provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert'}
+              </span>
             </div>
           </div>
           <div className="flex justify-between items-center">
@@ -473,8 +472,8 @@ if (provider.id === user.uid) {
             <div className="flex justify-between items-center">
               <span className="text-lg font-bold text-gray-900">Total</span>
               <span className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-  {service.amount.toFixed(2)} €
-</span>
+                {service.amount.toFixed(2)} €
+              </span>
             </div>
           </div>
         </div>
@@ -503,7 +502,7 @@ if (provider.id === user.uid) {
         ) : (
           <div className="flex items-center justify-center space-x-3">
             <Lock className="w-6 h-6" />
-            <span>Payer {service.amount}€ et lancer la consultation</span>
+            <span>Payer {service.amount.toFixed(2)}€ et lancer la consultation</span>
           </div>
         )}
       </button>
@@ -613,20 +612,21 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     // 3. Reconstruction depuis provider (fallback)
     const provider = getProviderFromSources();
     if (provider && (provider.price || provider.price === 0)) {
-      const price = provider.price || (provider.role === 'lawyer' || provider.type === 'lawyer' ? 49 : 19);
+      // 🔧 FIX: Montants en EUROS pour l'interface utilisateur
+      const priceInEuros = provider.price || (provider.role === 'lawyer' || provider.type === 'lawyer' ? 49 : 19);
       const duration = provider.duration || (provider.role === 'lawyer' || provider.type === 'lawyer' ? 20 : 30);
       
       const reconstructedService: ServiceData = {
         providerId: provider.id,
         serviceType: (provider.role || provider.type) === 'lawyer' ? 'lawyer_call' : 'expat_call',
         providerRole: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
-        amount: price,
+        amount: priceInEuros, // EN EUROS
         duration: duration,
         clientPhone: user?.phone || '',
-        commissionAmount: Math.round(price * 0.2 * 100) / 100,
-        providerAmount: Math.round(price * 0.8 * 100) / 100
+        commissionAmount: Math.round(priceInEuros * 0.2 * 100) / 100, // EN EUROS
+        providerAmount: Math.round(priceInEuros * 0.8 * 100) / 100 // EN EUROS
       };
-      console.log('✅ Service reconstruit depuis provider:', reconstructedService);
+      console.log('✅ Service reconstruit depuis provider (en euros):', reconstructedService);
       return reconstructedService;
     }
 
@@ -782,7 +782,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
           </div>
         </div>
 
-        {/* Provider Info avec photo visible */}
+        {/* Provider Info avec photo visible - PRIX EN EUROS */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-5 mb-6">
           <div className="flex items-center space-x-4">
             <div className="relative flex-shrink-0">
@@ -802,8 +802,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
             
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-bold text-gray-900 truncate">
-              {provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert'}
-            </h3>
+                {provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert'}
+              </h3>
               <div className="flex items-center space-x-2 text-sm mt-1">
                 <span className={`px-3 py-1 rounded-full font-medium text-xs ${
                   isLawyer 
@@ -824,7 +824,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
             
             <div className="text-right flex-shrink-0">
               <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                {service?.amount || 0}€
+                {service?.amount?.toFixed(2) || '0.00'}€
               </div>
               <div className="text-xs text-gray-500 font-medium">
                 {service?.duration || 0} min
@@ -935,7 +935,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                   Votre consultation avec {provider?.fullName || provider?.name} s'est terminée avec succès.
                 </p>
                 
-                {/* Résumé */}
+                {/* Résumé - AFFICHAGE EN EUROS */}
                 <div className="mt-6 bg-gray-50 rounded-lg p-4">
                   <h4 className="font-semibold text-gray-900 mb-3">Résumé de la consultation</h4>
                   <div className="space-y-2 text-sm text-gray-600">
@@ -949,7 +949,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
                     </div>
                     <div className="flex justify-between">
                       <span>Montant:</span>
-                      <span className="font-medium text-green-600">{service?.amount}€</span>
+                      <span className="font-medium text-green-600">{service?.amount?.toFixed(2)}€</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Date:</span>

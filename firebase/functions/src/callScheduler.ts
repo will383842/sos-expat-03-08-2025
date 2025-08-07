@@ -20,7 +20,7 @@ const SCHEDULER_CONFIG = {
   MAX_PENDING_SESSIONS: 100,
 } as const;
 
-// 🔧 FIX: Interface corrigée avec montant EN CENTIMES
+// 🔧 FIX: Interface corrigée avec montant EN EUROS reçu du frontend
 interface CreateCallParams {
   sessionId?: string;
   providerId: string;
@@ -30,7 +30,7 @@ interface CreateCallParams {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // 🔧 FIX: EN CENTIMES
+  amount: number; // 🔧 FIX: EN EUROS (sera converti en centimes pour Stripe si nécessaire)
   delayMinutes?: number;
   requestId?: string;
   clientLanguages?: string[];
@@ -410,7 +410,7 @@ export const scheduleCallSequence = async (
 };
 
 /**
- * 🔧 FIX: Fonction pour créer et programmer un nouvel appel - MONTANT EN CENTIMES
+ * 🔧 FIX CRITIQUE: Fonction pour créer et programmer un nouvel appel - MONTANT EN EUROS
  */
 export const createAndScheduleCall = async (params: CreateCallParams): Promise<CallSessionState> => {
   try {
@@ -418,32 +418,41 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
     const sessionId = params.sessionId || `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
-    console.log(`💰 Montant: ${params.amount} centimes (${params.amount/100}€)`);
+    console.log(`💰 Montant: ${params.amount}€ pour ${params.serviceType}`);
 
-    // 🔧 FIX: Valider les paramètres avec montants EN CENTIMES
+    // 🔧 FIX: Valider les paramètres avec montants EN EUROS
     if (!params.providerId || !params.clientId || !params.providerPhone || 
         !params.clientPhone || !params.paymentIntentId || !params.amount) {
       throw new Error('Paramètres obligatoires manquants pour créer l\'appel');
     }
 
-    // 🔧 FIX: Validation du montant EN CENTIMES
-    if (params.amount < 500) { // 5€ minimum
+    // 🔧 FIX: Validation du montant EN EUROS
+    if (params.amount < 5) { // 5€ minimum
       throw new Error('Montant minimum de 5€ requis');
     }
 
-    if (params.amount > 50000) { // 500€ maximum
+    if (params.amount > 500) { // 500€ maximum
       throw new Error('Montant maximum de 500€ dépassé');
     }
 
-    // 🔧 FIX: Validation cohérence service/montant EN CENTIMES
-    const expectedAmountCents = params.serviceType === 'lawyer_call' ? 4900 : 1900; // 49€ ou 19€
-    const tolerance = 1000; // 10€ de tolérance en centimes
+    // 🔧 FIX: Validation cohérence service/montant EN EUROS
+    const expectedAmountEuros = params.serviceType === 'lawyer_call' ? 49 : 19; // 49€ ou 19€
+    const tolerance = 10; // 10€ de tolérance
     
-    if (Math.abs(params.amount - expectedAmountCents) > tolerance) {
-      console.warn(`⚠️ Montant inhabituel: ${params.amount} centimes pour ${params.serviceType} (attendu: ${expectedAmountCents} centimes)`);
+    if (Math.abs(params.amount - expectedAmountEuros) > tolerance) {
+      console.warn(`⚠️ Montant inhabituel: ${params.amount}€ pour ${params.serviceType} (attendu: ${expectedAmountEuros}€)`);
     }
 
-    // Créer la session via le TwilioCallManager
+    // 🔧 FIX CRITIQUE: Conversion EN CENTIMES pour le TwilioCallManager et Stripe
+    const amountInCents = Math.round(params.amount * 100);
+    
+    console.log('💰 Conversion montant pour systèmes internes:', {
+      amountInEuros: params.amount,
+      amountInCents: amountInCents,
+      serviceType: params.serviceType
+    });
+
+    // Créer la session via le TwilioCallManager avec montants EN CENTIMES
     const callSession = await twilioCallManager.createCallSession({
       sessionId,
       providerId: params.providerId,
@@ -453,7 +462,7 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       serviceType: params.serviceType,
       providerType: params.providerType,
       paymentIntentId: params.paymentIntentId,
-      amount: params.amount, // 🔧 FIX: EN CENTIMES
+      amount: amountInCents, // 🔧 FIX: EN CENTIMES pour les systèmes internes
       requestId: params.requestId,
       clientLanguages: params.clientLanguages,
       providerLanguages: params.providerLanguages
@@ -477,16 +486,16 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       retryCount: 0,
       additionalData: {
         serviceType: params.serviceType,
-        amount: params.amount,
-        amountInEuros: params.amount / 100,
+        amountInEuros: params.amount, // Pour audit humain
+        amountInCents: amountInCents, // Pour systèmes internes
         delayMinutes: delayMinutes,
-        expectedAmountCents,
-        amountDifferenceFromExpected: params.amount - expectedAmountCents
+        expectedAmountEuros,
+        amountDifferenceFromExpected: params.amount - expectedAmountEuros
       }
     });
 
     console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes`);
-    console.log(`💰 Validation montant: ${params.amount} centimes (${params.amount/100}€) pour ${params.serviceType}`);
+    console.log(`💰 Validation montant: ${params.amount}€ (${amountInCents} centimes) pour ${params.serviceType}`);
     
     return callSession;
 
@@ -618,7 +627,7 @@ export const cleanupOldSessions = async (olderThanDays: number = 30): Promise<vo
 };
 
 /**
- * 🔧 FIX: Fonction pour obtenir des statistiques sur les appels avec montants EN CENTIMES
+ * 🔧 FIX: Fonction pour obtenir des statistiques sur les appels avec montants cohérents
  */
 export const getCallStatistics = async (periodDays: number = 7): Promise<{
   scheduler: SchedulerStats;
@@ -629,9 +638,7 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
     cancelled: number;
     averageDuration: number;
     successRate: number;
-    totalRevenueCents: number; // EN CENTIMES
     totalRevenueEuros: number; // EN EUROS pour affichage
-    averageAmountCents: number; // EN CENTIMES
     averageAmountEuros: number; // EN EUROS pour affichage
   };
 }> => {
@@ -645,8 +652,8 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
       twilioCallManager.getCallStatistics({ startDate })
     ]);
 
-    // 🔧 FIX: Calculs de revenus EN CENTIMES
-    let totalRevenueCents = 0;
+    // 🔧 FIX: Calculs de revenus EN EUROS pour l'affichage
+    let totalRevenueEuros = 0;
     let completedCallsWithRevenue = 0;
 
     // Récupérer les sessions complétées avec revenus
@@ -658,12 +665,13 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
 
     completedSessionsQuery.docs.forEach(doc => {
       const session = doc.data() as CallSessionState;
-      // Assumer que les montants dans payment sont EN CENTIMES (nouveau système)
-      totalRevenueCents += session.payment.amount || 0;
+      // Convertir depuis centimes vers euros si nécessaire
+      const amountInEuros = session.payment.amountInEuros || (session.payment.amount / 100);
+      totalRevenueEuros += amountInEuros;
       completedCallsWithRevenue++;
     });
 
-    const averageAmountCents = completedCallsWithRevenue > 0 ? totalRevenueCents / completedCallsWithRevenue : 0;
+    const averageAmountEuros = completedCallsWithRevenue > 0 ? totalRevenueEuros / completedCallsWithRevenue : 0;
 
     return {
       scheduler: schedulerStats,
@@ -674,10 +682,8 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
         cancelled: callStats.cancelled,
         averageDuration: callStats.averageDuration,
         successRate: callStats.successRate,
-        totalRevenueCents,
-        totalRevenueEuros: totalRevenueCents / 100,
-        averageAmountCents,
-        averageAmountEuros: averageAmountCents / 100
+        totalRevenueEuros,
+        averageAmountEuros
       }
     };
 

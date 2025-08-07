@@ -2,7 +2,7 @@
 // src/components/forms-data/MultiLanguageSelect.tsx
 // ========================================
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Select, { MultiValue, StylesConfig, components, OptionProps } from 'react-select';
 import Fuse from 'fuse.js';
 import languages, { Language } from '../../data/Languages-spoken';
@@ -20,13 +20,14 @@ interface MultiLanguageSelectProps {
   highlightShared?: boolean; // Option pour activer/désactiver la mise en évidence
 }
 
+// 🔧 FIX: Créer fuse en dehors du composant pour éviter les re-créations
 const fuse = new Fuse(languages, {
   keys: ['name'],
   threshold: 0.3,
 });
 
 // Composant personnalisé pour les options avec mise en évidence
-const CustomOption: React.FC<OptionProps<LanguageOption, true>> = (props) => {
+const CustomOption: React.FC<OptionProps<LanguageOption, true>> = React.memo((props) => {
   const { data, isSelected } = props;
   
   return (
@@ -43,9 +44,11 @@ const CustomOption: React.FC<OptionProps<LanguageOption, true>> = (props) => {
       </div>
     </components.Option>
   );
-};
+});
 
-// Styles personnalisés pour react-select
+CustomOption.displayName = 'CustomOption';
+
+// Styles personnalisés pour react-select - mémorisé
 const getCustomStyles = (highlightShared: boolean): StylesConfig<LanguageOption, true> => ({
   option: (provided, state) => {
     const { data } = state;
@@ -89,7 +92,7 @@ const getCustomStyles = (highlightShared: boolean): StylesConfig<LanguageOption,
   },
 });
 
-const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = ({ 
+const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({ 
   value, 
   onChange,
   providerLanguages = [],
@@ -97,32 +100,68 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   
-  console.log("📚 Langues chargées :", languages);
-  console.log("🎯 Langues du prestataire :", providerLanguages);
+  // 🔧 FIX: Déplacer les logs dans useEffect pour éviter les logs à chaque rendu
+  useEffect(() => {
+    console.log("📚 Langues chargées :", languages.length);
+  }, []); // Une seule fois au montage
 
-  const filteredLanguages: Language[] = inputValue 
-    ? fuse.search(inputValue).map(res => res.item)
-    : languages;
+  useEffect(() => {
+    console.log("🎯 Langues du prestataire :", providerLanguages.length);
+  }, [providerLanguages]); // Seulement quand providerLanguages change
 
-  // Création des options avec identification des langues partagées
-  const options: LanguageOption[] = filteredLanguages.map(lang => {
-    const isShared = highlightShared && providerLanguages.includes(lang.code);
+  // 🔧 FIX: Mémoriser les langues filtrées pour éviter les re-calculs
+  const filteredLanguages = useMemo((): Language[] => {
+    if (!inputValue) return languages;
+    return fuse.search(inputValue).map(res => res.item);
+  }, [inputValue]);
+
+  // 🔧 FIX: Mémoriser les options pour éviter les re-créations
+  const options = useMemo((): LanguageOption[] => {
+    return filteredLanguages.map(lang => {
+      const isShared = highlightShared && providerLanguages.includes(lang.code);
+      
+      return {
+        value: lang.code,
+        label: lang.name,
+        isShared
+      };
+    });
+  }, [filteredLanguages, highlightShared, providerLanguages]);
+
+  // 🔧 FIX: Mémoriser les options triées
+  const sortedOptions = useMemo(() => {
+    if (!highlightShared) return options;
     
-    return {
-      value: lang.code,
-      label: lang.name,
-      isShared
-    };
-  });
+    return [...options].sort((a, b) => {
+      if (a.isShared && !b.isShared) return -1;
+      if (!a.isShared && b.isShared) return 1;
+      return 0;
+    });
+  }, [options, highlightShared]);
 
-  // Tri des options : langues partagées en premier si la mise en évidence est activée
-  const sortedOptions = highlightShared 
-    ? [...options].sort((a, b) => {
-        if (a.isShared && !b.isShared) return -1;
-        if (!a.isShared && b.isShared) return 1;
-        return 0;
-      })
-    : options;
+  // 🔧 FIX: Mémoriser les styles pour éviter les re-créations
+  const customStyles = useMemo(() => getCustomStyles(highlightShared), [highlightShared]);
+
+  // 🔧 FIX: Callback mémorisé pour onInputChange
+  const handleInputChange = useCallback((input: string) => {
+    setInputValue(input);
+    return input;
+  }, []);
+
+  // 🔧 FIX: Callback mémorisé pour noOptionsMessage
+  const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => 
+    inputValue ? `Aucune langue trouvée pour "${inputValue}"` : "Aucune langue disponible"
+  , []);
+
+  // 🔧 FIX: Mémoriser les statistiques
+  const stats = useMemo(() => {
+    if (!highlightShared || providerLanguages.length === 0) return null;
+    
+    const compatibleCount = sortedOptions.filter(opt => opt.isShared).length;
+    const totalCount = sortedOptions.length;
+    
+    return { compatibleCount, totalCount };
+  }, [highlightShared, providerLanguages.length, sortedOptions]);
 
   return (
     <div className="w-full">
@@ -140,36 +179,33 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = ({
         isMulti
         options={sortedOptions}
         onChange={onChange}
-        onInputChange={(input) => {
-          setInputValue(input);
-          return input;
-        }}
+        onInputChange={handleInputChange}
         value={value}
         placeholder="Sélectionnez les langues"
         className="w-full"
         components={{
           Option: CustomOption
         }}
-        styles={getCustomStyles(highlightShared)}
+        styles={customStyles}
         // Configuration pour améliorer l'UX
         closeMenuOnSelect={false}
         hideSelectedOptions={false}
         blurInputOnSelect={false}
         // Message personnalisé quand aucune option n'est trouvée
-        noOptionsMessage={({ inputValue }) => 
-          inputValue ? `Aucune langue trouvée pour "${inputValue}"` : "Aucune langue disponible"
-        }
+        noOptionsMessage={noOptionsMessage}
       />
       
       {/* Statistiques optionnelles */}
-      {highlightShared && providerLanguages.length > 0 && (
+      {stats && (
         <div className="mt-2 text-xs text-gray-500">
-          {sortedOptions.filter(opt => opt.isShared).length} langue(s) compatible(s) 
-          sur {sortedOptions.length} disponible(s)
+          {stats.compatibleCount} langue(s) compatible(s) 
+          sur {stats.totalCount} disponible(s)
         </div>
       )}
     </div>
   );
-};
+});
+
+MultiLanguageSelect.displayName = 'MultiLanguageSelect';
 
 export default MultiLanguageSelect;

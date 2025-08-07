@@ -494,40 +494,160 @@ const BookingRequest: React.FC = () => {
     }
   };
 
-  // Fonction réelle pour notifier le prestataire via Firebase Functions
+  // 🔧 FIX: Fonction améliorée pour notifier le prestataire avec debug détaillé
   const notifyProviderOfRequest = async (providerId: string, requestData: BookingRequestData): Promise<{ success: boolean; result?: unknown; error?: unknown }> => {
+    console.log('🔍 [DEBUG] === DÉBUT NOTIFICATION PRESTATAIRE ===');
+    console.log('🔍 [DEBUG] Provider ID:', providerId);
+    console.log('🔍 [DEBUG] Request Data Keys:', Object.keys(requestData));
+    console.log('🔍 [DEBUG] Provider Email:', requestData.providerEmail);
+    console.log('🔍 [DEBUG] Provider Phone:', requestData.providerPhone);
+    console.log('🔍 [DEBUG] Client Info:', {
+      name: `${requestData.clientFirstName} ${requestData.clientLastName}`,
+      phone: requestData.clientPhone,
+      country: requestData.clientCurrentCountry
+    });
+
     try {
-      const sendNotification = httpsCallable(functions, 'sendEmail');
-      
+      // 🔧 FIX: Validation préalable des données critiques
+      if (!requestData.providerEmail && !requestData.providerPhone) {
+        console.warn('⚠️ [DEBUG] Aucun contact disponible pour le prestataire');
+        return { success: false, error: 'Aucun contact disponible pour le prestataire' };
+      }
+
+      if (!requestData.title || requestData.title.trim().length === 0) {
+        console.error('❌ [DEBUG] Titre manquant dans la demande');
+        return { success: false, error: 'Titre de la demande manquant' };
+      }
+
+      if (!requestData.description || requestData.description.trim().length === 0) {
+        console.error('❌ [DEBUG] Description manquante dans la demande');
+        return { success: false, error: 'Description de la demande manquante' };
+      }
+
+      console.log('✅ [DEBUG] Validation des données réussie');
+
+      // 🔧 FIX: Simplification drastique des données pour identifier le problème
       const notificationData: NotificationData = {
         type: 'provider_booking_request',
-        recipientEmail: requestData.providerEmail || 'provider@example.com',
-        recipientPhone: requestData.providerPhone,
-        recipientName: requestData.providerName,
-        emailSubject: `Nouvelle demande de consultation - ${requestData.title}`,
+        providerId: providerId,
+        recipientName: requestData.providerName || 'Prestataire',
+        emailSubject: `SOS Expat - Nouvelle demande: ${requestData.title.substring(0, 50)}`,
+        
+        // 🔧 FIX: HTML simplifié pour éviter les erreurs de parsing
         emailHtml: `
-          <h2>Nouvelle demande de consultation</h2>
-          <p><strong>Client :</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
-          <p><strong>Nationalité :</strong> ${requestData.clientNationality}</p>
-          <p><strong>Pays :</strong> ${requestData.clientCurrentCountry}</p>
-          <p><strong>Langues :</strong> ${requestData.clientLanguagesDetails?.map((l) => l.name).join(', ')}</p>
-          <p><strong>Titre :</strong> ${requestData.title}</p>
-          <p><strong>Description :</strong></p>
-          <p>${requestData.description}</p>
-          <p><strong>Téléphone client :</strong> ${requestData.clientPhone}</p>
-          <hr>
-          <p>Connectez-vous à votre espace prestataire pour répondre à cette demande.</p>
-        `,
-        smsMessage: `SOS Expat: Nouvelle demande de consultation de ${requestData.clientFirstName}. Titre: "${requestData.title}". Consultez votre espace prestataire.`,
-        whatsappMessage: `🔔 SOS Expat: Nouvelle demande de consultation de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire pour plus de détails.`
+<h2>Nouvelle demande de consultation</h2>
+<p><strong>Client:</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
+<p><strong>Nationalité:</strong> ${requestData.clientNationality}</p>
+<p><strong>Pays:</strong> ${requestData.clientCurrentCountry}</p>
+<p><strong>Téléphone:</strong> ${requestData.clientPhone}</p>
+<p><strong>Titre:</strong> ${requestData.title}</p>
+<p><strong>Description:</strong> ${requestData.description}</p>
+<hr>
+<p>Connectez-vous à votre espace prestataire pour répondre.</p>
+        `.trim(),
+
+        // 🔧 FIX: SMS simplifié
+        smsMessage: `SOS Expat: Nouvelle demande de ${requestData.clientFirstName}. Titre: "${requestData.title.substring(0, 30)}...". Consultez votre espace.`,
+
+        // 🔧 FIX: WhatsApp simplifié
+        whatsappMessage: `🔔 SOS Expat: Nouvelle demande de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire.`
       };
 
+      // 🔧 FIX: Ajouter email seulement s'il existe et est valide
+      if (requestData.providerEmail && requestData.providerEmail.includes('@')) {
+        notificationData.recipientEmail = requestData.providerEmail;
+        console.log('✅ [DEBUG] Email ajouté:', requestData.providerEmail);
+      } else {
+        console.warn('⚠️ [DEBUG] Email invalide ou manquant, notification par email ignorée');
+      }
+
+      // 🔧 FIX: Ajouter téléphone seulement s'il existe
+      if (requestData.providerPhone && requestData.providerPhone.length > 5) {
+        notificationData.recipientPhone = requestData.providerPhone;
+        console.log('✅ [DEBUG] Téléphone ajouté:', requestData.providerPhone);
+      } else {
+        console.warn('⚠️ [DEBUG] Téléphone invalide ou manquant, notification SMS/WhatsApp ignorée');
+      }
+
+      console.log('📤 [DEBUG] Données finales à envoyer:', {
+        type: notificationData.type,
+        hasEmail: !!notificationData.recipientEmail,
+        hasPhone: !!notificationData.recipientPhone,
+        emailSubject: notificationData.emailSubject,
+        htmlLength: notificationData.emailHtml?.length || 0,
+        smsLength: notificationData.smsMessage?.length || 0
+      });
+
+      // 🔧 FIX: Test de connectivité Firebase avant envoi
+      console.log('🔗 [DEBUG] Test de connectivité Firebase Functions...');
+      if (!functions) {
+        throw new Error('Firebase Functions non initialisé');
+      }
+
+      const sendNotification = httpsCallable(functions, 'sendEmail');
+      console.log('✅ [DEBUG] Fonction sendEmail récupérée avec succès');
+
+      console.log('🚀 [DEBUG] Envoi de la notification...');
       const result = await sendNotification(notificationData);
-      console.log('✅ Notification prestataire envoyée:', result);
+      
+      console.log('✅ [DEBUG] Réponse reçue:', {
+        hasData: !!result.data,
+        dataType: typeof result.data,
+        dataKeys: result.data ? Object.keys(result.data) : 'N/A'
+      });
+      
+      console.log('✅ [DEBUG] Notification prestataire envoyée avec succès');
       return { success: true, result };
       
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'envoi de notification au prestataire:', error);
+    } catch (error: unknown) {
+      console.error('❌ [DEBUG] === ERREUR DÉTAILLÉE NOTIFICATION ===');
+      console.error('❌ [DEBUG] Type d\'erreur:', typeof error);
+      console.error('❌ [DEBUG] Erreur complète:', error);
+      
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        console.error('❌ [DEBUG] Propriétés d\'erreur:', Object.keys(errorObj));
+        console.error('❌ [DEBUG] Code d\'erreur:', errorObj.code);
+        console.error('❌ [DEBUG] Message d\'erreur:', errorObj.message);
+        console.error('❌ [DEBUG] Détails d\'erreur:', errorObj.details);
+        console.error('❌ [DEBUG] Stack trace:', errorObj.stack);
+        
+        // 🔧 FIX: Analyse spécifique des erreurs Firebase
+        if (errorObj.code) {
+          switch (errorObj.code) {
+            case 'functions/invalid-argument':
+              console.error('❌ [DEBUG] Erreur: Arguments invalides envoyés à la fonction');
+              break;
+            case 'functions/unauthenticated':
+              console.error('❌ [DEBUG] Erreur: Utilisateur non authentifié');
+              break;
+            case 'functions/permission-denied':
+              console.error('❌ [DEBUG] Erreur: Permissions insuffisantes');
+              break;
+            case 'functions/not-found':
+              console.error('❌ [DEBUG] Erreur: Fonction Cloud non trouvée');
+              break;
+            case 'functions/internal':
+              console.error('❌ [DEBUG] Erreur: Erreur interne du serveur');
+              break;
+            case 'functions/unavailable':
+              console.error('❌ [DEBUG] Erreur: Service temporairement indisponible');
+              break;
+            default:
+              console.error('❌ [DEBUG] Erreur: Code d\'erreur non reconnu:', errorObj.code);
+          }
+        }
+      }
+      
+      console.error('❌ [DEBUG] Context:', {
+        providerId,
+        clientName: `${requestData.clientFirstName} ${requestData.clientLastName}`,
+        title: requestData.title,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      });
+      
       return { success: false, error };
     }
   };
@@ -615,7 +735,7 @@ const BookingRequest: React.FC = () => {
       providerRating: selectedProvider.rating,
       providerReviewCount: selectedProvider.reviewCount,
       providerLanguages: selectedProvider.languages,
-      providerSpecialties: selectedProvider.specialties,
+      providerSpecialities: selectedProvider.specialties,
       title: serviceData.title,
       description: serviceData.description,
       clientLanguages: serviceData.clientDetails.languages,
@@ -803,11 +923,17 @@ const BookingRequest: React.FC = () => {
         console.warn('⚠️ Erreur sessionStorage (non bloquant):', storageError);
       }
 
-      // Envoyer la notification au prestataire (non bloquant)
+      // 🔧 FIX: Envoyer la notification au prestataire avec debug amélioré (non bloquant)
+      console.log('📧 [DEBUG] Tentative d\'envoi de notification au prestataire...');
       try {
-        await notifyProviderOfRequest(provider.id, bookingRequest);
+        const notificationResult = await notifyProviderOfRequest(provider.id, bookingRequest);
+        if (notificationResult.success) {
+          console.log('✅ [DEBUG] Notification prestataire envoyée avec succès');
+        } else {
+          console.warn('⚠️ [DEBUG] Échec de notification prestataire (non bloquant):', notificationResult.error);
+        }
       } catch (notificationError) {
-        console.warn("⚠️ Échec de l'envoi de notification au prestataire (non bloquant):", notificationError);
+        console.warn("⚠️ [DEBUG] Erreur de notification prestataire (non bloquant):", notificationError);
       }
 
       // 🔧 NAVIGATION VERS CALL-CHECKOUT AVEC PROVIDER ID

@@ -7,8 +7,7 @@ export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } fr
 export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook'; 
 export { twilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
 
-// Export du système de paiement modernisé
-export { createPaymentIntent } from './createPaymentIntent';
+
 
 // Export des managers
 export { messageManager } from './MessageManager';
@@ -321,7 +320,7 @@ interface PaymentIntentData {
 }
 
 // Fonction pour créer un PaymentIntent Stripe (legacy - utiliser createPaymentIntent.ts)
-export const createPaymentIntent = onCall(async (request: CallableRequest<PaymentIntentData>) => {
+export const createPaymentIntentLegacy = onCall(async (request: CallableRequest<PaymentIntentData>) => {
   const data = request.data;
   
   // Vérifier l'authentification

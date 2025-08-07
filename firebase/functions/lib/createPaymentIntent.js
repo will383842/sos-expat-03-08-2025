@@ -56,32 +56,28 @@ const rateLimitStore = new Map();
 // =========================================
 const SECURITY_LIMITS = {
     RATE_LIMIT: {
-        // Développement: Très permissif pour les tests
-        // Test/Staging: Modéré
-        // Production: Sécurisé mais raisonnable
         MAX_REQUESTS: isDevelopment ? 1000 : (isProduction ? 25 : 100),
-        WINDOW_MS: isDevelopment ? 2 * 60 * 1000 : (isProduction ? 8 * 60 * 1000 : 5 * 60 * 1000), // 2min dev, 8min prod, 5min test
+        WINDOW_MS: isDevelopment ? 2 * 60 * 1000 : (isProduction ? 8 * 60 * 1000 : 5 * 60 * 1000),
         GLOBAL_MAX: isDevelopment ? 10000 : (isProduction ? 1000 : 2000),
     },
     AMOUNT_LIMITS: {
-        // 🔧 FIX: Limites EN CENTIMES (cohérent avec Stripe)
-        MIN_AMOUNT: 500, // 5€ en centimes
-        MAX_AMOUNT: 50000, // 500€ en centimes 
-        MAX_DAILY_USER: 200000, // 2000€ par jour par utilisateur EN CENTIMES
+        // 🔧 FIX: Limites EN EUROS (frontend) puis converties en centimes
+        MIN_AMOUNT_EUROS: 5, // 5€ minimum
+        MAX_AMOUNT_EUROS: 500, // 500€ maximum 
+        MAX_DAILY_USER_EUROS: 2000, // 2000€ par jour par utilisateur
     },
     VALIDATION: {
         MAX_METADATA_SIZE: isDevelopment ? 10000 : (isProduction ? 3000 : 5000),
         MAX_DESCRIPTION_LENGTH: isDevelopment ? 5000 : (isProduction ? 1500 : 2000),
-        // Tolérance pour cohérence des montants EN CENTIMES
-        AMOUNT_COHERENCE_TOLERANCE: isDevelopment ? 50 : (isProduction ? 5 : 10), // 🔧 FIX: EN CENTIMES
-        // Tolérance pour validation business EN CENTIMES
-        BUSINESS_AMOUNT_TOLERANCE: isDevelopment ? 5000 : (isProduction ? 1500 : 2500), // 🔧 FIX: EN CENTIMES
+        // Tolérance pour cohérence des montants EN EUROS
+        AMOUNT_COHERENCE_TOLERANCE_EUROS: isDevelopment ? 0.50 : (isProduction ? 0.05 : 0.10),
+        // Tolérance pour validation business EN EUROS
+        BUSINESS_AMOUNT_TOLERANCE_EUROS: isDevelopment ? 50 : (isProduction ? 15 : 25),
         ALLOWED_CURRENCIES: ['eur', 'usd', 'gbp'],
         ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'],
     },
     DUPLICATES: {
-        // Fenêtre de vérification des doublons
-        WINDOW_MS: isDevelopment ? 30 * 1000 : (isProduction ? 5 * 60 * 1000 : 2 * 60 * 1000), // 30s dev, 5min prod, 2min test
+        WINDOW_MS: isDevelopment ? 30 * 1000 : (isProduction ? 5 * 60 * 1000 : 2 * 60 * 1000),
     }
 };
 // =========================================
@@ -91,12 +87,10 @@ const SECURITY_LIMITS = {
  * Rate limiting avec configuration par environnement
  */
 function checkRateLimit(userId) {
-    // Bypass complet en mode debug
     if (BYPASS_MODE) {
         logSecurityEvent('rate_limit_bypassed', { userId });
         return { allowed: true };
     }
-    // Nettoyage automatique du cache en développement
     if (isDevelopment) {
         const now = Date.now();
         for (const [key, limit] of rateLimitStore.entries()) {
@@ -108,7 +102,6 @@ function checkRateLimit(userId) {
     const now = Date.now();
     const key = `payment_${userId}`;
     const limit = rateLimitStore.get(key);
-    // Nettoyer les anciens enregistrements
     if (limit && now > limit.resetTime) {
         rateLimitStore.delete(key);
     }
@@ -129,10 +122,9 @@ function checkRateLimit(userId) {
     return { allowed: true };
 }
 /**
- * 🔧 FIX: Validation business logic - montants EN CENTIMES
+ * 🔧 FIX CRITIQUE: Validation business logic - montants EN EUROS reçus du frontend
  */
 async function validateBusinessLogic(data, db) {
-    // Mode bypass complet
     if (BYPASS_MODE) {
         logSecurityEvent('business_validation_bypassed', { providerId: data.providerId });
         return { valid: true };
@@ -143,11 +135,9 @@ async function validateBusinessLogic(data, db) {
         if (!providerData) {
             return { valid: false, error: 'Prestataire non trouvé' };
         }
-        // Vérifications de statut (importantes dans tous les environnements)
         if (providerData.status === 'suspended' || providerData.status === 'banned') {
             return { valid: false, error: 'Prestataire non disponible' };
         }
-        // Validation allégée en développement
         if (isDevelopment) {
             logSecurityEvent('business_validation_dev_mode', {
                 providerId: data.providerId,
@@ -155,37 +145,35 @@ async function validateBusinessLogic(data, db) {
             });
             return { valid: true };
         }
-        // 🔧 FIX: Validation des tarifs avec montants EN CENTIMES
-        const expectedAmountCents = (providerData.price || (data.serviceType === 'lawyer_call' ? 49 : 19)) * 100;
-        const tolerance = SECURITY_LIMITS.VALIDATION.BUSINESS_AMOUNT_TOLERANCE;
-        const difference = Math.abs(data.amount - expectedAmountCents);
+        // 🔧 FIX: Validation des tarifs EN EUROS
+        const expectedAmountEuros = providerData.price || (data.serviceType === 'lawyer_call' ? 49 : 19);
+        const tolerance = SECURITY_LIMITS.VALIDATION.BUSINESS_AMOUNT_TOLERANCE_EUROS;
+        const difference = Math.abs(data.amount - expectedAmountEuros);
         if (difference > tolerance) {
             logSecurityEvent('business_amount_anomaly', {
-                expected: expectedAmountCents,
+                expected: expectedAmountEuros,
                 received: data.amount,
                 difference,
                 tolerance,
                 serviceType: data.serviceType
             });
-            // En production, bloquer seulement si très éloigné
-            if (isProduction && difference > 10000) { // 100€ d'écart EN CENTIMES = suspect
+            if (isProduction && difference > 100) { // 100€ d'écart = suspect
                 return { valid: false, error: 'Montant très éloigné du tarif standard' };
             }
         }
-        // 🔧 FIX: Vérification cohérence commission/prestataire EN CENTIMES
-        const expectedCommissionCents = Math.round(expectedAmountCents * 0.20);
-        const expectedProviderAmountCents = expectedAmountCents - expectedCommissionCents;
-        const commissionDiff = Math.abs(data.commissionAmount - expectedCommissionCents);
-        const providerDiff = Math.abs(data.providerAmount - expectedProviderAmountCents);
-        if (commissionDiff > 500 || providerDiff > 500) { // Tolérance 5€ EN CENTIMES
+        // 🔧 FIX: Vérification cohérence commission/prestataire EN EUROS
+        const expectedCommissionEuros = Math.round(expectedAmountEuros * 0.20 * 100) / 100;
+        const expectedProviderAmountEuros = expectedAmountEuros - expectedCommissionEuros;
+        const commissionDiff = Math.abs(data.commissionAmount - expectedCommissionEuros);
+        const providerDiff = Math.abs(data.providerAmount - expectedProviderAmountEuros);
+        if (commissionDiff > 5 || providerDiff > 5) { // Tolérance 5€
             logSecurityEvent('commission_split_anomaly', {
-                expectedCommission: expectedCommissionCents,
+                expectedCommission: expectedCommissionEuros,
                 receivedCommission: data.commissionAmount,
-                expectedProvider: expectedProviderAmountCents,
+                expectedProvider: expectedProviderAmountEuros,
                 receivedProvider: data.providerAmount
             });
-            // Bloquer seulement si très incohérent
-            if (isProduction && (commissionDiff > 2000 || providerDiff > 2000)) { // 20€ EN CENTIMES
+            if (isProduction && (commissionDiff > 20 || providerDiff > 20)) { // 20€
                 return { valid: false, error: 'Répartition des montants très incohérente' };
             }
         }
@@ -197,25 +185,25 @@ async function validateBusinessLogic(data, db) {
     }
 }
 /**
- * 🔧 FIX: Validation sécuritaire des montants - REÇOIT DES CENTIMES
+ * 🔧 FIX CRITIQUE: Validation sécuritaire des montants - REÇOIT DES EUROS, VALIDE EN EUROS
  */
-async function validateAmountSecurity(amount, // ✅ REÇOIT MAINTENANT DES CENTIMES
+async function validateAmountSecurity(amountInEuros, // ✅ REÇOIT DES EUROS du frontend
 userId, db) {
-    logSecurityEvent('amount_validation_start', { amount, userId });
-    // 🔧 FIX: Limites EN CENTIMES - comparaisons directes
-    if (amount < SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT) {
+    logSecurityEvent('amount_validation_start', { amountInEuros, userId });
+    // 🔧 FIX: Limites EN EUROS - validation directe
+    if (amountInEuros < SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT_EUROS) {
         return {
             valid: false,
-            error: `Montant minimum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT / 100}€ requis`
+            error: `Montant minimum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT_EUROS}€ requis`
         };
     }
-    if (amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT) {
+    if (amountInEuros > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT_EUROS) {
         return {
             valid: false,
-            error: `Montant maximum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT / 100}€ dépassé`
+            error: `Montant maximum de ${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT_EUROS}€ dépassé`
         };
     }
-    // 2. Limite journalière (désactivée en développement)
+    // Limite journalière (désactivée en développement)
     if (!isDevelopment) {
         try {
             const today = new Date();
@@ -225,40 +213,39 @@ userId, db) {
                 .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(today))
                 .where('status', 'in', ['succeeded', 'requires_capture', 'processing'])
                 .get();
-            // 🔧 FIX: Calcul en centimes cohérent
-            const dailyTotalCents = dailyPaymentsQuery.docs.reduce((total, doc) => {
-                const paymentAmount = doc.data().amount || 0;
-                // ✅ Assumer que les montants stockés sont en centimes (nouveau système)
-                return total + paymentAmount;
+            // 🔧 FIX: Calcul en euros cohérent (utiliser amountInEuros stocké)
+            const dailyTotalEuros = dailyPaymentsQuery.docs.reduce((total, doc) => {
+                const paymentData = doc.data();
+                // Utiliser amountInEuros si disponible, sinon convertir depuis centimes
+                const paymentAmountEuros = paymentData.amountInEuros || (paymentData.amount / 100);
+                return total + paymentAmountEuros;
             }, 0);
             logSecurityEvent('daily_limit_check', {
-                dailyTotalCents,
-                newAmountCents: amount,
-                limitCents: SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER
+                dailyTotalEuros,
+                newAmountEuros: amountInEuros,
+                limitEuros: SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER_EUROS
             });
-            if (dailyTotalCents + amount > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER) {
+            if (dailyTotalEuros + amountInEuros > SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER_EUROS) {
                 return {
                     valid: false,
-                    error: `Limite journalière dépassée (${Math.round((dailyTotalCents + amount) / 100)}€/${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER / 100}€)`
+                    error: `Limite journalière dépassée (${Math.round(dailyTotalEuros + amountInEuros)}€/${SECURITY_LIMITS.AMOUNT_LIMITS.MAX_DAILY_USER_EUROS}€)`
                 };
             }
         }
         catch (error) {
             await (0, logError_1.logError)('validateAmountSecurity:dailyLimit', error);
-            // Ne pas bloquer si erreur de calcul, juste logger
             logSecurityEvent('daily_limit_check_error', { error });
         }
     }
     return { valid: true };
 }
 /**
- * 🔧 FIX: Vérification des doublons - montants EN CENTIMES
+ * 🔧 FIX CRITIQUE: Vérification des doublons - montants EN EUROS
  */
-async function checkDuplicatePayments(clientId, providerId, amount, // EN CENTIMES
+async function checkDuplicatePayments(clientId, providerId, amountInEuros, // EN EUROS
 db) {
-    // Bypass en mode debug
     if (BYPASS_MODE) {
-        logSecurityEvent('duplicate_check_bypassed', { clientId, providerId, amount });
+        logSecurityEvent('duplicate_check_bypassed', { clientId, providerId, amountInEuros });
         return false;
     }
     try {
@@ -266,7 +253,7 @@ db) {
         const existingPayments = await db.collection('payments')
             .where('clientId', '==', clientId)
             .where('providerId', '==', providerId)
-            .where('amount', '==', amount) // Comparaison en centimes
+            .where('amountInEuros', '==', amountInEuros) // Comparaison en euros
             .where('status', 'in', ['pending', 'requires_confirmation', 'requires_capture', 'processing'])
             .where('createdAt', '>', admin.firestore.Timestamp.fromDate(new Date(Date.now() - windowMs)))
             .limit(1)
@@ -275,8 +262,7 @@ db) {
         logSecurityEvent('duplicate_check', {
             clientId,
             providerId,
-            amount,
-            amountInEuros: amount / 100,
+            amountInEuros,
             windowMs,
             hasDuplicate
         });
@@ -284,53 +270,60 @@ db) {
     }
     catch (error) {
         await (0, logError_1.logError)('checkDuplicatePayments', error);
-        return false; // En cas d'erreur, ne pas bloquer
+        return false;
     }
 }
 /**
- * 🔧 FIX: Validation cohérence des montants - TOUS EN CENTIMES
+ * 🔧 FIX CRITIQUE: Validation cohérence des montants - TOUS EN EUROS
  */
-function validateAmountCoherence(amount, // EN CENTIMES
-commissionAmount, // EN CENTIMES
-providerAmount // EN CENTIMES
+function validateAmountCoherence(amountInEuros, // EN EUROS
+commissionAmountInEuros, // EN EUROS
+providerAmountInEuros // EN EUROS
 ) {
-    const totalCalculated = Math.round(commissionAmount + providerAmount);
-    const amountRounded = Math.round(amount);
+    const totalCalculated = Math.round((commissionAmountInEuros + providerAmountInEuros) * 100) / 100;
+    const amountRounded = Math.round(amountInEuros * 100) / 100;
     const difference = Math.abs(totalCalculated - amountRounded);
-    const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
+    const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE_EUROS;
     logSecurityEvent('amount_coherence_check', {
-        amount: amountRounded,
-        amountInEuros: amountRounded / 100,
-        commission: commissionAmount,
-        commissionInEuros: commissionAmount / 100,
-        provider: providerAmount,
-        providerInEuros: providerAmount / 100,
-        total_calculated: totalCalculated,
+        amountInEuros: amountRounded,
+        commissionInEuros: commissionAmountInEuros,
+        providerInEuros: providerAmountInEuros,
+        totalCalculated,
         difference,
-        tolerance,
-        toleranceInEuros: tolerance / 100
+        tolerance
     });
     if (difference > tolerance) {
         return {
             valid: false,
-            error: `Incohérence montants: ${(difference / 100).toFixed(2)}€ d'écart (tolérance: ${(tolerance / 100).toFixed(2)}€)`,
+            error: `Incohérence montants: ${difference.toFixed(2)}€ d'écart (tolérance: ${tolerance.toFixed(2)}€)`,
             difference
         };
     }
     return { valid: true, difference };
 }
 /**
- * 🔧 FIX: Sanitization des données - PAS DE CONVERSION (déjà en centimes)
+ * 🔧 FIX CRITIQUE: Sanitization ET conversion des données EUROS → CENTIMES
  */
-function sanitizeInput(data) {
+function sanitizeAndConvertInput(data) {
     var _a, _b, _c, _d;
     const maxNameLength = isDevelopment ? 500 : 200;
     const maxDescLength = SECURITY_LIMITS.VALIDATION.MAX_DESCRIPTION_LENGTH;
     const maxMetaKeyLength = isDevelopment ? 100 : 50;
     const maxMetaValueLength = isDevelopment ? 500 : 200;
+    // 🔧 FIX CRITIQUE: Conversion sécurisée EUROS → CENTIMES
+    const amountInEuros = Math.round(Number(data.amount) * 100) / 100; // Arrondi à 2 décimales
+    const commissionAmountInEuros = Math.round(Number(data.commissionAmount) * 100) / 100;
+    const providerAmountInEuros = Math.round(Number(data.providerAmount) * 100) / 100;
+    const amountInCents = Math.round(amountInEuros * 100);
+    const commissionAmountInCents = Math.round(commissionAmountInEuros * 100);
+    const providerAmountInCents = Math.round(providerAmountInEuros * 100);
     return {
-        // 🔧 FIX: PAS de conversion - les montants sont déjà en centimes depuis le frontend
-        amount: Math.round(Number(data.amount)), // Arrondir seulement
+        amountInEuros,
+        amountInCents,
+        commissionAmountInEuros,
+        commissionAmountInCents,
+        providerAmountInEuros,
+        providerAmountInCents,
         currency: (data.currency || 'eur').toLowerCase().trim(),
         serviceType: data.serviceType,
         providerId: data.providerId.trim(),
@@ -338,8 +331,6 @@ function sanitizeInput(data) {
         clientEmail: (_a = data.clientEmail) === null || _a === void 0 ? void 0 : _a.trim().toLowerCase(),
         providerName: (_b = data.providerName) === null || _b === void 0 ? void 0 : _b.trim().substring(0, maxNameLength),
         description: (_c = data.description) === null || _c === void 0 ? void 0 : _c.trim().substring(0, maxDescLength),
-        commissionAmount: Math.round(Number(data.commissionAmount)), // Arrondir seulement
-        providerAmount: Math.round(Number(data.providerAmount)), // Arrondir seulement
         callSessionId: (_d = data.callSessionId) === null || _d === void 0 ? void 0 : _d.trim(),
         metadata: data.metadata ? Object.fromEntries(Object.entries(data.metadata)
             .filter(([key, value]) => key.length <= maxMetaKeyLength && value.length <= maxMetaValueLength)
@@ -347,18 +338,15 @@ function sanitizeInput(data) {
     };
 }
 /**
- * Logging adapté à l'environnement avec informations détaillées
+ * Logging adapté à l'environnement
  */
 function logSecurityEvent(event, data) {
     const timestamp = new Date().toISOString();
     if (isDevelopment) {
-        console.log(`🔧 [DEV-${timestamp}] ${event}:`, Object.assign(Object.assign(Object.assign(Object.assign({}, data), (data.amount && { amountEuros: data.amount / 100 })), (data.commissionAmount && { commissionEuros: data.commissionAmount / 100 })), (data.providerAmount && { providerEuros: data.providerAmount / 100 })));
+        console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
     }
     else if (isProduction) {
-        // En production: données sensibles masquées
-        const sanitizedData = Object.assign(Object.assign({}, data), { 
-            // Masquer les IDs sensibles
-            userId: data.userId ? data.userId.substring(0, 8) + '...' : undefined, clientId: data.clientId ? data.clientId.substring(0, 8) + '...' : undefined, providerId: data.providerId ? data.providerId.substring(0, 8) + '...' : undefined });
+        const sanitizedData = Object.assign(Object.assign({}, data), { userId: data.userId ? data.userId.substring(0, 8) + '...' : undefined, clientId: data.clientId ? data.clientId.substring(0, 8) + '...' : undefined, providerId: data.providerId ? data.providerId.substring(0, 8) + '...' : undefined });
         console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
     }
     else {
@@ -366,7 +354,7 @@ function logSecurityEvent(event, data) {
     }
 }
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE
+// 🚀 CLOUD FUNCTION PRINCIPALE CORRIGÉE
 // =========================================
 exports.createPaymentIntent = (0, https_1.onCall)({
     cors: [
@@ -378,7 +366,6 @@ exports.createPaymentIntent = (0, https_1.onCall)({
     var _a, _b, _c, _d, _e;
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
-    // Log de démarrage avec environnement
     logSecurityEvent('payment_intent_start', {
         requestId,
         environment: process.env.NODE_ENV,
@@ -394,19 +381,36 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             throw new https_1.HttpsError('unauthenticated', 'Authentification requise pour créer un paiement.');
         }
         const userId = request.auth.uid;
-        // 🔧 FIX: Debug des données reçues (montants maintenant en centimes)
-        logSecurityEvent('payment_data_received', {
+        // 🔧 FIX CRITIQUE: Debug des données reçues
+        console.log('💳 === BACKEND - DONNÉES REÇUES DU FRONTEND ===');
+        console.log('📥 Données brutes reçues:', {
             amount: request.data.amount,
-            amountInEuros: request.data.amount / 100,
-            serviceType: request.data.serviceType,
-            providerId: ((_a = request.data.providerId) === null || _a === void 0 ? void 0 : _a.substring(0, 10)) + '...',
+            type: typeof request.data.amount,
             commissionAmount: request.data.commissionAmount,
-            commissionInEuros: request.data.commissionAmount / 100,
             providerAmount: request.data.providerAmount,
-            providerInEuros: request.data.providerAmount / 100
+            serviceType: request.data.serviceType
         });
         // ========================================
-        // 2. RATE LIMITING
+        // 2. VALIDATION PRÉLIMINAIRE STRICTE
+        // ========================================
+        if (typeof request.data.amount !== 'number' || isNaN(request.data.amount) || request.data.amount <= 0) {
+            console.error('❌ MONTANT INVALIDE:', {
+                amount: request.data.amount,
+                type: typeof request.data.amount,
+                isNaN: isNaN(request.data.amount)
+            });
+            throw new https_1.HttpsError('invalid-argument', `Montant invalide reçu: ${request.data.amount} (type: ${typeof request.data.amount})`);
+        }
+        if (typeof request.data.commissionAmount !== 'number' || isNaN(request.data.commissionAmount)) {
+            console.error('❌ COMMISSION INVALIDE:', request.data.commissionAmount);
+            throw new https_1.HttpsError('invalid-argument', 'Commission invalide');
+        }
+        if (typeof request.data.providerAmount !== 'number' || isNaN(request.data.providerAmount)) {
+            console.error('❌ MONTANT PRESTATAIRE INVALIDE:', request.data.providerAmount);
+            throw new https_1.HttpsError('invalid-argument', 'Montant prestataire invalide');
+        }
+        // ========================================
+        // 3. RATE LIMITING
         // ========================================
         const rateLimitResult = checkRateLimit(userId);
         if (!rateLimitResult.allowed) {
@@ -414,69 +418,50 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             throw new https_1.HttpsError('resource-exhausted', `Trop de tentatives. Réessayez dans ${waitTime} minutes.`);
         }
         // ========================================
-        // 3. SANITIZATION DES DONNÉES
+        // 4. SANITIZATION ET CONVERSION DES DONNÉES
         // ========================================
-        const sanitizedData = sanitizeInput(request.data);
-        logSecurityEvent('data_sanitized', {
-            original_amount: request.data.amount,
-            sanitized_amount: sanitizedData.amount,
-            original_commission: request.data.commissionAmount,
-            sanitized_commission: sanitizedData.commissionAmount,
-            coherent: Math.abs(sanitizedData.amount - (sanitizedData.commissionAmount + sanitizedData.providerAmount)) <= 1
+        const sanitizedData = sanitizeAndConvertInput(request.data);
+        console.log('💳 === APRÈS SANITIZATION ===');
+        console.log('✅ Données sanitisées et converties:', {
+            amountInEuros: sanitizedData.amountInEuros,
+            amountInCents: sanitizedData.amountInCents,
+            commissionInEuros: sanitizedData.commissionAmountInEuros,
+            commissionInCents: sanitizedData.commissionAmountInCents,
+            providerInEuros: sanitizedData.providerAmountInEuros,
+            providerInCents: sanitizedData.providerAmountInCents
         });
         // ========================================
-        // 4. VALIDATION DES DONNÉES DE BASE
+        // 5. VALIDATION DE BASE
         // ========================================
-        const { amount, // ✅ DÉJÀ EN CENTIMES depuis le frontend
-        currency, serviceType, providerId, clientId, clientEmail, providerName, description, commissionAmount, // ✅ DÉJÀ EN CENTIMES
-        providerAmount, // ✅ DÉJÀ EN CENTIMES
-        callSessionId, metadata = {} } = sanitizedData;
-        // Validation de base avec logs détaillés
-        if (!amount || typeof amount !== 'number' || amount <= 0) {
-            logSecurityEvent('validation_error', { field: 'amount', value: amount, type: typeof amount });
-            throw new https_1.HttpsError('invalid-argument', `Montant invalide: ${amount} centimes (${amount / 100}€)`);
-        }
+        const { amountInEuros, amountInCents, commissionAmountInEuros, commissionAmountInCents, providerAmountInEuros, providerAmountInCents, currency, serviceType, providerId, clientId, clientEmail, providerName, description, callSessionId, metadata } = sanitizedData;
         if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
-            logSecurityEvent('validation_error', { field: 'serviceType', value: serviceType });
             throw new https_1.HttpsError('invalid-argument', 'Type de service invalide');
         }
         if (!providerId || typeof providerId !== 'string' || providerId.length < 5) {
-            logSecurityEvent('validation_error', { field: 'providerId', value: providerId });
             throw new https_1.HttpsError('invalid-argument', 'ID prestataire invalide');
         }
         if (!clientId || typeof clientId !== 'string' || clientId.length < 5) {
-            logSecurityEvent('validation_error', { field: 'clientId', value: clientId });
             throw new https_1.HttpsError('invalid-argument', 'ID client invalide');
         }
-        if (typeof commissionAmount !== 'number' || commissionAmount < 0) {
-            logSecurityEvent('validation_error', { field: 'commissionAmount', value: commissionAmount });
-            throw new https_1.HttpsError('invalid-argument', 'Montant commission invalide');
-        }
-        if (typeof providerAmount !== 'number' || providerAmount < 0) {
-            logSecurityEvent('validation_error', { field: 'providerAmount', value: providerAmount });
-            throw new https_1.HttpsError('invalid-argument', 'Montant prestataire invalide');
-        }
         // ========================================
-        // 5. VALIDATION DES PERMISSIONS
+        // 6. VALIDATION DES PERMISSIONS
         // ========================================
         if (userId !== clientId) {
-            logSecurityEvent('permission_denied', { userId, clientId });
             throw new https_1.HttpsError('permission-denied', 'Vous ne pouvez créer un paiement que pour votre propre compte.');
         }
         // ========================================
-        // 6. VALIDATION DES ENUMS ET TYPES
+        // 7. VALIDATION DES ENUMS ET TYPES
         // ========================================
-        const safeCurrency = (currency || 'eur');
+        const safeCurrency = currency;
         if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(safeCurrency)) {
-            throw new https_1.HttpsError('invalid-argument', `Devise non supportée: ${currency}. Devises autorisées: ${SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.join(', ')}`);
+            throw new https_1.HttpsError('invalid-argument', `Devise non supportée: ${currency}`);
         }
         // ========================================
-        // 7. VALIDATION DE LA COHÉRENCE DES MONTANTS
+        // 8. VALIDATION DE LA COHÉRENCE DES MONTANTS EN EUROS
         // ========================================
-        const coherenceResult = validateAmountCoherence(amount, commissionAmount, providerAmount);
+        const coherenceResult = validateAmountCoherence(amountInEuros, commissionAmountInEuros, providerAmountInEuros);
         if (!coherenceResult.valid) {
-            // En production: bloquer, en dev: juste logger et continuer si pas trop éloigné
-            if (isProduction || coherenceResult.difference > 100) { // 1€ EN CENTIMES
+            if (isProduction || coherenceResult.difference > 1) { // 1€
                 throw new https_1.HttpsError('invalid-argument', coherenceResult.error);
             }
             else {
@@ -484,87 +469,65 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             }
         }
         // ========================================
-        // 8. VALIDATION SÉCURITAIRE DES MONTANTS
+        // 9. VALIDATION SÉCURITAIRE DES MONTANTS (EN EUROS)
         // ========================================
         const db = admin.firestore();
-        const amountValidation = await validateAmountSecurity(amount, userId, db);
+        const amountValidation = await validateAmountSecurity(amountInEuros, userId, db);
         if (!amountValidation.valid) {
             throw new https_1.HttpsError('invalid-argument', amountValidation.error);
         }
         // ========================================
-        // 9. VALIDATION BUSINESS LOGIC
+        // 10. VALIDATION BUSINESS LOGIC (EN EUROS)
         // ========================================
-        const businessValidation = await validateBusinessLogic(sanitizedData, db);
+        const businessValidation = await validateBusinessLogic(request.data, db);
         if (!businessValidation.valid) {
             throw new https_1.HttpsError('failed-precondition', businessValidation.error);
         }
         // ========================================
-        // 10. VÉRIFICATION DES DOUBLONS
+        // 11. VÉRIFICATION DES DOUBLONS (EN EUROS)
         // ========================================
-        const hasDuplicate = await checkDuplicatePayments(clientId, providerId, amount, db);
+        const hasDuplicate = await checkDuplicatePayments(clientId, providerId, amountInEuros, db);
         if (hasDuplicate) {
             throw new https_1.HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
         }
         // ========================================
-        // 11. CRÉATION DU PAIEMENT VIA STRIPEMANAGER
+        // 12. CRÉATION DU PAIEMENT VIA STRIPEMANAGER (EN CENTIMES)
         // ========================================
-        logSecurityEvent('stripe_payment_creation_start', {
-            amount,
-            amountInEuros: amount / 100,
-            serviceType,
-            providerId: providerId.substring(0, 10) + '...'
+        console.log('💳 === ENVOI VERS STRIPEMANAGER ===');
+        console.log('📤 Données envoyées au StripeManager (EN CENTIMES):', {
+            amount: amountInCents,
+            commissionAmount: commissionAmountInCents,
+            providerAmount: providerAmountInCents
         });
-        // 🔧 FIX: Données pour StripeManager - montants DÉJÀ EN CENTIMES
         const stripePaymentData = {
-            amount, // DÉJÀ EN CENTIMES
+            amount: amountInCents, // EN CENTIMES pour Stripe
             currency: safeCurrency,
             clientId,
             providerId,
-            serviceType,
+            serviceType: serviceType,
             providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
-            commissionAmount, // DÉJÀ EN CENTIMES
-            providerAmount, // DÉJÀ EN CENTIMES
+            commissionAmount: commissionAmountInCents, // EN CENTIMES
+            providerAmount: providerAmountInCents, // EN CENTIMES
             callSessionId,
             metadata: Object.assign({ clientEmail: clientEmail || '', providerName: providerName || '', description: description || `Service ${serviceType}`, requestId, environment: process.env.NODE_ENV || 'development', 
-                // Ajouter des références en euros pour debug
-                originalAmountEuros: (amount / 100).toString(), originalCommissionEuros: (commissionAmount / 100).toString(), originalProviderAmountEuros: (providerAmount / 100).toString() }, metadata)
+                // Garder les références en euros pour l'audit
+                originalAmountEuros: amountInEuros.toString(), originalCommissionEuros: commissionAmountInEuros.toString(), originalProviderAmountEuros: providerAmountInEuros.toString() }, metadata)
         };
-        // 🔍 DEBUG FINAL BACKEND
-        console.log('💳 === BACKEND - DONNÉES FINALES ===');
-        console.log('📥 Données reçues (EN CENTIMES):', {
-            amount: `${amount} centimes (${amount / 100}€)`,
-            commission: `${commissionAmount} centimes (${commissionAmount / 100}€)`,
-            provider: `${providerAmount} centimes (${providerAmount / 100}€)`,
-            coherent: Math.abs(amount - (commissionAmount + providerAmount)) <= 1
-        });
-        console.log('✅ Validations passées:', {
-            minimum_respecte: amount >= SECURITY_LIMITS.AMOUNT_LIMITS.MIN_AMOUNT,
-            maximum_respecte: amount <= SECURITY_LIMITS.AMOUNT_LIMITS.MAX_AMOUNT,
-            coherence_totale: coherenceResult.valid
-        });
-        console.log('📤 Envoi vers StripeManager:', {
-            amount,
-            commissionAmount,
-            providerAmount
-        });
         const result = await StripeManager_1.stripeManager.createPaymentIntent(stripePaymentData);
         if (!result.success) {
-            logSecurityEvent('stripe_payment_creation_failed', {
-                error: result.error,
-                requestId
-            });
+            console.error('❌ STRIPE ERROR:', result.error);
             await (0, logError_1.logError)('createPaymentIntent:stripe_error', {
                 requestId,
                 userId,
                 serviceType,
-                amount,
-                amountInEuros: amount / 100,
+                amountInEuros,
+                amountInCents,
                 error: result.error
             });
             throw new https_1.HttpsError('internal', 'Erreur lors de la création du paiement. Veuillez réessayer.');
         }
         // ========================================
-        // 12. LOGGING ET AUDIT SÉCURISÉ
+        // 13. LOGGING ET AUDIT SÉCURISÉ
         // ========================================
         await db.collection('payment_audit_logs').add({
             action: 'payment_intent_created',
@@ -572,34 +535,31 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             paymentIntentId: result.paymentIntentId,
             clientId,
             providerId,
-            amount, // EN CENTIMES
-            amountInEuros: amount / 100, // Pour référence humaine
-            commissionAmount, // EN CENTIMES
-            commissionAmountInEuros: commissionAmount / 100,
-            providerAmount, // EN CENTIMES
-            providerAmountInEuros: providerAmount / 100,
+            amountInEuros, // EN EUROS pour l'audit humain
+            amountInCents, // EN CENTIMES pour Stripe
+            commissionAmountInEuros,
+            commissionAmountInCents,
+            providerAmountInEuros,
+            providerAmountInCents,
             serviceType,
             callSessionId,
             environment: process.env.NODE_ENV || 'development',
-            userAgent: ((_b = request.rawRequest.headers['user-agent']) === null || _b === void 0 ? void 0 : _b.substring(0, 200)) || 'unknown',
+            userAgent: ((_a = request.rawRequest.headers['user-agent']) === null || _a === void 0 ? void 0 : _a.substring(0, 200)) || 'unknown',
             ipAddress: request.rawRequest.ip || 'unknown',
             processingTime: Date.now() - startTime,
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
-        logSecurityEvent('payment_intent_created_success', {
-            paymentIntentId: result.paymentIntentId,
-            processingTime: Date.now() - startTime,
-            amountProcessed: amount,
-            amountInEuros: amount / 100
-        });
+        console.log('✅ === PAIEMENT CRÉÉ AVEC SUCCÈS ===');
+        console.log('🎉 PaymentIntent ID:', result.paymentIntentId);
+        console.log('💰 Montant traité:', `${amountInEuros}€ (${amountInCents} centimes)`);
         // ========================================
-        // 13. RÉPONSE SÉCURISÉE ET TYPÉE
+        // 14. RÉPONSE SÉCURISÉE ET TYPÉE
         // ========================================
         const response = {
             success: true,
             clientSecret: result.clientSecret,
             paymentIntentId: result.paymentIntentId,
-            amount, // EN CENTIMES (cohérent avec Stripe)
+            amount: amountInCents, // EN CENTIMES (cohérent avec Stripe)
             currency: currency || "eur",
             serviceType,
             status: 'requires_payment_method',
@@ -609,18 +569,17 @@ exports.createPaymentIntent = (0, https_1.onCall)({
     }
     catch (error) {
         // ========================================
-        // 14. GESTION D'ERREURS SÉCURISÉE
+        // 15. GESTION D'ERREURS SÉCURISÉE
         // ========================================
         const processingTime = Date.now() - startTime;
-        logSecurityEvent('payment_intent_error', {
-            requestId,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            processingTime,
-            environment: process.env.NODE_ENV,
-            receivedAmount: (_c = request.data) === null || _c === void 0 ? void 0 : _c.amount,
-            receivedAmountEuros: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.amount) ? request.data.amount / 100 : 'unknown'
+        console.error('❌ === ERREUR DÉTAILLÉE ===');
+        console.error('💥 Erreur:', error);
+        console.error('📊 Données reçues:', {
+            amount: (_b = request.data) === null || _b === void 0 ? void 0 : _b.amount,
+            type: typeof ((_c = request.data) === null || _c === void 0 ? void 0 : _c.amount),
+            serviceType: (_d = request.data) === null || _d === void 0 ? void 0 : _d.serviceType,
+            isAuthenticated: !!request.auth
         });
-        // Log détaillé pour debug
         await (0, logError_1.logError)('createPaymentIntent:error', {
             requestId,
             error: error instanceof Error ? error.message : 'Unknown error',
@@ -628,7 +587,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             processingTime,
             requestData: {
                 amount: request.data.amount,
-                amountInEuros: request.data.amount / 100,
+                type: typeof request.data.amount,
                 serviceType: request.data.serviceType,
                 hasAuth: !!request.auth
             },

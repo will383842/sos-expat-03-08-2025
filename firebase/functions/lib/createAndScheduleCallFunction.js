@@ -28,8 +28,17 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // ========================================
         // 2. VALIDATION DES DONNÉES
         // ========================================
-        const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, // 🔧 FIX: EN CENTIMES
+        const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, // 🔧 FIX: EN EUROS
         delayMinutes = 5, clientLanguages, providerLanguages } = request.data;
+        // 🔧 FIX: Debug des données reçues
+        console.log('📞 === CREATE AND SCHEDULE CALL - DONNÉES REÇUES ===');
+        console.log('💰 Montant reçu:', {
+            amount,
+            type: typeof amount,
+            amountInEuros: amount,
+            serviceType,
+            providerType
+        });
         // Vérification des champs obligatoires
         if (!providerId || !clientId || !providerPhone || !clientPhone ||
             !serviceType || !providerType || !paymentIntentId || !amount) {
@@ -53,19 +62,22 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             throw new https_1.HttpsError('invalid-argument', `Type de prestataire invalide. Types autorisés: ${allowedProviderTypes.join(', ')}`);
         }
         // ========================================
-        // 5. 🔧 FIX: VALIDATION DES MONTANTS EN CENTIMES
+        // 5. 🔧 FIX: VALIDATION DES MONTANTS EN EUROS
         // ========================================
-        if (amount <= 0 || amount > 50000) { // Max 500€ en centimes
-            throw new https_1.HttpsError('invalid-argument', 'Montant invalide. Doit être entre 0.01€ et 500€.');
+        if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+            throw new https_1.HttpsError('invalid-argument', `Montant invalide: ${amount} (type: ${typeof amount})`);
         }
-        if (amount < 500) { // 5€ minimum en centimes
+        if (amount > 500) { // Max 500€
+            throw new https_1.HttpsError('invalid-argument', 'Montant maximum de 500€ dépassé.');
+        }
+        if (amount < 5) { // 5€ minimum
             throw new https_1.HttpsError('invalid-argument', 'Montant minimum de 5€ requis.');
         }
-        // 🔧 FIX: Validation cohérence montant/service
-        const expectedAmountCents = serviceType === 'lawyer_call' ? 4900 : 1900; // 49€ ou 19€ en centimes
-        const tolerance = 500; // 5€ de tolérance en centimes
-        if (Math.abs(amount - expectedAmountCents) > tolerance) {
-            console.warn(`⚠️ Montant inhabituel: reçu ${amount} centimes, attendu ${expectedAmountCents} centimes`);
+        // 🔧 FIX: Validation cohérence montant/service EN EUROS
+        const expectedAmountEuros = serviceType === 'lawyer_call' ? 49 : 19;
+        const tolerance = 5; // 5€ de tolérance
+        if (Math.abs(amount - expectedAmountEuros) > tolerance) {
+            console.warn(`⚠️ Montant inhabituel: reçu ${amount}€, attendu ${expectedAmountEuros}€ pour ${serviceType}`);
             // Ne pas bloquer mais logger pour audit
         }
         // ========================================
@@ -89,9 +101,10 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // 8. CRÉATION ET PLANIFICATION DE L'APPEL
         // ========================================
         console.log(`[${requestId}] Création appel - Client: ${clientId}, Provider: ${providerId}`);
-        console.log(`[${requestId}] Montant: ${amount} centimes (${amount / 100}€)`);
+        console.log(`[${requestId}] Montant: ${amount}€ pour ${serviceType}`);
         console.log(`[${requestId}] Service: ${serviceType}, Provider: ${providerType}`);
         console.log(`[${requestId}] Délai: ${validDelayMinutes} minutes`);
+        // 🔧 FIX: Le callScheduler reçoit maintenant des EUROS et convertit en centimes si nécessaire
         const callSession = await (0, callScheduler_1.createAndScheduleCall)({
             providerId,
             clientId,
@@ -100,7 +113,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             serviceType,
             providerType,
             paymentIntentId,
-            amount, // 🔧 FIX: Déjà EN CENTIMES
+            amount, // 🔧 FIX: EN EUROS (callScheduler gère la conversion si nécessaire)
             delayMinutes: validDelayMinutes,
             requestId,
             clientLanguages: clientLanguages || ['fr'],
@@ -116,8 +129,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             status: callSession.status,
             scheduledFor: new Date(Date.now() + (validDelayMinutes * 60 * 1000)).toISOString(),
             message: `Appel programmé dans ${validDelayMinutes} minutes`,
-            amount: amount / 100, // 🔧 FIX: Convertir en euros pour l'affichage
-            amountInCents: amount, // Garder aussi en centimes pour référence
+            amount: amount, // 🔧 FIX: Retourner en euros pour l'affichage
             serviceType,
             providerType,
             requestId,
@@ -136,7 +148,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
                 providerId: request.data.providerId,
                 serviceType: request.data.serviceType,
                 amount: request.data.amount,
-                amountInEuros: request.data.amount / 100,
+                amountType: typeof request.data.amount,
                 hasAuth: !!request.auth
             },
             userAuth: ((_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid) || 'not-authenticated',

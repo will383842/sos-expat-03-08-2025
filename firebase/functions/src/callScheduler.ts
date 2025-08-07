@@ -444,15 +444,15 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
     }
 
     // 🔧 FIX CRITIQUE: Conversion EN CENTIMES pour le TwilioCallManager et Stripe
-    const amountInCents = Math.round(params.amount * 100);
-    
-    console.log('💰 Conversion montant pour systèmes internes:', {
+  // 🔧 FIX CRITIQUE: GARDER LES EUROS - ne pas convertir en centimes ici !
+    console.log('💰 Validation montant (GARDE EN EUROS):', {
       amountInEuros: params.amount,
-      amountInCents: amountInCents,
-      serviceType: params.serviceType
+      serviceType: params.serviceType,
+      expectedAmountEuros,
+      difference: params.amount - expectedAmountEuros
     });
 
-    // Créer la session via le TwilioCallManager avec montants EN CENTIMES
+    // 🔧 FIX: Créer la session avec montants EN EUROS
     const callSession = await twilioCallManager.createCallSession({
       sessionId,
       providerId: params.providerId,
@@ -462,7 +462,7 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       serviceType: params.serviceType,
       providerType: params.providerType,
       paymentIntentId: params.paymentIntentId,
-      amount: amountInCents, // 🔧 FIX: EN CENTIMES pour les systèmes internes
+      amount: params.amount, // 🔧 FIX: GARDER EN EUROS - laisser TwilioCallManager gérer la conversion
       requestId: params.requestId,
       clientLanguages: params.clientLanguages,
       providerLanguages: params.providerLanguages
@@ -487,7 +487,7 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       additionalData: {
         serviceType: params.serviceType,
         amountInEuros: params.amount, // Pour audit humain
-        amountInCents: amountInCents, // Pour systèmes internes
+         // amountInCents supprimé - on garde tout en euros maintenant
         delayMinutes: delayMinutes,
         expectedAmountEuros,
         amountDifferenceFromExpected: params.amount - expectedAmountEuros
@@ -495,7 +495,7 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
     });
 
     console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes`);
-    console.log(`💰 Validation montant: ${params.amount}€ (${amountInCents} centimes) pour ${params.serviceType}`);
+    console.log(`💰 Validation finale: ${params.amount}€ pour ${params.serviceType} (gardé en euros)`);
     
     return callSession;
 
@@ -666,7 +666,7 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
     completedSessionsQuery.docs.forEach(doc => {
       const session = doc.data() as CallSessionState;
       // Convertir depuis centimes vers euros si nécessaire
-      const amountInEuros = session.payment.amountInEuros || (session.payment.amount / 100);
+      const amountInEuros = session.payment.amount; // Déjà en euros maintenant
       totalRevenueEuros += amountInEuros;
       completedCallsWithRevenue++;
     });

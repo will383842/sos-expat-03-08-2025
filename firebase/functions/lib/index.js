@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createAndScheduleCallLegacy = exports.createPaymentIntentLegacy = exports.sendPushNotification = exports.sendEmail = exports.twilioClient = exports.createAndScheduleCall = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.createPaymentIntent = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
+exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createAndScheduleCallLegacy = exports.createPaymentIntentLegacy = exports.sendPushNotification = exports.sendEmail = exports.twilioClient = exports.createAndScheduleCall = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
 // Export des webhooks modernisés (remplace les anciens)
 var twilioWebhooks_1 = require("./Webhooks/twilioWebhooks");
 Object.defineProperty(exports, "twilioCallWebhook", { enumerable: true, get: function () { return twilioWebhooks_1.twilioCallWebhook; } });
@@ -48,9 +48,6 @@ var TwilioConferenceWebhook_1 = require("./Webhooks/TwilioConferenceWebhook");
 Object.defineProperty(exports, "modernConferenceWebhook", { enumerable: true, get: function () { return TwilioConferenceWebhook_1.twilioConferenceWebhook; } });
 var TwilioRecordingWebhook_1 = require("./Webhooks/TwilioRecordingWebhook");
 Object.defineProperty(exports, "modernRecordingWebhook", { enumerable: true, get: function () { return TwilioRecordingWebhook_1.twilioRecordingWebhook; } });
-// Export du système de paiement modernisé
-var createPaymentIntent_1 = require("./createPaymentIntent");
-Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: function () { return createPaymentIntent_1.createPaymentIntent; } });
 // Export des managers
 var MessageManager_1 = require("./MessageManager");
 Object.defineProperty(exports, "messageManager", { enumerable: true, get: function () { return MessageManager_1.messageManager; } });
@@ -339,7 +336,7 @@ exports.createPaymentIntentLegacy = (0, https_1.onCall)(async (request) => {
 // Fonction pour créer et programmer un appel (utilise le nouveau système)
 exports.createAndScheduleCallLegacy = (0, https_1.onCall)(async (request) => {
     const data = request.data;
-    // Vérifier l'authentification
+    // Vérifier l'authentification 
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'L\'utilisateur doit être authentifié pour effectuer cette action.');
     }

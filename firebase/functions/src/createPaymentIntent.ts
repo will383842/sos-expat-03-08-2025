@@ -558,7 +558,7 @@ export const createPaymentIntent = onCall(
         metadata
       } = sanitizedData;
 
-      if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
+      if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType as any)) {
         throw new HttpsError('invalid-argument', 'Type de service invalide');
       }
 
@@ -651,7 +651,7 @@ export const createPaymentIntent = onCall(
         currency: safeCurrency,
         clientId,
         providerId,
-        serviceType,
+        serviceType: serviceType as 'lawyer_call' | 'expat_call',
         providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
         commissionAmount: commissionAmountInCents, // EN CENTIMES
         providerAmount: providerAmountInCents,     // EN CENTIMES

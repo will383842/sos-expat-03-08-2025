@@ -387,9 +387,9 @@ function sanitizeAndConvertInput(data: PaymentIntentRequestData): {
   const maxMetaValueLength = isDevelopment ? 500 : 200;
 
   // 🔧 FIX CRITIQUE: Conversion sécurisée EUROS → CENTIMES
-  const amountInEuros = Math.round(Number(data.amount) * 100) / 100; // Arrondi à 2 décimales
-  const commissionAmountInEuros = Math.round(Number(data.commissionAmount) * 100) / 100;
-  const providerAmountInEuros = Math.round(Number(data.providerAmount) * 100) / 100;
+  const amountInEuros = Number(data.amount); // Garder tel quel (déjà en euros)
+  const commissionAmountInEuros = Number(data.commissionAmount);
+const providerAmountInEuros = Number(data.providerAmount);
   
   const amountInCents = Math.round(amountInEuros * 100);
   const commissionAmountInCents = Math.round(commissionAmountInEuros * 100);

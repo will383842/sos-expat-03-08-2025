@@ -498,7 +498,7 @@ export class StripeManager {
       providerAmountEuros: data.providerAmount / 100,
       serviceType: data.serviceType,
       providerType: data.providerType,
-      callSessionId: data.callSessionId || null,
+      callSessionId: (data.callSessionId === undefined || data.callSessionId === 'undefined' || data.callSessionId === null || data.callSessionId === '') ? null : data.callSessionId,
       status: paymentIntent.status,
       clientSecret: paymentIntent.client_secret,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),

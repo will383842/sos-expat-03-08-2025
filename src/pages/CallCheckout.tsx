@@ -189,6 +189,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       setIsProcessing(true);
 
+      // Dans handlePaymentSubmit(), avant la création du PaymentIntent
+console.log('🔍 Validation IDs:', {
+  providerId: provider.id,
+  clientId: user.uid,
+  providerName: provider.name,
+  userName: `${user.firstName} ${user.lastName}`
+});
+
+if (provider.id === user.uid) {
+  onError('Erreur : vous ne pouvez pas vous programmer un appel avec vous-même');
+  return;
+}
       // 🔧 FIX CRITIQUE: Conversion EN CENTIMES avant d'envoyer au backend
       const amountInCents = Math.round(service.amount * 100);
       const commissionInCents = Math.round(service.commissionAmount * 100);
@@ -461,7 +473,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div className="flex justify-between items-center">
               <span className="text-lg font-bold text-gray-900">Total</span>
               <span className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-  {(service.amount / 100).toFixed(2)} €
+  {service.amount.toFixed(2)} €
 </span>
             </div>
           </div>

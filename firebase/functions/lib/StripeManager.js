@@ -124,7 +124,7 @@ class StripeManager {
                 capture_method: 'manual', // Capture différée obligatoire
                 metadata: Object.assign({ clientId: data.clientId, providerId: data.providerId, serviceType: data.serviceType, providerType: data.providerType, commissionAmount: data.commissionAmount.toString(), providerAmount: data.providerAmount.toString(), commissionAmountEuros: (data.commissionAmount / 100).toFixed(2), providerAmountEuros: (data.providerAmount / 100).toFixed(2), callSessionId: data.callSessionId || '', environment: process.env.NODE_ENV || 'development' }, data.metadata),
                 description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount / 100}€`,
-                statement_descriptor: 'SOS EXPAT',
+                statement_descriptor_suffix: 'SOS EXPAT',
                 receipt_email: await this.getClientEmail(data.clientId)
             });
             console.log('✅ PaymentIntent Stripe créé:', {

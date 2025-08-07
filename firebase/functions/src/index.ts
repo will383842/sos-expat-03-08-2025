@@ -321,7 +321,7 @@ interface PaymentIntentData {
 }
 
 // Fonction pour créer un PaymentIntent Stripe (legacy - utiliser createPaymentIntent.ts)
-export const createPaymentIntentLegacy = onCall(async (request: CallableRequest<PaymentIntentData>) => {
+export const createPaymentIntent = onCall(async (request: CallableRequest<PaymentIntentData>) => {
   const data = request.data;
   
   // Vérifier l'authentification
@@ -423,7 +423,7 @@ interface CreateAndScheduleCallData {
 export const createAndScheduleCallLegacy = onCall(async (request: CallableRequest<CreateAndScheduleCallData>) => {
   const data = request.data;
   
-  // Vérifier l'authentification
+  // Vérifier l'authentification 
   if (!request.auth) {
     throw new HttpsError(
       'unauthenticated',

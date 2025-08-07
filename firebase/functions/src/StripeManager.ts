@@ -134,7 +134,7 @@ export class StripeManager {
           ...data.metadata
         },
         description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount/100}€`,
-        statement_descriptor: 'SOS EXPAT',
+        statement_descriptor_suffix: 'SOS EXPAT',
         receipt_email: await this.getClientEmail(data.clientId)
       });
 

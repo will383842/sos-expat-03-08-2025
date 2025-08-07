@@ -32,20 +32,30 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var _a, _b, _c;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Timestamp = exports.FieldValue = exports.auth = exports.messaging = exports.storage = exports.db = void 0;
-const admin = __importStar(require("firebase-admin"));
-// Initialiser Firebase Admin une seule fois
-if (!admin.apps.length) {
-    admin.initializeApp();
+exports.twilioPhoneNumber = exports.twilioClient = void 0;
+const twilio_1 = require("twilio");
+const functions = __importStar(require("firebase-functions"));
+// Récupérer la config Firebase Functions
+const config = functions.config();
+// Validation des variables d'environnement (avec tes noms)
+if (!((_a = config.twilio) === null || _a === void 0 ? void 0 : _a.sid) || !((_b = config.twilio) === null || _b === void 0 ? void 0 : _b.token)) {
+    throw new Error('Variables d\'environnement Twilio manquantes: twilio.sid et twilio.token requis');
 }
-// AJOUT CRITIQUE : Configuration Firestore avec ignoreUndefinedProperties
-exports.db = admin.firestore();
-exports.db.settings({ ignoreUndefinedProperties: true });
-exports.storage = admin.storage();
-exports.messaging = admin.messaging();
-exports.auth = admin.auth();
-// Constantes utiles
-exports.FieldValue = admin.firestore.FieldValue;
-exports.Timestamp = admin.firestore.Timestamp;
-//# sourceMappingURL=firebase.js.map
+if (!((_c = config.twilio) === null || _c === void 0 ? void 0 : _c.from)) {
+    throw new Error('Variable d\'environnement twilio.from manquante');
+}
+// Validation du format
+if (!config.twilio.from.startsWith('+')) {
+    throw new Error('twilio.from doit être au format international (+33...)');
+}
+// Créer le client Twilio avec tes variables
+exports.twilioClient = new twilio_1.Twilio(config.twilio.sid, // ← TON nom de variable
+config.twilio.token // ← TON nom de variable
+);
+// Exporter aussi le numéro de téléphone pour les autres modules
+exports.twilioPhoneNumber = config.twilio.from;
+console.log('✅ Client Twilio initialisé avec succès');
+exports.default = exports.twilioClient;
+//# sourceMappingURL=twilio.js.map

@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { logError } from './utils/logs/logError';
 import { logCallRecord } from './utils/logs/logCallRecord';
+import { db } from './utils/firebase'; // ← AJOUTER CET IMPORT
 
 // Configuration Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -30,7 +31,7 @@ export interface PaymentResult {
 }
 
 export class StripeManager {
-  private db = admin.firestore();
+  private db = db; // ← UTILISER LE DB CONFIGURÉ
 
   /**
    * Valide la configuration Stripe
@@ -129,7 +130,6 @@ export class StripeManager {
           providerAmount: data.providerAmount.toString(), // En centimes
           commissionAmountEuros: (data.commissionAmount / 100).toFixed(2), // Pour référence humaine
           providerAmountEuros: (data.providerAmount / 100).toFixed(2), // Pour référence humaine
-          callSessionId: data.callSessionId || '',
           environment: process.env.NODE_ENV || 'development',
           ...data.metadata
         },
@@ -485,36 +485,47 @@ export class StripeManager {
    * 🔧 FIX: Sauvegarde l'enregistrement de paiement avec montants EN CENTIMES
    */
   private async savePaymentRecord(paymentIntent: Stripe.PaymentIntent, data: StripePaymentData): Promise<void> {
-    const paymentRecord = {
-      stripePaymentIntentId: paymentIntent.id,
-      clientId: data.clientId,
-      providerId: data.providerId,
-      amount: data.amount, // EN CENTIMES
-      amountInEuros: data.amount / 100, // Pour référence humaine
-      currency: data.currency || 'eur',
-      commissionAmount: data.commissionAmount, // EN CENTIMES
-      commissionAmountEuros: data.commissionAmount / 100,
-      providerAmount: data.providerAmount, // EN CENTIMES
-      providerAmountEuros: data.providerAmount / 100,
-      serviceType: data.serviceType,
-      providerType: data.providerType,
-      callSessionId: (data.callSessionId === undefined || data.callSessionId === 'undefined' || data.callSessionId === null || data.callSessionId === '') ? null : data.callSessionId,
-      status: paymentIntent.status,
-      clientSecret: paymentIntent.client_secret,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      metadata: data.metadata || {},
-      environment: process.env.NODE_ENV || 'development'
-    };
+  // Créer l'objet de base SANS callSessionId
+  const paymentRecord: any = {
+    stripePaymentIntentId: paymentIntent.id,
+    clientId: data.clientId,
+    providerId: data.providerId,
+    amount: data.amount, // EN CENTIMES
+    amountInEuros: data.amount / 100, // Pour référence humaine
+    currency: data.currency || 'eur',
+    commissionAmount: data.commissionAmount, // EN CENTIMES
+    commissionAmountEuros: data.commissionAmount / 100,
+    providerAmount: data.providerAmount, // EN CENTIMES
+    providerAmountEuros: data.providerAmount / 100,
+    serviceType: data.serviceType,
+    providerType: data.providerType,
+    status: paymentIntent.status,
+    clientSecret: paymentIntent.client_secret,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    metadata: data.metadata || {},
+    environment: process.env.NODE_ENV || 'development'
+  };
 
-    await this.db.collection('payments').doc(paymentIntent.id).set(paymentRecord);
-    
-    console.log('✅ Enregistrement paiement sauvegardé en DB:', {
-      id: paymentIntent.id,
-      amount: data.amount,
-      amountInEuros: data.amount / 100
-    });
+  // Ajouter callSessionId SEULEMENT s'il est valide
+  if (data.callSessionId && 
+      data.callSessionId !== 'undefined' && 
+      data.callSessionId.trim() !== '') {
+    paymentRecord.callSessionId = data.callSessionId;
+    console.log('✅ CallSessionId ajouté:', data.callSessionId);
+  } else {
+    console.log('⚠️ CallSessionId omis (invalide):', data.callSessionId);
   }
+
+  await this.db.collection('payments').doc(paymentIntent.id).set(paymentRecord);
+  
+  console.log('✅ Enregistrement paiement sauvegardé en DB:', {
+    id: paymentIntent.id,
+    amount: data.amount,
+    amountInEuros: data.amount / 100,
+    hasCallSessionId: !!paymentRecord.callSessionId
+  });
+}
 
   /**
    * Met à jour le statut d'un paiement

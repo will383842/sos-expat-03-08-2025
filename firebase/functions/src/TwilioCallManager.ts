@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 // 🔧 CHANGEMENT : Import conditionnel de Twilio
-import type { Twilio } from 'twilio'; // Type seulement
+import { twilioClient, twilioPhoneNumber } from './lib/twilio';
 import { logError } from './utils/logs/logError';
 import { logCallRecord } from './utils/logs/logCallRecord';
 import { messageManager } from './MessageManager';
@@ -69,77 +69,19 @@ const CALL_CONFIG = {
 } as const;
 
 export class TwilioCallManager {
-  private twilioClient: Twilio | null = null; // 🔧 CHANGEMENT : Nullable
+  // Supprimé : private twilioClient
   private db: admin.firestore.Firestore;
   private activeCalls = new Map<string, NodeJS.Timeout>();
   private callQueue: string[] = [];
   private isProcessingQueue = false;
 
   constructor() {
-    // 🔧 CHANGEMENT : Ne plus valider/initialiser Twilio ici
-    this.db = admin.firestore();
+  this.db = admin.firestore();
+  this.startQueueProcessor();
+}
 
-    // Démarrer le processeur de queue
-    this.startQueueProcessor();
-  }
+ 
 
-  /**
-   * 🔧 NOUVEAU : Initialisation lazy de Twilio
-   */
-  private async initializeTwilio(): Promise<Twilio> {
-    if (this.twilioClient) {
-      return this.twilioClient;
-    }
-
-    // Valider l'environnement au moment de l'utilisation
-    this.validateEnvironment();
-
-    try {
-      // 🔧 CHANGEMENT : Import dynamique de Twilio
-      const twilioModule = await import('twilio');
-      const twilio = twilioModule.default;
-      
-      this.twilioClient = twilio(
-        process.env.TWILIO_ACCOUNT_SID!,
-        process.env.TWILIO_AUTH_TOKEN!
-      );
-
-      console.log('✅ Twilio client initialisé avec succès');
-      return this.twilioClient;
-
-    } catch (error) {
-      await logError('TwilioCallManager:initializeTwilio', error);
-      throw new Error('Impossible d\'initialiser Twilio');
-    }
-  }
-
-  /**
-   * Valide que toutes les variables d'environnement requises sont présentes
-   */
-  private validateEnvironment(): void {
-    const required = [
-      'TWILIO_ACCOUNT_SID',
-      'TWILIO_AUTH_TOKEN',
-      'TWILIO_PHONE_NUMBER',
-      'FUNCTION_URL'
-    ];
-    
-    const missing = required.filter(key => !process.env[key]);
-    if (missing.length > 0) {
-      throw new Error(`Variables d'environnement Twilio manquantes: ${missing.join(', ')}`);
-    }
-
-    // Valider le format des URLs et numéros
-    const phoneNumber = process.env.TWILIO_PHONE_NUMBER!;
-    if (!phoneNumber.startsWith('+') || phoneNumber.length < 10) {
-      throw new Error('TWILIO_PHONE_NUMBER doit être au format international (+33...)');
-    }
-
-    const functionUrl = process.env.FUNCTION_URL!;
-    if (!functionUrl.startsWith('https://')) {
-      throw new Error('FUNCTION_URL doit commencer par https://');
-    }
-  }
 
   /**
    * Démarrer le processeur de queue pour gérer les appels en file d'attente
@@ -455,9 +397,7 @@ export class TwilioCallManager {
       try {
         console.log(`📞 Tentative ${attempt}/${maxRetries} pour ${participantType} - ${sessionId}`);
 
-        // 🔧 CHANGEMENT : Initialiser Twilio ici
-        const twilioClient = await this.initializeTwilio();
-
+              
         // Incrémenter le compteur de tentatives
         await this.incrementAttemptCount(sessionId, participantType);
 
@@ -470,7 +410,7 @@ export class TwilioCallManager {
         // Créer l'appel avec configuration optimisée
         const call = await twilioClient.calls.create({
           to: phoneNumber,
-          from: process.env.TWILIO_PHONE_NUMBER!,
+          from: twilioPhoneNumber,
           twiml: this.generateConferenceTwiML(
             conferenceName,
             participantType,
@@ -1069,7 +1009,6 @@ export class TwilioCallManager {
    */
   private async cancelTwilioCall(callSid: string): Promise<void> {
     try {
-      const twilioClient = await this.initializeTwilio();
       await twilioClient.calls(callSid).update({ status: 'completed' });
       console.log(`📞 Appel Twilio annulé: ${callSid}`);
     } catch (error) {

@@ -41,13 +41,14 @@ const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
 const logError_1 = require("./utils/logs/logError");
 const logCallRecord_1 = require("./utils/logs/logCallRecord");
+const firebase_1 = require("./utils/firebase"); // ← AJOUTER CET IMPORT
 // Configuration Stripe
 const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || '', {
     apiVersion: '2023-10-16',
 });
 class StripeManager {
     constructor() {
-        this.db = admin.firestore();
+        this.db = firebase_1.db; // ← UTILISER LE DB CONFIGURÉ
     }
     /**
      * Valide la configuration Stripe
@@ -122,7 +123,7 @@ class StripeManager {
                 amount: data.amount, // Déjà en centimes
                 currency: data.currency || 'eur',
                 capture_method: 'manual', // Capture différée obligatoire
-                metadata: Object.assign({ clientId: data.clientId, providerId: data.providerId, serviceType: data.serviceType, providerType: data.providerType, commissionAmount: data.commissionAmount.toString(), providerAmount: data.providerAmount.toString(), commissionAmountEuros: (data.commissionAmount / 100).toFixed(2), providerAmountEuros: (data.providerAmount / 100).toFixed(2), callSessionId: data.callSessionId || '', environment: process.env.NODE_ENV || 'development' }, data.metadata),
+                metadata: Object.assign({ clientId: data.clientId, providerId: data.providerId, serviceType: data.serviceType, providerType: data.providerType, commissionAmount: data.commissionAmount.toString(), providerAmount: data.providerAmount.toString(), commissionAmountEuros: (data.commissionAmount / 100).toFixed(2), providerAmountEuros: (data.providerAmount / 100).toFixed(2), environment: process.env.NODE_ENV || 'development' }, data.metadata),
                 description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount / 100}€`,
                 statement_descriptor_suffix: 'SOS EXPAT',
                 receipt_email: await this.getClientEmail(data.clientId)
@@ -429,6 +430,7 @@ class StripeManager {
      * 🔧 FIX: Sauvegarde l'enregistrement de paiement avec montants EN CENTIMES
      */
     async savePaymentRecord(paymentIntent, data) {
+        // Créer l'objet de base SANS callSessionId
         const paymentRecord = {
             stripePaymentIntentId: paymentIntent.id,
             clientId: data.clientId,
@@ -442,7 +444,6 @@ class StripeManager {
             providerAmountEuros: data.providerAmount / 100,
             serviceType: data.serviceType,
             providerType: data.providerType,
-            callSessionId: (data.callSessionId === undefined || data.callSessionId === 'undefined' || data.callSessionId === null || data.callSessionId === '') ? null : data.callSessionId,
             status: paymentIntent.status,
             clientSecret: paymentIntent.client_secret,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -450,11 +451,22 @@ class StripeManager {
             metadata: data.metadata || {},
             environment: process.env.NODE_ENV || 'development'
         };
+        // Ajouter callSessionId SEULEMENT s'il est valide
+        if (data.callSessionId &&
+            data.callSessionId !== 'undefined' &&
+            data.callSessionId.trim() !== '') {
+            paymentRecord.callSessionId = data.callSessionId;
+            console.log('✅ CallSessionId ajouté:', data.callSessionId);
+        }
+        else {
+            console.log('⚠️ CallSessionId omis (invalide):', data.callSessionId);
+        }
         await this.db.collection('payments').doc(paymentIntent.id).set(paymentRecord);
         console.log('✅ Enregistrement paiement sauvegardé en DB:', {
             id: paymentIntent.id,
             amount: data.amount,
-            amountInEuros: data.amount / 100
+            amountInEuros: data.amount / 100,
+            hasCallSessionId: !!paymentRecord.callSessionId
         });
     }
     /**

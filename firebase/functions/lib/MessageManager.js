@@ -35,37 +35,12 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.messageManager = exports.MessageManager = void 0;
 const admin = __importStar(require("firebase-admin"));
-// SUPPRIMÉ : import { twilioClient } from './lib/twilio';
+const twilio_1 = require("./lib/twilio");
 const logError_1 = require("./utils/logs/logError");
 class MessageManager {
     constructor() {
         this.db = admin.firestore();
         this.templateCache = new Map();
-        this.twilioClient = null; // Import dynamique
-    }
-    /**
-     * 🔧 NOUVEAU : Initialisation lazy de Twilio (comme dans TwilioCallManager)
-     */
-    async getTwilioClient() {
-        if (this.twilioClient) {
-            return this.twilioClient;
-        }
-        // Valider l'environnement
-        if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-            throw new Error('Variables d\'environnement Twilio manquantes');
-        }
-        try {
-            // Import dynamique de Twilio
-            const twilioModule = await Promise.resolve().then(() => __importStar(require('twilio')));
-            const twilio = twilioModule.default;
-            this.twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-            console.log('✅ Twilio client initialisé dans MessageManager');
-            return this.twilioClient;
-        }
-        catch (error) {
-            await (0, logError_1.logError)('MessageManager:getTwilioClient', error);
-            throw new Error('Impossible d\'initialiser Twilio dans MessageManager');
-        }
     }
     /**
      * Récupère un template depuis Firestore (avec cache)
@@ -166,11 +141,9 @@ class MessageManager {
           <Say voice="alice" language="${params.language || 'fr-FR'}">${message}</Say>
         </Response>
       `;
-            // 🔧 CHANGEMENT : Utiliser l'import dynamique
-            const twilioClient = await this.getTwilioClient();
-            await twilioClient.calls.create({
+            await twilio_1.twilioClient.calls.create({
                 to: params.to,
-                from: process.env.TWILIO_PHONE_NUMBER,
+                from: twilio_1.twilioPhoneNumber,
                 twiml: twiml,
                 timeout: 30
             });
@@ -182,16 +155,14 @@ class MessageManager {
         }
     }
     /**
-     * FONCTION MANQUANTE - Envoie un appel de notification
+     * Envoie un appel de notification
      */
     async sendNotificationCall(phoneNumber, message) {
         try {
-            // 🔧 CHANGEMENT : Utiliser l'import dynamique
-            const twilioClient = await this.getTwilioClient();
             if (!process.env.TWILIO_PHONE_NUMBER) {
                 throw new Error('Configuration Twilio manquante');
             }
-            await twilioClient.calls.create({
+            await twilio_1.twilioClient.calls.create({
                 to: phoneNumber,
                 from: process.env.TWILIO_PHONE_NUMBER,
                 twiml: `<Response><Say voice="alice" language="fr-FR">${message}</Say></Response>`,
@@ -223,9 +194,7 @@ class MessageManager {
             if (!process.env.TWILIO_WHATSAPP_NUMBER) {
                 throw new Error('Numéro WhatsApp Twilio non configuré');
             }
-            // 🔧 CHANGEMENT : Utiliser l'import dynamique
-            const twilioClient = await this.getTwilioClient();
-            await twilioClient.messages.create({
+            await twilio_1.twilioClient.messages.create({
                 body: message,
                 from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
                 to: `whatsapp:${to}`
@@ -242,9 +211,7 @@ class MessageManager {
             if (!process.env.TWILIO_PHONE_NUMBER) {
                 throw new Error('Numéro SMS Twilio non configuré');
             }
-            // 🔧 CHANGEMENT : Utiliser l'import dynamique
-            const twilioClient = await this.getTwilioClient();
-            await twilioClient.messages.create({
+            await twilio_1.twilioClient.messages.create({
                 body: message,
                 from: process.env.TWILIO_PHONE_NUMBER,
                 to: to

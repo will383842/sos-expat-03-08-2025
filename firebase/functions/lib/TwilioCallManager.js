@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.twilioCallManager = exports.TwilioCallManager = void 0;
 const admin = __importStar(require("firebase-admin"));
+// 🔧 CHANGEMENT : Import conditionnel de Twilio
+const twilio_1 = require("./lib/twilio");
 const logError_1 = require("./utils/logs/logError");
 const logCallRecord_1 = require("./utils/logs/logCallRecord");
 const MessageManager_1 = require("./MessageManager");
@@ -50,60 +52,11 @@ const CALL_CONFIG = {
 };
 class TwilioCallManager {
     constructor() {
-        this.twilioClient = null; // 🔧 CHANGEMENT : Nullable
         this.activeCalls = new Map();
         this.callQueue = [];
         this.isProcessingQueue = false;
-        // 🔧 CHANGEMENT : Ne plus valider/initialiser Twilio ici
         this.db = admin.firestore();
-        // Démarrer le processeur de queue
         this.startQueueProcessor();
-    }
-    /**
-     * 🔧 NOUVEAU : Initialisation lazy de Twilio
-     */
-    async initializeTwilio() {
-        if (this.twilioClient) {
-            return this.twilioClient;
-        }
-        // Valider l'environnement au moment de l'utilisation
-        this.validateEnvironment();
-        try {
-            // 🔧 CHANGEMENT : Import dynamique de Twilio
-            const twilioModule = await Promise.resolve().then(() => __importStar(require('twilio')));
-            const twilio = twilioModule.default;
-            this.twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-            console.log('✅ Twilio client initialisé avec succès');
-            return this.twilioClient;
-        }
-        catch (error) {
-            await (0, logError_1.logError)('TwilioCallManager:initializeTwilio', error);
-            throw new Error('Impossible d\'initialiser Twilio');
-        }
-    }
-    /**
-     * Valide que toutes les variables d'environnement requises sont présentes
-     */
-    validateEnvironment() {
-        const required = [
-            'TWILIO_ACCOUNT_SID',
-            'TWILIO_AUTH_TOKEN',
-            'TWILIO_PHONE_NUMBER',
-            'FUNCTION_URL'
-        ];
-        const missing = required.filter(key => !process.env[key]);
-        if (missing.length > 0) {
-            throw new Error(`Variables d'environnement Twilio manquantes: ${missing.join(', ')}`);
-        }
-        // Valider le format des URLs et numéros
-        const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
-        if (!phoneNumber.startsWith('+') || phoneNumber.length < 10) {
-            throw new Error('TWILIO_PHONE_NUMBER doit être au format international (+33...)');
-        }
-        const functionUrl = process.env.FUNCTION_URL;
-        if (!functionUrl.startsWith('https://')) {
-            throw new Error('FUNCTION_URL doit commencer par https://');
-        }
     }
     /**
      * Démarrer le processeur de queue pour gérer les appels en file d'attente
@@ -348,8 +301,6 @@ class TwilioCallManager {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 console.log(`📞 Tentative ${attempt}/${maxRetries} pour ${participantType} - ${sessionId}`);
-                // 🔧 CHANGEMENT : Initialiser Twilio ici
-                const twilioClient = await this.initializeTwilio();
                 // Incrémenter le compteur de tentatives
                 await this.incrementAttemptCount(sessionId, participantType);
                 await (0, logCallRecord_1.logCallRecord)({
@@ -358,9 +309,9 @@ class TwilioCallManager {
                     retryCount: attempt
                 });
                 // Créer l'appel avec configuration optimisée
-                const call = await twilioClient.calls.create({
+                const call = await twilio_1.twilioClient.calls.create({
                     to: phoneNumber,
-                    from: process.env.TWILIO_PHONE_NUMBER,
+                    from: twilio_1.twilioPhoneNumber,
                     twiml: this.generateConferenceTwiML(conferenceName, participantType, timeLimit, sessionId),
                     statusCallback: `${process.env.FUNCTION_URL}/twilioConferenceWebhook`,
                     statusCallbackMethod: 'POST',
@@ -860,8 +811,7 @@ class TwilioCallManager {
      */
     async cancelTwilioCall(callSid) {
         try {
-            const twilioClient = await this.initializeTwilio();
-            await twilioClient.calls(callSid).update({ status: 'completed' });
+            await twilio_1.twilioClient.calls(callSid).update({ status: 'completed' });
             console.log(`📞 Appel Twilio annulé: ${callSid}`);
         }
         catch (error) {

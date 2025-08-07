@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-// SUPPRIMÉ : import { twilioClient } from './lib/twilio';
+import { twilioClient, twilioPhoneNumber } from './lib/twilio';
 import { logError } from './utils/logs/logError';
 
 export interface MessageTemplate {
@@ -17,39 +17,6 @@ export interface MessageTemplate {
 export class MessageManager {
   private db = admin.firestore();
   private templateCache = new Map<string, MessageTemplate>();
-  private twilioClient: any = null; // Import dynamique
-
-  /**
-   * 🔧 NOUVEAU : Initialisation lazy de Twilio (comme dans TwilioCallManager)
-   */
-  private async getTwilioClient(): Promise<any> {
-    if (this.twilioClient) {
-      return this.twilioClient;
-    }
-
-    // Valider l'environnement
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      throw new Error('Variables d\'environnement Twilio manquantes');
-    }
-
-    try {
-      // Import dynamique de Twilio
-      const twilioModule = await import('twilio');
-      const twilio = twilioModule.default;
-      
-      this.twilioClient = twilio(
-        process.env.TWILIO_ACCOUNT_SID!,
-        process.env.TWILIO_AUTH_TOKEN!
-      );
-
-      console.log('✅ Twilio client initialisé dans MessageManager');
-      return this.twilioClient;
-
-    } catch (error) {
-      await logError('MessageManager:getTwilioClient', error);
-      throw new Error('Impossible d\'initialiser Twilio dans MessageManager');
-    }
-  }
 
   /**
    * Récupère un template depuis Firestore (avec cache)
@@ -185,11 +152,9 @@ export class MessageManager {
         </Response>
       `;
 
-      // 🔧 CHANGEMENT : Utiliser l'import dynamique
-      const twilioClient = await this.getTwilioClient();
       await twilioClient.calls.create({
         to: params.to,
-        from: process.env.TWILIO_PHONE_NUMBER!,
+        from: twilioPhoneNumber,
         twiml: twiml,
         timeout: 30
       });
@@ -203,13 +168,10 @@ export class MessageManager {
   }
 
   /**
-   * FONCTION MANQUANTE - Envoie un appel de notification
+   * Envoie un appel de notification
    */
   async sendNotificationCall(phoneNumber: string, message: string): Promise<boolean> {
     try {
-      // 🔧 CHANGEMENT : Utiliser l'import dynamique
-      const twilioClient = await this.getTwilioClient();
-      
       if (!process.env.TWILIO_PHONE_NUMBER) {
         throw new Error('Configuration Twilio manquante');
       }
@@ -249,8 +211,6 @@ export class MessageManager {
         throw new Error('Numéro WhatsApp Twilio non configuré');
       }
 
-      // 🔧 CHANGEMENT : Utiliser l'import dynamique
-      const twilioClient = await this.getTwilioClient();
       await twilioClient.messages.create({
         body: message,
         from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
@@ -269,8 +229,6 @@ export class MessageManager {
         throw new Error('Numéro SMS Twilio non configuré');
       }
 
-      // 🔧 CHANGEMENT : Utiliser l'import dynamique
-      const twilioClient = await this.getTwilioClient();
       await twilioClient.messages.create({
         body: message,
         from: process.env.TWILIO_PHONE_NUMBER,

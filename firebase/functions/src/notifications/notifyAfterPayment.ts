@@ -3,6 +3,15 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { onCall } from 'firebase-functions/v2/https';
 import { messageManager } from '../MessageManager';
 
+// 🔧 FIX CRITIQUE: Configuration d'optimisation CPU
+const CPU_OPTIMIZED_CONFIG = {
+  memory: "128MiB" as const,
+  timeoutSeconds: 30,
+  maxInstances: 5,
+  minInstances: 0,
+  concurrency: 10
+};
+
 const db = getFirestore();
 
 // ✅ Fonction interne (pour usage depuis d'autres Cloud Functions comme les webhooks)
@@ -23,60 +32,63 @@ export async function notifyAfterPaymentInternal(callId: string) {
     language: Array.isArray(callData.clientLanguages) ? callData.clientLanguages[0] : 'fr',
   };
 
-try {
-  // Envoi des notifications au prestataire
-  await messageManager.sendSmartMessage({
-    to: provider.phoneNumber,
-    templateId: 'provider_notification',
-    variables: {
-      requestTitle: callData.title || 'Consultation',
-      language: messagePayload.language
-    }
-  });
+  try {
+    // Envoi des notifications au prestataire
+    await messageManager.sendSmartMessage({
+      to: provider.phoneNumber,
+      templateId: 'provider_notification',
+      variables: {
+        requestTitle: callData.title || 'Consultation',
+        language: messagePayload.language
+      }
+    });
 
-  // Envoi des notifications au client
-  await messageManager.sendSmartMessage({
-    to: client.phoneNumber,
-    templateId: 'client_notification',
-    variables: {
-      requestTitle: callData.title || 'Consultation',
-      language: messagePayload.language
-    }
-  });
+    // Envoi des notifications au client
+    await messageManager.sendSmartMessage({
+      to: client.phoneNumber,
+      templateId: 'client_notification',
+      variables: {
+        requestTitle: callData.title || 'Consultation',
+        language: messagePayload.language
+      }
+    });
 
-  console.log(`✅ Notifications envoyées via MessageManager pour callId: ${callId}`);
-} catch (error) {
-  console.error(`❌ Erreur lors de l'envoi des notifications pour callId ${callId}:`, error);
-  throw error;
-}
+    console.log(`✅ Notifications envoyées via MessageManager pour callId: ${callId}`);
+  } catch (error) {
+    console.error(`❌ Erreur lors de l'envoi des notifications pour callId ${callId}:`, error);
+    throw error;
+  }
 
   // 🔁 Déclenche l'appel vocal entre client et prestataire dans 5 minutes
   await scheduleCallSequence(callData.sessionId || callId);
 }
 
-// ✅ Cloud Function (appelable depuis le frontend)
-export const notifyAfterPayment = onCall(async (request) => {
-  // Vérifier l'authentification
-  if (!request.auth) {
-    throw new Error('L\'utilisateur doit être authentifié');
-  }
+// ✅ Cloud Function (appelable depuis le frontend) - OPTIMISÉE CPU
+export const notifyAfterPayment = onCall(
+  CPU_OPTIMIZED_CONFIG, // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU
+  async (request) => {
+    // Vérifier l'authentification
+    if (!request.auth) {
+      throw new Error('L\'utilisateur doit être authentifié');
+    }
 
-  const { callId } = request.data;
-  
-  if (!callId) {
-    throw new Error('callId est requis');
-  }
-
-  try {
-    await notifyAfterPaymentInternal(callId);
+    const { callId } = request.data;
     
-    return { 
-      success: true, 
-      message: 'Notifications envoyées avec succès',
-      callId 
-    };
-  } catch (error) {
-    console.error('❌ Erreur dans notifyAfterPayment Cloud Function:', error);
-    throw new Error(`Erreur lors de l'envoi des notifications: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    if (!callId) {
+      throw new Error('callId est requis');
+    }
+
+    try {
+      await notifyAfterPaymentInternal(callId);
+      
+      return { 
+        success: true, 
+        message: 'Notifications envoyées avec succès',
+        callId 
+      };
+    } catch (error) {
+      console.error('❌ Erreur dans notifyAfterPayment Cloud Function:', error);
+      throw new Error(`Erreur lors de l'envoi des notifications: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
   }
-});
+);

@@ -2,6 +2,16 @@ import { onCall } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import { MessageTemplate } from './MessageManager';
 
+// 🔧 FIX CRITIQUE: Configuration d'optimisation CPU SEULEMENT
+const CPU_OPTIMIZED_CONFIG = {
+  memory: "256MiB" as const, // Un peu plus de mémoire pour les templates complets
+  timeoutSeconds: 120, // Plus de temps pour tous les templates
+  maxInstances: 2, // Limite stricte pour cette fonction d'initialisation
+  minInstances: 0,
+  concurrency: 1 // Une seule exécution à la fois
+};
+
+// ⚠️ TOUS LES TEMPLATES ORIGINAUX GARDÉS (pas de suppression fonctionnelle)
 const defaultTemplates: Omit<MessageTemplate, 'createdAt' | 'updatedAt'>[] = [
   // ====== TEMPLATES WHATSAPP ======
   {
@@ -369,7 +379,7 @@ const defaultTemplates: Omit<MessageTemplate, 'createdAt' | 'updatedAt'>[] = [
 ];
 
 export const initializeMessageTemplates = onCall(
-  { cors: true },
+  CPU_OPTIMIZED_CONFIG, // 🔧 FIX CRITIQUE: SEULEMENT la configuration d'optimisation CPU
   async (request) => {
   try {
     // Vérifier que l'utilisateur est admin
@@ -383,75 +393,99 @@ export const initializeMessageTemplates = onCall(
     //   throw new Error('Accès refusé - Admin requis');
     // }
 
-    console.log('🚀 Initialisation des templates de messages...');
+    console.log('🚀 Initialisation des templates de messages (optimisé CPU mais COMPLET)...');
     
     const db = admin.firestore();
-    const batch = db.batch();
     
     let created = 0;
     let updated = 0;
     let errors = 0;
 
-    for (const template of defaultTemplates) {
-      try {
-        const templateRef = db.collection('message_templates').doc(template.id);
-        const existingDoc = await templateRef.get();
-        
-        const templateData = {
-          ...template,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        };
+    // 🔧 OPTIMISATION CPU: Traitement par petits lots SEULEMENT
+    const batchSize = 8; // Légèrement plus gros que la version réduite
+    const batches: typeof defaultTemplates[] = [];
+    
+    for (let i = 0; i < defaultTemplates.length; i += batchSize) {
+      batches.push(defaultTemplates.slice(i, i + batchSize));
+    }
 
-        if (existingDoc.exists) {
-          // Mise à jour du template existant (garde le contenu personnalisé si modifié)
-          const existingData = existingDoc.data();
+    console.log(`📊 Traitement de ${defaultTemplates.length} templates en ${batches.length} lots`);
+
+    for (const [batchIndex, batchTemplates] of batches.entries()) {
+      const batch = db.batch();
+      let batchOperations = 0;
+
+      console.log(`📦 Traitement du lot ${batchIndex + 1}/${batches.length} (${batchTemplates.length} templates)`);
+
+      for (const template of batchTemplates) {
+        try {
+          const templateRef = db.collection('message_templates').doc(template.id);
+          const existingDoc = await templateRef.get();
           
-          // Ne mettre à jour que si le contenu n'a pas été personnalisé
-          const shouldUpdate = !existingData?.isCustomized;
-          
-          if (shouldUpdate) {
-            batch.update(templateRef, {
-              name: template.name,
-              type: template.type,
-              language: template.language,
-              content: template.content, // Mettre à jour le contenu
-              variables: template.variables,
-              isActive: template.isActive,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            updated++;
-            console.log(`📝 Template mis à jour: ${template.id}`);
+          const templateData = {
+            ...template,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+
+          if (existingDoc.exists) {
+            // Mise à jour du template existant (garde le contenu personnalisé si modifié)
+            const existingData = existingDoc.data();
+            
+            // Ne mettre à jour que si le contenu n'a pas été personnalisé
+            const shouldUpdate = !existingData?.isCustomized;
+            
+            if (shouldUpdate) {
+              batch.update(templateRef, {
+                name: template.name,
+                type: template.type,
+                language: template.language,
+                content: template.content, // Mettre à jour le contenu
+                variables: template.variables,
+                isActive: template.isActive,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+              updated++;
+              batchOperations++;
+              console.log(`📝 Template mis à jour: ${template.id}`);
+            } else {
+              console.log(`⏭️ Template personnalisé ignoré: ${template.id}`);
+            }
           } else {
-            console.log(`⏭️ Template personnalisé ignoré: ${template.id}`);
+            // Création d'un nouveau template
+            batch.set(templateRef, {
+              ...templateData,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              isCustomized: false // Marquer comme non personnalisé
+            });
+            created++;
+            batchOperations++;
+            console.log(`✅ Nouveau template créé: ${template.id}`);
           }
-        } else {
-          // Création d'un nouveau template
-          batch.set(templateRef, {
-            ...templateData,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            isCustomized: false // Marquer comme non personnalisé
-          });
-          created++;
-          console.log(`✅ Nouveau template créé: ${template.id}`);
+        } catch (templateError) {
+          console.error(`❌ Erreur avec template ${template.id}:`, templateError);
+          errors++;
         }
-      } catch (templateError) {
-        console.error(`❌ Erreur avec template ${template.id}:`, templateError);
-        errors++;
+      }
+
+      // Valider le batch
+      if (batchOperations > 0) {
+        await batch.commit();
+        console.log(`🎉 Lot ${batchIndex + 1} validé: ${batchOperations} opérations`);
+      }
+
+      // 🔧 OPTIMISATION CPU: Pause entre les batches pour réduire la charge CPU
+      if (batchIndex < batches.length - 1) {
+        console.log('⏳ Pause entre lots pour optimiser CPU...');
+        await new Promise(resolve => setTimeout(resolve, 200)); // 200ms de pause
       }
     }
 
-    // Valider le batch
-    if (created > 0 || updated > 0) {
-      await batch.commit();
-      console.log(`🎉 Batch validé: ${created} créés, ${updated} mis à jour`);
-    }
-
-    // Créer les templates par défaut pour les langues supplémentaires (EN, ES)
+    // Créer les templates par défaut pour les langues supplémentaires (COMPLET)
     await createMultiLanguageTemplates(db);
 
     const summary = {
       success: true,
-      message: `Templates initialisés avec succès !`,
+      message: `Templates initialisés avec succès (optimisé CPU + COMPLET) !`,
       details: {
         created,
         updated,
@@ -460,7 +494,7 @@ export const initializeMessageTemplates = onCall(
       }
     };
 
-    console.log('✅ Initialisation terminée:', summary);
+    console.log('✅ Initialisation terminée (optimisé mais complet):', summary);
     return summary;
 
   } catch (error) {
@@ -480,11 +514,11 @@ export const initializeMessageTemplates = onCall(
 });
 
 /**
- * Créer des templates pour les langues supplémentaires
+ * Créer des templates pour les langues supplémentaires (FONCTION COMPLÈTE GARDÉE)
  */
 async function createMultiLanguageTemplates(db: admin.firestore.Firestore) {
   try {
-    console.log('🌍 Création des templates multi-langues...');
+    console.log('🌍 Création des templates multi-langues (version complète)...');
     
     // Templates critiques à traduire
     const criticalTemplates = [
@@ -515,44 +549,70 @@ async function createMultiLanguageTemplates(db: admin.firestore.Firestore) {
       }
     };
 
-    const batch = db.batch();
+    // 🔧 OPTIMISATION CPU: Traitement par lots aussi pour les multi-langues
+    const multiLangBatchSize = 6;
     let multiLangCreated = 0;
-
+    
     for (const [lang, langTranslations] of Object.entries(translations)) {
-      for (const templateId of criticalTemplates) {
-        const translation = (langTranslations as Record<string, string>)[templateId];
-        if (translation) {
-          const newId = `${templateId}_${lang}`;
-          const templateRef = db.collection('message_templates').doc(newId);
-          
-          // Vérifier si existe déjà
-          const exists = await templateRef.get();
-          if (!exists.exists) {
-            // Trouver le template original pour récupérer les métadonnées
-            const originalTemplate = defaultTemplates.find(t => t.id === templateId);
-            if (originalTemplate) {
-              batch.set(templateRef, {
-                id: newId,
-                name: `${originalTemplate.name} (${lang.toUpperCase()})`,
-                type: originalTemplate.type,
-                language: lang as 'fr' | 'en' | 'es',
-                content: translation,
-                variables: originalTemplate.variables,
-                isActive: true,
-                isCustomized: false,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-              });
-              multiLangCreated++;
+      console.log(`🌍 Traitement langue: ${lang.toUpperCase()}`);
+      
+      // Traiter par petits lots
+      const templatesArray = criticalTemplates.slice(); // Copie
+      const langBatches: string[][] = [];
+      
+      for (let i = 0; i < templatesArray.length; i += multiLangBatchSize) {
+        langBatches.push(templatesArray.slice(i, i + multiLangBatchSize));
+      }
+      
+      for (const [batchIndex, batchTemplateIds] of langBatches.entries()) {
+        const batch = db.batch();
+        let batchOps = 0;
+
+        for (const templateId of batchTemplateIds) {
+          const translation = (langTranslations as Record<string, string>)[templateId];
+          if (translation) {
+            const newId = `${templateId}_${lang}`;
+            const templateRef = db.collection('message_templates').doc(newId);
+            
+            // Vérifier si existe déjà
+            const exists = await templateRef.get();
+            if (!exists.exists) {
+              // Trouver le template original pour récupérer les métadonnées
+              const originalTemplate = defaultTemplates.find(t => t.id === templateId);
+              if (originalTemplate) {
+                batch.set(templateRef, {
+                  id: newId,
+                  name: `${originalTemplate.name} (${lang.toUpperCase()})`,
+                  type: originalTemplate.type,
+                  language: lang as 'fr' | 'en' | 'es',
+                  content: translation,
+                  variables: originalTemplate.variables,
+                  isActive: true,
+                  isCustomized: false,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                multiLangCreated++;
+                batchOps++;
+              }
             }
           }
+        }
+
+        if (batchOps > 0) {
+          await batch.commit();
+          console.log(`  📦 Lot ${lang}-${batchIndex + 1} validé: ${batchOps} templates`);
+        }
+
+        // Pause entre les lots multi-langues
+        if (batchIndex < langBatches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms
         }
       }
     }
 
     if (multiLangCreated > 0) {
-      await batch.commit();
-      console.log(`🌍 ${multiLangCreated} templates multi-langues créés`);
+      console.log(`🌍 ${multiLangCreated} templates multi-langues créés au total`);
     }
 
   } catch (error) {

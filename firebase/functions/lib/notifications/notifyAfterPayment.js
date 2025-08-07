@@ -6,6 +6,14 @@ const callScheduler_1 = require("../callScheduler");
 const firestore_1 = require("firebase-admin/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const MessageManager_1 = require("../MessageManager");
+// 🔧 FIX CRITIQUE: Configuration d'optimisation CPU
+const CPU_OPTIMIZED_CONFIG = {
+    memory: "128MiB",
+    timeoutSeconds: 30,
+    maxInstances: 5,
+    minInstances: 0,
+    concurrency: 10
+};
 const db = (0, firestore_1.getFirestore)();
 // ✅ Fonction interne (pour usage depuis d'autres Cloud Functions comme les webhooks)
 async function notifyAfterPaymentInternal(callId) {
@@ -51,8 +59,9 @@ async function notifyAfterPaymentInternal(callId) {
     // 🔁 Déclenche l'appel vocal entre client et prestataire dans 5 minutes
     await (0, callScheduler_1.scheduleCallSequence)(callData.sessionId || callId);
 }
-// ✅ Cloud Function (appelable depuis le frontend)
-exports.notifyAfterPayment = (0, https_1.onCall)(async (request) => {
+// ✅ Cloud Function (appelable depuis le frontend) - OPTIMISÉE CPU
+exports.notifyAfterPayment = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU
+async (request) => {
     // Vérifier l'authentification
     if (!request.auth) {
         throw new Error('L\'utilisateur doit être authentifié');

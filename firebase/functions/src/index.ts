@@ -48,6 +48,14 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+// ✅ AJOUTEZ CES DEUX LIGNES ICI
+try {
+  db.settings({ ignoreUndefinedProperties: true });
+  console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
+} catch (error) {
+  console.log('ℹ️ Firestore déjà configuré');
+}
+console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
 
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES

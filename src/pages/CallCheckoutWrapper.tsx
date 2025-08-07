@@ -2,36 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import CallCheckout from './CallCheckout';
 import { AlertCircle } from 'lucide-react';
-
-// Types cohérents avec BookingRequest.tsx
-interface Provider {
-  id: string;
-  fullName?: string;
-  name?: string;
-  firstName?: string;
-  lastName?: string;
-  role: 'lawyer' | 'expat';
-  type?: 'lawyer' | 'expat';
-  country: string;
-  currentCountry?: string;
-  avatar?: string;
-  profilePhoto?: string;
-  email?: string;
-  phone?: string;
-  phoneNumber?: string;
-  whatsapp?: string;
-  whatsAppNumber?: string;
-  languagesSpoken?: string[];
-  languages?: string[];
-  preferredLanguage?: string;
-  price?: number;
-  duration?: number;
-  rating?: number;
-  reviewCount?: number;
-  specialties?: string[];
-  isActive?: boolean;
-  isApproved?: boolean;
-}
+import { Provider, normalizeProvider, createDefaultProvider } from '../types/Provider';
 
 interface ServiceData {
   providerId: string;
@@ -89,7 +60,7 @@ const CallCheckoutWrapper: React.FC = () => {
           setState({
             isLoading: false,
             error: null,
-            provider: normalizeProviderData(stateProvider),
+            provider: normalizeProvider(stateProvider),
             serviceData: serviceInfo
           });
           return;
@@ -133,7 +104,7 @@ const CallCheckoutWrapper: React.FC = () => {
           setState({
             isLoading: false,
             error: null,
-            provider: normalizeProviderData(savedProviderData),
+            provider: normalizeProvider(savedProviderData),
             serviceData: savedServiceData
           });
           return;
@@ -178,7 +149,7 @@ const CallCheckoutWrapper: React.FC = () => {
               setState({
                 isLoading: false,
                 error: null,
-                provider: normalizeProviderData(profileData),
+                provider: normalizeProvider(profileData),
                 serviceData: reconstructedService
               });
               return;
@@ -188,7 +159,124 @@ const CallCheckoutWrapper: React.FC = () => {
           console.warn('⚠️ Erreur parsing providerProfile:', error);
         }
 
-        // 🔧 FIX 5: Fallback avec données par défaut si providerId fourni
+        // 🔧 FIX 5: Essayer autres sources dans sessionStorage
+        console.log('🔍 Recherche dans autres sources sessionStorage...');
+        const sessionStorageKeys = [
+          'providerData',
+          'selectedExpert',
+          'expertData',
+          'consultationData',
+          'callData'
+        ];
+
+        for (const key of sessionStorageKeys) {
+          try {
+            const data = sessionStorage.getItem(key);
+            if (data) {
+              const parsedData = JSON.parse(data);
+              if (parsedData && parsedData.id && (!providerId || parsedData.id === providerId)) {
+                console.log(`✅ Données trouvées dans ${key}:`, parsedData);
+                
+                setState({
+                  isLoading: false,
+                  error: null,
+                  provider: normalizeProvider(parsedData),
+                  serviceData: reconstructServiceData(parsedData)
+                });
+                return;
+              }
+            }
+          } catch (error) {
+            console.warn(`⚠️ Erreur parsing ${key}:`, error);
+          }
+        }
+
+        // 🔧 FIX 6: Essayer de récupérer depuis l'historique de navigation
+        console.log('🔍 Recherche dans l\'historique de navigation...');
+        try {
+          const historyState = window.history.state;
+          if (historyState) {
+            const historyProvider = historyState.selectedProvider || 
+                                  historyState.provider || 
+                                  historyState.providerData;
+            
+            if (historyProvider && historyProvider.id && (!providerId || historyProvider.id === providerId)) {
+              console.log('✅ Provider trouvé dans history state:', historyProvider);
+              
+              setState({
+                isLoading: false,
+                error: null,
+                provider: normalizeProvider(historyProvider),
+                serviceData: reconstructServiceData(historyProvider)
+              });
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Erreur récupération history state:', error);
+        }
+
+        // 🔧 FIX 7: Essayer de récupérer depuis localStorage (backup)
+        console.log('🔍 Recherche dans localStorage (backup)...');
+        try {
+          const localStorageKeys = [
+            'lastSelectedProvider',
+            'recentProvider',
+            'currentProvider'
+          ];
+
+          for (const key of localStorageKeys) {
+            const data = localStorage.getItem(key);
+            if (data) {
+              const parsedData = JSON.parse(data);
+              if (parsedData && parsedData.id && (!providerId || parsedData.id === providerId)) {
+                console.log(`✅ Données trouvées dans localStorage ${key}:`, parsedData);
+                
+                setState({
+                  isLoading: false,
+                  error: null,
+                  provider: normalizeProvider(parsedData),
+                  serviceData: reconstructServiceData(parsedData)
+                });
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Erreur récupération localStorage:', error);
+        }
+
+        // 🔧 FIX 8: Essayer de récupérer depuis les paramètres URL
+        console.log('🔍 Recherche dans les paramètres URL...');
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const providerParam = urlParams.get('provider');
+          const serviceParam = urlParams.get('service');
+          
+          if (providerParam) {
+            const providerData = JSON.parse(decodeURIComponent(providerParam));
+            if (providerData && providerData.id && (!providerId || providerData.id === providerId)) {
+              console.log('✅ Provider trouvé dans les paramètres URL:', providerData);
+              
+              let serviceData = null;
+              if (serviceParam) {
+                serviceData = JSON.parse(decodeURIComponent(serviceParam));
+              }
+              
+              setState({
+                isLoading: false,
+                error: null,
+                provider: normalizeProvider(providerData),
+                serviceData: serviceData || reconstructServiceData(providerData)
+              });
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Erreur récupération paramètres URL:', error);
+        }
+
+        // 🔧 FIX 9: Fallback avec données par défaut si providerId fourni
         if (providerId) {
           console.log('⚙️ Fallback avec données par défaut pour providerId:', providerId);
           const defaultProvider = createDefaultProvider(providerId);
@@ -201,6 +289,31 @@ const CallCheckoutWrapper: React.FC = () => {
             serviceData: defaultService
           });
           return;
+        }
+
+        // 🔧 FIX 10: Essayer de reconstruire depuis les données de l'URL elle-même
+        console.log('🔍 Tentative de reconstruction depuis l\'URL...');
+        try {
+          const pathParts = window.location.pathname.split('/');
+          const lastPart = pathParts[pathParts.length - 1];
+          
+          if (lastPart && lastPart.includes('-')) {
+            const extractedId = lastPart.split('-').pop();
+            if (extractedId && extractedId.length > 5) {
+              console.log('✅ ID extrait de l\'URL:', extractedId);
+              const reconstructedProvider = createDefaultProvider(extractedId);
+              
+              setState({
+                isLoading: false,
+                error: null,
+                provider: reconstructedProvider,
+                serviceData: reconstructServiceData(reconstructedProvider)
+              });
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Erreur reconstruction depuis URL:', error);
         }
 
         // Aucune donnée trouvée
@@ -225,92 +338,6 @@ const CallCheckoutWrapper: React.FC = () => {
 
     loadData();
   }, [location.state, providerId]);
-
-  /**
-   * 🔧 FIX: Normalise les données du provider pour assurer la cohérence
-   */
-  const normalizeProviderData = (providerData: any): Provider => {
-    return {
-      id: providerData.id || providerData.providerId || Math.random().toString(36),
-      fullName: providerData.fullName || 
-          providerData.name || 
-          providerData.providerName ||
-          providerData.displayName ||
-          providerData.nom ||
-          providerData.nomComplet ||
-          `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 
-          (providerData.id ? `Expert ${providerData.id.slice(-4)}` : 'Expert'),
-      name: providerData.name || 
-            providerData.fullName || 
-            providerData.providerName || 
-            'Expert',
-      firstName: providerData.firstName || '',
-      lastName: providerData.lastName || '',
-      role: providerData.role || 
-            providerData.type || 
-            providerData.providerType || 
-            'expat',
-      type: providerData.type || 
-            providerData.role || 
-            providerData.providerType || 
-            'expat',
-      country: providerData.country || 
-               providerData.currentCountry || 
-               providerData.providerCountry || 
-               '',
-      currentCountry: providerData.currentCountry || 
-                     providerData.country || 
-                     providerData.providerCountry || 
-                     '',
-      avatar: providerData.avatar || 
-              providerData.profilePhoto || 
-              providerData.providerAvatar || 
-              '/default-avatar.png',
-      profilePhoto: providerData.profilePhoto || 
-                   providerData.avatar || 
-                   providerData.providerAvatar || 
-                   '/default-avatar.png',
-      email: providerData.email || '',
-      phone: providerData.phone || 
-             providerData.phoneNumber || 
-             providerData.providerPhone || 
-             '',
-      phoneNumber: providerData.phoneNumber || 
-                  providerData.phone || 
-                  providerData.providerPhone || 
-                  '',
-      whatsapp: providerData.whatsapp || 
-               providerData.whatsAppNumber || 
-               '',
-      whatsAppNumber: providerData.whatsAppNumber || 
-                     providerData.whatsapp || 
-                     '',
-      languagesSpoken: providerData.languagesSpoken || 
-                      providerData.languages || 
-                      providerData.providerLanguages || 
-                      [],
-      languages: providerData.languages || 
-                providerData.languagesSpoken || 
-                providerData.providerLanguages || 
-                [],
-      preferredLanguage: providerData.preferredLanguage || 'fr',
-      price: providerData.price || 
-             (providerData.role === 'lawyer' || providerData.type === 'lawyer' || providerData.providerType === 'lawyer' ? 49 : 19),
-      duration: providerData.duration || 
-               (providerData.role === 'lawyer' || providerData.type === 'lawyer' || providerData.providerType === 'lawyer' ? 20 : 30),
-      rating: providerData.rating || 
-              providerData.providerRating || 
-              5.0,
-      reviewCount: providerData.reviewCount || 
-                  providerData.providerReviewCount || 
-                  0,
-      specialties: providerData.specialties || 
-                  providerData.providerSpecialties || 
-                  [],
-      isActive: providerData.isActive !== false,
-      isApproved: providerData.isApproved !== false
-    };
-  };
 
   /**
    * 🔧 FIX: Reconstruit les données de service à partir du provider
@@ -341,10 +368,10 @@ const CallCheckoutWrapper: React.FC = () => {
    * 🔧 NOUVEAU: Reconstruit un provider depuis bookingRequest
    */
   const reconstructProviderFromBooking = (bookingData: any): Provider => {
-    return {
+    return normalizeProvider({
       id: bookingData.providerId || Math.random().toString(36),
-      fullName: bookingData.providerName || 'Expert',
       name: bookingData.providerName || 'Expert',
+      fullName: bookingData.providerName || 'Expert',
       firstName: '',
       lastName: '',
       role: bookingData.providerType as 'lawyer' | 'expat' || 'expat',
@@ -363,12 +390,18 @@ const CallCheckoutWrapper: React.FC = () => {
       preferredLanguage: 'fr',
       price: bookingData.price || (bookingData.providerType === 'lawyer' ? 49 : 19),
       duration: bookingData.duration || (bookingData.providerType === 'lawyer' ? 20 : 30),
-      rating: bookingData.providerRating || 5.0,
+      rating: bookingData.providerRating || 4.5,
       reviewCount: bookingData.providerReviewCount || 0,
       specialties: bookingData.providerSpecialties || [],
+      description: '',
+      bio: '',
+      yearsOfExperience: 1,
       isActive: true,
-      isApproved: true
-    };
+      isApproved: true,
+      isVisible: true,
+      isBanned: false,
+      isOnline: true
+    });
   };
 
   /**
@@ -396,37 +429,73 @@ const CallCheckoutWrapper: React.FC = () => {
   };
 
   /**
-   * 🔧 NOUVEAU: Crée un provider par défaut si aucune donnée
+   * 🔧 NOUVEAU: Sauvegarde sécurisée des données pour session suivante
    */
-  const createDefaultProvider = (providerId: string): Provider => {
-    return {
-      id: providerId,
-      fullName: 'Expert Consultant',
-      name: 'Expert Consultant',
-      firstName: '',
-      lastName: '',
-      role: 'expat',
-      type: 'expat',
-      country: 'France',
-      currentCountry: 'France',
-      avatar: '/default-avatar.png',
-      profilePhoto: '/default-avatar.png',
-      email: '',
-      phone: '',
-      phoneNumber: '',
-      whatsapp: '',
-      whatsAppNumber: '',
-      languagesSpoken: ['fr'],
-      languages: ['fr'],
-      preferredLanguage: 'fr',
-      price: 19,
-      duration: 30,
-      rating: 5.0,
-      reviewCount: 0,
-      specialties: [],
-      isActive: true,
-      isApproved: true
-    };
+  const saveDataForSession = (provider: Provider, serviceData: ServiceData) => {
+    try {
+      // Sauvegarder dans sessionStorage
+      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+      sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+      
+      // Sauvegarder dans localStorage comme backup
+      localStorage.setItem('lastSelectedProvider', JSON.stringify(provider));
+      localStorage.setItem('lastServiceData', JSON.stringify(serviceData));
+      
+      console.log('💾 Données sauvegardées pour session suivante');
+    } catch (error) {
+      console.warn('⚠️ Erreur sauvegarde session:', error);
+    }
+  };
+
+  /**
+   * 🔧 NOUVEAU: Validation avancée des données provider
+   */
+  const validateProviderData = (provider: any): boolean => {
+    if (!provider) return false;
+    
+    const requiredFields = ['id'];
+    const hasRequiredFields = requiredFields.every(field => provider[field]);
+    
+    if (!hasRequiredFields) {
+      console.warn('⚠️ Provider manque des champs requis:', { provider, requiredFields });
+      return false;
+    }
+    
+    // Validation des types
+    if (provider.price && (typeof provider.price !== 'number' || provider.price < 0)) {
+      console.warn('⚠️ Prix invalid:', provider.price);
+      return false;
+    }
+    
+    if (provider.duration && (typeof provider.duration !== 'number' || provider.duration < 0)) {
+      console.warn('⚠️ Durée invalid:', provider.duration);
+      return false;
+    }
+    
+    return true;
+  };
+
+  /**
+   * 🔧 NOUVEAU: Validation avancée des données service
+   */
+  const validateServiceData = (serviceData: any): boolean => {
+    if (!serviceData) return false;
+    
+    const requiredFields = ['providerId', 'amount'];
+    const hasRequiredFields = requiredFields.every(field => serviceData[field]);
+    
+    if (!hasRequiredFields) {
+      console.warn('⚠️ ServiceData manque des champs requis:', { serviceData, requiredFields });
+      return false;
+    }
+    
+    // Validation des montants
+    if (typeof serviceData.amount !== 'number' || serviceData.amount <= 0) {
+      console.warn('⚠️ Montant invalid:', serviceData.amount);
+      return false;
+    }
+    
+    return true;
   };
 
   const handleGoBack = (): void => {
@@ -439,6 +508,13 @@ const CallCheckoutWrapper: React.FC = () => {
     }
   };
 
+  // 🔧 NOUVEAU: Hook pour sauvegarder automatiquement les données valides
+  useEffect(() => {
+    if (state.provider && state.serviceData && !state.isLoading && !state.error) {
+      saveDataForSession(state.provider, state.serviceData);
+    }
+  }, [state.provider, state.serviceData, state.isLoading, state.error]);
+
   // Loading state
   if (state.isLoading) {
     return (
@@ -449,6 +525,14 @@ const CallCheckoutWrapper: React.FC = () => {
           <p className="text-gray-600">
             Préparation de votre consultation...
           </p>
+          
+          {/* Indicateur de progression */}
+          <div className="mt-4">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-red-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Recherche des données de consultation</p>
+          </div>
         </div>
       </div>
     );
@@ -477,22 +561,43 @@ const CallCheckoutWrapper: React.FC = () => {
                 <div>SessionStorage Provider: {sessionStorage.getItem('selectedProvider') ? '✅ Présent' : '❌ Vide'}</div>
                 <div>SessionStorage Service: {sessionStorage.getItem('serviceData') ? '✅ Présent' : '❌ Vide'}</div>
                 <div>SessionStorage Booking: {sessionStorage.getItem('bookingRequest') ? '✅ Présent' : '❌ Vide'}</div>
+                <div>LocalStorage Backup: {localStorage.getItem('lastSelectedProvider') ? '✅ Présent' : '❌ Vide'}</div>
+                <div>Current URL: {window.location.pathname}</div>
+                <div>URL Search: {window.location.search}</div>
               </div>
             </div>
           )}
           
           <div className="space-y-3">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/experts')}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
             >
-              Retour à l'accueil
+              🔍 Sélectionner un expert
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
+            >
+              🏠 Retour à l'accueil
             </button>
             <button
               onClick={handleGoBack}
               className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
             >
-              Retour
+              ← Retour
+            </button>
+            
+            {/* Bouton pour vider le cache */}
+            <button
+              onClick={() => {
+                sessionStorage.clear();
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors duration-200"
+            >
+              🗑️ Vider le cache et recharger
             </button>
           </div>
         </div>

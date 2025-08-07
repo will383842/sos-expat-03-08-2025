@@ -5,40 +5,12 @@ import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { functions } from '../config/firebase';
 import { httpsCallable, HttpsCallable } from 'firebase/functions';
+import { Provider, normalizeProvider } from '../types/Provider';
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
 
 // Types cohérents avec CallCheckoutWrapper
-interface Provider {
-  id: string;
-  fullName?: string;
-  name?: string;
-  firstName?: string;
-  lastName?: string;
-  role: 'lawyer' | 'expat';
-  type?: 'lawyer' | 'expat';
-  country: string;
-  currentCountry?: string;
-  avatar?: string;
-  profilePhoto?: string;
-  email?: string;
-  phone?: string;
-  phoneNumber?: string;
-  whatsapp?: string;
-  whatsAppNumber?: string;
-  languagesSpoken?: string[];
-  languages?: string[];
-  preferredLanguage?: string;
-  price?: number;
-  duration?: number;
-  rating?: number;
-  reviewCount?: number;
-  specialties?: string[];
-  isActive?: boolean;
-  isApproved?: boolean;
-}
-
 interface ServiceData {
   providerId: string;
   serviceType: 'lawyer_call' | 'expat_call';
@@ -253,9 +225,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       
       // 🔧 FIX CRITIQUE: Envoyer les montants EN CENTIMES à la Cloud Function
       const paymentData: PaymentIntentData = {
-        amount: amountInCents,           // 4900 (centimes) pour 49€
-        commissionAmount: commissionInCents, // 980 (centimes) pour 9.80€
-        providerAmount: providerAmountInCents, // 3920 (centimes) pour 39.20€
+        amount: amountInCents,           // ← EN CENTIMES au lieu de service.amount
+        commissionAmount: commissionInCents, // ← EN CENTIMES
+        providerAmount: providerAmountInCents, // ← EN CENTIMES
         currency: 'eur',
         serviceType: service.serviceType,
         providerId: provider.id,
@@ -364,7 +336,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         serviceType: service.serviceType,
         providerType: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
         paymentIntentId: paymentIntent.id,
-        amount: amountInCents, // 🔧 EN CENTIMES
+        amount: amountInCents, // ← EN CENTIMES au lieu de service.amount
         delayMinutes: 5,
         clientLanguages: ['fr'],
         providerLanguages: provider.languagesSpoken || provider.languages || ['fr']
@@ -489,8 +461,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div className="flex justify-between items-center">
               <span className="text-lg font-bold text-gray-900">Total</span>
               <span className="text-xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                {service.amount.toFixed(2)} €
-              </span>
+  {(service.amount / 100).toFixed(2)} €
+</span>
             </div>
           </div>
         </div>
@@ -571,7 +543,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     // 1. Props (priorité haute)
     if (selectedProvider && selectedProvider.id) {
       console.log('✅ Provider trouvé via props:', selectedProvider);
-      return selectedProvider;
+      return normalizeProvider(selectedProvider);
     }
 
     // 2. SessionStorage (priorité moyenne)
@@ -581,7 +553,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
         const providerData = JSON.parse(savedProvider) as Provider;
         if (providerData && providerData.id) {
           console.log('✅ Provider trouvé via sessionStorage:', providerData);
-          return providerData;
+          return normalizeProvider(providerData);
         }
       }
     } catch (error) {
@@ -593,7 +565,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
       const locationState = (window as any).history?.state?.usr;
       if (locationState?.selectedProvider?.id) {
         console.log('✅ Provider trouvé via location state:', locationState.selectedProvider);
-        return locationState.selectedProvider as Provider;
+        return normalizeProvider(locationState.selectedProvider);
       }
     } catch (error) {
       console.error('❌ Erreur récupération location state:', error);
@@ -602,14 +574,9 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     console.warn('⚠️ Aucun provider trouvé dans toutes les sources');
     return null;
   };
-// 🔍 AJOUT DE LOGS POUR DEBUG  <-- Cette ligne existe déjà !
-  useEffect(() => {
-    console.log('CallCheckout - Props reçues:', {
-      selectedProvider,
-      serviceData,
-      user: user ? { uid: user.uid, firstName: user.firstName } : null
-    });
-  }, [selectedProvider, serviceData, user]);
+
+  const provider = getProviderFromSources();
+
   const getServiceFromSources = (): ServiceData | null => {
     // 1. Props (priorité haute)
     if (serviceData && serviceData.amount) {
@@ -665,7 +632,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
   }, [selectedProvider, serviceData, user]);
 
   // 🔒 RÉCUPÉRATION SÉCURISÉE DES DONNÉES
-  const provider = getProviderFromSources();
   const service = getServiceFromSources();
 
   // State management

@@ -12,6 +12,7 @@ import { Language } from '../data/Languages-spoken';
 import languages from '../data/Languages-spoken';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
+import { Provider, normalizeProvider } from '../types/Provider';
 
 const countries = [
   'Afghanistan',
@@ -254,29 +255,6 @@ interface BookingRequestData {
   providerPhone?: string;
 }
 
-interface Provider {
-  id: string;
-  name: string;
-  firstName?: string;
-  lastName?: string;
-  type: 'lawyer' | 'expat';
-  country: string;
-  avatar: string;
-  price: number;
-  duration: number;
-  rating?: number;
-  reviewCount?: number;
-  languages?: string[];
-  languagesSpoken?: string[];
-  specialties?: string[];
-  currentCountry?: string;
-  currentPresenceCountry?: string;
-  graduationYear?: string;
-  expatriationYear?: string;
-  email?: string;
-  phone?: string;
-}
-
 // 🔧 INTERFACES STANDARDISÉES POUR LE PASSAGE DE DONNÉES
 interface StandardizedServiceData {
   title: string;
@@ -373,7 +351,7 @@ const BookingRequest: React.FC = () => {
       if (savedProvider) {
         const providerData = JSON.parse(savedProvider);
         if (providerData.id === providerId) {
-          return providerData;
+          return normalizeProvider(providerData); // ← AJOUT de normalizeProvider
         }
       }
     } catch (error) {
@@ -803,14 +781,22 @@ const BookingRequest: React.FC = () => {
         }
       }
 
-      // 🔧 SAUVEGARDE DANS SESSIONSTORAGE POUR CALL-CHECKOUT
+      // 🔧 SAUVEGARDE DANS SESSIONSTORAGE POUR CALL-CHECKOUT (DONNÉES COHÉRENTES)
       try {
-        // Pour call-checkout, nous devons sauvegarder les données dans le bon format
-        sessionStorage.setItem('bookingRequest', JSON.stringify(bookingRequest));
+        const commissionAmount = Math.round(serviceData.serviceInfo.price * 0.20 * 100) / 100;
+        const providerAmount = Math.round(serviceData.serviceInfo.price * 0.80 * 100) / 100;
+
         sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
-        
-        // Données supplémentaires pour flexibilité
-        sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
+        sessionStorage.setItem('serviceData', JSON.stringify({
+          providerId: selectedProvider.id,
+          serviceType: serviceData.serviceInfo.type,
+          providerRole: selectedProvider.type,
+          amount: serviceData.serviceInfo.price,
+          duration: serviceData.serviceInfo.duration,
+          clientPhone: serviceData.clientDetails.phone,
+          commissionAmount: commissionAmount,
+          providerAmount: providerAmount
+        }));
         
         console.log('💾 Données sauvegardées dans sessionStorage pour call-checkout');
       } catch (storageError) {
@@ -965,8 +951,8 @@ const BookingRequest: React.FC = () => {
 
                 <div className="text-center sm:text-right bg-white rounded-xl p-3 sm:p-4 shadow-lg border border-gray-200 w-full sm:w-auto">
                   <div className="text-2xl sm:text-3xl font-bold text-blue-600">
-                    €{provider?.price ?? "--"}
-                  </div>
+  €{provider?.price ? (provider.price / 100).toFixed(2) : "--"}
+</div>
                   <div className="text-sm text-gray-600 mt-1">
                     {provider?.duration ? `${provider.duration} min` : "--"}
                   </div>

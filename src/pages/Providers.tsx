@@ -5,25 +5,7 @@ import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import { collection, query, getDocs, limit, where, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
-
-interface Provider {
-  id: string;
-  name: string;
-  type: 'lawyer' | 'expat';
-  country: string;
-  languages: string[];
-  specialties: string[];
-  rating: number;
-  reviewCount: number;
-  yearsOfExperience: number;
-  isOnline: boolean;
-  avatar: string;
-  description: string;
-  price: number;
-  isVisible: boolean;
-  isApproved: boolean;
-  isBanned: boolean;
-}
+import { Provider, normalizeProvider, validateProvider } from '../types/Provider';
 
 type ProviderType = 'all' | 'lawyer' | 'expat';
 type SortOption = 'rating' | 'price' | 'experience';
@@ -177,52 +159,22 @@ const Providers: React.FC = () => {
 
   const t = translations[language as keyof typeof translations] || translations.fr;
 
-  // Data transformation helper
+  // Data transformation helper - MODIFIÉ selon les instructions
   const transformFirestoreData = useCallback((doc: QueryDocumentSnapshot<DocumentData>): Provider | null => {
     try {
       const data = doc.data();
       if (!data) return null;
       
-      const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim();
-      if (!fullName || fullName.length < 2) return null;
-      
-      const type = data.type === 'lawyer' ? 'lawyer' : 'expat';
-      const presenceCountry = data.currentPresenceCountry || data.country || '';
-      if (!presenceCountry || !getCountryCoordinates(presenceCountry)) return null;
-      
-      return {
+      const provider = normalizeProvider({
         id: doc.id,
-        name: fullName,
-        type,
-        country: presenceCountry,
-        languages: Array.isArray(data.languages) ? data.languages : ['Français'],
-        specialties: Array.isArray(data.specialties) ? data.specialties : [],
-        rating: typeof data.rating === 'number' && data.rating > 0 ? data.rating : 4.5,
-        reviewCount: typeof data.reviewCount === 'number' ? Math.max(0, data.reviewCount) : 0,
-        yearsOfExperience: typeof data.yearsOfExperience === 'number' ? data.yearsOfExperience : 
-                          typeof data.yearsAsExpat === 'number' ? data.yearsAsExpat : 1,
-        isOnline: data.isOnline === true,
-        avatar: data.profilePhoto || data.photoURL || data.avatar || CONFIG.DEFAULT_AVATAR,
-        description: data.description || data.bio || '',
-        price: typeof data.price === 'number' && data.price > 0 ? data.price : CONFIG.PRICES[type],
-        isVisible: data.isVisible !== false,
-        isApproved: data.isApproved !== false,
-        isBanned: data.isBanned === true
-      };
+        ...data
+      });
+      
+      return provider;
     } catch (error) {
-      console.error("Erreur lors de la transformation des données:", error);
+      console.error("Erreur transformation:", error);
       return null;
     }
-  }, []);
-
-  // Provider validation
-  const validateProvider = useCallback((provider: Provider | null): provider is Provider => {
-    if (!provider) return false;
-    return provider.name?.trim().length >= 2 && 
-           provider.country?.trim().length > 0 && 
-           !provider.isBanned && 
-           provider.isVisible && 
-           provider.isApproved;
   }, []);
 
   // Load providers from Firestore
@@ -255,7 +207,7 @@ const Providers: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [transformFirestoreData, validateProvider]);
+  }, [transformFirestoreData]);
 
   // Initialize component
   useEffect(() => {
@@ -318,23 +270,26 @@ const Providers: React.FC = () => {
     const seoUrl = `/${role}/${countrySlug}/${mainLanguage}/${slug}-${provider.id}`;
     
     // ✅ CORRECTION : Utilisation des noms de propriétés attendus par CallCheckoutWrapper
+    const selectedProvider = normalizeProvider(provider); // ← AJOUT de normalizeProvider
+
+    const serviceData = {
+      providerId: selectedProvider.id,
+      serviceType: selectedProvider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      providerRole: selectedProvider.type,
+      amount: selectedProvider.price,
+      duration: selectedProvider.duration,
+      clientPhone: '',
+      commissionAmount: Math.round(selectedProvider.price * 0.20 * 100) / 100,
+      providerAmount: Math.round(selectedProvider.price * 0.80 * 100) / 100
+    };
+
+    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider)); // ← AJOUT
+    sessionStorage.setItem('serviceData', JSON.stringify(serviceData)); // ← AJOUT
+    
     navigate(seoUrl, { 
       state: { 
-        selectedProvider: provider, // ✅ Utilise "selectedProvider" au lieu de "providerData"
-        serviceData: {              // ✅ Utilise "serviceData" au lieu de "booking" ou autre
-          type: provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-          providerType: provider.type,
-          price: provider.price,
-          duration: CONFIG.CONSULTATION_DURATION[provider.type],
-          languages: provider.languages,
-          country: provider.country,
-          specialties: provider.specialties,
-          // Données supplémentaires utiles pour le checkout
-          isOnline: provider.isOnline,
-          rating: provider.rating,
-          reviewCount: provider.reviewCount,
-          description: provider.description
-        }
+        selectedProvider: selectedProvider, // ✅ Utilise "selectedProvider" au lieu de "providerData"
+        serviceData: serviceData            // ✅ Utilise "serviceData" au lieu de "booking" ou autre
       } 
     });
     

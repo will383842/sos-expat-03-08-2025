@@ -233,10 +233,13 @@ const CallCheckoutWrapper: React.FC = () => {
     return {
       id: providerData.id || providerData.providerId || Math.random().toString(36),
       fullName: providerData.fullName || 
-               providerData.name || 
-               providerData.providerName ||
-               `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 
-               'Expert',
+          providerData.name || 
+          providerData.providerName ||
+          providerData.displayName ||
+          providerData.nom ||
+          providerData.nomComplet ||
+          `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 
+          (providerData.id ? `Expert ${providerData.id.slice(-4)}` : 'Expert'),
       name: providerData.name || 
             providerData.fullName || 
             providerData.providerName || 

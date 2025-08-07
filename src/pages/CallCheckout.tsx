@@ -460,7 +460,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 }}
                 alt="Avatar expert"
               />
-              <span className="font-semibold text-gray-900">{provider.fullName || provider.name}</span>
+              <span className="font-semibold text-gray-900">
+              {provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert'}
+            </span>
             </div>
           </div>
           <div className="flex justify-between items-center">
@@ -600,7 +602,14 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
     console.warn('⚠️ Aucun provider trouvé dans toutes les sources');
     return null;
   };
-
+// 🔍 AJOUT DE LOGS POUR DEBUG  <-- Cette ligne existe déjà !
+  useEffect(() => {
+    console.log('CallCheckout - Props reçues:', {
+      selectedProvider,
+      serviceData,
+      user: user ? { uid: user.uid, firstName: user.firstName } : null
+    });
+  }, [selectedProvider, serviceData, user]);
   const getServiceFromSources = (): ServiceData | null => {
     // 1. Props (priorité haute)
     if (serviceData && serviceData.amount) {
@@ -815,8 +824,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({
             
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-bold text-gray-900 truncate">
-                {provider?.fullName || provider?.name || 'Expert non défini'}
-              </h3>
+              {provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert'}
+            </h3>
               <div className="flex items-center space-x-2 text-sm mt-1">
                 <span className={`px-3 py-1 rounded-full font-medium text-xs ${
                   isLawyer 

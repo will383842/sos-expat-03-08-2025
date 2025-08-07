@@ -569,6 +569,7 @@ const BookingRequest: React.FC = () => {
     const selectedProvider: StandardizedProviderData = {
       id: provider.id,
       name: provider.name,
+      fullName: provider.name || `${provider.firstName || ''} ${provider.lastName || ''}`.trim() || 'Expert', 
       firstName: provider.firstName,
       lastName: provider.lastName,
       type: provider.type,

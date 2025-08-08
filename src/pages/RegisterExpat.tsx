@@ -13,7 +13,7 @@ import { useApp } from '../contexts/AppContext';
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
-placeholder={t.langPlaceholder}
+
 // ===== Types =====
 interface LanguageOption { value: string; label: string }
 interface ExpatFormData {
@@ -61,6 +61,7 @@ const I18N = {
     bio: "Description de votre expérience",
     profilePhoto: 'Photo de profil',
     languages: 'Langues parlées',
+    langPlaceholder: 'Sélectionnez vos langues parlées',
     helpDomains: "Domaines d'aide",
     addHelp: "Ajouter un domaine d'aide",
     specifyHelp: "Précisez le domaine d'aide",
@@ -124,6 +125,7 @@ const I18N = {
     bio: 'Your experience (bio)',
     profilePhoto: 'Profile photo',
     languages: 'Spoken languages',
+    langPlaceholder: 'Select your spoken languages',
     helpDomains: 'Help domains',
     addHelp: 'Add a help domain',
     specifyHelp: 'Specify the help domain',
@@ -389,7 +391,6 @@ const RegisterExpat: React.FC = () => {
 
   // ---- Options (i18n) ----
   const countries = useMemo(() => mapDuo(COUNTRIES, lang), [lang]);
-  const helpTypes = useMemo(() => mapDuo(HELP_TYPES, lang), [lang]);
   const countryCodeOptions = useMemo(
     () =>
       COUNTRY_CODES.map((c) => (
@@ -490,9 +491,12 @@ const RegisterExpat: React.FC = () => {
         setFormData((prev) => ({ ...prev, helpTypes: [...prev.helpTypes, v] }));
       }
       e.target.value = '';
-      if (fieldErrors.helpTypes) setFieldErrors(({ ...rest }) => rest);
+      if (fieldErrors.helpTypes) {
+        const { helpTypes, ...rest } = fieldErrors;
+        setFieldErrors(rest);
+      }
     },
-    [formData.helpTypes, fieldErrors.helpTypes, lang]
+    [formData.helpTypes, fieldErrors, lang]
   );
 
   const removeHelp = useCallback((v: string) => {
@@ -611,9 +615,16 @@ const RegisterExpat: React.FC = () => {
     [countries]
   );
   const helpTypeOptions = useMemo(
-    () => helpTypes.map((c) => <option key={c} value={c}>{c}</option>),
-    [helpTypes]
+    () => mapDuo(HELP_TYPES, lang).map((c) => <option key={c} value={c}>{c}</option>),
+    [lang]
   );
+
+  // Language handler with explicit MultiValue type casting
+  const handleLanguageChange = useCallback((selectedOptions: any) => {
+    // Handle both array and null cases from react-select MultiValue
+    const options = selectedOptions || [];
+    setSelectedLanguages(Array.isArray(options) ? [...options] : []);
+  }, []);
 
   return (
     <Layout>
@@ -853,22 +864,14 @@ const RegisterExpat: React.FC = () => {
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     {t.languages} <span className="text-red-500">*</span>
                   </label>
-<Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
-  <ImageUploader
-    locale={lang}
-    currentImage={lawyerForm.profilePhoto}
-    onImageUploaded={(url: string) => {
-      setLawyerForm((prev) => ({
-        ...prev,
-        profilePhoto: url,
-      }));
-    }}
-    // labels supprimé (voir point 4)
-    hideNativeFileLabel
-    cropShape="round"
-    outputSize={512}
-  />
-</Suspense>
+                  <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
+                    <MultiLanguageSelect
+                      value={selectedLanguages}
+                      onChange={handleLanguageChange}
+                      placeholder={t.langPlaceholder}
+                    />
+                  </Suspense>
+                  {fieldErrors.languages && <p className="text-sm text-red-600 mt-2">{fieldErrors.languages}</p>}
                 </div>
 
                 {/* Bio */}
@@ -898,20 +901,20 @@ const RegisterExpat: React.FC = () => {
                     <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                   </label>
                   <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                  <ImageUploader
-                    locale={lang} // langue dynamique
-                    currentImage={formData.profilePhoto} // affiche la photo actuelle de l'expat
-                    onImageUploaded={(url: string) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        profilePhoto: url, // enregistre l'URL dans le state de l'expat
-                      }));
-                    }}
-                    hideNativeFileLabel
-                    cropShape="round"
-                    outputSize={512}
-                  />
-
+                    <ImageUploader
+                      locale={lang}
+                      currentImage={formData.profilePhoto}
+                      onImageUploaded={(url: string) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          profilePhoto: url,
+                        }));
+                      }}
+                      hideNativeFileLabel
+                      cropShape="round"
+                      outputSize={512}
+                    />
+                  </Suspense>
                   {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                   <p className="text-xs text-gray-500 mt-1">
                     {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}

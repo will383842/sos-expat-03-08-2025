@@ -1,371 +1,387 @@
+// src/pages/RegisterExpat.tsx
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Globe, MapPin, Users, Phone, X, Camera, CheckCircle, ArrowRight, Heart } from 'lucide-react';
+import {
+  Mail, Lock, Eye, EyeOff, AlertCircle, Globe, MapPin, Users, Phone,
+  X, Camera, CheckCircle, ArrowRight
+} from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { serverTimestamp } from 'firebase/firestore';
 
-// Types pour les langues
-interface LanguageOption {
-  value: string;
-  label: string;
-}
-
-// Lazy loading des composants
+// ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
 
-// Constants
-const COUNTRY_OPTIONS = [
-  'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne', 'Andorre', 'Angola', 
-  'Arabie Saoudite', 'Argentine', 'Arménie', 'Australie', 'Autriche', 'Azerbaïdjan', 
-  'Bahamas', 'Bahreïn', 'Bangladesh', 'Barbade', 'Belgique', 'Belize', 'Bénin', 
-  'Bhoutan', 'Biélorussie', 'Birmanie', 'Bolivie', 'Bosnie-Herzégovine', 'Botswana', 
-  'Brésil', 'Brunei', 'Bulgarie', 'Burkina Faso', 'Burundi', 'Cambodge', 'Cameroun', 
-  'Canada', 'Cap-Vert', 'Chili', 'Chine', 'Chypre', 'Colombie', 'Comores', 
-  'Congo', 'Corée du Nord', 'Corée du Sud', 'Costa Rica', 'Côte d\'Ivoire', 'Croatie', 'Cuba', 
-  'Danemark', 'Djibouti', 'Dominique', 'Égypte', 'Émirats arabes unis', 'Équateur', 'Érythrée', 
-  'Espagne', 'Estonie', 'États-Unis', 'Éthiopie', 'Fidji', 'Finlande', 'France', 'Autre'
-];
-
-const HELP_TYPE_OPTIONS = [
-  'Démarches administratives', 'Recherche de logement', 'Ouverture de compte bancaire',
-  'Système de santé', 'Éducation et écoles', 'Transport', 'Recherche d\'emploi',
-  'Création d\'entreprise', 'Fiscalité locale', 'Culture et intégration',
-  'Visa et immigration', 'Assurances', 'Téléphonie et internet',
-  'Alimentation et courses', 'Loisirs et sorties', 'Sports et activités',
-  'Sécurité', 'Urgences', 'Autre'
-];
-
-const COUNTRY_CODES = [
-  { code: '+33', flag: '🇫🇷', name: 'France' },
-  { code: '+1', flag: '🇺🇸', name: 'USA/Canada' },
-  { code: '+44', flag: '🇬🇧', name: 'Royaume-Uni' },
-  { code: '+49', flag: '🇩🇪', name: 'Allemagne' },
-  { code: '+34', flag: '🇪🇸', name: 'Espagne' },
-  { code: '+39', flag: '🇮🇹', name: 'Italie' },
-  { code: '+32', flag: '🇧🇪', name: 'Belgique' },
-  { code: '+41', flag: '🇨🇭', name: 'Suisse' },
-  { code: '+352', flag: '🇱🇺', name: 'Luxembourg' },
-  { code: '+31', flag: '🇳🇱', name: 'Pays-Bas' },
-  { code: '+43', flag: '🇦🇹', name: 'Autriche' },
-  { code: '+351', flag: '🇵🇹', name: 'Portugal' }
-];
-
-// Regex pour validation
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[0-9+\-\s()]{6,20}$/;
-
-// Interface pour les données du formulaire
+// ===== Types =====
+interface LanguageOption { value: string; label: string }
 interface ExpatFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  phone: string;
-  phoneCountryCode: string;
-  whatsappCountryCode: string;
-  whatsappNumber: string;
-  currentCountry: string;
-  currentPresenceCountry: string;
-  customCountry: string;
-  customPresenceCountry: string;
+  firstName: string; lastName: string; email: string; password: string;
+  phone: string; phoneCountryCode: string; whatsappCountryCode: string; whatsappNumber: string;
+  currentCountry: string; currentPresenceCountry: string; customCountry: string; customPresenceCountry: string;
   preferredLanguage: 'fr' | 'en';
-  practiceCountries: string[];
-  customPracticeCountry: string;
-  interventionCountry: string;
-  customInterventionCountry: string;
-  helpTypes: string[];
-  customHelpType: string;
-  customLanguage: string;
-  yearsAsExpat: number;
-  profilePhoto: string;
-  bio: string;
-  availability: 'available' | 'busy' | 'offline';
-  acceptTerms: boolean;
+  practiceCountries: string[]; customPracticeCountry: string;
+  interventionCountry: string; customInterventionCountry: string;
+  helpTypes: string[]; customHelpType: string; customLanguage: string;
+  yearsAsExpat: number; profilePhoto: string; bio: string;
+  availability: 'available' | 'busy' | 'offline'; acceptTerms: boolean;
 }
 
-// Props pour FormField
-interface FormFieldProps {
-  id: string;
-  name: string;
-  label: string;
-  type?: string;
-  required?: boolean;
-  value: string | number;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  autoComplete?: string;
-  className?: string;
-  icon?: React.ReactNode;
-  error?: string;
-  maxLength?: number;
-  min?: number;
-  max?: number;
-}
+// ===== THEME (expat = emerald/green, cohérent Register.tsx) =====
+const THEME = {
+  gradFrom: 'from-emerald-600',
+  gradTo: 'to-green-600',
+  ring: 'focus:border-emerald-600',
+  border: 'border-emerald-200',
+  icon: 'text-emerald-600',
+  chip: 'border-emerald-200',
+  subtle: 'bg-emerald-50',
+  button: 'from-emerald-600 via-green-600 to-teal-700',
+} as const;
 
-// Configuration i18n simplifiée
-const texts = {
-  title: 'Inscription Expatrié Aidant',
-  subtitle: 'Partagez votre expérience d\'expatriation et aidez d\'autres francophones à réussir leur nouvelle vie à l\'étranger',
-  alreadyRegistered: 'Déjà inscrit ?',
-  login: 'Se connecter',
-  personalInfo: 'Informations personnelles',
-  required: 'obligatoire',
-  loading: 'Création en cours...',
-  createAccount: 'Créer mon compte expatrié aidant',
-  acceptTerms: 'J\'accepte les',
-  termsLink: 'conditions générales pour expatriés aidants',
-  fields: {
-    firstName: 'Prénom',
-    lastName: 'Nom de famille',
-    email: 'Adresse email',
-    password: 'Mot de passe',
-    phone: 'Téléphone',
-    whatsappNumber: 'Numéro WhatsApp',
-    interventionCountry: 'Pays d\'intervention principal',
-    yearsAsExpat: 'Années d\'expérience d\'expatriation',
-    bio: 'Description de votre expérience',
-    profilePhoto: 'Photo de profil'
-  },
-  errors: {
-    allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
+// ===== i18n =====
+const I18N = {
+  fr: {
+    metaTitle: 'Inscription Expatrié Aidant • SOS Expats',
+    metaDesc: "Partagez votre expérience d'expatriation et aidez d'autres francophones. Rejoignez la communauté SOS Expats.",
+    heroTitle: 'Inscription Expatrié Aidant',
+    heroSubtitle: "Partagez votre expérience d'expatriation et aidez d'autres francophones à réussir leur nouvelle vie à l'étranger.",
+    already: 'Déjà inscrit ?', login: 'Se connecter',
+    step1: 'Informations personnelles',
+    step2: 'Informations géographiques et expérience',
+    step3: "Comment voulez-vous aider ?",
+    // fields
+    firstName: 'Prénom', lastName: 'Nom de famille', email: 'Adresse email', password: 'Mot de passe',
+    phone: 'Téléphone', whatsapp: 'Numéro WhatsApp',
+    countryCode: 'Indicatif pays',
+    residenceCountry: 'Pays de résidence', presenceCountry: 'Pays de présence actuel',
+    interventionCountry: "Pays d'intervention principal",
+    yearsAsExpat: "Années d'expérience d'expatriation",
+    bio: "Description de votre expérience",
+    profilePhoto: 'Photo de profil',
+    languages: 'Langues parlées',
+    helpDomains: "Domaines d'aide",
+    addHelp: "Ajouter un domaine d'aide",
+    specifyHelp: "Précisez le domaine d'aide",
+    // placeholders / hints
+    passwordHint: 'Minimum 6 caractères',
+    emailPlaceholder: 'jean.dupont@example.com',
+    firstPlaceholder: 'Jean', lastPlaceholder: 'Dupont',
+    phonePlaceholder: '612345678',
+    bioPlaceholder: "Décrivez votre parcours, vos compétences et comment vous aidez d'autres expatriés…",
+    // buttons
+    create: "Créer mon compte expatrié aidant",
+    loading: 'Création en cours…',
+    clickHere: 'Cliquez ici',
+    // validation / status
+    required: 'obligatoire',
+    allRequired: 'Tous les champs obligatoires doivent être remplis',
     invalidEmail: 'Veuillez saisir une adresse email valide',
-    emailAlreadyExists: 'Cette adresse email est déjà utilisée',
     passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
     phoneRequired: 'Le numéro de téléphone est obligatoire',
-    phoneInvalid: 'Le numéro de téléphone n\'est pas valide',
     whatsappRequired: 'Le numéro WhatsApp est obligatoire',
-    selectCountryError: 'Veuillez sélectionner votre pays',
-    selectInterventionCountry: 'Veuillez sélectionner votre pays d\'intervention',
+    selectCountry: 'Sélectionnez votre pays',
+    selectPresence: 'Sélectionnez votre pays de présence',
+    selectIntervention: "Sélectionnez votre pays d'intervention",
     selectLanguage: 'Veuillez sélectionner au moins une langue',
-    selectHelpType: 'Veuillez indiquer au moins un domaine d\'aide',
+    selectHelpType: "Veuillez indiquer au moins un domaine d'aide",
     bioRequired: 'La description est obligatoire',
     bioTooShort: 'La description doit contenir au moins 50 caractères',
     profilePhotoRequired: 'La photo de profil est obligatoire',
-    acceptTermsRequired: 'Vous devez accepter les conditions générales',
-    yearsAsExpatRequired: 'Vous devez avoir au moins 1 an d\'expérience',
-    registrationError: 'Erreur lors de l\'inscription',
-    networkError: 'Erreur de connexion',
-    serverError: 'Erreur du serveur'
+    yearsMin: "Vous devez avoir au moins 1 an d'expérience",
+    // progress
+    progress: 'Progression',
+    fieldValidated: '✓ Champ validé',
+    charsToValidate: (n: number) => `Encore ${n} caractères pour valider`,
+    // footer / legal
+    secureNote: '🔒 Données protégées • Support 24/7',
+    footerTitle: "🌍 Rejoignez la communauté d'entraide expatriée",
+    footerText: "Plus de 10 000 expatriés francophones dans le monde.",
+    cguLabel: '📋 CGU Expatriés',
+    privacyLabel: '🔒 Confidentialité',
+    helpLabel: '💬 Aide',
+    contactLabel: '📧 Contact',
+    // success
+    success: 'Inscription réussie ! Bienvenue dans la communauté.',
   },
-  success: {
-    registrationSuccess: 'Inscription réussie ! Bienvenue dans la communauté.'
+  en: {
+    metaTitle: 'Expat Helper Registration • SOS Expats',
+    metaDesc: 'Share your expat experience and help others. Join the SOS Expats community.',
+    heroTitle: 'Expat Helper Registration',
+    heroSubtitle: 'Share your expatriation experience and help other people succeed abroad.',
+    already: 'Already registered?', login: 'Log in',
+    step1: 'Personal Information',
+    step2: 'Geographic Information & Experience',
+    step3: 'How do you want to help?',
+    // fields
+    firstName: 'First name', lastName: 'Last name', email: 'Email', password: 'Password',
+    phone: 'Phone', whatsapp: 'WhatsApp number',
+    countryCode: 'Country code',
+    residenceCountry: 'Country of residence', presenceCountry: 'Current presence country',
+    interventionCountry: 'Main intervention country',
+    yearsAsExpat: 'Years as an expat',
+    bio: 'Your experience (bio)',
+    profilePhoto: 'Profile photo',
+    languages: 'Spoken languages',
+    helpDomains: 'Help domains',
+    addHelp: 'Add a help domain',
+    specifyHelp: 'Specify the help domain',
+    // placeholders / hints
+    passwordHint: 'At least 6 characters',
+    emailPlaceholder: 'john.doe@example.com',
+    firstPlaceholder: 'John', lastPlaceholder: 'Doe',
+    phonePlaceholder: '612345678',
+    bioPlaceholder: 'Describe your background, skills, and how you help other expats…',
+    // buttons
+    create: 'Create my expat helper account',
+    loading: 'Creating account…',
+    clickHere: 'Click here',
+    // validation / status
+    required: 'required',
+    allRequired: 'All required fields must be completed',
+    invalidEmail: 'Please enter a valid email address',
+    passwordTooShort: 'Password must be at least 6 characters',
+    phoneRequired: 'Phone number is required',
+    whatsappRequired: 'WhatsApp number is required',
+    selectCountry: 'Select your country',
+    selectPresence: 'Select your presence country',
+    selectIntervention: 'Select your intervention country',
+    selectLanguage: 'Please select at least one language',
+    selectHelpType: 'Please add at least one help domain',
+    bioRequired: 'Bio is required',
+    bioTooShort: 'Bio must be at least 50 characters',
+    profilePhotoRequired: 'Profile photo is required',
+    yearsMin: 'You must have at least 1 year of experience',
+    // progress
+    progress: 'Progress',
+    fieldValidated: '✓ Field validated',
+    charsToValidate: (n: number) => `+${n} chars to validate`,
+    // footer / legal
+    secureNote: '🔒 Data protected • 24/7 support',
+    footerTitle: '🌍 Join the expat helper community',
+    footerText: 'Over 10,000 French-speaking expats worldwide.',
+    cguLabel: '📋 CGU Expats',
+    privacyLabel: '🔒 Privacy',
+    helpLabel: '💬 Help',
+    contactLabel: '📧 Contact',
+    // success
+    success: 'Registration successful! Welcome to the community.',
   }
-};
+} as const;
 
-// Composant FormField
-const FormField = React.memo<FormFieldProps>(({ 
-  id, 
-  name, 
-  label, 
-  type = 'text', 
-  required = false, 
-  value, 
-  onChange, 
-  placeholder, 
-  autoComplete, 
-  className = '', 
-  icon, 
-  error,
-  maxLength,
-  min,
-  max
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
+// ===== Country options FR/EN (bilingue) =====
+type Duo = { fr: string; en: string };
+const COUNTRIES: Duo[] = [
+  { fr: 'Afghanistan', en: 'Afghanistan' },
+  { fr: 'Afrique du Sud', en: 'South Africa' },
+  { fr: 'Albanie', en: 'Albania' },
+  { fr: 'Algérie', en: 'Algeria' },
+  { fr: 'Allemagne', en: 'Germany' },
+  { fr: 'Andorre', en: 'Andorra' },
+  { fr: 'Angola', en: 'Angola' },
+  { fr: 'Arabie Saoudite', en: 'Saudi Arabia' },
+  { fr: 'Argentine', en: 'Argentina' },
+  { fr: 'Arménie', en: 'Armenia' },
+  { fr: 'Australie', en: 'Australia' },
+  { fr: 'Autriche', en: 'Austria' },
+  { fr: 'Azerbaïdjan', en: 'Azerbaijan' },
+  { fr: 'Bahamas', en: 'Bahamas' },
+  { fr: 'Bahreïn', en: 'Bahrain' },
+  { fr: 'Bangladesh', en: 'Bangladesh' },
+  { fr: 'Barbade', en: 'Barbados' },
+  { fr: 'Belgique', en: 'Belgium' },
+  { fr: 'Belize', en: 'Belize' },
+  { fr: 'Bénin', en: 'Benin' },
+  { fr: 'Bhoutan', en: 'Bhutan' },
+  { fr: 'Biélorussie', en: 'Belarus' },
+  { fr: 'Birmanie', en: 'Myanmar' },
+  { fr: 'Bolivie', en: 'Bolivia' },
+  { fr: 'Bosnie-Herzégovine', en: 'Bosnia and Herzegovina' },
+  { fr: 'Botswana', en: 'Botswana' },
+  { fr: 'Brésil', en: 'Brazil' },
+  { fr: 'Brunei', en: 'Brunei' },
+  { fr: 'Bulgarie', en: 'Bulgaria' },
+  { fr: 'Burkina Faso', en: 'Burkina Faso' },
+  { fr: 'Burundi', en: 'Burundi' },
+  { fr: 'Cambodge', en: 'Cambodia' },
+  { fr: 'Cameroun', en: 'Cameroon' },
+  { fr: 'Canada', en: 'Canada' },
+  { fr: 'Cap-Vert', en: 'Cape Verde' },
+  { fr: 'Chili', en: 'Chile' },
+  { fr: 'Chine', en: 'China' },
+  { fr: 'Chypre', en: 'Cyprus' },
+  { fr: 'Colombie', en: 'Colombia' },
+  { fr: 'Comores', en: 'Comoros' },
+  { fr: 'Congo', en: 'Congo' },
+  { fr: 'Corée du Nord', en: 'North Korea' },
+  { fr: 'Corée du Sud', en: 'South Korea' },
+  { fr: 'Costa Rica', en: 'Costa Rica' },
+  { fr: "Côte d'Ivoire", en: 'Ivory Coast' },
+  { fr: 'Croatie', en: 'Croatia' },
+  { fr: 'Cuba', en: 'Cuba' },
+  { fr: 'Danemark', en: 'Denmark' },
+  { fr: 'Djibouti', en: 'Djibouti' },
+  { fr: 'Dominique', en: 'Dominica' },
+  { fr: 'Égypte', en: 'Egypt' },
+  { fr: 'Émirats arabes unis', en: 'United Arab Emirates' },
+  { fr: 'Équateur', en: 'Ecuador' },
+  { fr: 'Érythrée', en: 'Eritrea' },
+  { fr: 'Espagne', en: 'Spain' },
+  { fr: 'Estonie', en: 'Estonia' },
+  { fr: 'États-Unis', en: 'United States' },
+  { fr: 'Éthiopie', en: 'Ethiopia' },
+  { fr: 'Fidji', en: 'Fiji' },
+  { fr: 'Finlande', en: 'Finland' },
+  { fr: 'France', en: 'France' },
+  { fr: 'Autre', en: 'Other' },
+];
 
-  const baseClasses = `
-    w-full px-4 py-3 border-2 rounded-xl font-medium
-    transition-all duration-300 bg-white focus:outline-none
-    ${icon ? 'pl-12' : ''}
-    ${isFocused ? 'border-blue-500 shadow-lg' : ''}
-    ${error ? 'border-red-500 bg-red-50' : 'border-gray-300'}
-  `;
-  
+const HELP_TYPES: Duo[] = [
+  { fr: 'Démarches administratives', en: 'Administrative procedures' },
+  { fr: 'Recherche de logement', en: 'Housing search' },
+  { fr: 'Ouverture de compte bancaire', en: 'Bank account opening' },
+  { fr: 'Système de santé', en: 'Healthcare system' },
+  { fr: 'Éducation et écoles', en: 'Education & schools' },
+  { fr: 'Transport', en: 'Transport' },
+  { fr: "Recherche d'emploi", en: 'Job search' },
+  { fr: "Création d'entreprise", en: 'Company creation' },
+  { fr: 'Fiscalité locale', en: 'Local taxation' },
+  { fr: 'Culture et intégration', en: 'Culture & integration' },
+  { fr: 'Visa et immigration', en: 'Visa & immigration' },
+  { fr: 'Assurances', en: 'Insurances' },
+  { fr: 'Téléphonie et internet', en: 'Phone & internet' },
+  { fr: 'Alimentation et courses', en: 'Groceries & food' },
+  { fr: 'Loisirs et sorties', en: 'Leisure & going out' },
+  { fr: 'Sports et activités', en: 'Sports & activities' },
+  { fr: 'Sécurité', en: 'Safety' },
+  { fr: 'Urgences', en: 'Emergencies' },
+  { fr: 'Autre', en: 'Other' },
+];
+
+// Country codes (names FR/EN)
+const COUNTRY_CODES = [
+  { code: '+33', flag: '🇫🇷', fr: 'France', en: 'France' },
+  { code: '+1', flag: '🇺🇸', fr: 'USA/Canada', en: 'USA/Canada' },
+  { code: '+44', flag: '🇬🇧', fr: 'Royaume-Uni', en: 'United Kingdom' },
+  { code: '+49', flag: '🇩🇪', fr: 'Allemagne', en: 'Germany' },
+  { code: '+34', flag: '🇪🇸', fr: 'Espagne', en: 'Spain' },
+  { code: '+39', flag: '🇮🇹', fr: 'Italie', en: 'Italy' },
+  { code: '+32', flag: '🇧🇪', fr: 'Belgique', en: 'Belgium' },
+  { code: '+41', flag: '🇨🇭', fr: 'Suisse', en: 'Switzerland' },
+  { code: '+352', flag: '🇱🇺', fr: 'Luxembourg', en: 'Luxembourg' },
+  { code: '+31', flag: '🇳🇱', fr: 'Pays-Bas', en: 'Netherlands' },
+  { code: '+43', flag: '🇦🇹', fr: 'Autriche', en: 'Austria' },
+  { code: '+351', flag: '🇵🇹', fr: 'Portugal', en: 'Portugal' },
+] as const;
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[0-9+\-\s()]{6,20}$/;
+
+const mapDuo = (list: Duo[], lang: 'fr' | 'en') => list.map(item => item[lang]);
+
+const TagSelector = React.memo(({ items, onRemove }: { items: string[]; onRemove: (v: string) => void }) => {
+  if (!items.length) return null;
   return (
-    <div className="space-y-3">
-      <label htmlFor={id} className="block text-sm font-bold text-gray-800">
-        {label} 
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      <div className="relative">
-        {icon && (
-          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
-            {icon}
-          </div>
-        )}
-        <input
-          id={id}
-          name={name}
-          type={type}
-          required={required}
-          value={value}
-          onChange={onChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          className={`${baseClasses} ${className}`}
-          maxLength={maxLength}
-          min={min}
-          max={max}
-        />
-      </div>
-      {error && (
-        <p className="text-sm text-red-600 flex items-center">
-          <AlertCircle className="w-4 h-4 mr-2" />
-          {error}
-        </p>
-      )}
-    </div>
-  );
-});
-
-FormField.displayName = 'FormField';
-
-// Composant TagSelector
-const TagSelector = React.memo(({ 
-  items, 
-  onRemove, 
-  color = 'green'
-}: { 
-  items: string[];
-  onRemove: (item: string) => void;
-  color?: 'green' | 'blue';
-}) => {
-  if (items.length === 0) return null;
-
-  const colorClasses = color === 'green' 
-    ? 'bg-green-100 text-green-800 border-green-300' 
-    : 'bg-blue-100 text-blue-800 border-blue-300';
-
-  return (
-    <div className="mb-6">
-      <div className="flex flex-wrap gap-3">
-        {items.map((item, index) => (
-          <div 
-            key={`${item}-${index}`}
-            className={`${colorClasses} px-4 py-2 rounded-xl text-sm flex items-center gap-2 border-2 font-medium`}
+    <div className="mb-4">
+      <div className="flex flex-wrap gap-2">
+        {items.map((v, i) => (
+          <span
+            key={`${v}-${i}`}
+            className={`bg-emerald-100 text-emerald-800 ${THEME.chip} px-3 py-1 rounded-xl text-sm border-2 flex items-center`}
           >
-            <span>{item}</span>
-            <button 
-              type="button" 
-              onClick={() => onRemove(item)}
-              className="text-current hover:bg-black hover:bg-opacity-20 rounded-full p-1"
-            >
+            {v}
+            <button type="button" onClick={() => onRemove(v)} className="ml-2 hover:opacity-70">
               <X className="w-4 h-4" />
             </button>
-          </div>
+          </span>
         ))}
       </div>
     </div>
   );
 });
-
 TagSelector.displayName = 'TagSelector';
 
-// Composant LoadingSpinner
-const LoadingSpinner = React.memo(() => (
-  <div className="flex justify-center items-center py-8">
-    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-  </div>
-));
-
-LoadingSpinner.displayName = 'LoadingSpinner';
-
-// Composant ProgressBar
-const ProgressBar = React.memo(({ progress }: { progress: number }) => (
-  <div className="mb-8">
-    <div className="flex items-center justify-between mb-3">
-      <span className="text-sm font-bold text-gray-700">Progression</span>
-      <span className="text-sm font-bold text-blue-600">{progress}%</span>
-    </div>
-    <div className="w-full bg-gray-200 rounded-full h-3">
-      <div 
-        className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-700"
-        style={{ width: `${progress}%` }}
-      />
-    </div>
-  </div>
-));
-
-ProgressBar.displayName = 'ProgressBar';
-
-// Composant SectionHeader
-const SectionHeader = React.memo(({ 
-  icon, 
-  title, 
-  subtitle, 
-  step, 
-  totalSteps 
-}: { 
-  icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  step?: number;
-  totalSteps?: number;
-}) => (
-  <div className="flex items-center space-x-4 mb-8">
-    <div className="relative">
-      <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-4 shadow-lg">
-        <div className="text-white">{icon}</div>
-      </div>
-      {step && totalSteps && (
-        <div className="absolute -bottom-2 -right-2 bg-white rounded-full px-2 py-1 shadow-md border-2 border-blue-200">
-          <span className="text-xs font-bold text-blue-600">{step}/{totalSteps}</span>
-        </div>
-      )}
-    </div>
+const SectionHeader = React.memo(({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: string }) => (
+  <div className="flex items-center space-x-3 mb-5">
+    <div className={`bg-gradient-to-br ${THEME.gradFrom} ${THEME.gradTo} rounded-2xl p-3 shadow-md text-white`}>{icon}</div>
     <div>
-      <h2 className="text-2xl font-bold text-gray-900">
-        {title}
-      </h2>
-      {subtitle && (
-        <p className="text-gray-600 mt-1 font-medium">{subtitle}</p>
-      )}
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
+      {subtitle && <p className="text-gray-600 text-sm sm:text-base mt-0.5">{subtitle}</p>}
     </div>
   </div>
 ));
-
 SectionHeader.displayName = 'SectionHeader';
 
-// Composant principal
+// ===== Component =====
 const RegisterExpat: React.FC = () => {
   const navigate = useNavigate();
   const { register, isLoading, error } = useAuth();
-  const { language } = useApp();
+  const { language } = useApp(); // 'fr' | 'en'
+  const lang = (language as 'fr' | 'en') || 'fr';
+  const t = I18N[lang];
 
-  // État du formulaire
-  const [formData, setFormData] = useState<ExpatFormData>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    phone: '',
-    phoneCountryCode: '+33',
-    whatsappCountryCode: '+33',
-    whatsappNumber: '',
-    currentCountry: '',
-    currentPresenceCountry: '',
-    customCountry: '',
-    customPresenceCountry: '',
-    preferredLanguage: language as 'fr' | 'en',
-    practiceCountries: [],
-    customPracticeCountry: '',
-    interventionCountry: '',
-    customInterventionCountry: '',
-    helpTypes: [],
-    customHelpType: '',
-    customLanguage: '',
-    yearsAsExpat: 0,
-    profilePhoto: '',
-    bio: '',
-    availability: 'available',
-    acceptTerms: false
-  });
+  // ---- SEO / OG / JSON-LD ----
+  useEffect(() => {
+    document.title = t.metaTitle;
+    const ensure = (name: string, content: string, prop = false) => {
+      const sel = prop ? `meta[property="${name}"]` : `meta[name="${name}"]`;
+      let el = document.querySelector(sel) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        prop ? el.setAttribute('property', name) : el.setAttribute('name', name);
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
+    ensure('description', t.metaDesc);
+    ensure('robots', 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
+    ensure('og:type', 'website', true);
+    ensure('og:title', t.metaTitle, true);
+    ensure('og:description', t.metaDesc, true);
+    ensure('og:locale', lang === 'en' ? 'en_US' : 'fr_FR', true);
+    ensure('twitter:card', 'summary_large_image');
+    ensure('twitter:title', t.metaTitle);
+    ensure('twitter:description', t.metaDesc);
 
+    // JSON-LD
+    const ld = {
+      '@context': 'https://schema.org',
+      '@type': ['WebPage', 'RegisterAction'],
+      name: t.metaTitle,
+      description: t.metaDesc,
+      inLanguage: lang === 'en' ? 'en-US' : 'fr-FR',
+      publisher: { '@type': 'Organization', name: 'SOS Expats' },
+    };
+    const id = 'ld-register-expat';
+    let s = document.getElementById(id) as HTMLScriptElement | null;
+    if (!s) {
+      s = document.createElement('script');
+      s.id = id;
+      s.type = 'application/ld+json';
+      document.head.appendChild(s);
+    }
+    s.textContent = JSON.stringify(ld);
+    return () => {
+      document.getElementById(id)?.remove();
+    };
+  }, [t, lang]);
+
+  // ---- Initial state ----
+  const initial: ExpatFormData = {
+    firstName: '', lastName: '', email: '', password: '',
+    phone: '', phoneCountryCode: '+33', whatsappCountryCode: '+33', whatsappNumber: '',
+    currentCountry: '', currentPresenceCountry: '', customCountry: '', customPresenceCountry: '',
+    preferredLanguage: lang,
+    practiceCountries: [], customPracticeCountry: '',
+    interventionCountry: '', customInterventionCountry: '',
+    helpTypes: [], customHelpType: '', customLanguage: '',
+    yearsAsExpat: 0, profilePhoto: '', bio: '',
+    availability: 'available', acceptTerms: false
+  };
+
+  const [formData, setFormData] = useState<ExpatFormData>(initial);
   const [selectedLanguages, setSelectedLanguages] = useState<LanguageOption[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
@@ -373,8 +389,21 @@ const RegisterExpat: React.FC = () => {
   const [showCustomHelpType, setShowCustomHelpType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calcul du progrès
-  const formProgress = useMemo(() => {
+  // ---- Options (i18n) ----
+  const countries = useMemo(() => mapDuo(COUNTRIES, lang), [lang]);
+  const helpTypes = useMemo(() => mapDuo(HELP_TYPES, lang), [lang]);
+  const countryCodeOptions = useMemo(
+    () =>
+      COUNTRY_CODES.map((c) => (
+        <option key={c.code} value={c.code}>
+          {c.flag} {c.code} ({lang === 'en' ? c.en : c.fr})
+        </option>
+      )),
+    [lang]
+  );
+
+  // ---- Progress ----
+  const progress = useMemo(() => {
     const fields = [
       formData.firstName.trim().length > 0,
       formData.lastName.trim().length > 0,
@@ -392,882 +421,609 @@ const RegisterExpat: React.FC = () => {
       selectedLanguages.length > 0,
       formData.acceptTerms
     ];
-    
-    const completed = fields.filter(Boolean).length;
-    return Math.round((completed / fields.length) * 100);
+    const done = fields.filter(Boolean).length;
+    return Math.round((done / fields.length) * 100);
   }, [formData, selectedLanguages]);
 
-  // Validation des champs
-  const validateField = useCallback((name: string, value: string | number | boolean): string => {
-    switch (name) {
-      case 'email':
-        if (!value) return texts.errors.allFieldsRequired;
-        if (!EMAIL_REGEX.test(value as string)) return texts.errors.invalidEmail;
-        return '';
-      
-      case 'password':
-        if (!value) return texts.errors.allFieldsRequired;
-        if ((value as string).length < 6) return texts.errors.passwordTooShort;
-        return '';
-      
-      case 'phone':
-        if (!value) return texts.errors.phoneRequired;
-        if (!PHONE_REGEX.test(value as string)) return texts.errors.phoneInvalid;
-        return '';
-      
-      case 'whatsappNumber':
-        if (!value) return texts.errors.whatsappRequired;
-        return '';
-      
-      case 'bio':
-        if (!value) return texts.errors.bioRequired;
-        if ((value as string).length < 50) return texts.errors.bioTooShort;
-        return '';
-      
-      case 'yearsAsExpat':
-        if (!value || (value as number) < 1) return texts.errors.yearsAsExpatRequired;
-        return '';
-      
-      default:
-        return '';
-    }
+  // ---- Validation helpers ----
+  const validateField = useCallback(
+    (name: string, value: string | number | boolean): string => {
+      switch (name) {
+        case 'email':
+          if (!value) return t.allRequired;
+          if (!EMAIL_REGEX.test(value as string)) return t.invalidEmail;
+          return '';
+        case 'password':
+          if (!value) return t.allRequired;
+          if ((value as string).length < 6) return t.passwordTooShort;
+          return '';
+        case 'phone':
+          if (!value) return t.phoneRequired;
+          if (!PHONE_REGEX.test(value as string)) return t.phoneRequired;
+          return '';
+        case 'whatsappNumber':
+          if (!value) return t.whatsappRequired;
+          return '';
+        case 'bio':
+          if (!(value as string)?.trim()) return t.bioRequired;
+          if ((value as string).length < 50) return t.bioTooShort;
+          return '';
+        case 'yearsAsExpat':
+          if (!value || (value as number) < 1) return t.yearsMin;
+          return '';
+        default:
+          return '';
+      }
+    },
+    [t]
+  );
+
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      const { name, value, type } = e.target;
+      const finalValue =
+        type === 'checkbox'
+          ? (e.target as HTMLInputElement).checked
+          : type === 'number'
+          ? Number(value)
+          : value;
+      setFormData((p) => ({ ...p, [name]: finalValue }));
+      const err = validateField(name, finalValue);
+      if (err || fieldErrors[name]) {
+        setFieldErrors((prev) => ({ ...prev, [name]: err }));
+      }
+      if (formError) setFormError('');
+    },
+    [validateField, fieldErrors, formError]
+  );
+
+  // ---- Help types ----
+  const onHelpSelect = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const v = e.target.value;
+      if (!v) return;
+      const other = lang === 'en' ? 'Other' : 'Autre';
+      if (v === other) {
+        setShowCustomHelpType(true);
+        e.target.value = '';
+        return;
+      }
+      if (!formData.helpTypes.includes(v)) {
+        setFormData((prev) => ({ ...prev, helpTypes: [...prev.helpTypes, v] }));
+      }
+      e.target.value = '';
+      if (fieldErrors.helpTypes) setFieldErrors(({ helpTypes, ...rest }) => rest);
+    },
+    [formData.helpTypes, fieldErrors.helpTypes, lang]
+  );
+
+  const removeHelp = useCallback((v: string) => {
+    setFormData((prev) => ({ ...prev, helpTypes: prev.helpTypes.filter((x) => x !== v) }));
   }, []);
 
-  // Gestionnaire de changement
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    const finalValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
-                      type === 'number' ? Number(value) : value;
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: finalValue
-    }));
-    
-    const error = validateField(name, finalValue);
-    setFieldErrors(prev => ({
-      ...prev,
-      [name]: error
-    }));
-
-    if (formError) {
-      setFormError('');
-    }
-  }, [validateField, formError]);
-
-  // Gestionnaire pour les types d'aide
-  const handleHelpTypeSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedHelpType = e.target.value;
-    
-    if (!selectedHelpType) return;
-    
-    if (selectedHelpType === 'Autre') {
-      setShowCustomHelpType(true);
-      return;
-    }
-    
-    if (!formData.helpTypes.includes(selectedHelpType)) {
-      setFormData(prev => ({
-        ...prev,
-        helpTypes: [...prev.helpTypes, selectedHelpType]
-      }));
-    }
-    
-    e.target.value = '';
-  }, [formData.helpTypes]);
-  
-  const handleRemoveHelpType = useCallback((helpType: string) => {
-    setFormData(prev => ({
-      ...prev,
-      helpTypes: prev.helpTypes.filter(type => type !== helpType)
-    }));
-  }, []);
-  
-  const handleAddCustomHelpType = useCallback(() => {
-    const customType = formData.customHelpType.trim();
-    if (customType && !formData.helpTypes.includes(customType)) {
-      setFormData(prev => ({
-        ...prev,
-        helpTypes: [...prev.helpTypes, customType],
-        customHelpType: ''
-      }));
+  const addCustomHelp = useCallback(() => {
+    const v = formData.customHelpType.trim();
+    if (v && !formData.helpTypes.includes(v)) {
+      setFormData((prev) => ({ ...prev, helpTypes: [...prev.helpTypes, v], customHelpType: '' }));
       setShowCustomHelpType(false);
     }
   }, [formData.customHelpType, formData.helpTypes]);
 
-  // Validation complète
+  // ---- Full validation ----
   const validateForm = useCallback((): boolean => {
-    const errors: Record<string, string> = {};
-    
-    if (!formData.firstName.trim()) errors.firstName = texts.errors.allFieldsRequired;
-    if (!formData.lastName.trim()) errors.lastName = texts.errors.allFieldsRequired;
-    if (!formData.email.trim()) errors.email = texts.errors.allFieldsRequired;
-    else if (!EMAIL_REGEX.test(formData.email)) errors.email = texts.errors.invalidEmail;
-    if (!formData.password) errors.password = texts.errors.allFieldsRequired;
-    else if (formData.password.length < 6) errors.password = texts.errors.passwordTooShort;
-    if (!formData.phone.trim()) errors.phone = texts.errors.phoneRequired;
-    if (!formData.whatsappNumber.trim()) errors.whatsappNumber = texts.errors.whatsappRequired;
-    if (!formData.currentCountry) errors.currentCountry = texts.errors.selectCountryError;
-    if (!formData.currentPresenceCountry) errors.currentPresenceCountry = texts.errors.selectCountryError;
-    if (!formData.interventionCountry) errors.interventionCountry = texts.errors.selectInterventionCountry;
-    if (formData.helpTypes.length === 0) errors.helpTypes = texts.errors.selectHelpType;
-    if (selectedLanguages.length === 0) errors.languages = texts.errors.selectLanguage;
-    if (!formData.bio.trim()) errors.bio = texts.errors.bioRequired;
-    else if (formData.bio.length < 50) errors.bio = texts.errors.bioTooShort;
-    if (!formData.profilePhoto) errors.profilePhoto = texts.errors.profilePhotoRequired;
-    if (!formData.acceptTerms) errors.acceptTerms = texts.errors.acceptTermsRequired;
-    if (formData.yearsAsExpat < 1) errors.yearsAsExpat = texts.errors.yearsAsExpatRequired;
-    
-    setFieldErrors(errors);
-    
-    if (Object.keys(errors).length > 0) {
-      setFormError(texts.errors.allFieldsRequired);
+    const e: Record<string, string> = {};
+    if (!formData.firstName.trim()) e.firstName = t.allRequired;
+    if (!formData.lastName.trim()) e.lastName = t.allRequired;
+    if (!formData.email.trim()) e.email = t.allRequired;
+    else if (!EMAIL_REGEX.test(formData.email)) e.email = t.invalidEmail;
+    if (!formData.password) e.password = t.allRequired;
+    else if (formData.password.length < 6) e.password = t.passwordTooShort;
+    if (!formData.phone.trim()) e.phone = t.phoneRequired;
+    if (!formData.whatsappNumber.trim()) e.whatsappNumber = t.whatsappRequired;
+    if (!formData.currentCountry) e.currentCountry = t.selectCountry;
+    if (!formData.currentPresenceCountry) e.currentPresenceCountry = t.selectPresence;
+    if (!formData.interventionCountry) e.interventionCountry = t.selectIntervention;
+    if (formData.helpTypes.length === 0) e.helpTypes = t.selectHelpType;
+    if (selectedLanguages.length === 0) e.languages = t.selectLanguage;
+    if (!formData.bio.trim()) e.bio = t.bioRequired;
+    else if (formData.bio.length < 50) e.bio = t.bioTooShort;
+    if (!formData.profilePhoto) e.profilePhoto = t.profilePhotoRequired;
+    if (!formData.acceptTerms) e.acceptTerms = t.allRequired;
+    if (formData.yearsAsExpat < 1) e.yearsAsExpat = t.yearsMin;
+
+    setFieldErrors(e);
+    if (Object.keys(e).length) {
+      setFormError(t.allRequired);
       return false;
     }
-    
     return true;
-  }, [formData, selectedLanguages]);
+  }, [formData, selectedLanguages, t]);
 
-  // Soumission du formulaire
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isSubmitting) return;
-    
-    setIsSubmitting(true);
-    setFormError('');
-
-    if (!validateForm()) {
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const userData = {
-        role: 'expat' as const,
-        type: 'expat' as const,
-        email: formData.email.trim().toLowerCase(),
-        fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        phone: formData.phoneCountryCode + formData.phone.trim(),
-        whatsapp: formData.whatsappCountryCode + formData.whatsappNumber.trim(),
-        currentCountry: formData.currentCountry,
-        country: formData.currentPresenceCountry,
-        interventionCountry: formData.interventionCountry,
-        profilePhoto: formData.profilePhoto,
-        bio: formData.bio.trim(),
-        languages: selectedLanguages.map((lang) => lang.value),
-        helpTypes: formData.helpTypes,
-        yearsAsExpat: formData.yearsAsExpat,
-        availability: formData.availability,
-        isApproved: true,
-        isVisible: true,
-        isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      await register(userData, formData.password);
-      
-      navigate('/dashboard', { 
-        state: { 
-          message: texts.success.registrationSuccess,
-          type: 'success'
-        } 
-      });
-      
-    } catch (error: any) {
-      console.error('Erreur inscription:', error);
-      
-      if (error.code === 'auth/email-already-in-use') {
-        setFieldErrors(prev => ({ ...prev, email: texts.errors.emailAlreadyExists }));
-        setFormError(texts.errors.emailAlreadyExists);
-      } else if (error.code === 'auth/network-request-failed') {
-        setFormError(texts.errors.networkError);
-      } else {
-        setFormError(error.message || texts.errors.registrationError);
+  // ---- Submit ----
+  const onSubmit = useCallback(
+    async (ev: React.FormEvent) => {
+      ev.preventDefault();
+      if (isSubmitting) return;
+      setIsSubmitting(true);
+      setFormError('');
+      if (!validateForm()) {
+        setIsSubmitting(false);
+        return;
       }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [formData, selectedLanguages, validateForm, register, navigate, isSubmitting]);
-
-  // Options mémorisées
-  const countrySelectOptions = useMemo(() => 
-    COUNTRY_OPTIONS.map(country => (
-      <option key={country} value={country}>{country}</option>
-    )), []
+      try {
+        const userData = {
+          role: 'expat' as const,
+          type: 'expat' as const,
+          email: formData.email.trim().toLowerCase(),
+          fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phone: formData.phoneCountryCode + formData.phone.trim(),
+          whatsapp: formData.whatsappCountryCode + formData.whatsappNumber.trim(),
+          currentCountry: formData.currentCountry,
+          country: formData.currentPresenceCountry,
+          interventionCountry: formData.interventionCountry,
+          profilePhoto: formData.profilePhoto,
+          bio: formData.bio.trim(),
+          languages: selectedLanguages.map((l) => l.value), // ISO codes from select
+          helpTypes: formData.helpTypes,
+          yearsAsExpat: formData.yearsAsExpat,
+          availability: formData.availability,
+          isApproved: true,
+          isVisible: true,
+          isActive: true,
+          preferredLanguage: lang,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await register(userData, formData.password);
+        navigate('/dashboard', { state: { message: t.success, type: 'success' } });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setFormError(msg || 'Error');
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [isSubmitting, validateForm, register, formData, selectedLanguages, navigate, t, lang]
   );
 
-  const helpTypeSelectOptions = useMemo(() => 
-    HELP_TYPE_OPTIONS.map(helpType => (
-      <option key={helpType} value={helpType}>{helpType}</option>
-    )), []
+  // ---- Can submit ----
+  const canSubmit = useMemo(
+    () =>
+      formData.email &&
+      formData.password &&
+      formData.firstName &&
+      formData.lastName &&
+      formData.interventionCountry &&
+      formData.acceptTerms &&
+      formData.bio &&
+      formData.profilePhoto &&
+      selectedLanguages.length > 0 &&
+      formData.helpTypes.length > 0 &&
+      !isLoading &&
+      !isSubmitting &&
+      !Object.keys(fieldErrors).length,
+    [formData, selectedLanguages, fieldErrors, isLoading, isSubmitting]
   );
 
-  const countryCodeOptions = useMemo(() => 
-    COUNTRY_CODES.map(({ code, flag, name }) => (
-      <option key={code} value={code}>{flag} {code} ({name})</option>
-    )), []
+  // ---- Options JSX ----
+  const countrySelectOptions = useMemo(
+    () => countries.map((c) => <option key={c} value={c}>{c}</option>),
+    [countries]
   );
-
-  // Vérification de soumission
-  const canSubmit = useMemo(() => {
-    return formData.email && 
-           formData.password && 
-           formData.firstName && 
-           formData.lastName && 
-           formData.interventionCountry && 
-           formData.acceptTerms &&
-           formData.bio &&
-           formData.profilePhoto &&
-           selectedLanguages.length > 0 &&
-           formData.helpTypes.length > 0 &&
-           Object.keys(fieldErrors).length === 0 &&
-           !isLoading && 
-           !isSubmitting;
-  }, [formData, selectedLanguages, fieldErrors, isLoading, isSubmitting]);
+  const helpTypeOptions = useMemo(
+    () => helpTypes.map((c) => <option key={c} value={c}>{c}</option>),
+    [helpTypes]
+  );
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
-        <div className="max-w-2xl mx-auto px-4">
-          
-          <ProgressBar progress={formProgress} />
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_35%,#f0fff7_100%)]">
+        {/* Compact hero (réduit l’espace vide sous le header) */}
+        <header className="pt-6 sm:pt-8 text-center">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-gray-900">
+            <span className={`bg-gradient-to-r ${THEME.gradFrom} ${THEME.gradTo} bg-clip-text text-transparent`}>
+              {t.heroTitle}
+            </span>
+          </h1>
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-700 px-4">
+            {t.heroSubtitle}
+          </p>
+          <div className="mt-3 inline-flex items-center gap-2">
+            <span className="text-xs sm:text-sm px-3 py-1 rounded-full bg-white border shadow-sm">24/7</span>
+            <span className="text-xs sm:text-sm px-3 py-1 rounded-full bg-white border shadow-sm">{lang === 'en' ? 'Multilingual' : 'Multilingue'}</span>
+          </div>
+          <div className="mt-5 h-1 w-40 mx-auto rounded-full" style={{ backgroundColor: 'rgba(5, 150, 105, 0.85)' }} />
+          <p className="mt-3 text-xs sm:text-sm text-gray-500">
+            {t.already}{' '}
+            <Link to="/login" className="font-semibold underline text-emerald-700 hover:text-emerald-800">
+              {t.login}
+            </Link>
+          </p>
+        </header>
 
-          {/* Header */}
-          <header className="text-center mb-8">
-            <h1 className="text-4xl font-black mb-4">
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                {texts.title}
-              </span>
-            </h1>
-            
-            <p className="text-base text-gray-700 mb-6 font-medium">
-              {texts.subtitle}
-            </p>
-            
-            <div className="bg-white rounded-xl p-4 shadow-md border border-blue-200 inline-block">
-              <p className="text-gray-700 font-medium">
-                {texts.alreadyRegistered}{' '}
-                <Link 
-                  to="/login" 
-                  className="text-blue-600 hover:text-blue-700 font-bold underline"
-                >
-                  {texts.login} →
-                </Link>
-              </p>
+        <main className="max-w-2xl mx-auto px-3 sm:px-6 py-6 sm:py-8">
+          {/* Progress */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-gray-700">{t.progress}</span>
+              <span className="text-sm font-bold text-emerald-600">{progress}%</span>
             </div>
-          </header>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div
+                className="h-2.5 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 transition-all duration-700"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
 
-          {/* Formulaire */}
-          <main className="bg-white rounded-2xl shadow-lg border overflow-hidden">
-            <form onSubmit={handleSubmit} className="divide-y divide-gray-50" noValidate>
-              
-              {/* Messages d'erreur */}
-              {(error || formError) && (
-                <div className="p-6 bg-red-50 border-l-4 border-red-500">
-                  <div className="flex items-start">
-                    <AlertCircle className="h-6 w-6 text-red-500 mr-3 mt-0.5" />
-                    <div>
-                      <h3 className="text-lg font-bold text-red-800 mb-2">
-                        Erreur lors de l'inscription
-                      </h3>
-                      <div className="text-red-700">
-                        {error || formError}
-                      </div>
-                    </div>
+          {/* Error banner */}
+          {(error || formError) && (
+            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-md">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
+                <div className="text-sm text-red-700">{error || formError}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Card */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+            <form onSubmit={onSubmit} noValidate>
+              {/* Step 1: Personal */}
+              <section className="p-5 sm:p-6">
+                <SectionHeader icon={<Users className="w-5 h-5" />} title={t.step1} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.firstName} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="firstName" autoComplete="given-name" value={formData.firstName} onChange={onChange}
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} focus:bg-white transition ${fieldErrors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                      placeholder={t.firstPlaceholder}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.lastName} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="lastName" autoComplete="family-name" value={formData.lastName} onChange={onChange}
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} focus:bg-white transition ${fieldErrors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                      placeholder={t.lastPlaceholder}
+                    />
                   </div>
                 </div>
-              )}
 
-              {/* Section 1: Informations personnelles */}
-              <section className="p-6 space-y-6">
-                <SectionHeader
-                  icon={<Users className="w-6 h-6" />}
-                  title={texts.personalInfo}
-                  subtitle="Commençons par vous connaître"
-                  step={1}
-                  totalSteps={3}
-                />
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField
-                    id="firstName"
-                    name="firstName"
-                    label={texts.fields.firstName}
-                    type="text"
-                    required
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    autoComplete="given-name"
-                    error={fieldErrors.firstName}
-                    placeholder="Jean"
-                  />
-
-                  <FormField
-                    id="lastName"
-                    name="lastName"
-                    label={texts.fields.lastName}
-                    type="text"
-                    required
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    autoComplete="family-name"
-                    error={fieldErrors.lastName}
-                    placeholder="Dupont"
-                  />
-                </div>
-
-                <FormField
-                  id="email"
-                  name="email"
-                  label={texts.fields.email}
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  autoComplete="email"
-                  placeholder="jean.dupont@example.com"
-                  icon={<Mail className="h-5 w-5" />}
-                  error={fieldErrors.email}
-                />
-
-                <div className="space-y-3">
-                  <label htmlFor="password" className="block text-sm font-bold text-gray-800">
-                    {texts.fields.password} <span className="text-red-500 ml-1">*</span>
+                <div className="mt-4">
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.email} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Lock className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
+                    <Mail className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${THEME.icon}`} />
                     <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      autoComplete="new-password"
-                      className={`w-full pl-12 pr-16 py-3 border-2 rounded-xl font-medium transition-all duration-300 bg-white focus:outline-none ${
-                        fieldErrors.password ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-500'
-                      }`}
-                      placeholder="Mot de passe"
+                      name="email" type="email" autoComplete="email" value={formData.email} onChange={onChange}
+                      className={`w-full pl-10 px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} focus:bg-white transition ${fieldErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                      placeholder={t.emailPlaceholder}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
                   </div>
-                  {fieldErrors.password && (
-                    <p className="text-sm text-red-600 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {fieldErrors.password}
-                    </p>
-                  )}
-                  {formData.password && (
-                    <div className="text-sm">
-                      Force du mot de passe: <span className={`font-bold ${
-                        formData.password.length < 6 ? 'text-red-500' : 
-                        formData.password.length < 10 ? 'text-orange-500' : 'text-green-500'
-                      }`}>
-                        {formData.password.length < 6 ? 'Faible' : 
-                         formData.password.length < 10 ? 'Moyen' : 'Solide'}
-                      </span>
-                    </div>
-                  )}
+                  {fieldErrors.email && <p className="text-sm text-red-600 mt-1">{fieldErrors.email}</p>}
                 </div>
 
-                {/* Section téléphone */}
-                <div className="bg-gray-50 rounded-xl p-4 border">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
-                    <Phone className="w-5 h-5 text-blue-600 mr-3" />
-                    Informations de contact
+                <div className="mt-4">
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.password} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Lock className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${THEME.icon}`} />
+                    <input
+                      name="password" type={showPassword ? 'text' : 'password'} value={formData.password} onChange={onChange} autoComplete="new-password"
+                      className={`w-full pl-10 pr-12 px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} ${fieldErrors.password ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                      placeholder={t.passwordHint}
+                    />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" onClick={() => setShowPassword((s) => !s)}>
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {formData.password && (
+                    <p className="text-xs mt-1 text-gray-600">
+                      {formData.password.length < 6
+                        ? (lang === 'en' ? 'Strength: Weak' : 'Force : Faible')
+                        : formData.password.length < 10
+                        ? (lang === 'en' ? 'Strength: Medium' : 'Force : Moyen')
+                        : (lang === 'en' ? 'Strength: Strong' : 'Force : Solide')}
+                    </p>
+                  )}
+                  {fieldErrors.password && <p className="text-sm text-red-600 mt-1">{fieldErrors.password}</p>}
+                </div>
+
+                {/* Contact */}
+                <div className={`mt-5 rounded-xl border ${THEME.border} ${THEME.subtle} p-4`}>
+                  <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
+                    <Phone className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.phone} / {t.whatsapp}
                   </h3>
-                  
-                  <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label htmlFor="phoneCountryCode" className="block text-sm font-bold text-gray-800 mb-2">
-                        Code pays <span className="text-red-500">*</span>
-                      </label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">{t.countryCode}</label>
                       <select
-                        id="phoneCountryCode"
-                        name="phoneCountryCode"
-                        value={formData.phoneCountryCode}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-blue-500"
+                        name="phoneCountryCode" value={formData.phoneCountryCode} onChange={onChange}
+                        className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-emerald-600"
                       >
                         {countryCodeOptions}
                       </select>
                     </div>
-                    
                     <div className="col-span-2">
-                      <FormField
-                        id="phone"
-                        name="phone"
-                        label="Téléphone"
-                        type="tel"
-                        required
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        error={fieldErrors.phone}
-                        placeholder="123456789"
-                        autoComplete="tel"
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        {t.phone} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        name="phone" value={formData.phone} onChange={onChange} autoComplete="tel"
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.phone ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                        placeholder={t.phonePlaceholder}
                       />
+                      {fieldErrors.phone && <p className="text-sm text-red-600 mt-1">{fieldErrors.phone}</p>}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-3 mt-3">
                     <div>
-                      <label htmlFor="whatsappCountryCode" className="block text-sm font-bold text-gray-800 mb-2">
-                        WhatsApp <span className="text-red-500">*</span>
-                      </label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp</label>
                       <select
-                        id="whatsappCountryCode"
-                        name="whatsappCountryCode"
-                        value={formData.whatsappCountryCode}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-green-500"
+                        name="whatsappCountryCode" value={formData.whatsappCountryCode} onChange={onChange}
+                        className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-green-600"
                       >
                         {countryCodeOptions}
                       </select>
                     </div>
-                    
                     <div className="col-span-2">
-                      <FormField
-                        id="whatsappNumber"
-                        name="whatsappNumber"
-                        label="Numéro WhatsApp"
-                        type="tel"
-                        required
-                        value={formData.whatsappNumber}
-                        onChange={handleInputChange}
-                        error={fieldErrors.whatsappNumber}
-                        placeholder="612345678"
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        {t.whatsapp} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        name="whatsappNumber" value={formData.whatsappNumber} onChange={onChange}
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.whatsappNumber ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                        placeholder={t.phonePlaceholder}
                       />
+                      {fieldErrors.whatsappNumber && <p className="text-sm text-red-600 mt-1">{fieldErrors.whatsappNumber}</p>}
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Section 2: Informations géographiques */}
-              <section className="p-6 space-y-6">
-                <SectionHeader
-                  icon={<Globe className="w-6 h-6" />}
-                  title="Informations géographiques et expérience"
-                  subtitle="Où évoluez-vous ?"
-                  step={2}
-                  totalSteps={3}
-                />
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Step 2: Geographic & Experience */}
+              <section className="p-5 sm:p-6 border-t border-gray-50">
+                <SectionHeader icon={<Globe className="w-5 h-5" />} title={t.step2} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="currentCountry" className="block text-sm font-bold text-gray-800 mb-3">
-                      Pays de résidence <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.residenceCountry} <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <MapPin className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 z-10" />
-                      <select
-                        id="currentCountry"
-                        name="currentCountry"
-                        required
-                        value={formData.currentCountry}
-                        onChange={handleInputChange}
-                        className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none ${
-                          fieldErrors.currentCountry ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="">Sélectionnez votre pays</option>
-                        {countrySelectOptions}
-                      </select>
-                    </div>
-                    {fieldErrors.currentCountry && (
-                      <p className="text-sm text-red-600 flex items-center mt-2">
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        {fieldErrors.currentCountry}
-                      </p>
-                    )}
+                    <select
+                      name="currentCountry" value={formData.currentCountry} onChange={onChange}
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.currentCountry ? 'border-red-500' : 'border-gray-200'}`}
+                    >
+                      <option value="">{t.selectCountry}</option>
+                      {countrySelectOptions}
+                    </select>
+                    {fieldErrors.currentCountry && <p className="text-sm text-red-600 mt-1">{fieldErrors.currentCountry}</p>}
                   </div>
-
                   <div>
-                    <label htmlFor="currentPresenceCountry" className="block text-sm font-bold text-gray-800 mb-3">
-                      Pays de présence actuel <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.presenceCountry} <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <Globe className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 z-10" />
-                      <select
-                        id="currentPresenceCountry"
-                        name="currentPresenceCountry"
-                        required
-                        value={formData.currentPresenceCountry}
-                        onChange={handleInputChange}
-                        className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none ${
-                          fieldErrors.currentPresenceCountry ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="">Sélectionnez votre pays de présence</option>
-                        {countrySelectOptions}
-                      </select>
-                    </div>
-                    {fieldErrors.currentPresenceCountry && (
-                      <p className="text-sm text-red-600 flex items-center mt-2">
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        {fieldErrors.currentPresenceCountry}
-                      </p>
-                    )}
+                    <select
+                      name="currentPresenceCountry" value={formData.currentPresenceCountry} onChange={onChange}
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.currentPresenceCountry ? 'border-red-500' : 'border-gray-200'}`}
+                    >
+                      <option value="">{t.selectPresence}</option>
+                      {countrySelectOptions}
+                    </select>
+                    {fieldErrors.currentPresenceCountry && <p className="text-sm text-red-600 mt-1">{fieldErrors.currentPresenceCountry}</p>}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label htmlFor="interventionCountry" className="block text-sm font-bold text-gray-800 mb-3">
-                      {texts.fields.interventionCountry} <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.interventionCountry} <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <MapPin className="h-5 w-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 z-10" />
-                      <select
-                        id="interventionCountry"
-                        name="interventionCountry"
-                        required
-                        value={formData.interventionCountry}
-                        onChange={handleInputChange}
-                        className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none ${
-                          fieldErrors.interventionCountry ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="">Sélectionnez votre pays</option>
-                        {countrySelectOptions}
-                      </select>
-                    </div>
-                    {fieldErrors.interventionCountry && (
-                      <p className="text-sm text-red-600 flex items-center mt-2">
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        {fieldErrors.interventionCountry}
-                      </p>
-                    )}
+                    <select
+                      name="interventionCountry" value={formData.interventionCountry} onChange={onChange}
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.interventionCountry ? 'border-red-500' : 'border-gray-200'}`}
+                    >
+                      <option value="">{t.selectIntervention}</option>
+                      {countrySelectOptions}
+                    </select>
+                    {fieldErrors.interventionCountry && <p className="text-sm text-red-600 mt-1">{fieldErrors.interventionCountry}</p>}
                   </div>
-
                   <div>
-                    <label htmlFor="yearsAsExpat" className="block text-sm font-bold text-gray-800 mb-3">
-                      {texts.fields.yearsAsExpat} <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.yearsAsExpat} <span className="text-red-500">*</span>
                     </label>
                     <input
-                      id="yearsAsExpat"
-                      name="yearsAsExpat"
-                      type="number"
-                      min="1"
-                      max="50"
-                      required
-                      value={formData.yearsAsExpat || ''}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none ${
-                        fieldErrors.yearsAsExpat ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
-                      }`}
+                      name="yearsAsExpat" type="number" min={1} max={50} value={formData.yearsAsExpat || ''} onChange={onChange}
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} ${fieldErrors.yearsAsExpat ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
                       placeholder="5"
                     />
-                    {fieldErrors.yearsAsExpat && (
-                      <p className="text-sm text-red-600 flex items-center mt-2">
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                        {fieldErrors.yearsAsExpat}
-                      </p>
-                    )}
+                    {fieldErrors.yearsAsExpat && <p className="text-sm text-red-600 mt-1">{fieldErrors.yearsAsExpat}</p>}
                   </div>
                 </div>
 
-                {/* Langues parlées */}
-                <div className="bg-gray-50 rounded-xl p-4 border">
-                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <span className="text-xl mr-3">🗣️</span>
-                    Langues parlées <span className="text-red-500 ml-2">*</span>
+                {/* Languages */}
+                <div className={`mt-4 rounded-xl border ${THEME.border} p-4 ${THEME.subtle}`}>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    {t.languages} <span className="text-red-500">*</span>
                   </label>
-                  
-                  <Suspense fallback={<LoadingSpinner />}>
+                  <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
                     <MultiLanguageSelect
                       value={selectedLanguages}
                       onChange={(value) => {
                         setSelectedLanguages(value as LanguageOption[]);
-                        
-                        if ((value as LanguageOption[]).length > 0 && fieldErrors.languages) {
-                          setFieldErrors(prev => {
-                            const { languages: _, ...rest } = prev;
-                            return rest;
-                          });
-                        }
+                        if (fieldErrors.languages) setFieldErrors(({ languages, ...rest }) => rest);
                       }}
                     />
                   </Suspense>
-                  
-                  {fieldErrors.languages && (
-                    <p className="text-sm text-red-600 flex items-center mt-3">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {fieldErrors.languages}
-                    </p>
-                  )}
+                  {fieldErrors.languages && <p className="text-sm text-red-600 mt-2">{fieldErrors.languages}</p>}
                 </div>
 
                 {/* Bio */}
-                <div>
-                  <label htmlFor="bio" className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <span className="text-xl mr-3">📝</span>
-                    {texts.fields.bio} <span className="text-red-500 ml-2">*</span>
+                <div className="mt-4">
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.bio} <span className="text-red-500">*</span>
                   </label>
                   <textarea
-                    id="bio"
-                    name="bio"
-                    required
-                    value={formData.bio}
-                    onChange={handleInputChange}
-                    rows={5}
-                    maxLength={500}
-                    className={`w-full px-4 py-3 border-2 rounded-xl font-medium bg-white focus:outline-none min-h-[120px] resize-y ${
-                      fieldErrors.bio ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-500'
-                    }`}
-                    placeholder="Décrivez votre parcours d'expatriation, vos compétences et comment vous pouvez aider d'autres expatriés..."
+                    name="bio" rows={5} maxLength={500} value={formData.bio} onChange={onChange}
+                    className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} min-h-[120px] ${fieldErrors.bio ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
+                    placeholder={t.bioPlaceholder}
                   />
-                  {fieldErrors.bio && (
-                    <p className="text-sm text-red-600 flex items-center mt-2">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {fieldErrors.bio}
-                    </p>
-                  )}
-                  <div className="flex justify-between text-sm mt-3">
-                    <div className="text-gray-600">
-                      {formData.bio.length < 50 ? (
-                        <span className="text-orange-600 font-medium">
-                          Plus que {50 - formData.bio.length} caractères pour valider ce champ
-                        </span>
-                      ) : (
-                        <span className="text-green-600 font-medium">✓ Champ validé</span>
-                      )}
-                    </div>
-                    <span className={`font-bold ${formData.bio.length > 450 ? 'text-orange-500' : 'text-gray-500'}`}>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className={formData.bio.length < 50 ? 'text-orange-600' : 'text-green-600'}>
+                      {formData.bio.length < 50 ? t.charsToValidate(50 - formData.bio.length) : t.fieldValidated}
+                    </span>
+                    <span className={formData.bio.length > 450 ? 'text-orange-500' : 'text-gray-500'}>
                       {formData.bio.length}/500
                     </span>
                   </div>
+                  {fieldErrors.bio && <p className="text-sm text-red-600 mt-1">{fieldErrors.bio}</p>}
                 </div>
 
-                {/* Photo de profil */}
-                <div className="bg-gray-50 rounded-xl p-4 border">
-                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <Camera className="w-5 h-5 text-pink-600 mr-3" />
-                    {texts.fields.profilePhoto} <span className="text-red-500 ml-2">*</span>
+                {/* Photo */}
+                <div className={`mt-4 rounded-xl border ${THEME.border} p-4 ${THEME.subtle}`}>
+                  <label className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                    <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                   </label>
-                  
-                  <Suspense fallback={<LoadingSpinner />}>
+                  <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
+                    {/* NOTE: on passe des labels i18n: le composant peut les ignorer si non supportés, mais ça ne casse rien */}
                     <ImageUploader
-                      onImageUploaded={(url) => {
-                        setFormData(prev => ({ ...prev, profilePhoto: url }));
-                        
-                        if (fieldErrors.profilePhoto) {
-                          setFieldErrors(prev => {
-                            const { profilePhoto: _, ...rest } = prev;
-                            return rest;
-                          });
-                        }
+                      onImageUploaded={(url: string) => {
+                        setFormData((p) => ({ ...p, profilePhoto: url }));
+                        if (fieldErrors.profilePhoto) setFieldErrors(({ profilePhoto, ...rest }) => rest);
                       }}
                       currentImage={formData.profilePhoto}
+                      ctaLabel={t.clickHere}
+                      noFileText={lang === 'en' ? 'No file selected' : 'Aucun fichier sélectionné'}
                     />
                   </Suspense>
-                  
-                  {fieldErrors.profilePhoto && (
-                    <p className="text-sm text-red-600 flex items-center mt-3">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {fieldErrors.profilePhoto}
-                    </p>
-                  )}
+                  {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
+                  <p className="text-xs text-gray-500 mt-1">
+                    {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}
+                  </p>
                 </div>
               </section>
 
-              {/* Section 3: Types d'aide */}
-              <section className="p-6 space-y-6">
-                <SectionHeader
-                  icon={<Heart className="w-6 h-6" />}
-                  title="Comment voulez-vous aider ?"
-                  subtitle="Définissez vos domaines d'expertise"
-                  step={3}
-                  totalSteps={3}
-                />
-
-                <div className="bg-gray-50 rounded-xl p-4 border">
-                  <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <CheckCircle className="w-5 h-5 text-green-600 mr-3" />
-                    Domaines d'aide <span className="text-red-500 ml-2">*</span>
+              {/* Step 3: Help domains */}
+              <section className="p-5 sm:p-6 border-t border-gray-50">
+                <SectionHeader icon={<CheckCircle className="w-5 h-5" />} title={t.step3} />
+                <div className={`rounded-xl border ${THEME.border} p-4 ${THEME.subtle}`}>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    {t.helpDomains} <span className="text-red-500">*</span>
                   </label>
-                  
-                  <TagSelector
-                    items={formData.helpTypes}
-                    onRemove={handleRemoveHelpType}
-                    color="green"
-                  />
-                  
+                  <TagSelector items={formData.helpTypes} onRemove={removeHelp} />
                   <select
-                    onChange={handleHelpTypeSelect}
-                    value=""
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl font-medium bg-white focus:outline-none focus:border-green-500"
+                    onChange={onHelpSelect} value=""
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-green-600"
                   >
-                    <option value="">Ajouter un domaine d'aide</option>
-                    {helpTypeSelectOptions}
+                    <option value="">{t.addHelp}</option>
+                    {helpTypeOptions}
                   </select>
-                  
-                  {fieldErrors.helpTypes && (
-                    <p className="text-sm text-red-600 flex items-center mt-3">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {fieldErrors.helpTypes}
-                    </p>
-                  )}
-                  
+                  {fieldErrors.helpTypes && <p className="text-sm text-red-600 mt-2">{fieldErrors.helpTypes}</p>}
+
                   {showCustomHelpType && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-xl border">
-                      <div className="flex gap-4">
-                        <input
-                          type="text"
-                          placeholder="Précisez le type d'aide"
-                          value={formData.customHelpType}
-                          onChange={(e) => setFormData(prev => ({ ...prev, customHelpType: e.target.value }))}
-                          className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCustomHelpType}
-                          disabled={!formData.customHelpType.trim()}
-                          className="px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 font-bold"
-                        >
-                          Ajouter
-                        </button>
-                      </div>
+                    <div className="flex gap-2 mt-3">
+                      <input
+                        value={formData.customHelpType}
+                        onChange={(e) => setFormData((p) => ({ ...p, customHelpType: e.target.value }))}
+                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl"
+                        placeholder={t.specifyHelp}
+                      />
+                      <button
+                        type="button"
+                        onClick={addCustomHelp}
+                        disabled={!formData.customHelpType.trim()}
+                        className="px-4 py-3 rounded-xl bg-green-600 text-white font-semibold disabled:opacity-60"
+                      >
+                        OK
+                      </button>
                     </div>
                   )}
                 </div>
               </section>
 
-              {/* Conditions générales et soumission */}
-              <section className="p-6 space-y-6 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600">
-                <div className="bg-white rounded-xl p-6 shadow-lg">
-                  <div className="flex items-start space-x-4">
+              {/* Terms + Submit */}
+              <section className={`p-5 sm:p-6 border-t border-gray-50 bg-gradient-to-br ${THEME.gradFrom} ${THEME.gradTo}`}>
+                <div className="bg-white rounded-xl p-4 sm:p-5 shadow-md">
+                  <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       id="acceptTerms"
                       checked={formData.acceptTerms}
-                      onChange={(e) => setFormData(prev => ({ ...prev, acceptTerms: e.target.checked }))}
-                      className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
+                      onChange={(e) => setFormData((p) => ({ ...p, acceptTerms: e.target.checked }))}
+                      className="h-5 w-5 text-emerald-600 border-gray-300 rounded mt-0.5"
                       required
                     />
-                    <label htmlFor="acceptTerms" className="text-sm text-gray-700 font-medium">
-                      {texts.acceptTerms}{' '}
-                      <Link 
-                        to="/cgu-expatries" 
-                        className="text-blue-600 hover:text-blue-700 underline font-bold"
+                    <label htmlFor="acceptTerms" className="text-sm text-gray-800">
+                      {lang === 'en' ? 'I accept the' : "J’accepte les"}{' '}
+                      <Link
+                        to="/cgu-expatries"
+                        className="text-emerald-700 underline font-semibold"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {texts.termsLink}
+                        {t.cguLabel}
                       </Link>{' '}
                       <span className="text-red-500">*</span>
                     </label>
                   </div>
-                  {fieldErrors.acceptTerms && (
-                    <p className="text-sm text-red-600 flex items-center mt-3 ml-9">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {fieldErrors.acceptTerms}
-                    </p>
-                  )}
+                  {fieldErrors.acceptTerms && <p className="text-sm text-red-600 mt-2">{fieldErrors.acceptTerms}</p>}
                 </div>
 
-                {/* Bouton de soumission */}
-                <div className="text-center">
+                <div className="mt-4">
                   <Button
                     type="submit"
                     loading={isLoading || isSubmitting}
-                    fullWidth={true}
+                    fullWidth
                     size="large"
-                    className={`
-                      ${canSubmit 
-                        ? 'bg-gradient-to-r from-green-500 via-blue-600 to-purple-700 hover:from-green-600 hover:via-blue-700 hover:to-purple-800 shadow-xl' 
-                        : 'bg-gray-400 cursor-not-allowed opacity-60'
-                      } 
-                      text-white font-black py-4 px-6 rounded-2xl text-lg w-full
-                    `}
+                    className={`text-white font-black py-4 px-6 rounded-2xl text-base sm:text-lg w-full shadow-lg
+                      ${canSubmit ? `bg-gradient-to-r ${THEME.button} hover:brightness-110` : 'bg-gray-400 cursor-not-allowed opacity-60'}`}
                     disabled={!canSubmit}
                   >
                     {isLoading || isSubmitting ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-4 border-white border-t-transparent mr-3"></div>
-                        <span>{texts.loading}</span>
-                      </div>
+                      t.loading
                     ) : (
-                      <div className="flex items-center justify-center">
-                        <CheckCircle className="w-6 h-6 mr-3" />
-                        <span>
-                          {canSubmit 
-                            ? `${texts.createAccount} 🎉` 
-                            : `Compléter (${formProgress}%)`
-                          }
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center justify-center">
+                        <ArrowRight className="w-5 h-5 mr-2" /> {t.create}
+                      </span>
                     )}
                   </Button>
-                  
-                  {/* Indicateur de progression */}
-                  {!canSubmit && (
-                    <div className="mt-4">
-                      <div className="bg-white bg-opacity-20 rounded-xl px-6 py-3 inline-block">
-                        <p className="text-white font-bold text-sm">
-                          ⚠️ Complétion: {formProgress}% - Plus que quelques champs !
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {canSubmit && (
-                    <div className="mt-4">
-                      <div className="bg-green-500 bg-opacity-20 rounded-xl px-6 py-3 inline-block border border-green-400 border-opacity-50">
-                        <p className="text-white font-bold text-sm">
-                          ✅ Formulaire complet - Prêt pour l'inscription !
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-center pt-4">
-                  <p className="text-xs text-white text-opacity-80 font-medium">
-                    🔒 Données protégées • Support 24/7
-                  </p>
+                  <p className="text-center text-xs text-white/90 mt-4">{t.secureNote}</p>
                 </div>
               </section>
             </form>
-          </main>
+          </div>
 
           {/* Footer */}
-          <footer className="text-center mt-8 space-y-6">
-            <div className="bg-white rounded-xl p-6 shadow-lg border">
-              <h3 className="text-xl font-black text-gray-900 mb-3">
-                🌍 Rejoignez la communauté d'entraide expatriée
-              </h3>
-              <p className="text-sm text-gray-700 font-medium">
-                En vous inscrivant, vous rejoignez une communauté de <strong className="text-blue-600">plus de 10 000 expatriés francophones</strong> 
-                dans le monde.
-              </p>
+          <footer className="text-center mt-8">
+            <div className="bg-white rounded-xl p-5 shadow border">
+              <h3 className="text-lg sm:text-xl font-black text-gray-900 mb-1">{t.footerTitle}</h3>
+              <p className="text-sm text-gray-700">{t.footerText}</p>
             </div>
-            
-            <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-500 font-medium">
-              <Link to="/confidentialite" className="hover:text-blue-600 underline">
-                🔒 Confidentialité
+            <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
+              <Link to="/politique-confidentialite" className="hover:text-emerald-700 underline">
+                {t.privacyLabel}
               </Link>
-              <Link to="/cgu-expatries" className="hover:text-purple-600 underline">
-                📋 CGU
+              <Link to="/cgu-expatries" className="hover:text-emerald-700 underline">
+                {t.cguLabel}
               </Link>
-              <Link to="/aide" className="hover:text-green-600 underline">
-                💬 Aide
+              <Link to="/centre-aide" className="hover:text-emerald-700 underline">
+                {t.helpLabel}
               </Link>
-              <Link to="/contact" className="hover:text-orange-600 underline">
-                📧 Contact
+              <Link to="/contact" className="hover:text-emerald-700 underline">
+                {t.contactLabel}
               </Link>
             </div>
           </footer>
-        </div>
+        </main>
       </div>
     </Layout>
   );

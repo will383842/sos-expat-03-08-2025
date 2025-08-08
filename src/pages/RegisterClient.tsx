@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Flag, MapPin, UserCheck, Clock3, Languages, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, UserCheck, Clock3, Languages, ShieldCheck } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,85 +8,83 @@ import { useApp } from '../contexts/AppContext';
 import { serverTimestamp } from 'firebase/firestore';
 import type { MultiValue } from 'react-select';
 
-// Lazy (inchangé)
+// Lazy loading des composants lourds pour améliorer le temps de chargement initial
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
 
-// ===== i18n =====
-const i18n = {
+// Regex pré-compilées pour améliorer les performances
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Interface pour le formulaire optimisée
+interface FormData {
+  firstName: string;
+  email: string;
+  password: string;
+  languagesSpoken: string[];
+  customLanguage: string;
+}
+
+// Configuration i18n complète - Préparée pour l'internationalisation
+const i18nConfig = {
   fr: {
+    // Métadonnées SEO
     meta: {
       title: "Inscription Client - SOS Expats | Accédez à l'aide de la communauté",
-      description:
-        "Créez votre compte client en moins d'une minute et accédez à notre réseau d'aidants. Support 24/7, multilingue.",
+      description: "Créez votre compte client en moins d'une minute et accédez à notre réseau d'aidants. Support 24/7, multilingue.",
       keywords: 'inscription client, expatriation, aide, expats, 24/7, multilingue'
     },
+    // Interface utilisateur
     ui: {
       heroTitle: 'Votre inscription, en moins de 1 minute',
       badge247: 'Disponible 24/7',
       badgeMulti: 'Multilingue',
       title: 'Inscription Client',
-      subtitle: 'Créez votre compte pour accéder à notre réseau d’experts',
+      subtitle: 'Créez votre compte pour accéder à notre réseau d\'experts',
       alreadyRegistered: 'Déjà inscrit ?',
       login: 'Se connecter',
       personalInfo: 'Informations personnelles',
-      geographicInfo: 'Informations géographiques',
-      acceptTerms: "J'accepte les",
+      acceptTerms: 'J\'accepte les',
       termsLink: 'conditions générales pour clients',
       createAccount: 'Créer mon compte client',
       required: 'obligatoire',
       loading: 'Création en cours...',
       progressHint: 'Veuillez remplir tous les champs obligatoires (*)'
     },
+    // Champs du formulaire
     fields: {
       firstName: 'Prénom',
-      lastName: 'Nom',
       email: 'Adresse email',
       password: 'Mot de passe',
-      nationality: 'Nationalité',
-      residenceCountry: 'Pays de résidence',
-      status: 'Statut',
       languagesSpoken: 'Langues parlées'
     },
+    // Actions
     actions: {
-      selectCountry: 'Sélectionnez un pays',
-      specifyCountry: 'Précisez votre pays',
-      specifyLanguage: 'Précisez la langue'
+      addLanguage: 'Ajouter une langue',
+      remove: 'Supprimer',
+      specifyLanguage: 'Précisez la langue',
+      add: 'Ajouter'
     },
+    // Textes d'aide
     help: {
       minPassword: 'Minimum 6 caractères',
       emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'Votre prénom',
-      lastNamePlaceholder: 'Votre nom',
-      nationalityPlaceholder: 'Votre nationalité'
+      firstNamePlaceholder: 'Votre prénom'
     },
+    // Messages d'erreur
     errors: {
-      title: "Erreur d'inscription",
+      title: 'Erreur d\'inscription',
       allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
       passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
       invalidEmail: 'Veuillez saisir une adresse email valide',
-      selectCountryError: 'Veuillez sélectionner votre pays de résidence',
-      specifyCountryError: 'Veuillez préciser votre pays de résidence',
       selectLanguage: 'Veuillez sélectionner au moins une langue parlée',
-      registrationError: "Une erreur est survenue lors de l'inscription. Veuillez réessayer."
+      registrationError: 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.'
     },
-    statuses: [
-      { value: '', label: 'Sélectionnez votre statut' },
-      { value: 'expat', label: 'Expatrié' },
-      { value: 'traveler', label: 'Voyageur ponctuel' },
-      { value: 'investor', label: 'Investisseur' },
-      { value: 'digital_nomad', label: 'Digital Nomade' },
-      { value: 'retired_expat', label: 'Retraité expatrié' },
-      { value: 'student', label: "Étudiant à l'étranger" },
-      { value: 'other', label: 'Autre' }
-    ],
     termsHref: '/cgu-clients',
     jsonLdName: 'Inscription Client'
   },
   en: {
     meta: {
       title: 'Client Registration - SOS Expats | Get help from the community',
-      description:
-        'Create your client account in under 1 minute and access our helper network. 24/7, multilingual support.',
+      description: 'Create your client account in under 1 minute and access our helper network. 24/7, multilingual support.',
       keywords: 'client registration, expat, help, 24/7, multilingual'
     },
     ui: {
@@ -98,7 +96,6 @@ const i18n = {
       alreadyRegistered: 'Already registered?',
       login: 'Log in',
       personalInfo: 'Personal information',
-      geographicInfo: 'Geographic information',
       acceptTerms: 'I accept the',
       termsLink: 'general terms for clients',
       createAccount: 'Create my client account',
@@ -108,95 +105,100 @@ const i18n = {
     },
     fields: {
       firstName: 'First name',
-      lastName: 'Last name',
       email: 'Email address',
       password: 'Password',
-      nationality: 'Nationality',
-      residenceCountry: 'Country of residence',
-      status: 'Status',
       languagesSpoken: 'Spoken languages'
     },
     actions: {
-      selectCountry: 'Select a country',
-      specifyCountry: 'Specify your country',
-      specifyLanguage: 'Specify the language'
+      addLanguage: 'Add a language',
+      remove: 'Remove',
+      specifyLanguage: 'Specify the language',
+      add: 'Add'
     },
     help: {
       minPassword: 'Minimum 6 characters',
       emailPlaceholder: 'your@email.com',
-      firstNamePlaceholder: 'Your first name',
-      lastNamePlaceholder: 'Your last name',
-      nationalityPlaceholder: 'Your nationality'
+      firstNamePlaceholder: 'Your first name'
     },
     errors: {
       title: 'Registration error',
       allFieldsRequired: 'All required fields must be filled',
       passwordTooShort: 'Password must contain at least 6 characters',
       invalidEmail: 'Please enter a valid email address',
-      selectCountryError: 'Please select your country of residence',
-      specifyCountryError: 'Please specify your country of residence',
       selectLanguage: 'Please select at least one spoken language',
       registrationError: 'An error occurred during registration. Please try again.'
     },
-    statuses: [
-      { value: '', label: 'Select your status' },
-      { value: 'expat', label: 'Expat' },
-      { value: 'traveler', label: 'Occasional traveler' },
-      { value: 'investor', label: 'Investor' },
-      { value: 'digital_nomad', label: 'Digital Nomad' },
-      { value: 'retired_expat', label: 'Retired expat' },
-      { value: 'student', label: 'Study abroad' },
-      { value: 'other', label: 'Other' }
-    ],
     termsHref: '/terms-conditions-clients',
     jsonLdName: 'Client Registration'
   }
 } as const;
 
-// ===== Countries FR / EN (brefs + “Other/Autre”) =====
-const COUNTRIES = {
-  fr: [
-    'France', 'Belgique', 'Suisse', 'Luxembourg', 'Canada', 'États-Unis', 'Royaume-Uni',
-    'Allemagne', 'Espagne', 'Italie', 'Portugal', 'Maroc', 'Algérie', 'Tunisie',
-    'Chine', 'Inde', 'Japon', 'Corée du Sud', 'Émirats arabes unis', 'Australie',
-    'Brésil', 'Mexique', 'Afrique du Sud', 'Autre'
-  ],
-  en: [
-    'France', 'Belgium', 'Switzerland', 'Luxembourg', 'Canada', 'United States', 'United Kingdom',
-    'Germany', 'Spain', 'Italy', 'Portugal', 'Morocco', 'Algeria', 'Tunisia',
-    'China', 'India', 'Japan', 'South Korea', 'United Arab Emirates', 'Australia',
-    'Brazil', 'Mexico', 'South Africa', 'Other'
-  ]
-} as const;
+// Composant CustomFieldInput optimisé pour les champs personnalisés
+const CustomFieldInput = React.memo(({ 
+  placeholder, 
+  value, 
+  onChange, 
+  onAdd, 
+  disabled 
+}: { 
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  onAdd: () => void;
+  disabled: boolean;
+}) => (
+  <div className="mt-3 flex flex-col sm:flex-row gap-2">
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300"
+      onKeyPress={(e) => e.key === 'Enter' && !disabled && onAdd()}
+    />
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={disabled}
+      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 whitespace-nowrap"
+    >
+      Ajouter
+    </button>
+  </div>
+));
 
-// ===== Regex =====
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+CustomFieldInput.displayName = 'CustomFieldInput';
 
-// ===== Types =====
-interface FormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  nationality: string;
-  currentCountry: string;
-  customCountry: string;
-  status: string;
-  languagesSpoken: string[];
-  customLanguage: string;
-}
-
+// Composant principal
 const RegisterClient: React.FC = () => {
   const navigate = useNavigate();
   const { register, isLoading, error } = useAuth();
   const { language } = useApp();
-  const lang = (language === 'en' ? 'en' : 'fr') as 'fr' | 'en';
-  const t = i18n[lang];
+  
+  // Configuration i18n basée sur la langue actuelle
+  const t = i18nConfig[language as keyof typeof i18nConfig] || i18nConfig.fr;
 
-  // ---- SEO / Social ----
+  // État initial du formulaire optimisé
+  const initialFormData: FormData = useMemo(() => ({
+    firstName: '',
+    email: '',
+    password: '',
+    languagesSpoken: [],
+    customLanguage: ''
+  }), []);
+
+  // États du composant
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [selectedLanguages, setSelectedLanguages] = useState<MultiValue<{ value: string; label: string }>>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [showCustomLanguage, setShowCustomLanguage] = useState(false);
+
+  // SEO - Mise à jour des métadonnées complète
   useEffect(() => {
     document.title = t.meta.title;
-
+    
+    // Fonction utilitaire pour mettre à jour les métadonnées
     const setMeta = (attr: 'name' | 'property', key: string, content: string) => {
       let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
       if (!el) {
@@ -207,17 +209,22 @@ const RegisterClient: React.FC = () => {
       el.content = content;
     };
 
+    // Métadonnées de base
     setMeta('name', 'description', t.meta.description);
     setMeta('name', 'keywords', t.meta.keywords);
+    
+    // Open Graph
     setMeta('property', 'og:title', t.meta.title);
     setMeta('property', 'og:description', t.meta.description);
     setMeta('property', 'og:type', 'website');
-    setMeta('property', 'og:locale', lang === 'fr' ? 'fr_FR' : 'en_US');
+    setMeta('property', 'og:locale', language === 'en' ? 'en_US' : 'fr_FR');
+    
+    // Twitter Card
     setMeta('name', 'twitter:card', 'summary_large_image');
     setMeta('name', 'twitter:title', t.meta.title);
     setMeta('name', 'twitter:description', t.meta.description);
 
-    // JSON-LD (IA/ChatGPT friendly)
+    // JSON-LD pour le SEO et l'IA
     const id = 'jsonld-register-client';
     let script = document.getElementById(id) as HTMLScriptElement | null;
     const jsonld = {
@@ -225,11 +232,16 @@ const RegisterClient: React.FC = () => {
       '@type': 'WebPage',
       name: t.jsonLdName,
       description: t.meta.description,
-      inLanguage: lang === 'fr' ? 'fr-FR' : 'en-US',
+      inLanguage: language === 'en' ? 'en-US' : 'fr-FR',
       url: typeof window !== 'undefined' ? window.location.href : undefined,
-      isPartOf: { '@type': 'WebSite', name: 'SOS Expats', url: typeof window !== 'undefined' ? window.location.origin : undefined },
+      isPartOf: { 
+        '@type': 'WebSite', 
+        name: 'SOS Expats', 
+        url: typeof window !== 'undefined' ? window.location.origin : undefined 
+      },
       mainEntity: { '@type': 'Person', name: 'Client' }
     };
+    
     if (!script) {
       script = document.createElement('script');
       script.id = id;
@@ -237,153 +249,145 @@ const RegisterClient: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(jsonld);
-  }, [t, lang]);
+  }, [t, language]);
 
-  // ---- State ----
-  const initialForm: FormData = useMemo(
-    () => ({
-      firstName: '',
-      lastName: '',
-      email: '',
-      password: '',
-      nationality: '',
-      currentCountry: '',
-      customCountry: '',
-      status: '',
-      languagesSpoken: [],
-      customLanguage: ''
-    }),
+  // Classes CSS optimisées et mémorisées
+  const inputBase = useMemo(() =>
+    'w-full px-4 py-3 rounded-xl border transition-all duration-200 text-sm focus:outline-none',
     []
   );
-
-  const [formData, setFormData] = useState<FormData>(initialForm);
-  const [selectedLanguages, setSelectedLanguages] =
-    useState<MultiValue<{ value: string; label: string }>>([]);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState('');
-
-  // ---- Helpers ----
-  const inputBase =
-    'w-full px-4 py-3 rounded-xl border transition-all duration-200 text-sm focus:outline-none';
-  const inputNeutral =
-    `${inputBase} bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400`;
-  const inputWithIcon = `${inputNeutral} pl-11`;
-
-  const isValidEmail = useCallback((email: string) => EMAIL_REGEX.test(email), []);
-
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
-      if (name === 'currentCountry') {
-        // Clear customCountry if user changes back
-        if (value !== 'Autre' && value !== 'Other') {
-          setFormData(prev => ({ ...prev, customCountry: '' }));
-        }
-      }
-      if (formError) setFormError('');
-    },
-    [formError]
+  
+  const inputNeutral = useMemo(() =>
+    `${inputBase} bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400`,
+    [inputBase]
+  );
+  
+  const inputWithIcon = useMemo(() => 
+    `${inputNeutral} pl-11`,
+    [inputNeutral]
   );
 
-  const handleLanguagesChange = useCallback(
-    (newValue: MultiValue<{ value: string; label: string }>) => {
-      setSelectedLanguages(newValue);
-      setFormData(prev => ({ ...prev, languagesSpoken: newValue.map(v => v.value) }));
-    },
-    []
-  );
+  // Validation email optimisée avec regex pré-compilée
+  const isValidEmail = useCallback((email: string): boolean => {
+    return EMAIL_REGEX.test(email);
+  }, []);
 
+  // Fonction pour faire défiler vers le haut (amélioration UX)
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Gestionnaire générique pour les changements d'input - optimisé
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear errors when user starts typing
+    if (formError) {
+      setFormError('');
+    }
+  }, [formError]);
+
+  // Gestion des langues avec MultiLanguageSelect - optimisée
+  const handleAddCustomLanguage = useCallback(() => {
+    const customLang = formData.customLanguage.trim();
+    if (customLang && !selectedLanguages.some(lang => lang.value === customLang)) {
+      const newLanguage = { value: customLang, label: customLang };
+      setSelectedLanguages(prev => [...prev, newLanguage]);
+      setFormData(prev => ({ 
+        ...prev, 
+        customLanguage: '',
+        languagesSpoken: [...prev.languagesSpoken, customLang]
+      }));
+      setShowCustomLanguage(false);
+    }
+  }, [formData.customLanguage, selectedLanguages]);
+
+  // Gestion du changement des langues sélectionnées
+  const handleLanguagesChange = useCallback((newValue: MultiValue<{ value: string; label: string }>) => {
+    setSelectedLanguages(newValue);
+    setFormData(prev => ({
+      ...prev,
+      languagesSpoken: newValue.map(lang => lang.value)
+    }));
+    
+    // Vérifier si "Autre" est sélectionné
+    setShowCustomLanguage(newValue.some(lang => lang.value === 'other'));
+  }, []);
+
+  // Validation du formulaire - optimisée
   const validateForm = useCallback((): boolean => {
-    const { firstName, lastName, email, password, currentCountry, customCountry, languagesSpoken } =
-      formData;
+    const { firstName, email, password, languagesSpoken } = formData;
 
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
+    if (!firstName?.trim() || !email?.trim() || !password) {
       setFormError(t.errors.allFieldsRequired);
+      scrollToTop();
       return false;
     }
+
     if (!isValidEmail(email)) {
       setFormError(t.errors.invalidEmail);
+      scrollToTop();
       return false;
     }
+
     if (password.length < 6) {
       setFormError(t.errors.passwordTooShort);
+      scrollToTop();
       return false;
     }
-    if (!currentCountry) {
-      setFormError(t.errors.selectCountryError);
-      return false;
-    }
-    const isOther = currentCountry === 'Autre' || currentCountry === 'Other';
-    if (isOther && !customCountry.trim()) {
-      setFormError(t.errors.specifyCountryError);
-      return false;
-    }
+    
     if (languagesSpoken.length === 0) {
       setFormError(t.errors.selectLanguage);
+      scrollToTop();
       return false;
     }
+
     return true;
-  }, [formData, isValidEmail, t.errors]);
+  }, [formData, t.errors, scrollToTop, isValidEmail]);
 
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      setFormError('');
-      if (!validateForm()) return;
+  // Soumission du formulaire - optimisée
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
 
-      try {
-        const userData = {
-          role: 'client' as const,
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          email: formData.email.trim().toLowerCase(),
-          nationality: formData.nationality.trim(),
-          currentCountry:
-            formData.currentCountry === 'Autre' || formData.currentCountry === 'Other'
-              ? formData.customCountry.trim()
-              : formData.currentCountry,
-          status: formData.status,
-          languagesSpoken: formData.languagesSpoken,
-          isApproved: true,
-          createdAt: serverTimestamp()
-        };
+    if (!validateForm()) return;
 
-        await register(userData, formData.password);
-        navigate('/dashboard');
-      } catch (e) {
-        console.error('Register client error:', e);
-        setFormError(t.errors.registrationError);
-      }
-    },
-    [formData, register, navigate, t.errors.registrationError, validateForm]
-  );
+    try {
+      const userData = {
+        role: 'client' as const,
+        firstName: formData.firstName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        languagesSpoken: formData.languagesSpoken,
+        isApproved: true,
+        createdAt: serverTimestamp()
+      };
 
-  const canSubmit =
-    !!formData.email &&
-    !!formData.password &&
-    !!formData.firstName &&
-    !!formData.lastName &&
-    !!formData.currentCountry &&
-    formData.languagesSpoken.length > 0 &&
-    !isLoading;
+      console.log('📝 Données envoyées pour l\'inscription client:', userData);
 
-  const countryOptions = useMemo(
-    () =>
-      (COUNTRIES[lang] as readonly string[]).map(c => (
-        <option key={c} value={c}>
-          {c}
-        </option>
-      )),
-    [lang]
-  );
+      await register(userData, formData.password);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'inscription client:', error);
+      setFormError(t.errors.registrationError);
+      scrollToTop();
+    }
+  }, [formData, validateForm, register, navigate, t.errors.registrationError, scrollToTop]);
 
-  // ===== UI =====
+  // Vérification si le formulaire peut être soumis
+  const canSubmit = useMemo(() => {
+    return formData.email && 
+           formData.password && 
+           formData.firstName && 
+           formData.languagesSpoken.length > 0 &&
+           !isLoading;
+  }, [formData.email, formData.password, formData.firstName, formData.languagesSpoken.length, isLoading]);
+
   return (
     <Layout>
-      {/* Fond pastel bleu (client) + correction d’espace sous header */}
+      {/* Fond pastel bleu (client) + correction d'espace sous header */}
       <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-blue-50">
-        {/* En-tête compact (évite le gros blanc sous le header global) */}
+        {/* En-tête compact optimisé pour mobile */}
         <header className="pt-6 sm:pt-8">
           <div className="mx-auto w-full max-w-2xl px-4">
             <div className="text-center">
@@ -405,13 +409,13 @@ const RegisterClient: React.FC = () => {
                 </span>
               </div>
 
-              {/* petit séparateur bleu, fin pour “sous-titre” */}
+              {/* petit séparateur bleu, fin pour "sous-titre" */}
               <div className="mx-auto mt-5 h-1 w-40 rounded-full bg-blue-500/60" />
             </div>
           </div>
         </header>
 
-        {/* Contenu principal : marge top réduite pour éviter l’immense vide */}
+        {/* Contenu principal : marge top réduite pour éviter l'immense vide */}
         <main className="mx-auto w-full max-w-2xl px-4 pb-12 pt-6 sm:pt-8">
           {/* Panneau formulaire */}
           <div className="rounded-2xl border border-blue-100 bg-white/90 shadow-xl backdrop-blur-sm">
@@ -430,6 +434,7 @@ const RegisterClient: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8 px-5 py-6 sm:px-8 sm:py-8" noValidate>
+              {/* Messages d'erreur améliorés */}
               {(error || formError) && (
                 <div
                   className="rounded-xl border border-red-200 bg-red-50/80 p-4"
@@ -446,206 +451,119 @@ const RegisterClient: React.FC = () => {
                 </div>
               )}
 
-              {/* Section infos perso */}
+              {/* Section: Informations personnelles */}
               <section>
                 <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
                   <UserCheck className="h-5 w-5 text-blue-600" />
                   {t.ui.personalInfo}
                 </h3>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-4">
                   <div>
                     <label htmlFor="firstName" className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.firstName} <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <input
-                        id="firstName"
-                        name="firstName"
-                        type="text"
-                        required
-                        autoComplete="given-name"
-                        value={formData.firstName}
-                        onChange={handleInputChange}
-                        placeholder={t.help.firstNamePlaceholder}
-                        className={inputNeutral}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="lastName" className="mb-1 block text-sm font-medium text-gray-700">
-                      {t.fields.lastName} <span className="text-red-500">*</span>
-                    </label>
                     <input
-                      id="lastName"
-                      name="lastName"
+                      id="firstName"
+                      name="firstName"
                       type="text"
                       required
-                      autoComplete="family-name"
-                      value={formData.lastName}
+                      autoComplete="given-name"
+                      value={formData.firstName}
                       onChange={handleInputChange}
-                      placeholder={t.help.lastNamePlaceholder}
+                      placeholder={t.help.firstNamePlaceholder}
                       className={inputNeutral}
+                      aria-describedby="firstName-required"
                     />
                   </div>
-                </div>
 
-                <div className="mt-4">
-                  <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
-                    {t.fields.email} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      autoComplete="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder={t.help.emailPlaceholder}
-                      className={inputWithIcon}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
-                    {t.fields.password} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      autoComplete="new-password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      placeholder={t.help.minPassword}
-                      className={`${inputWithIcon} pr-11`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(v => !v)}
-                      className="absolute right-3 top-2.5 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95"
-                      aria-label={showPassword ? (lang === 'fr' ? 'Masquer le mot de passe' : 'Hide password') : (lang === 'fr' ? 'Afficher le mot de passe' : 'Show password')}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              {/* Section géo */}
-              <section>
-                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
-                  <MapPin className="h-5 w-5 text-blue-600" />
-                  {t.ui.geographicInfo}
-                </h3>
-
-                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label htmlFor="nationality" className="mb-1 block text-sm font-medium text-gray-700">
-                      {t.fields.nationality}
+                    <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
+                      {t.fields.email} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <Flag className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
                       <input
-                        id="nationality"
-                        name="nationality"
-                        type="text"
-                        autoComplete="country"
-                        value={formData.nationality}
+                        id="email"
+                        name="email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={formData.email}
                         onChange={handleInputChange}
-                        placeholder={t.help.nationalityPlaceholder}
+                        placeholder={t.help.emailPlaceholder}
                         className={inputWithIcon}
+                        aria-describedby="email-required"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="currentCountry" className="mb-1 block text-sm font-medium text-gray-700">
-                      {t.fields.residenceCountry} <span className="text-red-500">*</span>
+                    <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
+                      {t.fields.password} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <MapPin className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                      <select
-                        id="currentCountry"
-                        name="currentCountry"
+                      <Lock className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <input
+                        id="password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
                         required
-                        value={formData.currentCountry}
+                        autoComplete="new-password"
+                        value={formData.password}
                         onChange={handleInputChange}
-                        className={inputWithIcon}
+                        placeholder={t.help.minPassword}
+                        className={`${inputWithIcon} pr-11`}
+                        aria-describedby="password-requirements"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+                        aria-label={showPassword ? (language === 'en' ? 'Hide password' : 'Masquer le mot de passe') : (language === 'en' ? 'Show password' : 'Afficher le mot de passe')}
                       >
-                        <option value="">{t.actions.selectCountry}</option>
-                        {countryOptions}
-                      </select>
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
                     </div>
-
-                    {(formData.currentCountry === 'Autre' || formData.currentCountry === 'Other') && (
-                      <div className="mt-3">
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          {t.actions.specifyCountry}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.customCountry}
-                          onChange={e =>
-                            setFormData(prev => ({ ...prev, customCountry: e.target.value }))
-                          }
-                          className={inputNeutral}
-                          placeholder={t.actions.specifyCountry}
-                        />
-                      </div>
-                    )}
                   </div>
 
-                  <div>
-                    <label htmlFor="status" className="mb-1 block text-sm font-medium text-gray-700">
-                      {t.fields.status}
-                    </label>
-                    <select
-                      id="status"
-                      name="status"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                      className={inputNeutral}
-                    >
-                      {i18n[lang].statuses.map(s => (
-                        <option key={s.value} value={s.value}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
+                  {/* Langues parlées avec MultiLanguageSelect */}
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.languagesSpoken} <span className="text-red-500">*</span>
                     </label>
-
-                    <Suspense
-                      fallback={
-                        <div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
-                      }
-                    >
-                      <MultiLanguageSelect value={selectedLanguages} onChange={handleLanguagesChange} />
+                    
+                    <Suspense fallback={
+                      <div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100 flex items-center px-3">
+                        <div className="text-gray-500 text-sm">Chargement des langues...</div>
+                      </div>
+                    }>
+                      <MultiLanguageSelect
+                        value={selectedLanguages}
+                        onChange={handleLanguagesChange}
+                      />
                     </Suspense>
+                    
+                    {showCustomLanguage && (
+                      <CustomFieldInput
+                        placeholder={t.actions.specifyLanguage}
+                        value={formData.customLanguage}
+                        onChange={(value) => setFormData(prev => ({ ...prev, customLanguage: value }))}
+                        onAdd={handleAddCustomLanguage}
+                        disabled={!formData.customLanguage.trim()}
+                      />
+                    )}
 
-                    {/* Astuce accessibilité: petite note de sécu & confiance */}
+                    {/* Note de sécurité */}
                     <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
                       <ShieldCheck className="h-4 w-4 text-green-600" />
-                      <span>SSL • {lang === 'fr' ? 'Données chiffrées' : 'Encrypted data'}</span>
+                      <span>SSL • {language === 'en' ? 'Encrypted data' : 'Données chiffrées'}</span>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Conditions + CTA */}
+              {/* Conditions générales */}
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <label className="flex items-start gap-3 text-sm text-gray-700">
                   <input
@@ -668,6 +586,7 @@ const RegisterClient: React.FC = () => {
                 </label>
               </div>
 
+              {/* Bouton de soumission optimisé */}
               <div>
                 <Button
                   type="submit"
@@ -680,6 +599,7 @@ const RegisterClient: React.FC = () => {
                   {isLoading ? t.ui.loading : t.ui.createAccount}
                 </Button>
 
+                {/* Indicateur de progression visuel */}
                 {!canSubmit && (
                   <p className="mt-3 text-center text-xs text-gray-500">{t.ui.progressHint}</p>
                 )}
@@ -687,11 +607,11 @@ const RegisterClient: React.FC = () => {
             </form>
           </div>
 
-          {/* Footer petit texte */}
+          {/* Footer informatif */}
           <div className="mt-6 text-center text-xs text-gray-500">
-            {lang === 'fr'
-              ? "En vous inscrivant, vous rejoignez notre réseau et accédez rapidement à de l’aide qualifiée."
-              : 'By registering, you join our network and quickly access qualified help.'}
+            {language === 'en'
+              ? 'By registering, you join our network and quickly access qualified help.'
+              : "En vous inscrivant, vous rejoignez notre réseau et accédez rapidement à de l'aide qualifiée."}
           </div>
         </main>
       </div>
@@ -699,4 +619,5 @@ const RegisterClient: React.FC = () => {
   );
 };
 
+// Export avec React.memo pour optimiser les re-renders
 export default React.memo(RegisterClient);

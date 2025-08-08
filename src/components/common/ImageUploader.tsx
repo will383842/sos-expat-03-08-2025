@@ -112,75 +112,163 @@ const useDropzone = (opts: UseDropzoneOptions) => {
   };
 };
 
-// Caméra (mobile + desktop)
-interface CameraCapture { openCamera: (facingMode?: 'user' | 'environment') => Promise<void>; isSupported: boolean; }
-const useCameraCapture = (onCapture: (file: File) => void, t: typeof I18N['fr']) : CameraCapture => {
+// Caméra (mobile + desktop) — version universelle & robuste
+interface CameraCapture {
+  openCamera: (facingMode?: 'user' | 'environment') => Promise<void>;
+  isSupported: boolean;
+}
+
+/**
+ * Hook caméra compatible iOS/Android/Desktop :
+ * - PAS d'ImageCapture().takePhoto() (iOS ne supporte pas)
+ * - Snapshot via <canvas> (fiable partout)
+ * - Fallback facingMode -> deviceId -> any caméra
+ * - Switch caméra robuste
+ */
+const useCameraCapture = (
+  onCapture: (file: File) => void,
+  tUi: typeof I18N['fr']['ui']   // ⬅️ corrige le typing : on passe t.ui
+): CameraCapture => {
   const isSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  const openCamera = useCallback(async (facingMode: 'user' | 'environment' = 'user') => {
-    if (!isSupported) throw new Error(t.errors.cameraNotSupported);
+
+  // Essaie d'abord le facingMode souhaité, sinon cherche un deviceId, sinon "any"
+  async function getBestStream(preferred: 'user' | 'environment' = 'user'): Promise<MediaStream> {
+    // 1) facingMode "ideal" (pas "exact")
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, width: { ideal: 1280 }, height: { ideal: 1280 } } });
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: preferred }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false,
+      });
+    } catch { /* ignore */ }
+
+    // 2) deviceId correspondant à une cam "dos" si possible
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videos = devices.filter(d => d.kind === 'videoinput');
+      const back = videos.find(d =>
+        /back|rear|environment|arrière|dos/i.test(d.label)
+      ) || videos[0];
+      if (back) {
+        return await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: back.deviceId }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+          audio: false,
+        });
+      }
+    } catch { /* ignore */ }
+
+    // 3) dernier recours : n'importe quelle caméra
+    return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  }
+
+  const openCamera = useCallback(async (facingMode: 'user' | 'environment' = 'user') => {
+    if (!isSupported) throw new Error(tUi.cameraNotSupported);
+
+    let stream: MediaStream | null = null;
+
+    try {
+      stream = await getBestStream(facingMode);
+
+      // --- UI légère (DOM natif) ---
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/90';
+
       const container = document.createElement('div');
       container.className = 'bg-white rounded-lg p-4 max-w-sm w-full mx-4';
+
       const video = document.createElement('video');
-      video.srcObject = stream; video.autoplay = true; video.playsInline = true;
+      video.autoplay = true;
+      video.playsInline = true; // iOS
       video.className = 'w-full h-64 object-cover rounded-lg bg-black';
+      video.srcObject = stream;
+
       const btns = document.createElement('div');
       btns.className = 'flex gap-3 mt-4';
 
-      const captureBtn = document.createElement('button');
-      captureBtn.textContent = t.ui.takePhoto;
-      captureBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700';
       const cancelBtn = document.createElement('button');
-      cancelBtn.textContent = t.ui.cancel;
+      cancelBtn.textContent = tUi.cancel;
       cancelBtn.className = 'flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50';
+
       const switchBtn = document.createElement('button');
       switchBtn.textContent = '🔄';
+      switchBtn.title = 'Changer de caméra';
       switchBtn.className = 'px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50';
-      switchBtn.title = 'Switch camera';
+
+      const captureBtn = document.createElement('button');
+      captureBtn.textContent = tUi.takePhoto;
+      captureBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700';
 
       btns.append(cancelBtn, switchBtn, captureBtn);
       container.append(video, btns);
       modal.appendChild(container);
       document.body.appendChild(modal);
 
-      const cleanup = () => { stream.getTracks().forEach(tr => tr.stop()); if (modal.parentNode) document.body.removeChild(modal); };
+      // utilitaire nettoyage
+      const cleanup = () => {
+        try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+        if (modal.parentNode) modal.parentNode.removeChild(modal);
+      };
+
+      // fermer si clic en fond
+      modal.onclick = (e) => { if (e.target === modal) cleanup(); };
+      cancelBtn.onclick = cleanup;
+
+      // ✅ CAPTURE via <canvas> (universel)
       captureBtn.onclick = () => {
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d'); if (!ctx) return;
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const w = video.videoWidth || 1280;
+        const h = video.videoHeight || 1280;
+        canvas.width = w;
+        canvas.height = h;
+
+        ctx.drawImage(video, 0, 0, w, h);
+
         canvas.toBlob((blob) => {
-          if (blob) onCapture(new File([blob], 'camera-capture.jpg', { type: 'image/jpeg', lastModified: Date.now() }));
+          if (blob) {
+            const file = new File([blob], 'camera-capture.jpg', {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            onCapture(file); // → ton flux: crop + upload Firebase
+          }
           cleanup();
         }, 'image/jpeg', 0.9);
       };
-      cancelBtn.onclick = cleanup;
+
+      // 🔁 SWITCH caméra robuste
+      let currentFacing: 'user' | 'environment' = facingMode;
       switchBtn.onclick = async () => {
         try {
-          const newFacing = (facingMode === 'user') ? 'environment' : 'user';
-          const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newFacing, width: { ideal: 1280 }, height: { ideal: 1280 } } });
-          stream.getTracks().forEach(tr => tr.stop());
+          const desired = currentFacing === 'user' ? 'environment' : 'user';
+          const newStream = await getBestStream(desired);
+          // stop ancien stream
+          try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+          stream = newStream;
           video.srcObject = newStream;
-          // update local reference
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (stream as any) = newStream;
+          currentFacing = desired;
         } catch (err) {
           console.warn('Could not switch camera:', err);
         }
       };
-      // close on background click
-      modal.onclick = (e) => { if (e.target === modal) cleanup(); };
+
     } catch (e) {
-      console.error('Camera access error:', e);
-      throw new Error(t.errors.cameraAccessFailed);
+      // erreurs claires pour tes toasts existants
+      const name = (e as DOMException)?.name;
+      if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        throw new Error(tUi.cameraNotSupported);
+      }
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        throw new Error(tUi.cameraAccessFailed);
+      }
+      throw e instanceof Error ? e : new Error(tUi.cameraAccessFailed);
     }
-  }, [isSupported, onCapture, t]);
+  }, [isSupported, onCapture, tUi]);
 
   return { openCamera, isSupported };
 };
+
 
 // Config images
 const SUPPORTED_IMAGE_CONFIG = {
@@ -602,8 +690,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             {...getInputProps()}
             ref={fileInputRef}
             aria-describedby="upload-description"
+            className="sr-only pointer-events-none absolute -m-px w-px h-px overflow-hidden border-0 p-0 clip-[rect(0,0,0,0)]"
+            tabIndex={-1}
+            aria-hidden="true"
           />
-
           {isUploading ? (
             <div className="space-y-3">
               <Upload className="w-10 h-10 sm:w-12 sm:h-12 text-blue-500 mx-auto animate-pulse" />

@@ -580,20 +580,30 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
             </div>
           </div>
 
-          {/* Zoom */}
-          <div className="flex items-center gap-3">
-            <ZoomIn size={18} className="text-gray-600" />
-            <CustomSlider
-              value={scale}
-              min={0.2}
-              max={3}
-              step={0.05}
-              onChange={(_, v) => handleScaleChange(v as number)}
-              disabled={!isInitialized || isProcessing}
-              aria-label={t.zoom}
-            />
-            <span className="text-sm text-gray-600 min-w-[3rem] text-right">{Math.round(scale * 100)}%</span>
-          </div>
+{/* Zoom moderne */}
+<div className="flex items-center gap-3 w-full">
+  <ZoomIn size={18} className="text-gray-600" />
+  <input
+    type="range"
+    value={scale}
+    min={0.2}
+    max={3}
+    step={0.05}
+    onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
+    disabled={!isInitialized || isProcessing}
+    aria-label={t.zoom}
+    className="flex-1 appearance-none h-2 bg-gray-200 rounded-lg accent-blue-600 cursor-pointer
+               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5
+               [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600
+               [&::-webkit-slider-thumb]:hover:bg-blue-700
+               [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5
+               [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-blue-600"
+  />
+  <span className="text-sm text-gray-600 min-w-[3rem] text-right">
+    {Math.round(scale * 100)}%
+  </span>
+</div>
+
 
           {/* Rotate */}
           <div className="flex items-center gap-3">

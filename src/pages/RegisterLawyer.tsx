@@ -711,8 +711,8 @@ const RegisterLawyer: React.FC = () => {
           rating: 4.5,
           reviewCount: 0,
           preferredLanguage: lawyerForm.preferredLanguage,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         };
 
         await register(userData, lawyerForm.password);
@@ -1298,28 +1298,26 @@ const RegisterLawyer: React.FC = () => {
                     <span className="text-red-500 ml-1">*</span>
                   </label>
 
-                  <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                    {/* On passe des labels pour forcer l’anglais quand nécessaire et masquer le “Choisir un fichier” natif */}
-                    <ImageUploader
-                    locale={lang} // 👈 IMPORTANT: fait suivre la langue au composant
-                    currentImage={lawyerForm.profilePhoto}
-                    onImageUploaded={(url: string) => {
-                      setLawyerForm((p) => ({ ...p, profilePhoto: url }));
-                    }}
-                    labels={{
-                      title: t.uploaderTitle,
-                      button: t.uploaderCta,
-                      empty: t.uploaderEmpty,
-                      hint: t.uploaderHint,
-                    }}
-                    hideNativeFileLabel
-                    // (optionnel mais conseillé pour un avatar)
-                    cropShape="round"
-                    outputSize={512}
-                  />
-
-                  </Suspense>
-
+                <ImageUploader
+                  locale={lang} // langue dynamique
+                  currentImage={lawyerForm.profilePhoto} // affiche la photo actuelle du lawyer
+                  onImageUploaded={(url: string) => {
+                    setLawyerForm((prev) => ({
+                      ...prev,
+                      profilePhoto: url, // enregistre l'URL dans le state du lawyer
+                    }));
+                  }}
+                  labels={{
+                    title: t.uploaderTitle,
+                    button: t.uploaderCta,
+                    empty: t.uploaderEmpty,
+                    hint: t.uploaderHint,
+                  }}
+                  hideNativeFileLabel
+                  cropShape="round"
+                  outputSize={512}
+                />
+          
                   {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                   <p className="text-xs text-gray-500 mt-1">
                     {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}

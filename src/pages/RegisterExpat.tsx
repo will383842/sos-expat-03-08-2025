@@ -13,7 +13,7 @@ import { useApp } from '../contexts/AppContext';
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
-
+placeholder={t.langPlaceholder}
 // ===== Types =====
 interface LanguageOption { value: string; label: string }
 interface ExpatFormData {
@@ -853,15 +853,22 @@ const RegisterExpat: React.FC = () => {
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     {t.languages} <span className="text-red-500">*</span>
                   </label>
-                  <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
-                    <MultiLanguageSelect
-                      value={selectedLanguages}
-                      onChange={(value) => {
-                        setSelectedLanguages(value as LanguageOption[]);
-                      }}
-                    />
-                  </Suspense>
-                  {fieldErrors.languages && <p className="text-sm text-red-600 mt-2">{fieldErrors.languages}</p>}
+<Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
+  <ImageUploader
+    locale={lang}
+    currentImage={lawyerForm.profilePhoto}
+    onImageUploaded={(url: string) => {
+      setLawyerForm((prev) => ({
+        ...prev,
+        profilePhoto: url,
+      }));
+    }}
+    // labels supprimé (voir point 4)
+    hideNativeFileLabel
+    cropShape="round"
+    outputSize={512}
+  />
+</Suspense>
                 </div>
 
                 {/* Bio */}
@@ -891,18 +898,20 @@ const RegisterExpat: React.FC = () => {
                     <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                   </label>
                   <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                    <ImageUploader
-                    locale={lang} // 👈 IMPORTANT: fait suivre la langue au composant
+                  <ImageUploader
+                    locale={lang} // langue dynamique
+                    currentImage={formData.profilePhoto} // affiche la photo actuelle de l'expat
                     onImageUploaded={(url: string) => {
-                      setFormData((p) => ({ ...p, profilePhoto: url }));
+                      setFormData((prev) => ({
+                        ...prev,
+                        profilePhoto: url, // enregistre l'URL dans le state de l'expat
+                      }));
                     }}
-                    currentImage={formData.profilePhoto}
-                    // (optionnel mais conseillé pour un avatar)
+                    hideNativeFileLabel
                     cropShape="round"
                     outputSize={512}
                   />
 
-                  </Suspense>
                   {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                   <p className="text-xs text-gray-500 mt-1">
                     {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}

@@ -367,7 +367,6 @@ const RegisterLawyer: React.FC = () => {
       let el = document.querySelector(sel) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement('meta');
-        prop ? el.setAttribute('property', name) : el.setAttribute('name', name);
         document.head.appendChild(el);
       }
       el.content = content;
@@ -1302,19 +1301,23 @@ const RegisterLawyer: React.FC = () => {
                   <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
                     {/* On passe des labels pour forcer l’anglais quand nécessaire et masquer le “Choisir un fichier” natif */}
                     <ImageUploader
-                      currentImage={lawyerForm.profilePhoto}
-                      onImageUploaded={(url: string) => {
-                        setLawyerForm((p) => ({ ...p, profilePhoto: url }));
-                        if (fieldErrors.profilePhoto) setFieldErrors(({ profilePhoto, ...r }) => r);
-                      }}
-                      labels={{
-                        title: t.uploaderTitle,
-                        button: t.uploaderCta,
-                        empty: t.uploaderEmpty,
-                        hint: t.uploaderHint,
-                      }}
-                      hideNativeFileLabel // -> à gérer dans votre composant (masque le “Choisir un fichier”)
-                    />
+                    locale={lang} // 👈 IMPORTANT: fait suivre la langue au composant
+                    currentImage={lawyerForm.profilePhoto}
+                    onImageUploaded={(url: string) => {
+                      setLawyerForm((p) => ({ ...p, profilePhoto: url }));
+                    }}
+                    labels={{
+                      title: t.uploaderTitle,
+                      button: t.uploaderCta,
+                      empty: t.uploaderEmpty,
+                      hint: t.uploaderHint,
+                    }}
+                    hideNativeFileLabel
+                    // (optionnel mais conseillé pour un avatar)
+                    cropShape="round"
+                    outputSize={512}
+                  />
+
                   </Suspense>
 
                   {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}

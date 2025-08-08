@@ -7,12 +7,25 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { serverTimestamp } from 'firebase/firestore';
 import type { MultiValue } from 'react-select';
+import { FieldValue } from 'firebase/firestore';
 
 // Lazy loading des composants lourds pour améliorer le temps de chargement initial
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
 
 // Regex pré-compilées pour améliorer les performances
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Interface pour la création d'utilisateur
+interface CreateUserData {
+  role: 'client';
+  firstName: string;
+  email: string;
+  languagesSpoken: string[];
+  isApproved: boolean;
+  createdAt: FieldValue;
+}
+
+// Interface pour le formulaire optimisée
 
 // Interface pour le formulaire optimisée
 interface FormData {
@@ -354,7 +367,7 @@ const RegisterClient: React.FC = () => {
     if (!validateForm()) return;
 
     try {
-      const userData = {
+      const userData: CreateUserData = {
         role: 'client' as const,
         firstName: formData.firstName.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -365,7 +378,7 @@ const RegisterClient: React.FC = () => {
 
       console.log('📝 Données envoyées pour l\'inscription client:', userData);
 
-      await register(userData, formData.password);
+      await register(userData as unknown as Parameters<typeof register>[0], formData.password);
       navigate('/dashboard');
     } catch (error) {
       console.error('❌ Erreur lors de l\'inscription client:', error);
@@ -563,27 +576,28 @@ const RegisterClient: React.FC = () => {
                 </div>
               </section>
 
-              {/* Conditions générales */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <label className="flex items-start gap-3 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    required
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>
-                    {t.ui.acceptTerms}{' '}
-                    <Link
-                      to={t.termsHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
-                    >
-                      {t.ui.termsLink}
-                    </Link>{' '}
-                    <span className="text-red-500">*</span>
-                  </span>
-                </label>
+{/* Conditions générales */}
+<div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+  <div className="flex items-start gap-3">
+    <input
+      id="acceptClientTerms"
+      type="checkbox"
+      required
+      className="h-5 w-5 text-blue-600 border-gray-300 rounded mt-0.5"
+    />
+    <label htmlFor="acceptClientTerms" className="text-sm text-gray-700">
+      {t.ui.acceptTerms}{' '}
+      <Link
+        to={t.termsHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
+      >
+        {t.ui.termsLink}
+      </Link>{' '}
+      <span className="text-red-500">*</span>
+    </label>
+  </div>
               </div>
 
               {/* Bouton de soumission optimisé */}

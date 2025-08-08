@@ -2,14 +2,13 @@
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Mail, Lock, Eye, EyeOff, AlertCircle, Globe, MapPin, Users, Phone,
+  Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Users, Phone,
   X, Camera, CheckCircle, ArrowRight
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { serverTimestamp } from 'firebase/firestore';
 
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
@@ -330,7 +329,6 @@ const RegisterExpat: React.FC = () => {
       let el = document.querySelector(sel) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement('meta');
-        prop ? el.setAttribute('property', name) : el.setAttribute('name', name);
         document.head.appendChild(el);
       }
       el.content = content;
@@ -492,7 +490,7 @@ const RegisterExpat: React.FC = () => {
         setFormData((prev) => ({ ...prev, helpTypes: [...prev.helpTypes, v] }));
       }
       e.target.value = '';
-      if (fieldErrors.helpTypes) setFieldErrors(({ helpTypes, ...rest }) => rest);
+      if (fieldErrors.helpTypes) setFieldErrors(({ ...rest }) => rest);
     },
     [formData.helpTypes, fieldErrors.helpTypes, lang]
   );
@@ -573,8 +571,8 @@ const RegisterExpat: React.FC = () => {
           isVisible: true,
           isActive: true,
           preferredLanguage: lang,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         };
         await register(userData, formData.password);
         navigate('/dashboard', { state: { message: t.success, type: 'success' } });
@@ -620,7 +618,7 @@ const RegisterExpat: React.FC = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_35%,#f0fff7_100%)]">
-        {/* Compact hero (réduit l’espace vide sous le header) */}
+        {/* Compact hero (réduit l'espace vide sous le header) */}
         <header className="pt-6 sm:pt-8 text-center">
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-gray-900">
             <span className={`bg-gradient-to-r ${THEME.gradFrom} ${THEME.gradTo} bg-clip-text text-transparent`}>
@@ -860,7 +858,6 @@ const RegisterExpat: React.FC = () => {
                       value={selectedLanguages}
                       onChange={(value) => {
                         setSelectedLanguages(value as LanguageOption[]);
-                        if (fieldErrors.languages) setFieldErrors(({ languages, ...rest }) => rest);
                       }}
                     />
                   </Suspense>
@@ -894,16 +891,17 @@ const RegisterExpat: React.FC = () => {
                     <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                   </label>
                   <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                    {/* NOTE: on passe des labels i18n: le composant peut les ignorer si non supportés, mais ça ne casse rien */}
                     <ImageUploader
-                      onImageUploaded={(url: string) => {
-                        setFormData((p) => ({ ...p, profilePhoto: url }));
-                        if (fieldErrors.profilePhoto) setFieldErrors(({ profilePhoto, ...rest }) => rest);
-                      }}
-                      currentImage={formData.profilePhoto}
-                      ctaLabel={t.clickHere}
-                      noFileText={lang === 'en' ? 'No file selected' : 'Aucun fichier sélectionné'}
-                    />
+                    locale={lang} // 👈 IMPORTANT: fait suivre la langue au composant
+                    onImageUploaded={(url: string) => {
+                      setFormData((p) => ({ ...p, profilePhoto: url }));
+                    }}
+                    currentImage={formData.profilePhoto}
+                    // (optionnel mais conseillé pour un avatar)
+                    cropShape="round"
+                    outputSize={512}
+                  />
+
                   </Suspense>
                   {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                   <p className="text-xs text-gray-500 mt-1">
@@ -963,7 +961,7 @@ const RegisterExpat: React.FC = () => {
                       required
                     />
                     <label htmlFor="acceptTerms" className="text-sm text-gray-800">
-                      {lang === 'en' ? 'I accept the' : "J’accepte les"}{' '}
+                      {lang === 'en' ? 'I accept the' : "J'accepte les"}{' '}
                       <Link
                         to="/cgu-expatries"
                         className="text-emerald-700 underline font-semibold"

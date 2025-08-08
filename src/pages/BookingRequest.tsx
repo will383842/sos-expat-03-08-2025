@@ -4,6 +4,7 @@ import { ArrowLeft, Euro, Shield, CheckCircle, AlertCircle, Phone, MessageCircle
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext'; // 🔧 AJOUT: Import du contexte App
 import { createBookingRequest } from '../utils/firestore';
 import { logLanguageMismatch } from '../services/analytics';
 import { Link } from 'react-router-dom';
@@ -214,6 +215,7 @@ const countries = [
 
 interface NotificationData {
   type: string;
+  providerId?: string;
   recipientEmail?: string;
   recipientPhone?: string;
   recipientName?: string;
@@ -306,6 +308,7 @@ const BookingRequest: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
+  const { language } = useApp(); // 🔧 AJOUT: Récupération de la langue du contexte
   
   const [formData, setFormData] = useState({
     title: '',
@@ -351,7 +354,7 @@ const BookingRequest: React.FC = () => {
       if (savedProvider) {
         const providerData = JSON.parse(savedProvider);
         if (providerData.id === providerId) {
-          return normalizeProvider(providerData); // ← AJOUT de normalizeProvider
+          return normalizeProvider(providerData);
         }
       }
     } catch (error) {
@@ -475,7 +478,6 @@ const BookingRequest: React.FC = () => {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
-      // Validation spécifique pour les numéros de téléphone
       let sanitizedValue = value;
       if (name === 'phoneNumber' || name === 'whatsappNumber') {
         sanitizedValue = value.replace(/[^\d\s+()-]/g, '');
@@ -508,7 +510,6 @@ const BookingRequest: React.FC = () => {
     });
 
     try {
-      // 🔧 FIX: Validation préalable des données critiques
       if (!requestData.providerEmail && !requestData.providerPhone) {
         console.warn('⚠️ [DEBUG] Aucun contact disponible pour le prestataire');
         return { success: false, error: 'Aucun contact disponible pour le prestataire' };
@@ -526,14 +527,12 @@ const BookingRequest: React.FC = () => {
 
       console.log('✅ [DEBUG] Validation des données réussie');
 
-      // 🔧 FIX: Simplification drastique des données pour identifier le problème
       const notificationData: NotificationData = {
         type: 'provider_booking_request',
         providerId: providerId,
         recipientName: requestData.providerName || 'Prestataire',
         emailSubject: `SOS Expat - Nouvelle demande: ${requestData.title.substring(0, 50)}`,
         
-        // 🔧 FIX: HTML simplifié pour éviter les erreurs de parsing
         emailHtml: `
 <h2>Nouvelle demande de consultation</h2>
 <p><strong>Client:</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
@@ -546,14 +545,11 @@ const BookingRequest: React.FC = () => {
 <p>Connectez-vous à votre espace prestataire pour répondre.</p>
         `.trim(),
 
-        // 🔧 FIX: SMS simplifié
         smsMessage: `SOS Expat: Nouvelle demande de ${requestData.clientFirstName}. Titre: "${requestData.title.substring(0, 30)}...". Consultez votre espace.`,
 
-        // 🔧 FIX: WhatsApp simplifié
         whatsappMessage: `🔔 SOS Expat: Nouvelle demande de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire.`
       };
 
-      // 🔧 FIX: Ajouter email seulement s'il existe et est valide
       if (requestData.providerEmail && requestData.providerEmail.includes('@')) {
         notificationData.recipientEmail = requestData.providerEmail;
         console.log('✅ [DEBUG] Email ajouté:', requestData.providerEmail);
@@ -561,7 +557,6 @@ const BookingRequest: React.FC = () => {
         console.warn('⚠️ [DEBUG] Email invalide ou manquant, notification par email ignorée');
       }
 
-      // 🔧 FIX: Ajouter téléphone seulement s'il existe
       if (requestData.providerPhone && requestData.providerPhone.length > 5) {
         notificationData.recipientPhone = requestData.providerPhone;
         console.log('✅ [DEBUG] Téléphone ajouté:', requestData.providerPhone);
@@ -578,7 +573,6 @@ const BookingRequest: React.FC = () => {
         smsLength: notificationData.smsMessage?.length || 0
       });
 
-      // 🔧 FIX: Test de connectivité Firebase avant envoi
       console.log('🔗 [DEBUG] Test de connectivité Firebase Functions...');
       if (!functions) {
         throw new Error('Firebase Functions non initialisé');
@@ -612,7 +606,6 @@ const BookingRequest: React.FC = () => {
         console.error('❌ [DEBUG] Détails d\'erreur:', errorObj.details);
         console.error('❌ [DEBUG] Stack trace:', errorObj.stack);
         
-        // 🔧 FIX: Analyse spécifique des erreurs Firebase
         if (errorObj.code) {
           switch (errorObj.code) {
             case 'functions/invalid-argument':
@@ -660,14 +653,12 @@ const BookingRequest: React.FC = () => {
   ): {
     selectedProvider: StandardizedProviderData;
     serviceData: StandardizedServiceData;
-    bookingRequest: BookingRequestData; // Pour backward compatibility
+    bookingRequest: BookingRequestData;
   } => {
     
-    // 🔧 DONNÉES PROVIDER STANDARDISÉES
     const selectedProvider: StandardizedProviderData = {
       id: provider.id,
       name: provider.name,
-      fullName: provider.name || `${provider.firstName || ''} ${provider.lastName || ''}`.trim() || 'Expert', 
       firstName: provider.firstName,
       lastName: provider.lastName,
       type: provider.type,
@@ -685,7 +676,6 @@ const BookingRequest: React.FC = () => {
       phone: provider.phone
     };
 
-    // 🔧 DONNÉES SERVICE STANDARDISÉES
     const serviceData: StandardizedServiceData = {
       title: sanitizeInput(formData.title),
       description: sanitizeInput(formData.description),
@@ -717,7 +707,6 @@ const BookingRequest: React.FC = () => {
       }
     };
 
-    // 🔧 DONNÉES LEGACY POUR BACKWARD COMPATIBILITY
     const bookingRequest: BookingRequestData = {
       clientPhone: serviceData.clientDetails.phone,
       clientId: user?.id,
@@ -735,7 +724,7 @@ const BookingRequest: React.FC = () => {
       providerRating: selectedProvider.rating,
       providerReviewCount: selectedProvider.reviewCount,
       providerLanguages: selectedProvider.languages,
-      providerSpecialities: selectedProvider.specialties,
+      providerSpecialties: selectedProvider.specialties,
       title: serviceData.title,
       description: serviceData.description,
       clientLanguages: serviceData.clientDetails.languages,
@@ -1076,9 +1065,10 @@ const BookingRequest: React.FC = () => {
                 </div>
 
                 <div className="text-center sm:text-right bg-white rounded-xl p-3 sm:p-4 shadow-lg border border-gray-200 w-full sm:w-auto">
+                  {/* 🔧 FIX: Correction de l'affichage du prix */}
                   <div className="text-2xl sm:text-3xl font-bold text-blue-600">
-  €{provider?.price ? (provider.price / 100).toFixed(2) : "--"}
-</div>
+                    €{provider?.price ? provider.price.toFixed(2) : "--"}
+                  </div>
                   <div className="text-sm text-gray-600 mt-1">
                     {provider?.duration ? `${provider.duration} min` : "--"}
                   </div>
@@ -1327,6 +1317,7 @@ const BookingRequest: React.FC = () => {
                     Langues que vous parlez <span className="text-red-500">*</span>
                   </label>
                   <div className={`${fieldErrors.languages ? 'error-field' : ''}`} data-error={!!fieldErrors.languages}>
+                    {/* 🔧 FIX: Passage de la langue du contexte au composant */}
                     <MultiLanguageSelect
                       value={languagesSpoken.map(lang => ({ value: lang.code, label: lang.name }))}
                       onChange={(selectedOptions) => {
@@ -1337,6 +1328,8 @@ const BookingRequest: React.FC = () => {
                       }}
                       providerLanguages={provider?.languages || provider?.languagesSpoken || []}
                       highlightShared={true}
+                      locale={language} // 🔧 FIX: Passage de la langue du contexte
+                      showLanguageToggle={false} // Masqué car la langue vient du header
                     />
                   </div>
                   {fieldErrors.languages && (
@@ -1552,7 +1545,8 @@ const BookingRequest: React.FC = () => {
                         </div>
                         <div className="flex items-center">
                           <span className="font-medium">💰 Prix :</span>
-                          <span className="ml-2 text-xl font-bold">{provider?.price || '--'}€</span>
+                          {/* 🔧 FIX: Correction de l'affichage du prix dans le récapitulatif */}
+                          <span className="ml-2 text-xl font-bold">{provider?.price ? provider.price.toFixed(2) : '--'}€</span>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -1600,8 +1594,9 @@ const BookingRequest: React.FC = () => {
                     <div className="flex items-center justify-center">
                       <Euro size={20} className="mr-2 sm:mr-3" />
                       <span>
+                        {/* 🔧 FIX: Correction de l'affichage du prix dans le bouton */}
                         {isFormValid 
-                          ? `Continuer vers le paiement (${provider?.price || '--'}€)` 
+                          ? `Continuer vers le paiement (${provider?.price ? provider.price.toFixed(2) : '--'}€)` 
                           : `Veuillez compléter le formulaire (${formProgress}%)`
                         }
                       </span>

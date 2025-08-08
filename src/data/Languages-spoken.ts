@@ -1,141 +1,257 @@
 // ========================================
-// src/data/languages-spoken.ts - VERSION CORRIGÉE
+// src/data/Languages-spoken.ts - VERSION MULTILINGUE INTELLIGENTE
 // ========================================
 
 // IMPORTANT: Définir et exporter l'interface AVANT le tableau
 export interface Language {
   code: string;
   name: string;
+  nameEn?: string; // Nom en anglais
+  nameFr?: string; // Nom en français
 }
 
-const languages: Language[] = [
-  { code: "en", name: "English" },
-  { code: "fr", name: "French" },
-  { code: "de", name: "German" },
-  { code: "es", name: "Spanish" },
-  { code: "pt", name: "Portuguese" },
-  { code: "zh", name: "Chinese (Mandarin)" },
-  { code: "ru", name: "Russian" },
-  { code: "af", name: "Afrikaans" },
-  { code: "sq", name: "Albanian" },
-  { code: "am", name: "Amharic" },
-  { code: "ar", name: "Arabic" },
-  { code: "hy", name: "Armenian" },
-  { code: "as", name: "Assamese" },
-  { code: "ay", name: "Aymara" },
-  { code: "az", name: "Azerbaijani" },
-  { code: "eu", name: "Basque" },
-  { code: "be", name: "Belarusian" },
-  { code: "bn", name: "Bengali" },
-  { code: "bs", name: "Bosnian" },
-  { code: "bg", name: "Bulgarian" },
-  { code: "my", name: "Burmese" },
-  { code: "ca", name: "Catalan" },
-  { code: "ceb", name: "Cebuano" },
-  { code: "ny", name: "Chichewa" },
-  { code: "hr", name: "Croatian" },
-  { code: "cs", name: "Czech" },
-  { code: "da", name: "Danish" },
-  { code: "dv", name: "Dhivehi" },
-  { code: "nl", name: "Dutch" },
-  { code: "dz", name: "Dzongkha" },
-  { code: "et", name: "Estonian" },
-  { code: "fo", name: "Faroese" },
-  { code: "tl", name: "Filipino" },
-  { code: "fi", name: "Finnish" },
-  { code: "gl", name: "Galician" },
-  { code: "ka", name: "Georgian" },
-  { code: "el", name: "Greek" },
-  { code: "gn", name: "Guarani" },
-  { code: "gu", name: "Gujarati" },
-  { code: "ht", name: "Haitian Creole" },
-  { code: "ha", name: "Hausa" },
-  { code: "haw", name: "Hawaiian" },
-  { code: "he", name: "Hebrew" },
-  { code: "hi", name: "Hindi" },
-  { code: "hmn", name: "Hmong" },
-  { code: "hu", name: "Hungarian" },
-  { code: "is", name: "Icelandic" },
-  { code: "ig", name: "Igbo" },
-  { code: "id", name: "Indonesian" },
-  { code: "ga", name: "Irish" },
-  { code: "it", name: "Italian" },
-  { code: "ja", name: "Japanese" },
-  { code: "jv", name: "Javanese" },
-  { code: "kn", name: "Kannada" },
-  { code: "kk", name: "Kazakh" },
-  { code: "km", name: "Khmer" },
-  { code: "ko", name: "Korean" },
-  { code: "ku", name: "Kurdish (Kurmanji)" },
-  { code: "ckb", name: "Kurdish (Sorani)" },
-  { code: "ky", name: "Kyrgyz" },
-  { code: "lo", name: "Lao" },
-  { code: "la", name: "Latin" },
-  { code: "lv", name: "Latvian" },
-  { code: "lt", name: "Lithuanian" },
-  { code: "lb", name: "Luxembourgish" },
-  { code: "mk", name: "Macedonian" },
-  { code: "mg", name: "Malagasy" },
-  { code: "ms", name: "Malay" },
-  { code: "ml", name: "Malayalam" },
-  { code: "mt", name: "Maltese" },
-  { code: "mi", name: "Maori" },
-  { code: "mr", name: "Marathi" },
-  { code: "mn", name: "Mongolian" },
-  { code: "ne", name: "Nepali" },
-  { code: "no", name: "Norwegian" },
-  { code: "or", name: "Odia" },
-  { code: "ps", name: "Pashto" },
-  { code: "fa", name: "Persian" },
-  { code: "pl", name: "Polish" },
-  { code: "pa", name: "Punjabi" },
-  { code: "qu", name: "Quechua" },
-  { code: "ro", name: "Romanian" },
-  { code: "gd", name: "Scottish Gaelic" },
-  { code: "sr", name: "Serbian" },
-  { code: "si", name: "Sinhala" },
-  { code: "sk", name: "Slovak" },
-  { code: "sl", name: "Slovenian" },
-  { code: "so", name: "Somali" },
-  { code: "su", name: "Sundanese" },
-  { code: "sw", name: "Swahili" },
-  { code: "sv", name: "Swedish" },
-  { code: "tg", name: "Tajik" },
-  { code: "ta", name: "Tamil" },
-  { code: "tt", name: "Tatar" },
-  { code: "te", name: "Telugu" },
-  { code: "th", name: "Thai" },
-  { code: "bo", name: "Tibetan" },
-  { code: "ti", name: "Tigrinya" },
-  { code: "tr", name: "Turkish" },
-  { code: "tk", name: "Turkmen" },
-  { code: "uk", name: "Ukrainian" },
-  { code: "ur", name: "Urdu" },
-  { code: "ug", name: "Uyghur" },
-  { code: "uz", name: "Uzbek" },
-  { code: "vi", name: "Vietnamese" },
-  { code: "cy", name: "Welsh" },
-  { code: "xh", name: "Xhosa" },
-  { code: "yi", name: "Yiddish" },
-  { code: "yo", name: "Yoruba" },
-  { code: "zu", name: "Zulu" },
+// 🌍 Fonction pour détecter la langue du navigateur
+const getBrowserLanguage = (): 'fr' | 'en' => {
+  const browserLang = navigator.language.toLowerCase();
+  
+  // Si le navigateur est en français (fr, fr-FR, fr-CA, etc.)
+  if (browserLang.startsWith('fr')) {
+    return 'fr';
+  }
+  
+  // Sinon, par défaut en anglais
+  return 'en';
+};
+
+// 🌍 Tableau des langues avec noms français ET anglais
+const languagesData: Array<{ code: string; nameFr: string; nameEn: string }> = [
+  { code: "en", nameFr: "Anglais", nameEn: "English" },
+  { code: "fr", nameFr: "Français", nameEn: "French" },
+  { code: "de", nameFr: "Allemand", nameEn: "German" },
+  { code: "es", nameFr: "Espagnol", nameEn: "Spanish" },
+  { code: "pt", nameFr: "Portugais", nameEn: "Portuguese" },
+  { code: "zh", nameFr: "Chinois (Mandarin)", nameEn: "Chinese (Mandarin)" },
+  { code: "ru", nameFr: "Russe", nameEn: "Russian" },
+  { code: "af", nameFr: "Afrikaans", nameEn: "Afrikaans" },
+  { code: "sq", nameFr: "Albanais", nameEn: "Albanian" },
+  { code: "am", nameFr: "Amharique", nameEn: "Amharic" },
+  { code: "ar", nameFr: "Arabe", nameEn: "Arabic" },
+  { code: "hy", nameFr: "Arménien", nameEn: "Armenian" },
+  { code: "as", nameFr: "Assamais", nameEn: "Assamese" },
+  { code: "ay", nameFr: "Aymara", nameEn: "Aymara" },
+  { code: "az", nameFr: "Azéri", nameEn: "Azerbaijani" },
+  { code: "eu", nameFr: "Basque", nameEn: "Basque" },
+  { code: "be", nameFr: "Biélorusse", nameEn: "Belarusian" },
+  { code: "bn", nameFr: "Bengali", nameEn: "Bengali" },
+  { code: "bs", nameFr: "Bosniaque", nameEn: "Bosnian" },
+  { code: "bg", nameFr: "Bulgare", nameEn: "Bulgarian" },
+  { code: "my", nameFr: "Birman", nameEn: "Burmese" },
+  { code: "ca", nameFr: "Catalan", nameEn: "Catalan" },
+  { code: "ceb", nameFr: "Cebuano", nameEn: "Cebuano" },
+  { code: "ny", nameFr: "Chichewa", nameEn: "Chichewa" },
+  { code: "hr", nameFr: "Croate", nameEn: "Croatian" },
+  { code: "cs", nameFr: "Tchèque", nameEn: "Czech" },
+  { code: "da", nameFr: "Danois", nameEn: "Danish" },
+  { code: "dv", nameFr: "Dhivehi", nameEn: "Dhivehi" },
+  { code: "nl", nameFr: "Néerlandais", nameEn: "Dutch" },
+  { code: "dz", nameFr: "Dzongkha", nameEn: "Dzongkha" },
+  { code: "et", nameFr: "Estonien", nameEn: "Estonian" },
+  { code: "fo", nameFr: "Féroïen", nameEn: "Faroese" },
+  { code: "tl", nameFr: "Filipino", nameEn: "Filipino" },
+  { code: "fi", nameFr: "Finnois", nameEn: "Finnish" },
+  { code: "gl", nameFr: "Galicien", nameEn: "Galician" },
+  { code: "ka", nameFr: "Géorgien", nameEn: "Georgian" },
+  { code: "el", nameFr: "Grec", nameEn: "Greek" },
+  { code: "gn", nameFr: "Guarani", nameEn: "Guarani" },
+  { code: "gu", nameFr: "Gujarati", nameEn: "Gujarati" },
+  { code: "ht", nameFr: "Créole haïtien", nameEn: "Haitian Creole" },
+  { code: "ha", nameFr: "Haoussa", nameEn: "Hausa" },
+  { code: "haw", nameFr: "Hawaïen", nameEn: "Hawaiian" },
+  { code: "he", nameFr: "Hébreu", nameEn: "Hebrew" },
+  { code: "hi", nameFr: "Hindi", nameEn: "Hindi" },
+  { code: "hmn", nameFr: "Hmong", nameEn: "Hmong" },
+  { code: "hu", nameFr: "Hongrois", nameEn: "Hungarian" },
+  { code: "is", nameFr: "Islandais", nameEn: "Icelandic" },
+  { code: "ig", nameFr: "Igbo", nameEn: "Igbo" },
+  { code: "id", nameFr: "Indonésien", nameEn: "Indonesian" },
+  { code: "ga", nameFr: "Irlandais", nameEn: "Irish" },
+  { code: "it", nameFr: "Italien", nameEn: "Italian" },
+  { code: "ja", nameFr: "Japonais", nameEn: "Japanese" },
+  { code: "jv", nameFr: "Javanais", nameEn: "Javanese" },
+  { code: "kn", nameFr: "Kannada", nameEn: "Kannada" },
+  { code: "kk", nameFr: "Kazakh", nameEn: "Kazakh" },
+  { code: "km", nameFr: "Khmer", nameEn: "Khmer" },
+  { code: "ko", nameFr: "Coréen", nameEn: "Korean" },
+  { code: "ku", nameFr: "Kurde (Kurmanji)", nameEn: "Kurdish (Kurmanji)" },
+  { code: "ckb", nameFr: "Kurde (Sorani)", nameEn: "Kurdish (Sorani)" },
+  { code: "ky", nameFr: "Kirghize", nameEn: "Kyrgyz" },
+  { code: "lo", nameFr: "Lao", nameEn: "Lao" },
+  { code: "la", nameFr: "Latin", nameEn: "Latin" },
+  { code: "lv", nameFr: "Letton", nameEn: "Latvian" },
+  { code: "lt", nameFr: "Lituanien", nameEn: "Lithuanian" },
+  { code: "lb", nameFr: "Luxembourgeois", nameEn: "Luxembourgish" },
+  { code: "mk", nameFr: "Macédonien", nameEn: "Macedonian" },
+  { code: "mg", nameFr: "Malgache", nameEn: "Malagasy" },
+  { code: "ms", nameFr: "Malais", nameEn: "Malay" },
+  { code: "ml", nameFr: "Malayalam", nameEn: "Malayalam" },
+  { code: "mt", nameFr: "Maltais", nameEn: "Maltese" },
+  { code: "mi", nameFr: "Maori", nameEn: "Maori" },
+  { code: "mr", nameFr: "Marathi", nameEn: "Marathi" },
+  { code: "mn", nameFr: "Mongol", nameEn: "Mongolian" },
+  { code: "ne", nameFr: "Népalais", nameEn: "Nepali" },
+  { code: "no", nameFr: "Norvégien", nameEn: "Norwegian" },
+  { code: "or", nameFr: "Odia", nameEn: "Odia" },
+  { code: "ps", nameFr: "Pachto", nameEn: "Pashto" },
+  { code: "fa", nameFr: "Persan", nameEn: "Persian" },
+  { code: "pl", nameFr: "Polonais", nameEn: "Polish" },
+  { code: "pa", nameFr: "Pendjabi", nameEn: "Punjabi" },
+  { code: "qu", nameFr: "Quechua", nameEn: "Quechua" },
+  { code: "ro", nameFr: "Roumain", nameEn: "Romanian" },
+  { code: "gd", nameFr: "Gaélique écossais", nameEn: "Scottish Gaelic" },
+  { code: "sr", nameFr: "Serbe", nameEn: "Serbian" },
+  { code: "si", nameFr: "Singhalais", nameEn: "Sinhala" },
+  { code: "sk", nameFr: "Slovaque", nameEn: "Slovak" },
+  { code: "sl", nameFr: "Slovène", nameEn: "Slovenian" },
+  { code: "so", nameFr: "Somali", nameEn: "Somali" },
+  { code: "su", nameFr: "Soundanais", nameEn: "Sundanese" },
+  { code: "sw", nameFr: "Swahili", nameEn: "Swahili" },
+  { code: "sv", nameFr: "Suédois", nameEn: "Swedish" },
+  { code: "tg", nameFr: "Tadjik", nameEn: "Tajik" },
+  { code: "ta", nameFr: "Tamoul", nameEn: "Tamil" },
+  { code: "tt", nameFr: "Tatar", nameEn: "Tatar" },
+  { code: "te", nameFr: "Télougou", nameEn: "Telugu" },
+  { code: "th", nameFr: "Thaï", nameEn: "Thai" },
+  { code: "bo", nameFr: "Tibétain", nameEn: "Tibetan" },
+  { code: "ti", nameFr: "Tigrigna", nameEn: "Tigrinya" },
+  { code: "tr", nameFr: "Turc", nameEn: "Turkish" },
+  { code: "tk", nameFr: "Turkmène", nameEn: "Turkmen" },
+  { code: "uk", nameFr: "Ukrainien", nameEn: "Ukrainian" },
+  { code: "ur", nameFr: "Ourdou", nameEn: "Urdu" },
+  { code: "ug", nameFr: "Ouïghour", nameEn: "Uyghur" },
+  { code: "uz", nameFr: "Ouzbek", nameEn: "Uzbek" },
+  { code: "vi", nameFr: "Vietnamien", nameEn: "Vietnamese" },
+  { code: "cy", nameFr: "Gallois", nameEn: "Welsh" },
+  { code: "xh", nameFr: "Xhosa", nameEn: "Xhosa" },
+  { code: "yi", nameFr: "Yiddish", nameEn: "Yiddish" },
+  { code: "yo", nameFr: "Yoruba", nameEn: "Yoruba" },
+  { code: "zu", nameFr: "Zoulou", nameEn: "Zulu" },
 ];
 
+// 🌍 Fonction pour obtenir le nom localisé d'une langue
+export const getLocalizedLanguageName = (code: string, locale?: 'fr' | 'en'): string => {
+  const targetLocale = locale || getBrowserLanguage();
+  const languageData = languagesData.find(lang => lang.code === code);
+  
+  if (!languageData) {
+    return code; // Fallback vers le code si non trouvé
+  }
+  
+  return targetLocale === 'fr' ? languageData.nameFr : languageData.nameEn;
+};
+
+// 🌍 Génération du tableau des langues selon la langue du navigateur
+const generateLanguagesArray = (locale?: 'fr' | 'en'): Language[] => {
+  const targetLocale = locale || getBrowserLanguage();
+  
+  return languagesData.map(langData => ({
+    code: langData.code,
+    name: targetLocale === 'fr' ? langData.nameFr : langData.nameEn,
+    nameEn: langData.nameEn,
+    nameFr: langData.nameFr
+  }));
+};
+
+// 🌍 Export du tableau principal (détection automatique)
+const languages: Language[] = generateLanguagesArray();
+
+// 🌍 Export des versions spécifiques
+export const languagesFr: Language[] = generateLanguagesArray('fr');
+export const languagesEn: Language[] = generateLanguagesArray('en');
+
 /**
- * Fonction de recherche floue
+ * 🌍 Fonction de recherche floue multilingue
  */
-export const searchLanguages = (query: string): Language[] => {
-  return languages.filter(lang =>
-    lang.name.toLowerCase().startsWith(query.toLowerCase())
+export const searchLanguages = (query: string, locale?: 'fr' | 'en'): Language[] => {
+  const targetLanguages = locale ? generateLanguagesArray(locale) : languages;
+  
+  return targetLanguages.filter(lang =>
+    lang.name.toLowerCase().includes(query.toLowerCase()) ||
+    (lang.nameEn && lang.nameEn.toLowerCase().includes(query.toLowerCase())) ||
+    (lang.nameFr && lang.nameFr.toLowerCase().includes(query.toLowerCase()))
   );
 };
 
 /**
- * Liste triée alphabétiquement
+ * 🌍 Liste triée alphabétiquement selon la locale
  */
-export const sortedLanguages: Language[] = [...languages].sort((a, b) =>
-  a.name.localeCompare(b.name)
-);
+export const getSortedLanguages = (locale?: 'fr' | 'en'): Language[] => {
+  const targetLanguages = locale ? generateLanguagesArray(locale) : languages;
+  
+  return [...targetLanguages].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+};
 
-// Export par défaut du tableau
+/**
+ * 🌍 Hook pour changer la langue dynamiquement
+ */
+export const useLanguageLocale = () => {
+  const [currentLocale, setCurrentLocale] = React.useState<'fr' | 'en'>(getBrowserLanguage());
+  
+  const switchLocale = (newLocale: 'fr' | 'en') => {
+    setCurrentLocale(newLocale);
+    // Optionnel: sauvegarder la préférence
+    localStorage.setItem('languageLocale', newLocale);
+  };
+  
+  const getCurrentLanguages = () => generateLanguagesArray(currentLocale);
+  
+  return {
+    currentLocale,
+    switchLocale,
+    getCurrentLanguages,
+    languages: getCurrentLanguages()
+  };
+};
+
+/**
+ * 🌍 Fonction utilitaire pour obtenir la langue du navigateur
+ */
+export const getDetectedBrowserLanguage = (): 'fr' | 'en' => {
+  return getBrowserLanguage();
+};
+
+/**
+ * 🌍 Export de constantes utiles
+ */
+export const SUPPORTED_LOCALES = ['fr', 'en'] as const;
+export const DEFAULT_LOCALE = 'en' as const;
+
+// Export par défaut du tableau (détection automatique)
 export default languages;
+
+// 🌍 UTILISATION DANS LES COMPOSANTS:
+/*
+// Utilisation basique (détection automatique):
+import languages from '../data/Languages-spoken';
+
+// Utilisation avec locale spécifique:
+import { languagesFr, languagesEn, getLocalizedLanguageName } from '../data/Languages-spoken';
+
+// Utilisation avec hook React:
+import { useLanguageLocale } from '../data/Languages-spoken';
+
+function MyComponent() {
+  const { languages, currentLocale, switchLocale } = useLanguageLocale();
+  
+  return (
+    <div>
+      <button onClick={() => switchLocale('fr')}>Français</button>
+      <button onClick={() => switchLocale('en')}>English</button>
+      {languages.map(lang => (
+        <div key={lang.code}>{lang.name}</div>
+      ))}
+    </div>
+  );
+}
+*/

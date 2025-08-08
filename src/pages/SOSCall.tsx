@@ -36,6 +36,8 @@ const SOSCall: React.FC = () => {
   const { language } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  
+  // États principaux - CONSERVÉS de l'original
   const [selectedType, setSelectedType] = useState<'all' | 'lawyer' | 'expat'>(
     searchParams.get('type') === 'lawyer' ? 'lawyer' : 
     searchParams.get('type') === 'expat' ? 'expat' : 'all'
@@ -51,6 +53,7 @@ const SOSCall: React.FC = () => {
   const [realProviders, setRealProviders] = useState<Provider[]>([]);
   const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
 
+  // Fonction de mapping des langues - CONSERVÉE
   const getLanguageLabel = (lang: string): string => {
     const languageMap: { [key: string]: string } = {
       'Français': 'Français',
@@ -94,6 +97,7 @@ const SOSCall: React.FC = () => {
     return languageMap[lang] || lang;
   };
 
+  // Options - CONSERVÉES de l'original
   const countryOptions = [
     'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne', 'Andorre', 'Angola',
     'Arabie Saoudite', 'Argentine', 'Arménie', 'Australie', 'Autriche', 'Azerbaïdjan',
@@ -140,7 +144,8 @@ const SOSCall: React.FC = () => {
     'Slovène', 'Suédois', 'Swahili', 'Tadjik', 'Tamoul', 'Tchèque', 'Telugu',
     'Thaï', 'Tibétain', 'Turc', 'Turkmen', 'Ukrainien', 'Vietnamien', 'Gallois'
   ];
-  
+
+  // Effet pour charger les providers - LOGIQUE ORIGINALE CONSERVÉE
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const typeParam = params.get('type');
@@ -208,7 +213,6 @@ const SOSCall: React.FC = () => {
         const hasBasicInfo = profile.name && profile.name.trim() !== '';
         const hasValidCountry = profile.country && profile.country.trim() !== '';
         const isVisible = profile.isVisible !== false;
-        
         const isApprovedLawyer = profile.type !== 'lawyer' || profile.isApproved !== false;
 
         return notBanned && hasBasicInfo && hasValidCountry && isVisible && isApprovedLawyer;
@@ -229,6 +233,7 @@ const SOSCall: React.FC = () => {
     };
   }, [setSearchParams]);
 
+  // Effet de filtrage - LOGIQUE ORIGINALE CONSERVÉE
   useEffect(() => {
     if (realProviders.length === 0) return;
     
@@ -252,6 +257,7 @@ const SOSCall: React.FC = () => {
       return matchesType && matchesCountry && matchesLanguage && matchesStatus;
     });
     
+    // TRI ORIGINAL CONSERVÉ
     filtered.sort((a, b) => {
       if (a.isOnline !== b.isOnline) {
         return (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
@@ -271,6 +277,7 @@ const SOSCall: React.FC = () => {
     setFilteredProviders(filtered);
   }, [realProviders, selectedType, selectedCountry, selectedLanguage, customCountry, customLanguage, onlineOnly]);
 
+  // Handlers - CONSERVÉS
   const handleCountryChange = (value: string) => {
     setSelectedCountry(value);
     setShowCustomCountry(value === 'Autre');
@@ -287,7 +294,7 @@ const SOSCall: React.FC = () => {
     }
   };
 
-  // ✅ CORRECTION PRINCIPALE : Navigation vers le profil au lieu du paiement
+  // Navigation vers profil - CONSERVÉE EXACTEMENT
   const handleProviderClick = (provider: Provider) => {
     console.log('🔗 Navigation vers le profil de:', provider.name);
     
@@ -307,7 +314,7 @@ const SOSCall: React.FC = () => {
       console.warn('⚠️ Erreur sessionStorage:', error);
     }
     
-    // ✅ TOUJOURS naviguer vers le profil (suppression de la logique agressive)
+    // Navigation vers le profil
     navigate(seoUrl, { 
       state: { 
         selectedProvider: provider,
@@ -316,6 +323,7 @@ const SOSCall: React.FC = () => {
     });
   };
 
+  // Fonction truncateText - AJOUTÉE de l'original
   const truncateText = (text: string, maxLength: number): { text: string; isTruncated: boolean } => {
     if (text.length <= maxLength) {
       return { text, isTruncated: false };
@@ -353,6 +361,7 @@ const SOSCall: React.FC = () => {
       />
       
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        {/* Hero Section - CONSERVÉ */}
         <section role="banner" className="relative overflow-hidden bg-gradient-to-r from-red-600 via-red-700 to-red-800">
           <div className="absolute inset-0 bg-black/10" aria-hidden="true"></div>
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
@@ -372,6 +381,7 @@ const SOSCall: React.FC = () => {
           </div>
         </section>
 
+        {/* Main Content */}
         <main className="py-8 sm:py-12 lg:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8 sm:mb-12">
@@ -379,6 +389,7 @@ const SOSCall: React.FC = () => {
                 {selectedType === 'lawyer' ? 'Avocats disponibles' : selectedType === 'expat' ? 'Expatriés disponibles' : 'Experts disponibles'}
               </h2>
 
+              {/* FILTRES ORIGINAUX CONSERVÉS - Interface exacte */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100/60 p-4 sm:p-6 max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="space-y-1">
@@ -505,6 +516,7 @@ const SOSCall: React.FC = () => {
               </div>
             </div>
             
+            {/* CARTES SOS ORIGINALES CONSERVÉES */}
             {isLoadingProviders ? (
               <div className="overflow-x-auto pb-4">
                 <div className="flex gap-4 sm:gap-6 lg:hidden" style={{ width: 'max-content' }}>
@@ -534,6 +546,7 @@ const SOSCall: React.FC = () => {
               </div>
             ) : filteredProviders.length > 0 ? (
               <>
+                {/* Mobile SOS Cards - Scroll horizontal */}
                 <div className="overflow-x-auto pb-4 lg:hidden">
                   <div className="flex gap-4 sm:gap-6" style={{ width: 'max-content' }}>
                     {filteredProviders.map((provider) => {
@@ -700,6 +713,7 @@ const SOSCall: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Desktop SOS Cards - Grid */}
                 <div className="hidden lg:grid lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredProviders.map((provider) => {
                     const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 100);
@@ -895,6 +909,7 @@ const SOSCall: React.FC = () => {
               </div>
             )}
 
+            {/* Call to Action Section - CONSERVÉ */}
             <section className="text-center mt-12 sm:mt-16">
               <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-3xl p-8 sm:p-12">
                 <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">

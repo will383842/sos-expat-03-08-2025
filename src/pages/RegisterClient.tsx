@@ -1,44 +1,178 @@
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Flag, MapPin, UserCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Flag, MapPin, UserCheck, Clock3, Languages, ShieldCheck } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { serverTimestamp } from 'firebase/firestore';
-import { MultiValue } from 'react-select';
+import type { MultiValue } from 'react-select';
 
-// Lazy loading des composants lourds pour améliorer le temps de chargement initial
+// Lazy (inchangé)
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
 
-// Constants optimisées et externalisées
-const COUNTRY_OPTIONS = Object.freeze([
-  'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne', 'Andorre', 'Angola', 
-  'Arabie Saoudite', 'Argentine', 'Arménie', 'Australie', 'Autriche', 'Azerbaïdjan', 
-  'Bahamas', 'Bahreïn', 'Bangladesh', 'Barbade', 'Belgique', 'Belize', 'Bénin', 
-  'Bhoutan', 'Biélorussie', 'Birmanie', 'Bolivie', 'Bosnie-Herzégovine', 'Botswana', 
-  'Brésil', 'Brunei', 'Bulgarie', 'Burkina Faso', 'Burundi', 'Cambodge', 'Cameroun', 
-  'Canada', 'Cap-Vert', 'Chili', 'Chine', 'Chypre', 'Colombie', 'Comores', 
-  'Congo', 'Corée du Nord', 'Corée du Sud', 'Costa Rica', 'Côte d\'Ivoire', 'Croatie', 'Cuba', 
-  'Danemark', 'Djibouti', 'Dominique', 'Égypte', 'Émirats arabes unis', 'Équateur', 'Érythrée', 
-  'Espagne', 'Estonie', 'États-Unis', 'Éthiopie', 'Fidji', 'Finlande', 'France', 'Autre'
-]);
+// ===== i18n =====
+const i18n = {
+  fr: {
+    meta: {
+      title: "Inscription Client - SOS Expats | Accédez à l'aide de la communauté",
+      description:
+        "Créez votre compte client en moins d'une minute et accédez à notre réseau d'aidants. Support 24/7, multilingue.",
+      keywords: 'inscription client, expatriation, aide, expats, 24/7, multilingue'
+    },
+    ui: {
+      heroTitle: 'Votre inscription, en moins de 1 minute',
+      badge247: 'Disponible 24/7',
+      badgeMulti: 'Multilingue',
+      title: 'Inscription Client',
+      subtitle: 'Créez votre compte pour accéder à notre réseau d’experts',
+      alreadyRegistered: 'Déjà inscrit ?',
+      login: 'Se connecter',
+      personalInfo: 'Informations personnelles',
+      geographicInfo: 'Informations géographiques',
+      acceptTerms: "J'accepte les",
+      termsLink: 'conditions générales pour clients',
+      createAccount: 'Créer mon compte client',
+      required: 'obligatoire',
+      loading: 'Création en cours...',
+      progressHint: 'Veuillez remplir tous les champs obligatoires (*)'
+    },
+    fields: {
+      firstName: 'Prénom',
+      lastName: 'Nom',
+      email: 'Adresse email',
+      password: 'Mot de passe',
+      nationality: 'Nationalité',
+      residenceCountry: 'Pays de résidence',
+      status: 'Statut',
+      languagesSpoken: 'Langues parlées'
+    },
+    actions: {
+      selectCountry: 'Sélectionnez un pays',
+      specifyCountry: 'Précisez votre pays',
+      specifyLanguage: 'Précisez la langue'
+    },
+    help: {
+      minPassword: 'Minimum 6 caractères',
+      emailPlaceholder: 'votre@email.com',
+      firstNamePlaceholder: 'Votre prénom',
+      lastNamePlaceholder: 'Votre nom',
+      nationalityPlaceholder: 'Votre nationalité'
+    },
+    errors: {
+      title: "Erreur d'inscription",
+      allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
+      passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
+      invalidEmail: 'Veuillez saisir une adresse email valide',
+      selectCountryError: 'Veuillez sélectionner votre pays de résidence',
+      specifyCountryError: 'Veuillez préciser votre pays de résidence',
+      selectLanguage: 'Veuillez sélectionner au moins une langue parlée',
+      registrationError: "Une erreur est survenue lors de l'inscription. Veuillez réessayer."
+    },
+    statuses: [
+      { value: '', label: 'Sélectionnez votre statut' },
+      { value: 'expat', label: 'Expatrié' },
+      { value: 'traveler', label: 'Voyageur ponctuel' },
+      { value: 'investor', label: 'Investisseur' },
+      { value: 'digital_nomad', label: 'Digital Nomade' },
+      { value: 'retired_expat', label: 'Retraité expatrié' },
+      { value: 'student', label: "Étudiant à l'étranger" },
+      { value: 'other', label: 'Autre' }
+    ],
+    termsHref: '/cgu-clients',
+    jsonLdName: 'Inscription Client'
+  },
+  en: {
+    meta: {
+      title: 'Client Registration - SOS Expats | Get help from the community',
+      description:
+        'Create your client account in under 1 minute and access our helper network. 24/7, multilingual support.',
+      keywords: 'client registration, expat, help, 24/7, multilingual'
+    },
+    ui: {
+      heroTitle: 'Register in under 1 minute',
+      badge247: 'Available 24/7',
+      badgeMulti: 'Multilingual',
+      title: 'Client Registration',
+      subtitle: 'Create your account to access our network of experts',
+      alreadyRegistered: 'Already registered?',
+      login: 'Log in',
+      personalInfo: 'Personal information',
+      geographicInfo: 'Geographic information',
+      acceptTerms: 'I accept the',
+      termsLink: 'general terms for clients',
+      createAccount: 'Create my client account',
+      required: 'required',
+      loading: 'Creating account...',
+      progressHint: 'Please complete all required fields (*)'
+    },
+    fields: {
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email address',
+      password: 'Password',
+      nationality: 'Nationality',
+      residenceCountry: 'Country of residence',
+      status: 'Status',
+      languagesSpoken: 'Spoken languages'
+    },
+    actions: {
+      selectCountry: 'Select a country',
+      specifyCountry: 'Specify your country',
+      specifyLanguage: 'Specify the language'
+    },
+    help: {
+      minPassword: 'Minimum 6 characters',
+      emailPlaceholder: 'your@email.com',
+      firstNamePlaceholder: 'Your first name',
+      lastNamePlaceholder: 'Your last name',
+      nationalityPlaceholder: 'Your nationality'
+    },
+    errors: {
+      title: 'Registration error',
+      allFieldsRequired: 'All required fields must be filled',
+      passwordTooShort: 'Password must contain at least 6 characters',
+      invalidEmail: 'Please enter a valid email address',
+      selectCountryError: 'Please select your country of residence',
+      specifyCountryError: 'Please specify your country of residence',
+      selectLanguage: 'Please select at least one spoken language',
+      registrationError: 'An error occurred during registration. Please try again.'
+    },
+    statuses: [
+      { value: '', label: 'Select your status' },
+      { value: 'expat', label: 'Expat' },
+      { value: 'traveler', label: 'Occasional traveler' },
+      { value: 'investor', label: 'Investor' },
+      { value: 'digital_nomad', label: 'Digital Nomad' },
+      { value: 'retired_expat', label: 'Retired expat' },
+      { value: 'student', label: 'Study abroad' },
+      { value: 'other', label: 'Other' }
+    ],
+    termsHref: '/terms-conditions-clients',
+    jsonLdName: 'Client Registration'
+  }
+} as const;
 
-const EXPAT_STATUSES = Object.freeze([
-  { value: '', label: 'Sélectionnez votre statut' },
-  { value: 'expat', label: 'Expatrié' },
-  { value: 'traveler', label: 'Voyageur ponctuel' },
-  { value: 'investor', label: 'Investisseur' },
-  { value: 'digital_nomad', label: 'Digital Nomade' },
-  { value: 'retired_expat', label: 'Retraité expatrié' },
-  { value: 'student', label: 'Étudiant à l\'étranger' },
-  { value: 'other', label: 'Autre' }
-]);
+// ===== Countries FR / EN (brefs + “Other/Autre”) =====
+const COUNTRIES = {
+  fr: [
+    'France', 'Belgique', 'Suisse', 'Luxembourg', 'Canada', 'États-Unis', 'Royaume-Uni',
+    'Allemagne', 'Espagne', 'Italie', 'Portugal', 'Maroc', 'Algérie', 'Tunisie',
+    'Chine', 'Inde', 'Japon', 'Corée du Sud', 'Émirats arabes unis', 'Australie',
+    'Brésil', 'Mexique', 'Afrique du Sud', 'Autre'
+  ],
+  en: [
+    'France', 'Belgium', 'Switzerland', 'Luxembourg', 'Canada', 'United States', 'United Kingdom',
+    'Germany', 'Spain', 'Italy', 'Portugal', 'Morocco', 'Algeria', 'Tunisia',
+    'China', 'India', 'Japan', 'South Korea', 'United Arab Emirates', 'Australia',
+    'Brazil', 'Mexico', 'South Africa', 'Other'
+  ]
+} as const;
 
-// Regex pré-compilées pour améliorer les performances
+// ===== Regex =====
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Interface pour le formulaire optimisée
+// ===== Types =====
 interface FormData {
   firstName: string;
   lastName: string;
@@ -52,464 +186,295 @@ interface FormData {
   customLanguage: string;
 }
 
-// Configuration i18n - Préparée pour l'internationalisation
-const i18nConfig = {
-  fr: {
-    // Métadonnées SEO
-    meta: {
-      title: 'Inscription Client - Accédez à notre réseau d\'experts',
-      description: 'Créez votre compte client et accédez à notre réseau d\'expatriés aidants. Trouvez l\'aide dont vous avez besoin pour votre expatriation.',
-      keywords: 'inscription client, expatriation, aide, experts, réseau'
-    },
-    // Interface utilisateur
-    ui: {
-      title: 'Inscription Client',
-      subtitle: 'Créez votre compte pour accéder à notre réseau d\'experts',
-      alreadyRegistered: 'Déjà inscrit ?',
-      login: 'Se connecter',
-      personalInfo: 'Informations personnelles',
-      geographicInfo: 'Informations géographiques',
-      acceptTerms: 'J\'accepte les',
-      termsLink: 'conditions générales pour clients',
-      createAccount: 'Créer mon compte client',
-      required: 'obligatoire',
-      loading: 'Création en cours...'
-    },
-    // Champs du formulaire
-    fields: {
-      firstName: 'Prénom',
-      lastName: 'Nom',
-      email: 'Adresse email',
-      password: 'Mot de passe',
-      nationality: 'Nationalité',
-      residenceCountry: 'Pays de résidence',
-      status: 'Statut',
-      languagesSpoken: 'Langues parlées'
-    },
-    // Actions
-    actions: {
-      addLanguage: 'Ajouter une langue',
-      remove: 'Supprimer',
-      selectCountry: 'Sélectionnez un pays',
-      specifyCountry: 'Précisez votre pays',
-      specifyLanguage: 'Précisez la langue',
-      add: 'Ajouter'
-    },
-    // Textes d'aide
-    help: {
-      minPassword: 'Minimum 6 caractères',
-      emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'Votre prénom',
-      lastNamePlaceholder: 'Votre nom',
-      nationalityPlaceholder: 'Votre nationalité'
-    },
-    // Messages d'erreur
-    errors: {
-      allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
-      passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
-      invalidEmail: 'Veuillez saisir une adresse email valide',
-      selectCountryError: 'Veuillez sélectionner votre pays de résidence',
-      specifyCountryError: 'Veuillez préciser votre pays de résidence',
-      selectLanguage: 'Veuillez sélectionner au moins une langue parlée',
-      registrationError: 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.'
-    }
-  },
-  en: {
-    meta: {
-      title: 'Client Registration - Access our network of experts',
-      description: 'Create your client account and access our network of expat helpers. Find the help you need for your expatriation.',
-      keywords: 'client registration, expatriation, help, experts, network'
-    },
-    ui: {
-      title: 'Client Registration',
-      subtitle: 'Create your account to access our network of experts',
-      alreadyRegistered: 'Already registered?',
-      login: 'Log in',
-      personalInfo: 'Personal Information',
-      geographicInfo: 'Geographic Information',
-      acceptTerms: 'I accept the',
-      termsLink: 'general terms for clients',
-      createAccount: 'Create my client account',
-      required: 'required',
-      loading: 'Creating account...'
-    },
-    fields: {
-      firstName: 'First Name',
-      lastName: 'Last Name',
-      email: 'Email Address',
-      password: 'Password',
-      nationality: 'Nationality',
-      residenceCountry: 'Country of Residence',
-      status: 'Status',
-      languagesSpoken: 'Languages Spoken'
-    },
-    actions: {
-      addLanguage: 'Add a language',
-      remove: 'Remove',
-      selectCountry: 'Select a country',
-      specifyCountry: 'Specify your country',
-      specifyLanguage: 'Specify the language',
-      add: 'Add'
-    },
-    help: {
-      minPassword: 'Minimum 6 characters',
-      emailPlaceholder: 'your@email.com',
-      firstNamePlaceholder: 'Your first name',
-      lastNamePlaceholder: 'Your last name',
-      nationalityPlaceholder: 'Your nationality'
-    },
-    errors: {
-      allFieldsRequired: 'All required fields must be filled',
-      passwordTooShort: 'Password must contain at least 6 characters',
-      invalidEmail: 'Please enter a valid email address',
-      selectCountryError: 'Please select your country of residence',
-      specifyCountryError: 'Please specify your country of residence',
-      selectLanguage: 'Please select at least one spoken language',
-      registrationError: 'An error occurred during registration. Please try again.'
-    }
-  }
-} as const;
-
-// Composant CustomFieldInput optimisé
-const CustomFieldInput = React.memo(({ 
-  placeholder, 
-  value, 
-  onChange, 
-  onAdd, 
-  disabled 
-}: { 
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-  onAdd: () => void;
-  disabled: boolean;
-}) => (
-  <div className="mt-3 flex flex-col sm:flex-row gap-2">
-    <input
-      type="text"
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300"
-      onKeyPress={(e) => e.key === 'Enter' && !disabled && onAdd()}
-    />
-    <button
-      type="button"
-      onClick={onAdd}
-      disabled={disabled}
-      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 whitespace-nowrap"
-    >
-      Ajouter
-    </button>
-  </div>
-));
-
-CustomFieldInput.displayName = 'CustomFieldInput';
-
-// Composant principal
 const RegisterClient: React.FC = () => {
   const navigate = useNavigate();
   const { register, isLoading, error } = useAuth();
   const { language } = useApp();
-  
-  // Configuration i18n basée sur la langue actuelle
-  const t = i18nConfig[language as keyof typeof i18nConfig] || i18nConfig.fr;
+  const lang = (language === 'en' ? 'en' : 'fr') as 'fr' | 'en';
+  const t = i18n[lang];
 
-  // État initial du formulaire
-  const initialFormData: FormData = useMemo(() => ({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    nationality: '',
-    currentCountry: '',
-    customCountry: '',
-    status: '',
-    languagesSpoken: [],
-    customLanguage: ''
-  }), []);
-
-  // États du composant
-  const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [selectedLanguages, setSelectedLanguages] = useState<MultiValue<{ value: string; label: string }>>([]);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [showCustomCountry, setShowCustomCountry] = useState(false);
-  const [showCustomLanguage, setShowCustomLanguage] = useState(false);
-
-  // SEO - Mise à jour des métadonnées
+  // ---- SEO / Social ----
   useEffect(() => {
     document.title = t.meta.title;
-    
-    // Mise à jour des métadonnées
-    const updateMetaTag = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name="${name}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
+
+    const setMeta = (attr: 'name' | 'property', key: string, content: string) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
       }
-      meta.setAttribute('content', content);
+      el.content = content;
     };
 
-    updateMetaTag('description', t.meta.description);
-    updateMetaTag('keywords', t.meta.keywords);
-    
-    // Open Graph
-    updateMetaTag('og:title', t.meta.title);
-    updateMetaTag('og:description', t.meta.description);
-    updateMetaTag('og:type', 'website');
+    setMeta('name', 'description', t.meta.description);
+    setMeta('name', 'keywords', t.meta.keywords);
+    setMeta('property', 'og:title', t.meta.title);
+    setMeta('property', 'og:description', t.meta.description);
+    setMeta('property', 'og:type', 'website');
+    setMeta('property', 'og:locale', lang === 'fr' ? 'fr_FR' : 'en_US');
+    setMeta('name', 'twitter:card', 'summary_large_image');
+    setMeta('name', 'twitter:title', t.meta.title);
+    setMeta('name', 'twitter:description', t.meta.description);
 
-    return () => {
-      // Nettoyage si nécessaire
+    // JSON-LD (IA/ChatGPT friendly)
+    const id = 'jsonld-register-client';
+    let script = document.getElementById(id) as HTMLScriptElement | null;
+    const jsonld = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: t.jsonLdName,
+      description: t.meta.description,
+      inLanguage: lang === 'fr' ? 'fr-FR' : 'en-US',
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+      isPartOf: { '@type': 'WebSite', name: 'SOS Expats', url: typeof window !== 'undefined' ? window.location.origin : undefined },
+      mainEntity: { '@type': 'Person', name: 'Client' }
     };
-  }, [t.meta]);
+    if (!script) {
+      script = document.createElement('script');
+      script.id = id;
+      script.type = 'application/ld+json';
+      document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify(jsonld);
+  }, [t, lang]);
 
-  // Classes CSS optimisées
-  const inputClasses = useMemo(() => 
-    "w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 text-sm",
+  // ---- State ----
+  const initialForm: FormData = useMemo(
+    () => ({
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      nationality: '',
+      currentCountry: '',
+      customCountry: '',
+      status: '',
+      languagesSpoken: [],
+      customLanguage: ''
+    }),
     []
   );
-  
-  const requiredInputClasses = useMemo(() => 
-    `${inputClasses} bg-gray-50 focus:bg-white hover:bg-white`,
-    [inputClasses]
+
+  const [formData, setFormData] = useState<FormData>(initialForm);
+  const [selectedLanguages, setSelectedLanguages] =
+    useState<MultiValue<{ value: string; label: string }>>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  // ---- Helpers ----
+  const inputBase =
+    'w-full px-4 py-3 rounded-xl border transition-all duration-200 text-sm focus:outline-none';
+  const inputNeutral =
+    `${inputBase} bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400`;
+  const inputWithIcon = `${inputNeutral} pl-11`;
+
+  const isValidEmail = useCallback((email: string) => EMAIL_REGEX.test(email), []);
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setFormData(prev => ({ ...prev, [name]: value }));
+      if (name === 'currentCountry') {
+        // Clear customCountry if user changes back
+        if (value !== 'Autre' && value !== 'Other') {
+          setFormData(prev => ({ ...prev, customCountry: '' }));
+        }
+      }
+      if (formError) setFormError('');
+    },
+    [formError]
   );
 
-  const inputWithIconClasses = useMemo(() => 
-    `${requiredInputClasses} pl-10`,
-    [requiredInputClasses]
+  const handleLanguagesChange = useCallback(
+    (newValue: MultiValue<{ value: string; label: string }>) => {
+      setSelectedLanguages(newValue);
+      setFormData(prev => ({ ...prev, languagesSpoken: newValue.map(v => v.value) }));
+    },
+    []
   );
 
-  // Validation email optimisée avec regex pré-compilée
-  const isValidEmail = useCallback((email: string): boolean => {
-    return EMAIL_REGEX.test(email);
-  }, []);
-
-  // Fonction pour faire défiler vers le haut
-  const scrollToTop = useCallback(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  // Gestionnaire générique pour les changements d'input - optimisé
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Gérer l'affichage des champs personnalisés
-    if (name === 'currentCountry') {
-      setShowCustomCountry(value === 'Autre');
-    }
-
-    // Clear errors when user starts typing
-    if (formError) {
-      setFormError('');
-    }
-  }, [formError]);
-
-  // Gestion des langues avec MultiLanguageSelect - optimisée
-  const handleAddCustomLanguage = useCallback(() => {
-    const customLang = formData.customLanguage.trim();
-    if (customLang && !selectedLanguages.some(lang => lang.value === customLang)) {
-      const newLanguage = { value: customLang, label: customLang };
-      setSelectedLanguages(prev => [...prev, newLanguage]);
-      setFormData(prev => ({ 
-        ...prev, 
-        customLanguage: '',
-        languagesSpoken: [...prev.languagesSpoken, customLang]
-      }));
-      setShowCustomLanguage(false);
-    }
-  }, [formData.customLanguage, selectedLanguages]);
-
-  // Gestion du changement des langues sélectionnées
-  const handleLanguagesChange = useCallback((newValue: MultiValue<{ value: string; label: string }>) => {
-    setSelectedLanguages(newValue);
-    setFormData(prev => ({
-      ...prev,
-      languagesSpoken: newValue.map(lang => lang.value)
-    }));
-    
-    // Vérifier si "Autre" est sélectionné
-    setShowCustomLanguage(newValue.some(lang => lang.value === 'other'));
-  }, []);
-
-  // Validation du formulaire - optimisée
   const validateForm = useCallback((): boolean => {
-    const { firstName, lastName, email, password, currentCountry, customCountry, languagesSpoken } = formData;
+    const { firstName, lastName, email, password, currentCountry, customCountry, languagesSpoken } =
+      formData;
 
-    if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
       setFormError(t.errors.allFieldsRequired);
-      scrollToTop();
       return false;
     }
-
-    if (password.length < 6) {
-      setFormError(t.errors.passwordTooShort);
-      scrollToTop();
-      return false;
-    }
-
     if (!isValidEmail(email)) {
       setFormError(t.errors.invalidEmail);
-      scrollToTop();
       return false;
     }
-
+    if (password.length < 6) {
+      setFormError(t.errors.passwordTooShort);
+      return false;
+    }
     if (!currentCountry) {
       setFormError(t.errors.selectCountryError);
-      scrollToTop();
       return false;
     }
-
-    if (currentCountry === 'Autre' && !customCountry?.trim()) {
+    const isOther = currentCountry === 'Autre' || currentCountry === 'Other';
+    if (isOther && !customCountry.trim()) {
       setFormError(t.errors.specifyCountryError);
-      scrollToTop();
       return false;
     }
-    
     if (languagesSpoken.length === 0) {
       setFormError(t.errors.selectLanguage);
-      scrollToTop();
       return false;
     }
-
     return true;
-  }, [formData, t.errors, scrollToTop, isValidEmail]);
+  }, [formData, isValidEmail, t.errors]);
 
-  // Soumission du formulaire - optimisée
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setFormError('');
+      if (!validateForm()) return;
 
-    if (!validateForm()) return;
+      try {
+        const userData = {
+          role: 'client' as const,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          email: formData.email.trim().toLowerCase(),
+          nationality: formData.nationality.trim(),
+          currentCountry:
+            formData.currentCountry === 'Autre' || formData.currentCountry === 'Other'
+              ? formData.customCountry.trim()
+              : formData.currentCountry,
+          status: formData.status,
+          languagesSpoken: formData.languagesSpoken,
+          isApproved: true,
+          createdAt: serverTimestamp()
+        };
 
-    try {
-      const userData = {
-        role: 'client' as const,
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        nationality: formData.nationality.trim(),
-        currentCountry: formData.currentCountry === 'Autre' ? formData.customCountry.trim() : formData.currentCountry,
-        status: formData.status,
-        languagesSpoken: formData.languagesSpoken,
-        isApproved: true,
-        createdAt: serverTimestamp()
-      };
-
-      console.log('📝 Données envoyées pour l\'inscription client:', userData);
-
-      await register(userData, formData.password);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'inscription client:', error);
-      setFormError(t.errors.registrationError);
-      scrollToTop();
-    }
-  }, [formData, validateForm, register, navigate, t.errors.registrationError, scrollToTop]);
-
-  // Options mémorisées pour éviter les re-renders
-  const countrySelectOptions = useMemo(() => 
-    COUNTRY_OPTIONS.map(country => (
-      <option key={country} value={country}>{country}</option>
-    )), []
+        await register(userData, formData.password);
+        navigate('/dashboard');
+      } catch (e) {
+        console.error('Register client error:', e);
+        setFormError(t.errors.registrationError);
+      }
+    },
+    [formData, register, navigate, t.errors.registrationError, validateForm]
   );
 
-  const expatStatusOptions = useMemo(() => 
-    EXPAT_STATUSES.map(status => (
-      <option key={status.value} value={status.value}>{status.label}</option>
-    )), []
+  const canSubmit =
+    !!formData.email &&
+    !!formData.password &&
+    !!formData.firstName &&
+    !!formData.lastName &&
+    !!formData.currentCountry &&
+    formData.languagesSpoken.length > 0 &&
+    !isLoading;
+
+  const countryOptions = useMemo(
+    () =>
+      (COUNTRIES[lang] as readonly string[]).map(c => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      )),
+    [lang]
   );
 
-  // Vérification si le formulaire peut être soumis
-  const canSubmit = useMemo(() => {
-    return formData.email && 
-           formData.password && 
-           formData.firstName && 
-           formData.lastName && 
-           formData.currentCountry &&
-           formData.languagesSpoken.length > 0 &&
-           !isLoading;
-  }, [formData.email, formData.password, formData.firstName, formData.lastName, formData.currentCountry, formData.languagesSpoken.length, isLoading]);
-
+  // ===== UI =====
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50 py-4 sm:py-8 lg:py-12">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* En-tête optimisé pour mobile */}
-          <header className="text-center mb-6 sm:mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="bg-blue-100 rounded-full p-3 sm:p-4 shadow-sm">
-                <UserCheck className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-blue-600" />
+      {/* Fond pastel bleu (client) + correction d’espace sous header */}
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-blue-50">
+        {/* En-tête compact (évite le gros blanc sous le header global) */}
+        <header className="pt-6 sm:pt-8">
+          <div className="mx-auto w-full max-w-2xl px-4">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg mb-3">
+                <UserCheck className="w-8 h-8" />
               </div>
-            </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 px-2">
-              {t.ui.title}
-            </h1>
-            <p className="text-sm sm:text-base text-gray-600 px-4 max-w-2xl mx-auto leading-relaxed">
-              {t.ui.subtitle}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500 mt-3">
-              {t.ui.alreadyRegistered}{' '}
-              <Link 
-                to="/login" 
-                className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200 underline"
-              >
-                {t.ui.login}
-              </Link>
-            </p>
-          </header>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                {t.ui.heroTitle}
+              </h1>
 
-          {/* Formulaire principal */}
-          <main className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 lg:p-8 space-y-8" noValidate>
-              {/* Messages d'erreur améliorés */}
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
+                  <Clock3 className="h-4 w-4 text-blue-600" />
+                  {t.ui.badge247}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
+                  <Languages className="h-4 w-4 text-blue-600" />
+                  {t.ui.badgeMulti}
+                </span>
+              </div>
+
+              {/* petit séparateur bleu, fin pour “sous-titre” */}
+              <div className="mx-auto mt-5 h-1 w-40 rounded-full bg-blue-500/60" />
+            </div>
+          </div>
+        </header>
+
+        {/* Contenu principal : marge top réduite pour éviter l’immense vide */}
+        <main className="mx-auto w-full max-w-2xl px-4 pb-12 pt-6 sm:pt-8">
+          {/* Panneau formulaire */}
+          <div className="rounded-2xl border border-blue-100 bg-white/90 shadow-xl backdrop-blur-sm">
+            <div className="border-b border-blue-100 px-5 py-4 sm:px-8">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">{t.ui.title}</h2>
+              <p className="mt-1 text-sm text-gray-600">{t.ui.subtitle}</p>
+              <p className="mt-2 text-xs text-gray-500">
+                {t.ui.alreadyRegistered}{' '}
+                <Link
+                  to="/login"
+                  className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
+                >
+                  {t.ui.login}
+                </Link>
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-8 px-5 py-6 sm:px-8 sm:py-8" noValidate>
               {(error || formError) && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4" role="alert">
+                <div
+                  className="rounded-xl border border-red-200 bg-red-50/80 p-4"
+                  role="alert"
+                  aria-live="polite"
+                >
                   <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                    <AlertCircle className="h-5 w-5 text-red-500" />
                     <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">
-                        Erreur d'inscription
-                      </h3>
-                      <div className="mt-2 text-sm text-red-700">
-                        {error || formError}
-                      </div>
+                      <h3 className="text-sm font-semibold text-red-800">{t.errors.title}</h3>
+                      <p className="mt-1 text-sm text-red-700">{error || formError}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Section 1: Informations personnelles */}
-              <section className="space-y-6">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 border-b border-gray-200 pb-3 flex items-center">
-                  <UserCheck className="w-5 h-5 mr-2 text-gray-600" />
+              {/* Section infos perso */}
+              <section>
+                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <UserCheck className="h-5 w-5 text-blue-600" />
                   {t.ui.personalInfo}
-                </h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                </h3>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="firstName" className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.firstName} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      id="firstName"
-                      name="firstName"
-                      type="text"
-                      required
-                      autoComplete="given-name"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      className={requiredInputClasses}
-                      placeholder={t.help.firstNamePlaceholder}
-                      aria-describedby="firstName-required"
-                    />
+                    <div className="relative">
+                      <input
+                        id="firstName"
+                        name="firstName"
+                        type="text"
+                        required
+                        autoComplete="given-name"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        placeholder={t.help.firstNamePlaceholder}
+                        className={inputNeutral}
+                      />
+                    </div>
                   </div>
 
                   <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="lastName" className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.lastName} <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -520,18 +485,18 @@ const RegisterClient: React.FC = () => {
                       autoComplete="family-name"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      className={requiredInputClasses}
                       placeholder={t.help.lastNamePlaceholder}
-                      aria-describedby="lastName-required"
+                      className={inputNeutral}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="mt-4">
+                  <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
                     {t.fields.email} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
                     <input
                       id="email"
                       name="email"
@@ -540,19 +505,18 @@ const RegisterClient: React.FC = () => {
                       autoComplete="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className={inputWithIconClasses}
                       placeholder={t.help.emailPlaceholder}
-                      aria-describedby="email-required"
+                      className={inputWithIcon}
                     />
-                    <Mail className="h-5 w-5 text-gray-400 absolute left-3 top-3" />
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="mt-4">
+                  <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
                     {t.fields.password} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
                     <input
                       id="password"
                       name="password"
@@ -561,16 +525,14 @@ const RegisterClient: React.FC = () => {
                       autoComplete="new-password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-300 bg-gray-50 focus:bg-white hover:bg-white text-sm"
                       placeholder={t.help.minPassword}
-                      aria-describedby="password-requirements"
+                      className={`${inputWithIcon} pr-11`}
                     />
-                    <Lock className="h-5 w-5 text-gray-400 absolute left-3 top-3" />
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                      aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-2.5 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+                      aria-label={showPassword ? (lang === 'fr' ? 'Masquer le mot de passe' : 'Hide password') : (lang === 'fr' ? 'Afficher le mot de passe' : 'Show password')}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -578,204 +540,163 @@ const RegisterClient: React.FC = () => {
                 </div>
               </section>
 
-              {/* Section 2: Informations géographiques */}
-              <section className="space-y-6">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 border-b border-gray-200 pb-3 flex items-center">
-                  <MapPin className="w-5 h-5 mr-2 text-gray-600" />
+              {/* Section géo */}
+              <section>
+                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <MapPin className="h-5 w-5 text-blue-600" />
                   {t.ui.geographicInfo}
-                </h2>
+                </h3>
 
-                <div>
-                  <label htmlFor="nationality" className="block text-sm font-medium text-gray-700 mb-2">
-                    {t.fields.nationality}
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="nationality"
-                      name="nationality"
-                      type="text"
-                      autoComplete="country"
-                      value={formData.nationality}
-                      onChange={handleInputChange}
-                      className={inputWithIconClasses}
-                      placeholder={t.help.nationalityPlaceholder}
-                    />
-                    <Flag className="h-5 w-5 text-gray-400 absolute left-3 top-3" />
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label htmlFor="nationality" className="mb-1 block text-sm font-medium text-gray-700">
+                      {t.fields.nationality}
+                    </label>
+                    <div className="relative">
+                      <Flag className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <input
+                        id="nationality"
+                        name="nationality"
+                        type="text"
+                        autoComplete="country"
+                        value={formData.nationality}
+                        onChange={handleInputChange}
+                        placeholder={t.help.nationalityPlaceholder}
+                        className={inputWithIcon}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label htmlFor="currentCountry" className="block text-sm font-medium text-gray-700 mb-2">
-                    {t.fields.residenceCountry} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <MapPin className="h-5 w-5 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+                  <div>
+                    <label htmlFor="currentCountry" className="mb-1 block text-sm font-medium text-gray-700">
+                      {t.fields.residenceCountry} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <select
+                        id="currentCountry"
+                        name="currentCountry"
+                        required
+                        value={formData.currentCountry}
+                        onChange={handleInputChange}
+                        className={inputWithIcon}
+                      >
+                        <option value="">{t.actions.selectCountry}</option>
+                        {countryOptions}
+                      </select>
+                    </div>
+
+                    {(formData.currentCountry === 'Autre' || formData.currentCountry === 'Other') && (
+                      <div className="mt-3">
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          {t.actions.specifyCountry}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.customCountry}
+                          onChange={e =>
+                            setFormData(prev => ({ ...prev, customCountry: e.target.value }))
+                          }
+                          className={inputNeutral}
+                          placeholder={t.actions.specifyCountry}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="status" className="mb-1 block text-sm font-medium text-gray-700">
+                      {t.fields.status}
+                    </label>
                     <select
-                      id="currentCountry"
-                      name="currentCountry"
-                      required
-                      value={formData.currentCountry}
+                      id="status"
+                      name="status"
+                      value={formData.status}
                       onChange={handleInputChange}
-                      className={inputWithIconClasses}
-                      aria-describedby="currentCountry-required"
+                      className={inputNeutral}
                     >
-                      <option value="">{t.actions.selectCountry}</option>
-                      {countrySelectOptions}
+                      {i18n[lang].statuses.map(s => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                  
-                  {showCustomCountry && (
-                    <CustomFieldInput
-                      placeholder={t.actions.specifyCountry}
-                      value={formData.customCountry}
-                      onChange={(value) => setFormData(prev => ({ ...prev, customCountry: value }))}
-                      onAdd={() => {
-                        setFormData(prev => ({ ...prev, currentCountry: prev.customCountry, customCountry: '' }));
-                        setShowCustomCountry(false);
-                      }}
-                      disabled={!formData.customCountry}
-                    />
-                  )}
-                </div>
 
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-                    {t.fields.status}
-                  </label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className={inputClasses}
-                  >
-                    {expatStatusOptions}
-                  </select>
-                </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      {t.fields.languagesSpoken} <span className="text-red-500">*</span>
+                    </label>
 
-                {/* Langues parlées avec MultiLanguageSelect */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t.fields.languagesSpoken} <span className="text-red-500">*</span>
-                  </label>
-                  
-                  <Suspense fallback={
-                    <div className="h-10 bg-gray-100 rounded-lg animate-pulse flex items-center px-3">
-                      <div className="text-gray-500 text-sm">Chargement des langues...</div>
+                    <Suspense
+                      fallback={
+                        <div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+                      }
+                    >
+                      <MultiLanguageSelect value={selectedLanguages} onChange={handleLanguagesChange} />
+                    </Suspense>
+
+                    {/* Astuce accessibilité: petite note de sécu & confiance */}
+                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                      <ShieldCheck className="h-4 w-4 text-green-600" />
+                      <span>SSL • {lang === 'fr' ? 'Données chiffrées' : 'Encrypted data'}</span>
                     </div>
-                  }>
-                    <MultiLanguageSelect
-                      value={selectedLanguages}
-                      onChange={handleLanguagesChange}
-                    />
-                  </Suspense>
-                  
-                  {showCustomLanguage && (
-                    <CustomFieldInput
-                      placeholder={t.actions.specifyLanguage}
-                      value={formData.customLanguage}
-                      onChange={(value) => setFormData(prev => ({ ...prev, customLanguage: value }))}
-                      onAdd={handleAddCustomLanguage}
-                      disabled={!formData.customLanguage.trim()}
-                    />
-                  )}
+                  </div>
                 </div>
               </section>
 
-              {/* Conditions générales */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-start space-x-3">
+              {/* Conditions + CTA */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <label className="flex items-start gap-3 text-sm text-gray-700">
                   <input
                     type="checkbox"
-                    id="terms"
                     required
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed">
+                  <span>
                     {t.ui.acceptTerms}{' '}
-                    <Link 
-                      to="/cgu-clients" 
-                      className="text-blue-600 hover:text-blue-700 underline font-medium transition-colors duration-200"
+                    <Link
+                      to={t.termsHref}
                       target="_blank"
                       rel="noopener noreferrer"
+                      className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
                     >
                       {t.ui.termsLink}
                     </Link>{' '}
                     <span className="text-red-500">*</span>
-                  </label>
-                </div>
+                  </span>
+                </label>
               </div>
 
-              {/* Bouton de soumission optimisé */}
-              <div className="pt-4">
+              <div>
                 <Button
                   type="submit"
                   loading={isLoading}
-                  fullWidth={true}
+                  fullWidth
                   size="large"
-                  className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base sm:text-lg py-3 sm:py-4 font-semibold transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                   disabled={!canSubmit}
+                  className="min-h-[52px] rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 font-bold text-white shadow-lg shadow-blue-500/20 transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-blue-600/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isLoading ? t.ui.loading : t.ui.createAccount}
                 </Button>
-                
-                {/* Indicateur de progression visuel */}
+
                 {!canSubmit && (
-                  <div className="mt-3 text-center">
-                    <p className="text-xs text-gray-500">
-                      Veuillez remplir tous les champs obligatoires (*)
-                    </p>
-                  </div>
+                  <p className="mt-3 text-center text-xs text-gray-500">{t.ui.progressHint}</p>
                 )}
               </div>
             </form>
-          </main>
+          </div>
 
-          {/* Footer informatif */}
-          <footer className="text-center mt-8 text-xs text-gray-500 px-4">
-            <p>
-              En vous inscrivant, vous rejoignez notre réseau de clients et bénéficiez de l'aide d'expatriés expérimentés.
-              Votre compte sera immédiatement actif après validation !
-            </p>
-          </footer>
-        </div>
+          {/* Footer petit texte */}
+          <div className="mt-6 text-center text-xs text-gray-500">
+            {lang === 'fr'
+              ? "En vous inscrivant, vous rejoignez notre réseau et accédez rapidement à de l’aide qualifiée."
+              : 'By registering, you join our network and quickly access qualified help.'}
+          </div>
+        </main>
       </div>
-
-      {/* Schema.org structured data pour le SEO */}
-      <script type="application/ld+json">
-        {JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "WebPage",
-          "name": t.meta.title,
-          "description": t.meta.description,
-          "url": window.location.href,
-          "mainEntity": {
-            "@type": "Organization",
-            "name": "Réseau Expatriés",
-            "description": "Réseau d'aide pour clients en expatriation"
-          },
-          "breadcrumb": {
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Accueil",
-                "item": "/"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Inscription Client",
-                "item": "/register-client"
-              }
-            ]
-          }
-        })}
-      </script>
     </Layout>
   );
 };
 
-// Export avec React.memo pour optimiser les re-renders
 export default React.memo(RegisterClient);

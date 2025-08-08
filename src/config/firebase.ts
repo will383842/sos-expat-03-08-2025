@@ -5,7 +5,7 @@ import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
-
+import { getFunctions } from "firebase/functions";
 
 // Configuration Firebase depuis les variables d'environnement
 const firebaseConfig = {
@@ -37,6 +37,17 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'us-central1');
+
+// 🔧 Émulateur pour développement local
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  const { connectFunctionsEmulator } = await import('firebase/functions');
+  try {
+    connectFunctionsEmulator(functions, 'localhost', 5001);
+    console.log('🔧 Émulateur Firebase Functions connecté sur localhost:5001');
+  } catch (error) {
+    console.log('ℹ️ Émulateur déjà connecté');
+  }
+}
 export { db };
 
 // Configuration de la persistance offline pour Firestore

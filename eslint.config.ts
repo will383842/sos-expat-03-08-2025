@@ -9,3 +9,9 @@ export default defineConfig([
   tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
 ]);
+{
+  "plugins": ["react"],
+  "rules": {
+    "react/no-danger": "warn"
+  }
+}

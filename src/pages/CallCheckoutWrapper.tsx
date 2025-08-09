@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/CallCheckoutWrapper.tsx
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import CallCheckout from './CallCheckout';
 import { AlertCircle } from 'lucide-react';
-import { Provider, normalizeProvider, createDefaultProvider } from '../types/Provider';
+import { Provider, normalizeProvider, createDefaultProvider } from '../types/provider'; // ⚠️ casse unifiée: 'provider'
 
+// —————————————————————————————————————————————————————
+// Types
+// —————————————————————————————————————————————————————
 interface ServiceData {
   providerId: string;
   serviceType: 'lawyer_call' | 'expat_call';
@@ -22,582 +26,434 @@ interface LoadingState {
   serviceData: ServiceData | null;
 }
 
+type RouterState = {
+  selectedProvider?: Provider;
+  providerData?: Provider;
+  provider?: Provider;
+  serviceData?: ServiceData;
+  service?: ServiceData;
+  bookingData?: BookingData;
+} | null;
+
+type ProviderLike = Partial<Provider> & {
+  id?: string;
+  providerId?: string;
+  role?: 'lawyer' | 'expat';
+  type?: 'lawyer' | 'expat';
+  providerType?: 'lawyer' | 'expat';
+  price?: number;
+  duration?: number;
+};
+
+interface BookingData {
+  providerId?: string;
+  providerName?: string;
+  providerType?: 'lawyer' | 'expat';
+  providerCountry?: string;
+  providerAvatar?: string;
+  providerPhone?: string;
+  providerLanguages?: string[];
+  price?: number;
+  duration?: number;
+  providerRating?: number;
+  providerReviewCount?: number;
+  providerSpecialties?: string[];
+  clientPhone?: string;
+}
+
+// —————————————————————————————————————————————————————
+// i18n light (aligné avec ce qu’on a fait côté pages)
+// —————————————————————————————————————————————————————
+import { useApp } from '../contexts/AppContext';
+
+const useTranslation = () => {
+  const { language } = useApp();
+  const t = (key: string): string => {
+    const tr: Record<string, Record<string, string>> = {
+      'loading.title': { fr: 'Chargement', en: 'Loading' },
+      'loading.subtitle': { fr: 'Préparation de votre consultation...', en: 'Preparing your consultation...' },
+      'loading.progress': { fr: 'Recherche des données de consultation', en: 'Fetching consultation data' },
+      'error.title': { fr: 'Données manquantes', en: 'Missing data' },
+      'error.body': {
+        fr: 'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.',
+        en: 'Consultation details are missing. Please select an expert again.',
+      },
+      'cta.select_expert': { fr: '🔍 Sélectionner un expert', en: '🔍 Choose an expert' },
+      'cta.home': { fr: '🏠 Retour à l’accueil', en: '🏠 Back to home' },
+      'cta.back': { fr: '← Retour', en: '← Back' },
+      'cta.clear_cache': { fr: '🗑️ Vider le cache et recharger', en: '🗑️ Clear cache & reload' },
+    };
+    return tr[key]?.[language] ?? tr[key]?.fr ?? key;
+  };
+  return { t, language };
+};
+
+// —————————————————————————————————————————————————————
+// Helpers (typés, sans any)
+// —————————————————————————————————————————————————————
+const reconstructServiceData = (provider: ProviderLike): ServiceData => {
+  const providerRole: 'lawyer' | 'expat' =
+    (provider.role || provider.type || provider.providerType || 'expat') as 'lawyer' | 'expat';
+  const baseAmount = typeof provider.price === 'number' ? provider.price : providerRole === 'lawyer' ? 49 : 19;
+  const duration = typeof provider.duration === 'number' ? provider.duration : providerRole === 'lawyer' ? 20 : 30;
+
+  // Commission 20%
+  const commissionRate = 0.2;
+  const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
+  const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
+
+  return {
+    providerId: provider.id || provider.providerId || Math.random().toString(36).slice(2),
+    serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
+    providerRole,
+    amount: baseAmount,
+    duration,
+    clientPhone: '',
+    commissionAmount,
+    providerAmount,
+  };
+};
+
+const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
+  return normalizeProvider({
+    id: bookingData.providerId || Math.random().toString(36).slice(2),
+    name: bookingData.providerName || 'Expert',
+    fullName: bookingData.providerName || 'Expert',
+    firstName: '',
+    lastName: '',
+    role: (bookingData.providerType as 'lawyer' | 'expat') || 'expat',
+    type: (bookingData.providerType as 'lawyer' | 'expat') || 'expat',
+    country: bookingData.providerCountry || '',
+    currentCountry: bookingData.providerCountry || '',
+    avatar: bookingData.providerAvatar || '/default-avatar.png',
+    profilePhoto: bookingData.providerAvatar || '/default-avatar.png',
+    email: '',
+    phone: bookingData.providerPhone || '',
+    phoneNumber: bookingData.providerPhone || '',
+    whatsapp: '',
+    whatsAppNumber: '',
+    languagesSpoken: bookingData.providerLanguages || [],
+    languages: bookingData.providerLanguages || [],
+    preferredLanguage: 'fr',
+    price: typeof bookingData.price === 'number' ? bookingData.price : bookingData.providerType === 'lawyer' ? 49 : 19,
+    duration: typeof bookingData.duration === 'number' ? bookingData.duration : bookingData.providerType === 'lawyer' ? 20 : 30,
+    rating: bookingData.providerRating || 4.5,
+    reviewCount: bookingData.providerReviewCount || 0,
+    specialties: bookingData.providerSpecialties || [],
+    description: '',
+    bio: '',
+    yearsOfExperience: 1,
+    isActive: true,
+    isApproved: true,
+    isVisible: true,
+    isBanned: false,
+    isOnline: true,
+  });
+};
+
+const reconstructServiceFromBooking = (bookingData: BookingData): ServiceData => {
+  const providerRole: 'lawyer' | 'expat' = (bookingData.providerType as 'lawyer' | 'expat') || 'expat';
+  const baseAmount = typeof bookingData.price === 'number' ? bookingData.price : providerRole === 'lawyer' ? 49 : 19;
+  const duration = typeof bookingData.duration === 'number' ? bookingData.duration : providerRole === 'lawyer' ? 20 : 30;
+
+  const commissionRate = 0.2;
+  const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
+  const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
+
+  return {
+    providerId: bookingData.providerId || Math.random().toString(36).slice(2),
+    serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
+    providerRole,
+    amount: baseAmount,
+    duration,
+    clientPhone: bookingData.clientPhone || '',
+    commissionAmount,
+    providerAmount,
+  };
+};
+
+// —————————————————————————————————————————————————————
+// Component
+// —————————————————————————————————————————————————————
 const CallCheckoutWrapper: React.FC = () => {
-  const location = useLocation();
+  const { t } = useTranslation();
+  const location = useLocation() as { state: RouterState };
   const navigate = useNavigate();
   const { providerId } = useParams<{ providerId: string }>();
-  
+
   const [state, setState] = useState<LoadingState>({
     isLoading: true,
     error: null,
     provider: null,
-    serviceData: null
+    serviceData: null,
   });
+
+  const locState = useMemo(() => location.state || null, [location.state]);
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        console.log('🔍 CallCheckoutWrapper - Recherche des données pour providerId:', providerId);
-        
-        // 🔧 FIX 1: Essayer TOUTES les variantes de noms dans location.state
-        const stateProvider = location.state?.selectedProvider || 
-                            location.state?.providerData || 
-                            location.state?.provider;
-        const stateService = location.state?.serviceData || 
-                           location.state?.service || 
-                           location.state?.bookingData;
-        
-        if (stateProvider && stateProvider.id) {
-          console.log('✅ Provider trouvé dans location.state');
-          let serviceInfo = stateService;
-          
-          // Si pas de service data, la reconstruire
-          if (!serviceInfo || !serviceInfo.amount) {
-            console.log('⚙️ Reconstruction service data depuis location.state provider');
-            serviceInfo = reconstructServiceData(stateProvider);
-          }
-          
-          setState({
-            isLoading: false,
-            error: null,
-            provider: normalizeProvider(stateProvider),
-            serviceData: serviceInfo
-          });
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 CallCheckoutWrapper - providerId:', providerId);
+        }
+
+        // 1) location.state (plusieurs clés possibles)
+        const stateProvider = locState?.selectedProvider || locState?.providerData || locState?.provider;
+        const stateService = locState?.serviceData || locState?.service || locState?.bookingData;
+
+        if (stateProvider && (stateProvider as ProviderLike).id) {
+          if (process.env.NODE_ENV === 'development') console.log('✅ Provider via location.state');
+          const normalized = normalizeProvider(stateProvider as Provider);
+          const svc =
+            (stateService as ServiceData | undefined) && (stateService as ServiceData).amount
+              ? (stateService as ServiceData)
+              : reconstructServiceData(normalized);
+          setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
           return;
         }
 
-        // 🔧 FIX 2: SessionStorage avec gestion d'erreurs améliorée
-        console.log('🔍 Recherche dans sessionStorage...');
-        
+        // 2) sessionStorage
+        if (process.env.NODE_ENV === 'development') console.log('🔎 sessionStorage…');
         let savedProviderData: Provider | null = null;
         let savedServiceData: ServiceData | null = null;
 
-        // Essayer selectedProvider
         try {
           const savedProvider = sessionStorage.getItem('selectedProvider');
-          if (savedProvider) {
-            savedProviderData = JSON.parse(savedProvider) as Provider;
-            console.log('✅ selectedProvider trouvé:', savedProviderData.id);
-          }
-        } catch (error) {
-          console.warn('⚠️ Erreur parsing selectedProvider:', error);
-        }
+          if (savedProvider) savedProviderData = JSON.parse(savedProvider) as Provider;
+       } catch (err) {
+  console.error(err);
+}
 
-        // Essayer serviceData
         try {
           const savedService = sessionStorage.getItem('serviceData');
-          if (savedService) {
-            savedServiceData = JSON.parse(savedService) as ServiceData;
-            console.log('✅ serviceData trouvé:', savedServiceData.amount);
-          }
-        } catch (error) {
-          console.warn('⚠️ Erreur parsing serviceData:', error);
-        }
+          if (savedService) savedServiceData = JSON.parse(savedService) as ServiceData;
+        } catch (err) {
+  console.error(err);
+}
 
-        // Vérifier correspondance avec providerId si fourni
         if (savedProviderData && (!providerId || savedProviderData.id === providerId)) {
-          if (!savedServiceData) {
-            console.log('⚙️ Reconstruction service data depuis sessionStorage provider');
-            savedServiceData = reconstructServiceData(savedProviderData);
-          }
-          
-          setState({
-            isLoading: false,
-            error: null,
-            provider: normalizeProvider(savedProviderData),
-            serviceData: savedServiceData
-          });
+          const normalized = normalizeProvider(savedProviderData);
+          const svc = savedServiceData ?? reconstructServiceData(normalized);
+          setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
           return;
         }
 
-        // 🔧 FIX 3: Essayer bookingRequest avec reconstruction complète
-        console.log('🔍 Recherche dans bookingRequest...');
+        // 3) bookingRequest
         try {
           const savedBookingRequest = sessionStorage.getItem('bookingRequest');
           if (savedBookingRequest) {
-            const bookingData = JSON.parse(savedBookingRequest);
-            console.log('✅ bookingRequest trouvé:', bookingData);
-            
+            const bookingData = JSON.parse(savedBookingRequest) as BookingData;
             if (!providerId || bookingData.providerId === providerId) {
               const reconstructedProvider = reconstructProviderFromBooking(bookingData);
               const reconstructedService = reconstructServiceFromBooking(bookingData);
-              
-              setState({
-                isLoading: false,
-                error: null,
-                provider: reconstructedProvider,
-                serviceData: reconstructedService
-              });
+              setState({ isLoading: false, error: null, provider: reconstructedProvider, serviceData: reconstructedService });
               return;
             }
           }
-        } catch (error) {
-          console.warn('⚠️ Erreur parsing bookingRequest:', error);
-        }
+        } catch (err) {
+  console.error(err);
+}
 
-        // 🔧 FIX 4: Essayer providerProfile (nouveau fallback)
-        console.log('🔍 Recherche dans providerProfile...');
+        // 4) providerProfile
         try {
           const savedProviderProfile = sessionStorage.getItem('providerProfile');
           if (savedProviderProfile) {
-            const profileData = JSON.parse(savedProviderProfile);
-            console.log('✅ providerProfile trouvé:', profileData);
-            
+            const profileData = JSON.parse(savedProviderProfile) as Provider;
             if (!providerId || profileData.id === providerId) {
-              const reconstructedService = reconstructServiceData(profileData);
-              
-              setState({
-                isLoading: false,
-                error: null,
-                provider: normalizeProvider(profileData),
-                serviceData: reconstructedService
-              });
+              const normalized = normalizeProvider(profileData);
+              const reconstructedService = reconstructServiceData(normalized);
+              setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructedService });
               return;
             }
           }
-        } catch (error) {
-          console.warn('⚠️ Erreur parsing providerProfile:', error);
-        }
+        } catch (err) {
+  console.error(err);
+}
 
-        // 🔧 FIX 5: Essayer autres sources dans sessionStorage
-        console.log('🔍 Recherche dans autres sources sessionStorage...');
-        const sessionStorageKeys = [
-          'providerData',
-          'selectedExpert',
-          'expertData',
-          'consultationData',
-          'callData'
-        ];
-
+        // 5) autres clés sessionStorage
+        const sessionStorageKeys = ['providerData', 'selectedExpert', 'expertData', 'consultationData', 'callData'] as const;
         for (const key of sessionStorageKeys) {
           try {
             const data = sessionStorage.getItem(key);
             if (data) {
-              const parsedData = JSON.parse(data);
-              if (parsedData && parsedData.id && (!providerId || parsedData.id === providerId)) {
-                console.log(`✅ Données trouvées dans ${key}:`, parsedData);
-                
-                setState({
-                  isLoading: false,
-                  error: null,
-                  provider: normalizeProvider(parsedData),
-                  serviceData: reconstructServiceData(parsedData)
-                });
+              const parsed = JSON.parse(data) as ProviderLike;
+              if (parsed && (parsed.id || parsed.providerId) && (!providerId || parsed.id === providerId || parsed.providerId === providerId)) {
+                const normalized = normalizeProvider(parsed as Provider);
+                const reconstructedService = reconstructServiceData(normalized);
+                setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructedService });
                 return;
               }
             }
-          } catch (error) {
-            console.warn(`⚠️ Erreur parsing ${key}:`, error);
-          }
+          } catch (err) {
+  console.error(err);
+}
         }
 
-        // 🔧 FIX 6: Essayer de récupérer depuis l'historique de navigation
-        console.log('🔍 Recherche dans l\'historique de navigation...');
+        // 6) history.state
         try {
-          const historyState = window.history.state;
-          if (historyState) {
-            const historyProvider = historyState.selectedProvider || 
-                                  historyState.provider || 
-                                  historyState.providerData;
-            
-            if (historyProvider && historyProvider.id && (!providerId || historyProvider.id === providerId)) {
-              console.log('✅ Provider trouvé dans history state:', historyProvider);
-              
-              setState({
-                isLoading: false,
-                error: null,
-                provider: normalizeProvider(historyProvider),
-                serviceData: reconstructServiceData(historyProvider)
-              });
-              return;
-            }
+          const historyState = window.history.state as RouterState;
+          const historyProvider = historyState?.selectedProvider || historyState?.provider || historyState?.providerData;
+          if (historyProvider && (historyProvider as ProviderLike).id && (!providerId || (historyProvider as ProviderLike).id === providerId)) {
+            const normalized = normalizeProvider(historyProvider as Provider);
+            setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized) });
+            return;
           }
-        } catch (error) {
-          console.warn('⚠️ Erreur récupération history state:', error);
-        }
+        } catch (err) {
+  console.error(err);
+}
 
-        // 🔧 FIX 7: Essayer de récupérer depuis localStorage (backup)
-        console.log('🔍 Recherche dans localStorage (backup)...');
+        // 7) localStorage (backup)
         try {
-          const localStorageKeys = [
-            'lastSelectedProvider',
-            'recentProvider',
-            'currentProvider'
-          ];
-
+          const localStorageKeys = ['lastSelectedProvider', 'recentProvider', 'currentProvider'] as const;
           for (const key of localStorageKeys) {
             const data = localStorage.getItem(key);
             if (data) {
-              const parsedData = JSON.parse(data);
-              if (parsedData && parsedData.id && (!providerId || parsedData.id === providerId)) {
-                console.log(`✅ Données trouvées dans localStorage ${key}:`, parsedData);
-                
-                setState({
-                  isLoading: false,
-                  error: null,
-                  provider: normalizeProvider(parsedData),
-                  serviceData: reconstructServiceData(parsedData)
-                });
+              const parsed = JSON.parse(data) as Provider;
+              if (parsed && parsed.id && (!providerId || parsed.id === providerId)) {
+                const normalized = normalizeProvider(parsed);
+                setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized) });
                 return;
               }
             }
           }
-        } catch (error) {
-          console.warn('⚠️ Erreur récupération localStorage:', error);
-        }
+        } catch (err) {
+  console.error(err);
+}
 
-        // 🔧 FIX 8: Essayer de récupérer depuis les paramètres URL
-        console.log('🔍 Recherche dans les paramètres URL...');
+        // 8) paramètres URL
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const providerParam = urlParams.get('provider');
           const serviceParam = urlParams.get('service');
-          
           if (providerParam) {
-            const providerData = JSON.parse(decodeURIComponent(providerParam));
+            const providerData = JSON.parse(decodeURIComponent(providerParam)) as Provider;
             if (providerData && providerData.id && (!providerId || providerData.id === providerId)) {
-              console.log('✅ Provider trouvé dans les paramètres URL:', providerData);
-              
-              let serviceData = null;
-              if (serviceParam) {
-                serviceData = JSON.parse(decodeURIComponent(serviceParam));
-              }
-              
-              setState({
-                isLoading: false,
-                error: null,
-                provider: normalizeProvider(providerData),
-                serviceData: serviceData || reconstructServiceData(providerData)
-              });
+              const normalized = normalizeProvider(providerData);
+              const svc = serviceParam
+                ? (JSON.parse(decodeURIComponent(serviceParam)) as ServiceData)
+                : reconstructServiceData(normalized);
+              setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
               return;
             }
           }
-        } catch (error) {
-          console.warn('⚠️ Erreur récupération paramètres URL:', error);
-        }
+        } catch (err) {
+  console.error(err);
+}
 
-        // 🔧 FIX 9: Fallback avec données par défaut si providerId fourni
+        // 9) fallback avec providerId => default provider
         if (providerId) {
-          console.log('⚙️ Fallback avec données par défaut pour providerId:', providerId);
           const defaultProvider = createDefaultProvider(providerId);
-          const defaultService = reconstructServiceData(defaultProvider);
-          
           setState({
             isLoading: false,
             error: null,
             provider: defaultProvider,
-            serviceData: defaultService
+            serviceData: reconstructServiceData(defaultProvider),
           });
           return;
         }
 
-        // 🔧 FIX 10: Essayer de reconstruire depuis les données de l'URL elle-même
-        console.log('🔍 Tentative de reconstruction depuis l\'URL...');
-        try {
-          const pathParts = window.location.pathname.split('/');
-          const lastPart = pathParts[pathParts.length - 1];
-          
-          if (lastPart && lastPart.includes('-')) {
-            const extractedId = lastPart.split('-').pop();
-            if (extractedId && extractedId.length > 5) {
-              console.log('✅ ID extrait de l\'URL:', extractedId);
-              const reconstructedProvider = createDefaultProvider(extractedId);
-              
-              setState({
-                isLoading: false,
-                error: null,
-                provider: reconstructedProvider,
-                serviceData: reconstructServiceData(reconstructedProvider)
-              });
-              return;
-            }
-          }
-        } catch (error) {
-          console.warn('⚠️ Erreur reconstruction depuis URL:', error);
-        }
-
-        // Aucune donnée trouvée
-        console.error('❌ Aucune donnée trouvée pour providerId:', providerId);
+        // 10) rien trouvé
         setState({
           isLoading: false,
-          error: 'Les données de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.',
+          error: t('error.body'),
           provider: null,
-          serviceData: null
+          serviceData: null,
         });
-        
-      } catch (error) {
-        console.error('❌ Erreur lors du chargement des données:', error);
+      } catch (err) {
+        if (process.env.NODE_ENV === 'development') console.error('❌ loadData error', err);
         setState({
           isLoading: false,
-          error: 'Erreur lors du chargement des données de consultation',
+          error: t('error.body'),
           provider: null,
-          serviceData: null
+          serviceData: null,
         });
       }
     };
 
     loadData();
-  }, [location.state, providerId]);
+  }, [locState, providerId, t]);
 
-  /**
-   * 🔧 FIX: Reconstruit les données de service à partir du provider
-   */
-  const reconstructServiceData = (provider: any): ServiceData => {
-    const providerRole = provider.role || provider.type || provider.providerType || 'expat';
-    const baseAmount = provider.price || (providerRole === 'lawyer' ? 49 : 19);
-    const duration = provider.duration || (providerRole === 'lawyer' ? 20 : 30);
-    
-    // Calcul des commissions (20% pour la plateforme)
-    const commissionRate = 0.20;
-    const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
-    const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
-    
-    return {
-      providerId: provider.id || provider.providerId || Math.random().toString(36),
-      serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
-      providerRole: providerRole as 'lawyer' | 'expat',
-      amount: baseAmount,
-      duration: duration,
-      clientPhone: '', // Sera rempli par CallCheckout
-      commissionAmount: commissionAmount,
-      providerAmount: providerAmount
-    };
-  };
-
-  /**
-   * 🔧 NOUVEAU: Reconstruit un provider depuis bookingRequest
-   */
-  const reconstructProviderFromBooking = (bookingData: any): Provider => {
-    return normalizeProvider({
-      id: bookingData.providerId || Math.random().toString(36),
-      name: bookingData.providerName || 'Expert',
-      fullName: bookingData.providerName || 'Expert',
-      firstName: '',
-      lastName: '',
-      role: bookingData.providerType as 'lawyer' | 'expat' || 'expat',
-      type: bookingData.providerType as 'lawyer' | 'expat' || 'expat',
-      country: bookingData.providerCountry || '',
-      currentCountry: bookingData.providerCountry || '',
-      avatar: bookingData.providerAvatar || '/default-avatar.png',
-      profilePhoto: bookingData.providerAvatar || '/default-avatar.png',
-      email: '',
-      phone: bookingData.providerPhone || '',
-      phoneNumber: bookingData.providerPhone || '',
-      whatsapp: '',
-      whatsAppNumber: '',
-      languagesSpoken: bookingData.providerLanguages || [],
-      languages: bookingData.providerLanguages || [],
-      preferredLanguage: 'fr',
-      price: bookingData.price || (bookingData.providerType === 'lawyer' ? 49 : 19),
-      duration: bookingData.duration || (bookingData.providerType === 'lawyer' ? 20 : 30),
-      rating: bookingData.providerRating || 4.5,
-      reviewCount: bookingData.providerReviewCount || 0,
-      specialties: bookingData.providerSpecialties || [],
-      description: '',
-      bio: '',
-      yearsOfExperience: 1,
-      isActive: true,
-      isApproved: true,
-      isVisible: true,
-      isBanned: false,
-      isOnline: true
-    });
-  };
-
-  /**
-   * 🔧 NOUVEAU: Reconstruit serviceData depuis bookingRequest
-   */
-  const reconstructServiceFromBooking = (bookingData: any): ServiceData => {
-    const providerRole = bookingData.providerType || 'expat';
-    const baseAmount = bookingData.price || (providerRole === 'lawyer' ? 49 : 19);
-    const duration = bookingData.duration || (providerRole === 'lawyer' ? 20 : 30);
-    
-    const commissionRate = 0.20;
-    const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
-    const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
-    
-    return {
-      providerId: bookingData.providerId || Math.random().toString(36),
-      serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
-      providerRole: providerRole as 'lawyer' | 'expat',
-      amount: baseAmount,
-      duration: duration,
-      clientPhone: bookingData.clientPhone || '',
-      commissionAmount: commissionAmount,
-      providerAmount: providerAmount
-    };
-  };
-
-  /**
-   * 🔧 NOUVEAU: Sauvegarde sécurisée des données pour session suivante
-   */
-  const saveDataForSession = (provider: Provider, serviceData: ServiceData) => {
-    try {
-      // Sauvegarder dans sessionStorage
-      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
-      sessionStorage.setItem('serviceData', JSON.stringify(serviceData));
-      
-      // Sauvegarder dans localStorage comme backup
-      localStorage.setItem('lastSelectedProvider', JSON.stringify(provider));
-      localStorage.setItem('lastServiceData', JSON.stringify(serviceData));
-      
-      console.log('💾 Données sauvegardées pour session suivante');
-    } catch (error) {
-      console.warn('⚠️ Erreur sauvegarde session:', error);
-    }
-  };
-
-  /**
-   * 🔧 NOUVEAU: Validation avancée des données provider
-   */
-  const validateProviderData = (provider: any): boolean => {
-    if (!provider) return false;
-    
-    const requiredFields = ['id'];
-    const hasRequiredFields = requiredFields.every(field => provider[field]);
-    
-    if (!hasRequiredFields) {
-      console.warn('⚠️ Provider manque des champs requis:', { provider, requiredFields });
-      return false;
-    }
-    
-    // Validation des types
-    if (provider.price && (typeof provider.price !== 'number' || provider.price < 0)) {
-      console.warn('⚠️ Prix invalid:', provider.price);
-      return false;
-    }
-    
-    if (provider.duration && (typeof provider.duration !== 'number' || provider.duration < 0)) {
-      console.warn('⚠️ Durée invalid:', provider.duration);
-      return false;
-    }
-    
-    return true;
-  };
-
-  /**
-   * 🔧 NOUVEAU: Validation avancée des données service
-   */
-  const validateServiceData = (serviceData: any): boolean => {
-    if (!serviceData) return false;
-    
-    const requiredFields = ['providerId', 'amount'];
-    const hasRequiredFields = requiredFields.every(field => serviceData[field]);
-    
-    if (!hasRequiredFields) {
-      console.warn('⚠️ ServiceData manque des champs requis:', { serviceData, requiredFields });
-      return false;
-    }
-    
-    // Validation des montants
-    if (typeof serviceData.amount !== 'number' || serviceData.amount <= 0) {
-      console.warn('⚠️ Montant invalid:', serviceData.amount);
-      return false;
-    }
-    
-    return true;
-  };
-
-  const handleGoBack = (): void => {
-    // Essayer de retourner à la page précédente
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      // 🔧 FIX: Navigation cohérente avec les autres fichiers
-      navigate('/');
-    }
-  };
-
-  // 🔧 NOUVEAU: Hook pour sauvegarder automatiquement les données valides
+  // Sauvegarde session (utile pour CallCheckout et retours)
   useEffect(() => {
     if (state.provider && state.serviceData && !state.isLoading && !state.error) {
-      saveDataForSession(state.provider, state.serviceData);
+      try {
+        sessionStorage.setItem('selectedProvider', JSON.stringify(state.provider));
+        sessionStorage.setItem('serviceData', JSON.stringify(state.serviceData));
+        localStorage.setItem('lastSelectedProvider', JSON.stringify(state.provider));
+        localStorage.setItem('lastServiceData', JSON.stringify(state.serviceData));
+      } catch (err) {
+  console.error(err);
+}
     }
   }, [state.provider, state.serviceData, state.isLoading, state.error]);
 
-  // Loading state
+  const handleGoBack = (): void => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/');
+  };
+
+  // —————————————————————————————————————————————————————
+  // UI States — mobile-first, i18n
+  // —————————————————————————————————————————————————————
   if (state.isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center max-w-lg mx-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Chargement</h2>
-          <p className="text-gray-600">
-            Préparation de votre consultation...
-          </p>
-          
-          {/* Indicateur de progression */}
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 sm:p-8 text-center w-full max-w-lg">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600 mx-auto mb-4" />
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">{t('loading.title')}</h2>
+          <p className="text-gray-600 text-sm">{t('loading.subtitle')}</p>
           <div className="mt-4">
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-red-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              <div className="bg-red-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }} />
             </div>
-            <p className="text-xs text-gray-500 mt-2">Recherche des données de consultation</p>
+            <p className="text-xs text-gray-500 mt-2">{t('loading.progress')}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Error state
   if (state.error || !state.provider || !state.serviceData) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center max-w-lg mx-4">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Données manquantes</h2>
-          <p className="text-gray-600 mb-6">
-            {state.error || 'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.'}
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 sm:p-8 text-center w-full max-w-lg">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">{t('error.title')}</h2>
+          <p className="text-gray-600 text-sm mb-5">
+            {state.error || t('error.body')}
           </p>
-          
-          {/* Debug info en développement */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mb-6 p-4 bg-gray-100 rounded-lg text-left">
-              <h3 className="font-semibold text-gray-800 mb-2">Debug Info:</h3>
-              <div className="text-xs text-gray-600 space-y-1">
-                <div>Provider ID: {providerId || 'Non fourni'}</div>
-                <div>Provider Data: {state.provider ? '✅ Trouvé' : '❌ Manquant'}</div>
-                <div>Service Data: {state.serviceData ? '✅ Trouvé' : '❌ Manquant'}</div>
-                <div>Location State: {location.state ? '✅ Présent' : '❌ Vide'}</div>
-                <div>SessionStorage Provider: {sessionStorage.getItem('selectedProvider') ? '✅ Présent' : '❌ Vide'}</div>
-                <div>SessionStorage Service: {sessionStorage.getItem('serviceData') ? '✅ Présent' : '❌ Vide'}</div>
-                <div>SessionStorage Booking: {sessionStorage.getItem('bookingRequest') ? '✅ Présent' : '❌ Vide'}</div>
-                <div>LocalStorage Backup: {localStorage.getItem('lastSelectedProvider') ? '✅ Présent' : '❌ Vide'}</div>
-                <div>Current URL: {window.location.pathname}</div>
-                <div>URL Search: {window.location.search}</div>
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-3">
+
+          <div className="space-y-2">
             <button
               onClick={() => navigate('/experts')}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              🔍 Sélectionner un expert
+              {t('cta.select_expert')}
             </button>
             <button
               onClick={() => navigate('/')}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              🏠 Retour à l'accueil
+              {t('cta.home')}
             </button>
             <button
               onClick={handleGoBack}
-              className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200"
+              className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              ← Retour
+              {t('cta.back')}
             </button>
-            
-            {/* Bouton pour vider le cache */}
             <button
               onClick={() => {
-                sessionStorage.clear();
-                localStorage.clear();
-                window.location.reload();
+                try {
+                  sessionStorage.clear();
+                  localStorage.clear();
+                } finally {
+                  window.location.reload();
+                }
               }}
-              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors duration-200"
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 rounded-lg text-sm transition-colors"
             >
-              🗑️ Vider le cache et recharger
+              {t('cta.clear_cache')}
             </button>
           </div>
         </div>
@@ -605,7 +461,7 @@ const CallCheckoutWrapper: React.FC = () => {
     );
   }
 
-  // Success - render CallCheckout with data
+  // Success — CallCheckout
   return (
     <CallCheckout
       selectedProvider={state.provider}

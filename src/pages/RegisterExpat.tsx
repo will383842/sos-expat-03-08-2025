@@ -1,6 +1,6 @@
 // src/pages/RegisterExpat.tsx
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Users, Phone,
   X, Camera, CheckCircle, ArrowRight
@@ -9,6 +9,8 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
+import { MultiValue } from 'react-select';
+import type { Provider } from '../types/provider';
 
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
@@ -318,6 +320,35 @@ SectionHeader.displayName = 'SectionHeader';
 // ===== Component =====
 const RegisterExpat: React.FC = () => {
   const navigate = useNavigate();
+  // --- Types sûrs (pas de any) ---
+type NavState = Readonly<{ selectedProvider?: Provider }>;
+
+function isProviderLike(v: unknown): v is Provider {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === 'string'
+    && typeof o.name === 'string'
+    && (o.type === 'lawyer' || o.type === 'expat');
+}
+
+const location = useLocation();
+const [searchParams] = useSearchParams();
+const redirect = searchParams.get('redirect') || '/dashboard';
+
+useEffect(() => {
+  const rawState: unknown = location.state;
+  const state = (rawState ?? null) as NavState | null;
+  const sp = state?.selectedProvider;
+
+  if (isProviderLike(sp)) {
+    try {
+      sessionStorage.setItem('selectedProvider', JSON.stringify(sp));
+    } catch {
+  /* no-op: sessionStorage indisponible (mode privé / quota) */
+  void 0;
+}
+  }
+}, [location.state]);
   const { register, isLoading, error } = useAuth();
   const { language } = useApp(); // 'fr' | 'en'
   const lang = (language as 'fr' | 'en') || 'fr';
@@ -425,36 +456,40 @@ const RegisterExpat: React.FC = () => {
   }, [formData, selectedLanguages]);
 
   // ---- Validation helpers ----
+  
+
   const validateField = useCallback(
     (name: string, value: string | number | boolean): string => {
       switch (name) {
-        case 'email':
-          if (!value) return t.allRequired;
-          if (!EMAIL_REGEX.test(value as string)) return t.invalidEmail;
-          return '';
+        case 'email': {
+  const v = (value as string) || '';
+  if (!v.trim()) return I18N[lang].allRequired;
+  return EMAIL_REGEX.test(v) ? '' : I18N[lang].invalidEmail;
+}
+
         case 'password':
-          if (!value) return t.allRequired;
-          if ((value as string).length < 6) return t.passwordTooShort;
+          if (!value) return I18N[lang].allRequired;
+          if ((value as string).length < 6) return I18N[lang].passwordTooShort;
           return '';
         case 'phone':
-          if (!value) return t.phoneRequired;
-          if (!PHONE_REGEX.test(value as string)) return t.phoneRequired;
+          if (!value) return I18N[lang].phoneRequired;
+          if (!PHONE_REGEX.test(value as string)) return I18N[lang].phoneRequired;
           return '';
         case 'whatsappNumber':
-          if (!value) return t.whatsappRequired;
+          if (!value) return I18N[lang].whatsappRequired;
           return '';
         case 'bio':
-          if (!(value as string)?.trim()) return t.bioRequired;
-          if ((value as string).length < 50) return t.bioTooShort;
+          if (!(value as string)?.trim()) return I18N[lang].bioRequired;
+          if ((value as string).length < 50) return I18N[lang].bioTooShort;
           return '';
         case 'yearsAsExpat':
-          if (!value || (value as number) < 1) return t.yearsMin;
+          if (!value || (value as number) < 1) return I18N[lang].yearsMin;
           return '';
         default:
           return '';
       }
     },
-    [t]
+    [lang]
   );
 
   const onChange = useCallback(
@@ -492,7 +527,9 @@ const RegisterExpat: React.FC = () => {
       }
       e.target.value = '';
       if (fieldErrors.helpTypes) {
-        const { helpTypes, ...rest } = fieldErrors;
+        // éviter la variable inutilisée via destructuring
+        const rest = { ...fieldErrors };
+        delete rest.helpTypes;
         setFieldErrors(rest);
       }
     },
@@ -579,7 +616,7 @@ const RegisterExpat: React.FC = () => {
           updatedAt: new Date(),
         };
         await register(userData, formData.password);
-        navigate('/dashboard', { state: { message: t.success, type: 'success' } });
+        navigate(redirect, { replace: true, state: { message: I18N[lang].success, type: 'success' } });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         setFormError(msg || 'Error');
@@ -587,7 +624,7 @@ const RegisterExpat: React.FC = () => {
         setIsSubmitting(false);
       }
     },
-    [isSubmitting, validateForm, register, formData, selectedLanguages, navigate, t, lang]
+    [isSubmitting, validateForm, register, formData, selectedLanguages, navigate, redirect, lang]
   );
 
   // ---- Can submit ----
@@ -619,10 +656,9 @@ const RegisterExpat: React.FC = () => {
     [lang]
   );
 
-  // Language handler with explicit MultiValue type casting
-  const handleLanguageChange = useCallback((selectedOptions: any) => {
-    // Handle both array and null cases from react-select MultiValue
-    const options = selectedOptions || [];
+  // Language handler with explicit MultiValue type (no 'any')
+  const handleLanguageChange = useCallback((selectedOptions: MultiValue<LanguageOption> | null) => {
+    const options = selectedOptions ?? [];
     setSelectedLanguages(Array.isArray(options) ? [...options] : []);
   }, []);
 
@@ -646,7 +682,7 @@ const RegisterExpat: React.FC = () => {
           <div className="mt-5 h-1 w-40 mx-auto rounded-full" style={{ backgroundColor: 'rgba(5, 150, 105, 0.85)' }} />
           <p className="mt-3 text-xs sm:text-sm text-gray-500">
             {t.already}{' '}
-            <Link to="/login" className="font-semibold underline text-emerald-700 hover:text-emerald-800">
+            <Link to={`/login?redirect=${encodeURIComponent(redirect)}`} className="font-semibold underline text-emerald-700 hover:text-emerald-800">
               {t.login}
             </Link>
           </p>
@@ -868,7 +904,7 @@ const RegisterExpat: React.FC = () => {
                     <MultiLanguageSelect
                       value={selectedLanguages}
                       onChange={handleLanguageChange}
-                      placeholder={t.langPlaceholder}
+                      /* placeholder prop retirée ici pour éviter TS2322 si le composant ne l'expose pas */
                     />
                   </Suspense>
                   {fieldErrors.languages && <p className="text-sm text-red-600 mt-2">{fieldErrors.languages}</p>}

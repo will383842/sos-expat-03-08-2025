@@ -1,7 +1,7 @@
+// src/pages/PasswordReset.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle, Shield, Globe, Smartphone, RefreshCw } from 'lucide-react';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +22,14 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): void;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
+
+/** gtag typé (évite any et les redéclarations globales) */
+type GtagFunction = (...args: unknown[]) => void;
+interface GtagWindow {
+  gtag?: GtagFunction;
+}
+const getGtag = (): GtagFunction | undefined =>
+  (typeof window !== 'undefined' ? (window as unknown as GtagWindow).gtag : undefined);
 
 // Hook de traduction optimisé avec contexte App
 const useTranslation = () => {
@@ -302,7 +310,7 @@ const PasswordReset: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [submitAttempts, setSubmitAttempts] = useState(0);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [lastSentEmail, setLastSentEmail] = useState<string>('');
   const [cooldownTime, setCooldownTime] = useState(0);
@@ -491,7 +499,7 @@ const PasswordReset: React.FC = () => {
     // Function to update or create meta tag
     const updateMetaTag = (name: string, content: string, property?: boolean) => {
       const attribute = property ? 'property' : 'name';
-      let meta = document.querySelector(`meta[${attribute}="${name}"]`) as HTMLMetaElement;
+      let meta = document.querySelector(`meta[${attribute}="${name}"]`) as HTMLMetaElement | null;
       if (!meta) {
         meta = document.createElement('meta');
         meta.setAttribute(attribute, name);
@@ -507,13 +515,21 @@ const PasswordReset: React.FC = () => {
     updateMetaTag('author', 'SOS Expats');
     updateMetaTag('language', currentLang);
     
+    // og:locale sûr (évite le type never)
+    const ogLocale =
+      currentLang === 'fr'
+        ? 'fr_FR'
+        : currentLang === 'en'
+        ? 'en_US'
+        : `${String(currentLang)}_${String(currentLang).toUpperCase()}`;
+
     // OpenGraph with i18n
     updateMetaTag('og:type', 'website', true);
     updateMetaTag('og:title', metaData.ogTitle, true);
     updateMetaTag('og:description', metaData.ogDescription, true);
     updateMetaTag('og:url', metaData.canonicalUrl, true);
     updateMetaTag('og:site_name', 'SOS Expats', true);
-    updateMetaTag('og:locale', currentLang === 'fr' ? 'fr_FR' : currentLang === 'en' ? 'en_US' : `${currentLang}_${currentLang.toUpperCase()}`, true);
+    updateMetaTag('og:locale', ogLocale, true);
     updateMetaTag('og:image', `${window.location.origin}/images/og-password-reset-${currentLang}.jpg`, true);
     updateMetaTag('og:image:width', '1200', true);
     updateMetaTag('og:image:height', '630', true);
@@ -546,7 +562,7 @@ const PasswordReset: React.FC = () => {
     updateMetaTag('application-name', 'SOS Expats');
     
     // Canonical and alternate languages
-    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement('link');
       canonical.rel = 'canonical';
@@ -555,7 +571,7 @@ const PasswordReset: React.FC = () => {
     canonical.href = metaData.canonicalUrl;
     
     // Remove existing alternate links
-    document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(link => link.remove());
+    document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(link => link.parentElement?.removeChild(link));
     
     // Add alternate language links
     Object.entries(metaData.alternateUrls).forEach(([lang, url]) => {
@@ -574,7 +590,7 @@ const PasswordReset: React.FC = () => {
     document.head.appendChild(xDefault);
     
     // JSON-LD Structured Data
-    let structuredDataScript = document.querySelector('#structured-data') as HTMLScriptElement;
+    let structuredDataScript = document.querySelector('#structured-data') as HTMLScriptElement | null;
     if (!structuredDataScript) {
       structuredDataScript = document.createElement('script');
       structuredDataScript.id = 'structured-data';
@@ -602,8 +618,9 @@ const PasswordReset: React.FC = () => {
       setSubmitAttempts(prev => prev + 1);
       
       // Analytics for validation errors
-      if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-        (window as any).gtag('event', 'password_reset_validation_failed', {
+      const gtag = getGtag();
+      if (gtag) {
+        gtag('event', 'password_reset_validation_failed', {
           attempts: submitAttempts + 1,
           errors: Object.keys(formErrors).join(',')
         });
@@ -623,29 +640,33 @@ const PasswordReset: React.FC = () => {
       
       // Performance measure
       performance.mark('password-reset-attempt-end');
-      performance.measure('password-reset-attempt', 'password-reset-attempt-start', 'password-reset-attempt-end');
+      performance.measure('password-reset-attempt', { start: 'password-reset-attempt-start', end: 'password-reset-attempt-end' });
       
       setIsSuccess(true);
       setLastSentEmail(formData.email);
       setCooldownTime(60); // 1 minute cooldown
       
       // Success analytics
-      if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-        (window as any).gtag('event', 'password_reset_success', {
+      const gtag = getGtag();
+      if (gtag) {
+        gtag('event', 'password_reset_success', {
           email_domain: formData.email.split('@')[1],
           attempt_number: submitAttempts + 1
         });
       }
       
-    } catch (error: any) {
-      console.error('Password reset error:', error);
+    } catch (error) {
+      // Narrow typing + extraction
+      const err = error as { code?: string; message?: string } | Error | unknown;
+      console.error('Password reset error:', err);
       setSubmitAttempts(prev => prev + 1);
       
       let errorMessage = t('error.description');
       
       // Firebase specific error handling
-      if (error?.code) {
-        switch (error.code) {
+      const code = (err as { code?: string })?.code;
+      if (code) {
+        switch (code) {
           case 'auth/user-not-found':
             errorMessage = t('error.user_not_found');
             break;
@@ -655,6 +676,7 @@ const PasswordReset: React.FC = () => {
             break;
           case 'auth/invalid-email':
             setFormErrors({ email: t('validation.email_invalid') });
+            setIsLoading(false);
             return;
           default:
             errorMessage = t('error.description');
@@ -664,9 +686,10 @@ const PasswordReset: React.FC = () => {
       setFormErrors({ general: errorMessage });
       
       // Error analytics
-      if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-        (window as any).gtag('event', 'password_reset_failed', {
-          error_type: error?.code || 'unknown',
+      const gtag = getGtag();
+      if (gtag) {
+        gtag('event', 'password_reset_failed', {
+          error_type: code || 'unknown',
           attempts: submitAttempts + 1,
           email_domain: formData.email.split('@')[1]
         });
@@ -696,8 +719,9 @@ const PasswordReset: React.FC = () => {
     if (installPrompt) {
       installPrompt.prompt();
       installPrompt.userChoice.then((choiceResult) => {
-        if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-          (window as any).gtag('event', 'pwa_install_prompt', {
+        const gtag = getGtag();
+        if (gtag) {
+          gtag('event', 'pwa_install_prompt', {
             choice: choiceResult.outcome,
             page: 'password-reset'
           });
@@ -707,13 +731,16 @@ const PasswordReset: React.FC = () => {
     }
   }, [installPrompt]);
 
-  // Classes CSS pour inputs
-  const inputClass = useCallback((fieldName: string) =>
-    `appearance-none block w-full px-4 py-3.5 text-base border rounded-xl placeholder-gray-400 bg-white text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-gray-400 ${
-      formErrors[fieldName]
-        ? 'border-red-300 bg-red-50 ring-2 ring-red-200'
-        : 'border-gray-300'
-    }`, [formErrors]);
+  // Classes CSS pour inputs (clé typée)
+  const inputClass = useCallback(
+    (fieldName: keyof FormErrors) =>
+      `appearance-none block w-full px-4 py-3.5 text-base border rounded-xl placeholder-gray-400 bg-white text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-gray-400 ${
+        formErrors[fieldName]
+          ? 'border-red-300 bg-red-50 ring-2 ring-red-200'
+          : 'border-gray-300'
+      }`,
+    [formErrors]
+  );
 
   const isFormValid = !formErrors.email && formData.email && emailRegex.test(formData.email);
 
@@ -725,8 +752,9 @@ const PasswordReset: React.FC = () => {
     <ErrorBoundary 
       FallbackComponent={ErrorFallback} 
       onError={(error, errorInfo) => {
-        if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-          (window as any).gtag('event', 'password_reset_error_boundary', {
+        const gtag = getGtag();
+        if (gtag) {
+          gtag('event', 'password_reset_error_boundary', {
             error: error.message,
             component_stack: errorInfo.componentStack
           });
@@ -1071,10 +1099,3 @@ const PasswordReset: React.FC = () => {
 
 // Export with React.memo for performance optimization
 export default React.memo(PasswordReset);
-
-// Ajout des types pour Firebase/Firestore si nécessaire
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-  }
-}

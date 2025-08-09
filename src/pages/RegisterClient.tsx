@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, UserCheck, Clock3, Languages, ShieldCheck } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { serverTimestamp } from 'firebase/firestore';
+import { serverTimestamp, FieldValue } from 'firebase/firestore';
 import type { MultiValue } from 'react-select';
-import { FieldValue } from 'firebase/firestore';
+import type { Provider } from '../types/provider'; // <= IMPORTANT: minuscule
 
 // Lazy loading des composants lourds pour améliorer le temps de chargement initial
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
@@ -26,14 +26,23 @@ interface CreateUserData {
 }
 
 // Interface pour le formulaire optimisée
-
-// Interface pour le formulaire optimisée
 interface FormData {
   firstName: string;
   email: string;
   password: string;
   languagesSpoken: string[];
   customLanguage: string;
+}
+
+// --- Types sûrs (pas de any) — en dehors du composant pour éviter toute erreur de parsing ---
+type NavState = Readonly<{ selectedProvider?: Provider }>;
+
+function isProviderLike(v: unknown): v is Provider {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === 'string'
+    && typeof o.name === 'string'
+    && (o.type === 'lawyer' || o.type === 'expat');
 }
 
 // Configuration i18n complète - Préparée pour l'internationalisation
@@ -147,13 +156,13 @@ const i18nConfig = {
 } as const;
 
 // Composant CustomFieldInput optimisé pour les champs personnalisés
-const CustomFieldInput = React.memo(({ 
-  placeholder, 
-  value, 
-  onChange, 
-  onAdd, 
-  disabled 
-}: { 
+const CustomFieldInput = React.memo(({
+  placeholder,
+  value,
+  onChange,
+  onAdd,
+  disabled
+}: {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
@@ -185,9 +194,29 @@ CustomFieldInput.displayName = 'CustomFieldInput';
 // Composant principal
 const RegisterClient: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/dashboard';
+
+  // Conserver le provider si on arrive depuis "Réservez maintenant"
+  useEffect(() => {
+    const rawState: unknown = location.state;
+    const state = (rawState ?? null) as NavState | null;
+    const sp = state?.selectedProvider;
+
+    if (isProviderLike(sp)) {
+      try {
+        sessionStorage.setItem('selectedProvider', JSON.stringify(sp));
+      } catch {
+        /* no-op: sessionStorage indisponible (mode privé / quota) */
+        void 0;
+      }
+    }
+  }, [location.state]);
+
   const { register, isLoading, error } = useAuth();
   const { language } = useApp();
-  
+
   // Configuration i18n basée sur la langue actuelle
   const t = i18nConfig[language as keyof typeof i18nConfig] || i18nConfig.fr;
 
@@ -210,7 +239,7 @@ const RegisterClient: React.FC = () => {
   // SEO - Mise à jour des métadonnées complète
   useEffect(() => {
     document.title = t.meta.title;
-    
+
     // Fonction utilitaire pour mettre à jour les métadonnées
     const setMeta = (attr: 'name' | 'property', key: string, content: string) => {
       let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
@@ -225,13 +254,13 @@ const RegisterClient: React.FC = () => {
     // Métadonnées de base
     setMeta('name', 'description', t.meta.description);
     setMeta('name', 'keywords', t.meta.keywords);
-    
+
     // Open Graph
     setMeta('property', 'og:title', t.meta.title);
     setMeta('property', 'og:description', t.meta.description);
     setMeta('property', 'og:type', 'website');
     setMeta('property', 'og:locale', language === 'en' ? 'en_US' : 'fr_FR');
-    
+
     // Twitter Card
     setMeta('name', 'twitter:card', 'summary_large_image');
     setMeta('name', 'twitter:title', t.meta.title);
@@ -247,14 +276,14 @@ const RegisterClient: React.FC = () => {
       description: t.meta.description,
       inLanguage: language === 'en' ? 'en-US' : 'fr-FR',
       url: typeof window !== 'undefined' ? window.location.href : undefined,
-      isPartOf: { 
-        '@type': 'WebSite', 
-        name: 'SOS Expats', 
-        url: typeof window !== 'undefined' ? window.location.origin : undefined 
+      isPartOf: {
+        '@type': 'WebSite',
+        name: 'SOS Expats',
+        url: typeof window !== 'undefined' ? window.location.origin : undefined
       },
       mainEntity: { '@type': 'Person', name: 'Client' }
     };
-    
+
     if (!script) {
       script = document.createElement('script');
       script.id = id;
@@ -265,17 +294,17 @@ const RegisterClient: React.FC = () => {
   }, [t, language]);
 
   // Classes CSS optimisées et mémorisées
-  const inputBase = useMemo(() =>
-    'w-full px-4 py-3 rounded-xl border transition-all duration-200 text-sm focus:outline-none',
+  const inputBase = useMemo(
+    () => 'w-full px-4 py-3 rounded-xl border transition-all duration-200 text-sm focus:outline-none',
     []
   );
-  
-  const inputNeutral = useMemo(() =>
-    `${inputBase} bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400`,
+
+  const inputNeutral = useMemo(
+    () => `${inputBase} bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400`,
     [inputBase]
   );
-  
-  const inputWithIcon = useMemo(() => 
+
+  const inputWithIcon = useMemo(() =>
     `${inputNeutral} pl-11`,
     [inputNeutral]
   );
@@ -294,7 +323,7 @@ const RegisterClient: React.FC = () => {
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // Clear errors when user starts typing
     if (formError) {
       setFormError('');
@@ -307,8 +336,8 @@ const RegisterClient: React.FC = () => {
     if (customLang && !selectedLanguages.some(lang => lang.value === customLang)) {
       const newLanguage = { value: customLang, label: customLang };
       setSelectedLanguages(prev => [...prev, newLanguage]);
-      setFormData(prev => ({ 
-        ...prev, 
+      setFormData(prev => ({
+        ...prev,
         customLanguage: '',
         languagesSpoken: [...prev.languagesSpoken, customLang]
       }));
@@ -323,7 +352,7 @@ const RegisterClient: React.FC = () => {
       ...prev,
       languagesSpoken: newValue.map(lang => lang.value)
     }));
-    
+
     // Vérifier si "Autre" est sélectionné
     setShowCustomLanguage(newValue.some(lang => lang.value === 'other'));
   }, []);
@@ -349,7 +378,7 @@ const RegisterClient: React.FC = () => {
       scrollToTop();
       return false;
     }
-    
+
     if (languagesSpoken.length === 0) {
       setFormError(t.errors.selectLanguage);
       scrollToTop();
@@ -379,21 +408,21 @@ const RegisterClient: React.FC = () => {
       console.log('📝 Données envoyées pour l\'inscription client:', userData);
 
       await register(userData as unknown as Parameters<typeof register>[0], formData.password);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'inscription client:', error);
+      navigate(redirect, { replace: true });
+    } catch (err) {
+      console.error('❌ Erreur lors de l\'inscription client:', err);
       setFormError(t.errors.registrationError);
       scrollToTop();
     }
-  }, [formData, validateForm, register, navigate, t.errors.registrationError, scrollToTop]);
+  }, [formData, validateForm, register, navigate, redirect, t.errors.registrationError, scrollToTop]);
 
   // Vérification si le formulaire peut être soumis
   const canSubmit = useMemo(() => {
-    return formData.email && 
-           formData.password && 
-           formData.firstName && 
-           formData.languagesSpoken.length > 0 &&
-           !isLoading;
+    return formData.email &&
+      formData.password &&
+      formData.firstName &&
+      formData.languagesSpoken.length > 0 &&
+      !isLoading;
   }, [formData.email, formData.password, formData.firstName, formData.languagesSpoken.length, isLoading]);
 
   return (
@@ -438,7 +467,7 @@ const RegisterClient: React.FC = () => {
               <p className="mt-2 text-xs text-gray-500">
                 {t.ui.alreadyRegistered}{' '}
                 <Link
-                  to="/login"
+                  to={`/login?redirect=${encodeURIComponent(redirect)}`}
                   className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
                 >
                   {t.ui.login}
@@ -450,7 +479,7 @@ const RegisterClient: React.FC = () => {
               {/* Messages d'erreur améliorés */}
               {(error || formError) && (
                 <div
-                  className="rounded-xl border border-red-200 bg-red-50/80 p-4"
+                  className="rounded-xl border border-red-2 00 bg-red-50/80 p-4"
                   role="alert"
                   aria-live="polite"
                 >
@@ -545,7 +574,7 @@ const RegisterClient: React.FC = () => {
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.languagesSpoken} <span className="text-red-500">*</span>
                     </label>
-                    
+
                     <Suspense fallback={
                       <div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100 flex items-center px-3">
                         <div className="text-gray-500 text-sm">Chargement des langues...</div>
@@ -556,7 +585,7 @@ const RegisterClient: React.FC = () => {
                         onChange={handleLanguagesChange}
                       />
                     </Suspense>
-                    
+
                     {showCustomLanguage && (
                       <CustomFieldInput
                         placeholder={t.actions.specifyLanguage}
@@ -576,28 +605,28 @@ const RegisterClient: React.FC = () => {
                 </div>
               </section>
 
-{/* Conditions générales */}
-<div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-  <div className="flex items-start gap-3">
-    <input
-      id="acceptClientTerms"
-      type="checkbox"
-      required
-      className="h-5 w-5 text-blue-600 border-gray-300 rounded mt-0.5"
-    />
-    <label htmlFor="acceptClientTerms" className="text-sm text-gray-700">
-      {t.ui.acceptTerms}{' '}
-      <Link
-        to={t.termsHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
-      >
-        {t.ui.termsLink}
-      </Link>{' '}
-      <span className="text-red-500">*</span>
-    </label>
-  </div>
+              {/* Conditions générales */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <input
+                    id="acceptClientTerms"
+                    type="checkbox"
+                    required
+                    className="h-5 w-5 text-blue-600 border-gray-300 rounded mt-0.5"
+                  />
+                  <label htmlFor="acceptClientTerms" className="text-sm text-gray-700">
+                    {t.ui.acceptTerms}{' '}
+                    <Link
+                      to={t.termsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
+                    >
+                      {t.ui.termsLink}
+                    </Link>{' '}
+                    <span className="text-red-500">*</span>
+                  </label>
+                </div>
               </div>
 
               {/* Bouton de soumission optimisé */}

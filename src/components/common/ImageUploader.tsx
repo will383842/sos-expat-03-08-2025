@@ -12,7 +12,37 @@ import {
 
 type Locale = 'fr' | 'en';
 
-const I18N = {
+/** ====== I18N types ====== */
+type I18nUI = {
+  dropHere: string;
+  clickOrDrag: string;
+  formatInfo: (maxSizeMB: number) => string;
+  uploading: (p: number) => string;
+  uploadSuccess: string;
+  replaceImage: string;
+  removeImage: string;
+  profileImage: string;
+  converting: string;
+  takePhoto: string;
+  chooseFromGallery: string;
+  webcamInfo: string;
+  chooseImage: string;
+  cancel: string;
+};
+type I18nErrors = {
+  unsupportedFormat: string;
+  fileTooLarge: (sizeMB: number, maxSizeMB: number) => string;
+  uploadFailed: (error: string) => string;
+  previewFailed: string;
+  deleteFailed: string;
+  imageLoadError: string;
+  cameraNotSupported: string;
+  cameraAccessFailed: string;
+};
+type I18n = { errors: I18nErrors; ui: I18nUI };
+
+/** ====== I18N data ====== */
+const I18N: Record<Locale, I18n> = {
   fr: {
     errors: {
       unsupportedFormat: 'Format non supporté. Formats acceptés: JPG, PNG, WEBP, GIF, HEIC, BMP, TIFF, AVIF',
@@ -69,7 +99,7 @@ const I18N = {
       cancel: 'Cancel',
     }
   }
-} as const;
+};
 
 // ========== Helpers ==========
 const generateUniqueId = (): string =>
@@ -78,7 +108,7 @@ const generateUniqueId = (): string =>
 // Native dropzone (léger, accessible)
 interface UseDropzoneOptions {
   onDrop: (files: File[]) => void;
-  accept: Record<string, string[]>;
+  accept: Record<string, readonly string[]>;
   maxSize: number;
   multiple: boolean;
   disabled: boolean;
@@ -88,14 +118,21 @@ const useDropzone = (opts: UseDropzoneOptions) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const onDragEnter = (e: React.DragEvent) => { e.preventDefault(); if (!opts.disabled) setIsDragActive(true); };
-  const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragActive(false); };
+  const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); if (!(e.currentTarget as Element).contains(e.relatedTarget as Node)) setIsDragActive(false); };
   const onDragOver = (e: React.DragEvent) => e.preventDefault();
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setIsDragActive(false);
     if (opts.disabled) return;
     const files = Array.from(e.dataTransfer.files);
-    const accepted = Object.values(opts.accept).flat();
-    const valid = files.filter(f => accepted.some(t => t === 'image/*' || f.type.includes(t.replace('*', ''))));
+
+    // validation simple: type image/* OU extension acceptée
+    const acceptedExts = new Set<string>(Object.values(opts.accept).flat().map(String));
+    const valid = files.filter(f => {
+      const byMime = f.type.startsWith('image/');
+      const byExt = acceptedExts.has('.' + (f.name.split('.').pop() || '').toLowerCase());
+      return byMime || byExt;
+    });
+
     if (valid.length) opts.onDrop(valid);
   };
   const onClick = () => { if (!opts.disabled) inputRef.current?.click(); };
@@ -103,7 +140,14 @@ const useDropzone = (opts: UseDropzoneOptions) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     if (files.length) opts.onDrop(files);
   };
-  const acceptString = useMemo(() => Object.keys(opts.accept).join(','), [opts.accept]);
+  const acceptString = useMemo(() => {
+    // pour l’input, concatène le type + extensions
+    const parts = new Set<string>([
+      ...Object.keys(opts.accept),
+      ...Object.values(opts.accept).flat().map(String)
+    ]);
+    return Array.from(parts).join(',');
+  }, [opts.accept]);
 
   return {
     getRootProps: () => ({ onDragEnter, onDragLeave, onDragOver, onDrop, onClick, role: 'button', tabIndex: opts.disabled ? -1 : 0 }),
@@ -112,36 +156,34 @@ const useDropzone = (opts: UseDropzoneOptions) => {
   };
 };
 
-// Caméra (mobile + desktop) — version universelle & robuste
+/* =========================
+   Caméra (mobile + desktop)
+   -> Version corrigée (pas de réassignation de const, on utilise un useRef)
+   ========================= */
 interface CameraCapture {
   openCamera: (facingMode?: 'user' | 'environment') => Promise<void>;
   isSupported: boolean;
 }
 
-/**
- * Hook caméra compatible iOS/Android/Desktop :
- * - PAS d'ImageCapture().takePhoto() (iOS ne supporte pas)
- * - Snapshot via <canvas> (fiable partout)
- * - Fallback facingMode -> deviceId -> any caméra
- * - Switch caméra robuste
- */
 const useCameraCapture = (
   onCapture: (file: File) => void,
-  tUi: typeof I18N['fr']['ui']   // ⬅️ corrige le typing : on passe t.ui
+  t: I18n
 ): CameraCapture => {
   const isSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  // Essaie d'abord le facingMode souhaité, sinon cherche un deviceId, sinon "any"
   async function getBestStream(preferred: 'user' | 'environment' = 'user'): Promise<MediaStream> {
-    // 1) facingMode "ideal" (pas "exact")
+    // 1) tenter facingMode
     try {
       return await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: preferred }, width: { ideal: 1280 }, height: { ideal: 1280 } },
         audio: false,
       });
-    } catch { /* ignore */ }
+    } catch {
+      /* no-op */
+    }
 
-    // 2) deviceId correspondant à une cam "dos" si possible
+    // 2) chercher une cam dos / back, ou première dispos
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videos = devices.filter(d => d.kind === 'videoinput');
@@ -154,21 +196,21 @@ const useCameraCapture = (
           audio: false,
         });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* no-op */
+    }
 
-    // 3) dernier recours : n'importe quelle caméra
+    // 3) fallback
     return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
   }
 
   const openCamera = useCallback(async (facingMode: 'user' | 'environment' = 'user') => {
-    if (!isSupported) throw new Error(tUi.cameraNotSupported);
-
-    let stream: MediaStream | null = null;
+    if (!isSupported) throw new Error(t.errors.cameraNotSupported);
 
     try {
-      stream = await getBestStream(facingMode);
+      const stream = await getBestStream(facingMode);
+      streamRef.current = stream;
 
-      // --- UI légère (DOM natif) ---
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/90';
 
@@ -177,15 +219,15 @@ const useCameraCapture = (
 
       const video = document.createElement('video');
       video.autoplay = true;
-      video.playsInline = true; // iOS
+      (video as HTMLVideoElement).playsInline = true; // iOS
       video.className = 'w-full h-64 object-cover rounded-lg bg-black';
-      video.srcObject = stream;
+      (video as HTMLVideoElement).srcObject = stream;
 
       const btns = document.createElement('div');
       btns.className = 'flex gap-3 mt-4';
 
       const cancelBtn = document.createElement('button');
-      cancelBtn.textContent = tUi.cancel;
+      cancelBtn.textContent = t.ui.cancel;
       cancelBtn.className = 'flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50';
 
       const switchBtn = document.createElement('button');
@@ -194,7 +236,7 @@ const useCameraCapture = (
       switchBtn.className = 'px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50';
 
       const captureBtn = document.createElement('button');
-      captureBtn.textContent = tUi.takePhoto;
+      captureBtn.textContent = t.ui.takePhoto;
       captureBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700';
 
       btns.append(cancelBtn, switchBtn, captureBtn);
@@ -202,9 +244,9 @@ const useCameraCapture = (
       modal.appendChild(container);
       document.body.appendChild(modal);
 
-      // utilitaire nettoyage
       const cleanup = () => {
-        try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+        try { streamRef.current?.getTracks().forEach(tr => tr.stop()); } catch { /* no-op */ }
+        streamRef.current = null;
         if (modal.parentNode) modal.parentNode.removeChild(modal);
       };
 
@@ -212,18 +254,18 @@ const useCameraCapture = (
       modal.onclick = (e) => { if (e.target === modal) cleanup(); };
       cancelBtn.onclick = cleanup;
 
-      // ✅ CAPTURE via <canvas> (universel)
+      // capture via canvas
       captureBtn.onclick = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const w = video.videoWidth || 1280;
-        const h = video.videoHeight || 1280;
+        const w = (video as HTMLVideoElement).videoWidth || 1280;
+        const h = (video as HTMLVideoElement).videoHeight || 1280;
         canvas.width = w;
         canvas.height = h;
 
-        ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(video as unknown as CanvasImageSource, 0, 0, w, h);
 
         canvas.toBlob((blob) => {
           if (blob) {
@@ -231,22 +273,21 @@ const useCameraCapture = (
               type: 'image/jpeg',
               lastModified: Date.now()
             });
-            onCapture(file); // → ton flux: crop + upload Firebase
+            onCapture(file);
           }
           cleanup();
         }, 'image/jpeg', 0.9);
       };
 
-      // 🔁 SWITCH caméra robuste
+      // switch caméra
       let currentFacing: 'user' | 'environment' = facingMode;
       switchBtn.onclick = async () => {
         try {
           const desired = currentFacing === 'user' ? 'environment' : 'user';
           const newStream = await getBestStream(desired);
-          // stop ancien stream
-          try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-          stream = newStream;
-          video.srcObject = newStream;
+          try { streamRef.current?.getTracks().forEach(tr => tr.stop()); } catch { /* no-op */ }
+          streamRef.current = newStream;
+          (video as HTMLVideoElement).srcObject = newStream;
           currentFacing = desired;
         } catch (err) {
           console.warn('Could not switch camera:', err);
@@ -254,26 +295,24 @@ const useCameraCapture = (
       };
 
     } catch (e) {
-      // erreurs claires pour tes toasts existants
       const name = (e as DOMException)?.name;
       if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-        throw new Error(tUi.cameraNotSupported);
+        throw new Error(t.errors.cameraNotSupported);
       }
       if (name === 'NotAllowedError' || name === 'SecurityError') {
-        throw new Error(tUi.cameraAccessFailed);
+        throw new Error(t.errors.cameraAccessFailed);
       }
-      throw e instanceof Error ? e : new Error(tUi.cameraAccessFailed);
+      throw e instanceof Error ? e : new Error(t.errors.cameraAccessFailed);
     }
-  }, [isSupported, onCapture, tUi]);
+  }, [isSupported, onCapture, t]);
 
   return { openCamera, isSupported };
 };
 
-
 // Config images
 const SUPPORTED_IMAGE_CONFIG = {
-  extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.avif', '.apng', '.ico'],
-  mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'image/bmp', 'image/tiff', 'image/avif'],
+  extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.avif', '.apng', '.ico'] as const,
+  mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'image/bmp', 'image/tiff', 'image/avif'] as const,
   maxDimension: 2048,
   jpegQuality: 0.85
 } as const;
@@ -283,13 +322,14 @@ interface ImageUploaderProps {
   currentImage?: string;
   className?: string;
   maxSizeMB?: number;
-  uploadPath?: string;        // e.g. 'sos_profiles/avatars'
+  uploadPath?: string;
   disabled?: boolean;
-  aspectRatio?: number;       // width/height (1=square)
+  aspectRatio?: number;
   preferredCamera?: 'user' | 'environment';
-  outputSize?: number;        // output width px (height = width / aspect)
+  outputSize?: number;
   cropShape?: 'rect' | 'round';
   locale?: Locale;
+  hideNativeFileLabel?: boolean;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -316,7 +356,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [showCropModal, setShowCropModal] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
 
-  const { openCamera, isSupported: isCameraSupported } = useCameraCapture((file) => handleFileSelect([file]), t.ui);
+  const { openCamera, isSupported: isCameraSupported } = useCameraCapture((file) => handleFileSelect([file]), t);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -335,11 +375,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     return () => { if (tempImageUrl?.startsWith('blob:')) URL.revokeObjectURL(tempImageUrl); };
   }, [tempImageUrl]);
 
-  // Validation stricte
   const validateFile = useCallback((file: File): string | null => {
     const fileName = file.name.toLowerCase();
     const hasExt = SUPPORTED_IMAGE_CONFIG.extensions.some(ext => fileName.endsWith(ext));
-    const hasMime = file.type === '' || SUPPORTED_IMAGE_CONFIG.mimeTypes.includes(file.type as never);
+    const hasMime = file.type === '' || (SUPPORTED_IMAGE_CONFIG.mimeTypes as readonly string[]).includes(file.type);
     if (!hasExt && !hasMime) return t.errors.unsupportedFormat;
 
     const maxBytes = maxSizeMB * 1024 * 1024;
@@ -347,7 +386,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     return null;
   }, [maxSizeMB, t]);
 
-  // Conversion/optimisation basique si format exotique
   const processImage = useCallback(async (file: File): Promise<File> => {
     const needsConversion = /\.(heic|heif|tiff|tif|bmp)$/i.test(file.name);
     if (!needsConversion) return file;
@@ -386,14 +424,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
   }, []);
 
-  // Suppression Firebase Storage (si URL storage)
   const deleteFromStorage = useCallback(async (url: string): Promise<void> => {
     try {
-      // Si c’est une URL Firebase Storage (gs) ou https storage.googleapis.com
       if (!url) return;
       const storage = getStorage();
-      // On ne peut pas déduire toujours le path depuis une URL signée => prévoir d’enregistrer le path côté app si besoin
-      // Ici on tente une heuristique simple
+      // Heuristique très simple pour récupérer un nom de fichier
       const match = url.match(/(?:\/o\/|\/)([^/?#]+)\?alt=media|\/([^/?#]+)$/);
       const fileName = match?.[1] || match?.[2];
       if (!fileName) return;
@@ -406,7 +441,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   }, [uploadPath]);
 
-  // Upload Firebase
   const uploadImage = useCallback(async (file: File | Blob): Promise<string> => {
     const storage = getStorage();
     const processed = await (file instanceof File ? processImage(file) : processImage(new File([file], 'image.jpg', { type: 'image/jpeg' })));
@@ -438,7 +472,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
   }, [uploadPath, processImage]);
 
-  // Sélection fichier → ouvrir crop
   const handleFileSelect = useCallback(async (files: File[]) => {
     const file = files?.[0];
     if (!file || disabled || isUploading) return;
@@ -459,7 +492,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   }, [validateFile, disabled, isUploading, locale]);
 
-  // Crop terminé → upload
   const handleCropComplete = useCallback(async (croppedBlob: Blob) => {
     setShowCropModal(false);
     setIsUploading(true);
@@ -496,7 +528,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const openCameraCapture = useCallback(async (facing: 'user' | 'environment' = preferredCamera) => {
     if (!disabled && !isUploading && isCameraSupported) {
-      try { await openCamera(facing); } catch (e) { setError(I18N[locale].errors.cameraAccessFailed); }
+      try { await openCamera(facing); } catch {
+        setError(I18N[locale].errors.cameraAccessFailed);
+      }
     } else if (!isCameraSupported) {
       setError(I18N[locale].errors.cameraNotSupported);
     }
@@ -508,7 +542,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     input.type = 'file';
     input.accept = accept;
     input.multiple = false;
-    if (capture) (input as unknown as { capture?: string }).capture = capture; // mobile hint
+    if (capture) (input as unknown as { capture?: string }).capture = capture; // hint mobile
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files?.length) handleFileSelect(Array.from(files));
@@ -538,7 +572,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (e) e.stopPropagation();
     if (isUploading || disabled) return;
 
-    // Mobile → petit sheet choix
     if (window.innerWidth < 640 && isCameraSupported) {
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50';
@@ -598,8 +631,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               alt={t.ui.profileImage}
               className={`w-full h-auto rounded-lg object-cover max-h-72 sm:max-h-96 border border-gray-200 transition-opacity ${disabled || isUploading ? 'opacity-75' : 'group-hover:opacity-90'}`}
               onError={(e) => {
-                // tiny placeholder svg
-                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyMCIgZmlsbD0iI2Y2ZjZmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5JbWFnZSBub3QgYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==';
+                (e.currentTarget as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyMCIgZmlsbD0iI2Y2ZjZmNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5JbWFnZSBub3QgYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==';
               }}
               loading="lazy"
             />
@@ -675,13 +707,17 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               }
             }
           }}
-          className={`
-            border-2 border-dashed rounded-lg p-6 sm:p-8 text-center cursor-pointer transition-all
-            ${isDragActive ? 'border-blue-500 bg-blue-50'
-              : isUploading || disabled ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-              : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}
-            focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2
-          `}
+          className={
+            [
+              'border-2 border-dashed rounded-lg p-6 sm:p-8 text-center cursor-pointer transition-all',
+              isDragActive
+                ? 'border-blue-500 bg-blue-50'
+                : (isUploading || disabled)
+                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                  : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50',
+              'focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2'
+            ].join(' ')
+          }
           role="button"
           tabIndex={disabled || isUploading ? -1 : 0}
           aria-label={isDragActive ? t.ui.dropHere : t.ui.clickOrDrag}
@@ -696,11 +732,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           />
           {isUploading ? (
             <div className="space-y-3">
-              <Upload className="w-10 h-10 sm:w-12 sm:h-12 text-blue-500 mx-auto animate-pulse" />
+              <Upload className="w-10 h-10 sm:w-12 sm:h-12 mx-auto animate-pulse" />
               <p className="text-gray-600 text-sm sm:text-base">{t.ui.uploading(uploadProgress)}</p>
               <div className="w-48 bg-gray-200 rounded-full h-2 mx-auto overflow-hidden">
                 <div
-                  className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                  className="h-full rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                   role="progressbar"
                   aria-valuenow={uploadProgress}

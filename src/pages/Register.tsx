@@ -23,7 +23,7 @@ const useTranslation = () => {
       en: 'Sign up - SOS Expats | Choose your profile',
     },
     'meta.description': {
-      fr: "Rejoignez SOS Expats : choisissez un profil (Client, Avocat, Expatrié) pour accéder à nos services. 24/7, multi-langues.",
+      fr: "Rejoignez SOS Expats : choisissez un profil (Client, Avocat, Expatrie) pour acceder a nos services. 24/7, multi-langues.",
       en: 'Join SOS Expats: choose a profile (Client, Lawyer, Expat) to access our services. 24/7, multilingual.',
     },
     'og.title': {
@@ -31,30 +31,30 @@ const useTranslation = () => {
       en: 'SOS Expats Sign up - Choose your profile',
     },
     'og.description': {
-      fr: 'Plateforme d’assistance aux expatriés et conseils juridiques. 24/7.',
+      fr: 'Plateforme d\'assistance aux expatries et conseils juridiques. 24/7.',
       en: 'Expat assistance & legal advisory platform. 24/7.',
     },
 
     // Header
     'register.title': { fr: 'Choisissez votre profil', en: 'Choose your profile' },
-    'register.subtitle': { fr: 'Rejoignez notre communauté', en: 'Join our community' },
+    'register.subtitle': { fr: 'Rejoignez notre communaute', en: 'Join our community' },
     'register.description': {
       fr: 'Choisissez votre profil pour vous inscrire sur la plateforme',
       en: 'Choose your profile to register on the platform',
     },
     'register.loginPrompt': {
-      fr: 'connectez-vous à votre compte existant',
+      fr: 'connectez-vous a votre compte existant',
       en: 'sign in to your existing account',
     },
     'register.bookingMessage': {
-      fr: 'Après inscription, vous serez redirigé pour finaliser votre réservation',
-      en: 'After sign-up, you’ll be redirected to finish your booking',
+      fr: 'Apres inscription, vous serez redirige pour finaliser votre reservation',
+      en: 'After sign-up, you\'ll be redirected to finish your booking',
     },
     'register.needHelp': { fr: "Besoin d'aide ? ", en: 'Need help? ' },
     'register.contactUs': { fr: 'Contactez-nous', en: 'Contact us' },
     'register.termsAccept': { fr: 'En vous inscrivant, vous acceptez nos', en: 'By signing up, you agree to our' },
     'register.termsLink': { fr: "conditions d'utilisation", en: 'terms of use' },
-    'register.secureData': { fr: 'Données sécurisées', en: 'Secure data' },
+    'register.secureData': { fr: 'Donnees securisees', en: 'Secure data' },
     'register.freeRegistration': { fr: 'Inscription gratuite', en: 'Free registration' },
 
     // Role titles/descriptions
@@ -63,22 +63,26 @@ const useTranslation = () => {
     'role.expat':  { fr: 'Expatrié', en: 'Expat' },
 
     'role.client.desc': {
-      fr: "Expatrié, voyageur ou en déplacement à l'étranger",
-      en: 'Expat, traveler or abroad temporarily',
+      fr: "Conseils et experts dans toutes les langues, dans le monde entier",
+      en: 'Advice and experts in all languages, worldwide',
     },
     'role.lawyer.desc': {
       fr: 'Expert juridique international, toutes nationalités',
       en: 'International legal expert, all nationalities',
     },
     'role.expat.desc': {
-      fr: "Partagez votre expérience d'expatriation",
+      fr: "Partagez votre experience d'expatriation",
       en: 'Share your expatriation know-how',
     },
 
     // Role micro-CTA (revenus)
-    'role.earn.cta': {
-      fr: "Offrez vos conseils juridiques à une clientèle internationale et développez vos revenus.",
-      en: "Offer your legal expertise to an international clientele and grow your income.",
+    'role.lawyer.cta': {
+      fr: "Offrez vos conseils juridiques a des expatriés, voyageurs, vacanciers ou que vous soyez dans le monde et developpez votre chiffre d'affaires.",
+      en: "Offer your legal expertise to expats, travelers, vacationers wherever you are in the world and grow your income.",
+    },
+    'role.expat.cta': {
+      fr: "Aidez par telephone des expatriés, voyageurs, vacanciers ou que vous soyez dans le monde et gagnez des revenus.",
+      en: "Help expats, travelers, vacationers by phone wherever you are in the world and earn income.",
     },
 
     // Role features
@@ -91,7 +95,7 @@ const useTranslation = () => {
     'role.lawyer.f3': { fr: 'Revenus flexibles',                   en: 'Flexible income' },
 
     'role.expat.f1':  { fr: 'Aide pratique terrain',               en: 'Hands-on help' },
-    'role.expat.f2':  { fr: "Partage d'expérience",                en: 'Experience sharing' },
+    'role.expat.f2':  { fr: "Partage d'experience",                en: 'Experience sharing' },
     'role.expat.f3':  { fr: "Revenus d'entraide",                  en: 'Support-based earnings' },
 
     // Top badges (2)
@@ -159,7 +163,7 @@ const Register: React.FC = () => {
         chipBg: 'bg-purple-100',
         chipText: 'text-purple-800',
         features: [t('role.lawyer.f1'), t('role.lawyer.f2'), t('role.lawyer.f3')],
-        cta: t('role.earn.cta'),
+        cta: t('role.lawyer.cta'),
       },
       {
         id: 'expat' as const,
@@ -174,7 +178,7 @@ const Register: React.FC = () => {
         chipBg: 'bg-emerald-100',
         chipText: 'text-emerald-800',
         features: [t('role.expat.f1'), t('role.expat.f2'), t('role.expat.f3')],
-        cta: t('role.earn.cta'),
+        cta: t('role.expat.cta'),
       },
     ],
     [t]
@@ -359,10 +363,10 @@ const Register: React.FC = () => {
 
                         {/* Texte */}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-extrabold text-gray-900 text-base sm:text-lg mb-0.5">{role.title}</h3>
+                          <h3 className="font-extrabold text-gray-900 text-lg sm:text-xl mb-0.5 text-center">{role.title}</h3>
 
                           {/* Description principale */}
-                          <p className="text-xs sm:text-sm text-gray-800 leading-snug mb-2 line-clamp-2">
+                          <p className="text-xs sm:text-sm text-gray-800 leading-snug mb-2 line-clamp-2 break-words hyphens-none">
                             {role.description}
                           </p>
 

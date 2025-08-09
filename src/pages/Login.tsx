@@ -1,3 +1,4 @@
+// src/pages/Login.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, LogIn, Shield, Smartphone, Globe, CheckCircle } from 'lucide-react';
@@ -6,7 +7,7 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-
+import { Provider } from '../types/provider';
 interface LoginFormData {
   email: string;
   password: string;
@@ -212,6 +213,32 @@ const Login: React.FC = () => {
     });
   }, [encodedRedirectUrl, navigate, location.state]);
 
+  // --- Types sûrs (pas de any) ---
+type NavState = Readonly<{ selectedProvider?: Provider }>;
+
+function isProviderLike(v: unknown): v is Provider {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === 'string'
+    && typeof o.name === 'string'
+    && (o.type === 'lawyer' || o.type === 'expat');
+}
+
+// Persiste le provider passé via state (depuis "Réservez maintenant")
+useEffect(() => {
+  const rawState: unknown = location.state;
+  const state = (rawState ?? null) as NavState | null;
+  const sp = state?.selectedProvider;
+
+  if (isProviderLike(sp)) {
+    try {
+      sessionStorage.setItem('selectedProvider', JSON.stringify(sp));
+     } catch {
+      // sessionStorage non disponible (mode privé, quotas…)
+    }
+  }
+}, [location.state]);
+
   // Performance monitoring
   useEffect(() => {
     const markStart = performance.now();
@@ -402,13 +429,20 @@ const Login: React.FC = () => {
     updateMetaTag('author', 'SOS Expats');
     updateMetaTag('language', currentLang);
 
-    // OpenGraph with i18n
+    // OpenGraph avec calcul d'og:locale sans erreur TS (évite `never`)
+    const ogLocale =
+      currentLang === 'fr'
+        ? 'fr_FR'
+        : currentLang === 'en'
+        ? 'en_US'
+        : `${String(currentLang)}_${String(currentLang).toUpperCase()}`;
+
     updateMetaTag('og:type', 'website', true);
     updateMetaTag('og:title', metaData.ogTitle, true);
     updateMetaTag('og:description', metaData.ogDescription, true);
     updateMetaTag('og:url', metaData.canonicalUrl, true);
     updateMetaTag('og:site_name', 'SOS Expats', true);
-    updateMetaTag('og:locale', currentLang === 'fr' ? 'fr_FR' : currentLang === 'en' ? 'en_US' : `${currentLang}_${currentLang.toUpperCase()}`, true);
+    updateMetaTag('og:locale', ogLocale, true);
     updateMetaTag('og:image', `${window.location.origin}/images/og-login-${currentLang}.jpg`, true);
     updateMetaTag('og:image:width', '1200', true);
     updateMetaTag('og:image:height', '630', true);
@@ -506,7 +540,7 @@ const Login: React.FC = () => {
       const getUserId = (u: unknown): string | undefined => {
         const obj = u as { uid?: string; id?: string };
         return obj?.uid || obj?.id;
-        };
+      };
 
       const gtag = getGtag();
       if (gtag) {
@@ -518,10 +552,14 @@ const Login: React.FC = () => {
       }
 
       // Clean session storage
-      sessionStorage.removeItem('selectedProvider');
-      sessionStorage.removeItem('loginAttempts');
+      // Clean session storage, but keep selectedProvider if we go to booking-request
+const goingToBooking = finalUrl.startsWith('/booking-request/');
+if (!goingToBooking) {
+  sessionStorage.removeItem('selectedProvider');
+}
+sessionStorage.removeItem('loginAttempts');
 
-      navigate(finalUrl, { replace: true });
+navigate(finalUrl, { replace: true });
     }
   }, [authInitialized, user, navigate, redirectUrl]);
 
@@ -553,10 +591,10 @@ const Login: React.FC = () => {
         performance.mark('login-attempt-start');
 
         // si tu veux garder le rememberMe, stocke-le localement
-if (formData.rememberMe) localStorage.setItem('rememberMe', '1');
-else localStorage.removeItem('rememberMe');
+        if (formData.rememberMe) localStorage.setItem('rememberMe', '1');
+        else localStorage.removeItem('rememberMe');
 
-await login(formData.email.trim().toLowerCase(), formData.password);
+        await login(formData.email.trim().toLowerCase(), formData.password);
 
         performance.mark('login-attempt-end');
         performance.measure('login-attempt', { start: 'login-attempt-start', end: 'login-attempt-end' });

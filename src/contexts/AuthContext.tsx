@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -7,6 +7,8 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   setPersistence,
   browserLocalPersistence,
   updateProfile,
@@ -27,6 +29,19 @@ import { FirebaseError } from 'firebase/app';
 import { auth, db, storage } from '../config/firebase';
 import { User } from './types';
 
+declare global {
+  interface Window {
+    /** défini quand la page est en COOP/COEP */
+    crossOriginIsolated?: boolean;
+  }
+}
+
+interface ExistingUserData {
+  role?: string;
+  photoURL?: string;
+  profilePhoto?: string;
+  avatar?: string;
+}
 // ===============================
 // TYPES ET INTERFACES
 // ===============================
@@ -420,7 +435,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       responseTime: userData.responseTime || '< 5 minutes',
       provider: provider || 'password',
       affiliateCode,
-      referralBy: userData.referralBy ?? undefined, // <-- plus de null
+      referralBy: userData.referralBy ?? undefined,
       registrationIP: '',
       deviceInfo: {
         type: deviceInfo.type,
@@ -580,7 +595,7 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
 // ===============================
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth doit être utilisé dans un AuthProvider');
@@ -693,7 +708,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       },
       (e) => {
-        if (isMounted) console.error('Erreur listener document utilisateur:', e);
+        console.error('Erreur listener document utilisateur:', e);
       }
     );
 
@@ -792,9 +807,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       provider.addScope('email');
       provider.addScope('profile');
       provider.setCustomParameters({
-        prompt: 'select_account',
-        display: (deviceInfo.type === 'mobile' ? 'touch' : 'popup') as unknown as string
+      prompt: 'select_account',
+      display: getDeviceInfo().type === 'mobile' ? 'touch' : 'popup'
       });
+
+
+      // ✅ En COOP/COEP, éviter signInWithPopup (fenêtre ne peut pas se fermer) → use redirect
+      const isCrossOriginIsolated = window.crossOriginIsolated === true;
+      if (isCrossOriginIsolated) {
+        await signInWithRedirect(auth, provider);
+        return; // Suite gérée dans le useEffect getRedirectResult
+      }
 
       const result = await signInWithPopup(auth, provider);
       const googleUser = result.user;
@@ -808,7 +831,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await firebaseSignOut(auth);
           setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1, roleRestrictionBlocks: prev.roleRestrictionBlocks + 1 }));
 
-          const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', deviceInfo);
+          const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', getDeviceInfo());
           const finalMessage = helpText ? `${message}\n\n💡 ${helpText}` : message;
           setError(finalMessage);
 
@@ -816,8 +839,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             userId: googleUser.uid,
             userEmail: googleUser.email,
             blockedRole: existingData.role,
-            deviceType: deviceInfo.type
-          }, deviceInfo);
+            deviceType: getDeviceInfo().type
+          }, getDeviceInfo());
 
           throw new Error('GOOGLE_ROLE_RESTRICTION');
         }
@@ -827,9 +850,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           updatedAt: serverTimestamp(),
           isActive: true,
           lastDeviceInfo: {
-            type: deviceInfo.type,
-            os: deviceInfo.os,
-            browser: deviceInfo.browser,
+            type: getDeviceInfo().type,
+            os: getDeviceInfo().os,
+            browser: getDeviceInfo().browser,
             loginTimestamp: new Date().toISOString()
           },
           ...(googleUser.photoURL && googleUser.photoURL !== existingData.photoURL && {
@@ -855,21 +878,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           isVerifiedEmail: googleUser.emailVerified
         };
 
-        await createUserDocumentInFirestore(googleUser, newUserData, deviceInfo);
+        await createUserDocumentInFirestore(googleUser, newUserData, getDeviceInfo());
       }
 
       await logAuthEvent('successful_google_login', {
         userId: googleUser.uid,
         userEmail: googleUser.email,
         isNewUser: !userDoc.exists(),
-        deviceType: deviceInfo.type,
-        connectionSpeed: deviceInfo.connectionSpeed
-      }, deviceInfo);
+        deviceType: getDeviceInfo().type,
+        connectionSpeed: getDeviceInfo().connectionSpeed
+      }, getDeviceInfo());
     } catch (e) {
       let errorCode = getErrorCode(e);
       if ((e as Error).message === 'GOOGLE_ROLE_RESTRICTION') errorCode = 'GOOGLE_ROLE_RESTRICTION';
 
-      const { message, helpText } = getLocalizedErrorMessage(errorCode, deviceInfo);
+      const { message, helpText } = getLocalizedErrorMessage(errorCode, getDeviceInfo());
       const finalMessage = helpText ? `${message}\n\n💡 ${helpText}` : message;
 
       setError(finalMessage);
@@ -878,9 +901,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await logAuthEvent('google_login_failed', {
         errorCode,
         errorMessage: (e as Error).message,
-        deviceType: deviceInfo.type,
+        deviceType: getDeviceInfo().type,
         attempts: authMetrics.googleAttempts + 1
-      }, deviceInfo);
+      }, getDeviceInfo());
 
       throw new Error(finalMessage);
     } finally {
@@ -893,7 +916,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
 
     if (!userData.role) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '⚠️ Rôle requis pour inscription' : "Le rôle utilisateur est obligatoire pour l'inscription";
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '⚠️ Rôle requis pour inscription' : "Le rôle utilisateur est obligatoire pour l'inscription";
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
@@ -905,20 +928,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error(errorMsg);
     }
     if (!userData.email || !password) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '📧 Email et 🔑 mot de passe requis' : 'Email et mot de passe sont obligatoires';
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '📧 Email et 🔑 mot de passe requis' : 'Email et mot de passe sont obligatoires';
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userData.email)) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '📧 Format email invalide' : "Format d'email invalide";
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '📧 Format email invalide' : "Format d'email invalide";
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
     }
     if (password.length < 8) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '🔒 Mot de passe min. 8 caractères' : 'Le mot de passe doit contenir au moins 8 caractères';
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '🔒 Mot de passe min. 8 caractères' : 'Le mot de passe doit contenir au moins 8 caractères';
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
@@ -927,7 +950,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumbers = /\d/.test(password);
     if (!hasUpperCase || !hasLowerCase || !hasNumbers) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '💪 Mot de passe : A-z + 0-9 requis' : 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre';
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '💪 Mot de passe : A-z + 0-9 requis' : 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre';
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
@@ -945,18 +968,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         finalProfilePhotoURL = '/default-avatar.png';
       }
 
-     await createUserDocumentInFirestore(
-  userCredential.user,
-  {
-    ...userData,
-    role: userData.role as 'client' | 'lawyer' | 'expat' | 'admin',
-    profilePhoto: finalProfilePhotoURL,
-    photoURL: finalProfilePhotoURL,
-    avatar: finalProfilePhotoURL,
-    provider: 'password'
-  },
-  deviceInfo
-);
+      await createUserDocumentInFirestore(
+        userCredential.user,
+        {
+          ...userData,
+          role: userData.role as 'client' | 'lawyer' | 'expat' | 'admin',
+          profilePhoto: finalProfilePhotoURL,
+          photoURL: finalProfilePhotoURL,
+          avatar: finalProfilePhotoURL,
+          provider: 'password'
+        },
+        getDeviceInfo()
+      );
+
       try {
         const userLanguage = userData.preferredLanguage || 'fr';
         const authUtils = await import('../utils/auth').catch(() => null);
@@ -980,11 +1004,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (e) {
       await logAuthEvent(
         'registration_error',
-        { errorCode: getErrorCode(e), errorMessage: (e as Error).message, userEmail: userData.email, userRole: userData.role, deviceType: deviceInfo.type },
-        deviceInfo
+        { errorCode: getErrorCode(e), errorMessage: (e as Error).message, userEmail: userData.email, userRole: userData.role, deviceType: getDeviceInfo().type },
+        getDeviceInfo()
       );
 
-      const { message, helpText } = getLocalizedErrorMessage(getErrorCode(e), deviceInfo);
+      const { message, helpText } = getLocalizedErrorMessage(getErrorCode(e), getDeviceInfo());
       const finalMessage = helpText ? `${message}\n\n💡 ${helpText}` : (message || (e as Error).message);
       setError(finalMessage);
       throw new Error(finalMessage);
@@ -996,7 +1020,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       if (user?.id) {
-        await logAuthEvent('logout', { userId: user.id, sessionDuration: Date.now() - (user.lastLoginAt?.getTime() || Date.now()), userRole: user.role }, deviceInfo);
+        await logAuthEvent('logout', { userId: user.id, sessionDuration: Date.now() - (user.lastLoginAt?.getTime() || Date.now()), userRole: user.role }, getDeviceInfo());
         if (user.role === 'lawyer' || user.role === 'expat') {
           try {
             await updateDoc(doc(db, 'users', user.id), { isOnline: false, lastSeenAt: serverTimestamp() });
@@ -1031,9 +1055,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { sendEmailVerification } = await import('firebase/auth');
         await sendEmailVerification(firebaseUser);
       }
-      await logAuthEvent('verification_email_sent', { userId: firebaseUser.uid, language: userLanguage }, deviceInfo);
+      await logAuthEvent('verification_email_sent', { userId: firebaseUser.uid, language: userLanguage }, getDeviceInfo());
     } catch (e) {
-      const { message } = getLocalizedErrorMessage(getErrorCode(e), deviceInfo);
+      const { message } = getLocalizedErrorMessage(getErrorCode(e), getDeviceInfo());
       setError(message);
       throw new Error(message);
     }
@@ -1086,7 +1110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authInitialized,
     error,
     authMetrics,
-    deviceInfo,
+    deviceInfo: getDeviceInfo(),
     login,
     loginWithGoogle,
     register,
@@ -1097,6 +1121,102 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshUser,
     getLastLoginInfo
   };
+
+  // ===============================
+  // 🔁 RÉCUPÉRER LE RÉSULTAT GOOGLE EN COOP/COEP (Redirect flow)
+  // (à placer tout en bas du composant, juste avant le return)
+  // ===============================
+  const redirectHandledRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Si la page est "crossOriginIsolated", on vient d'un signInWithRedirect
+        const isCrossOriginIsolated = window.crossOriginIsolated === true;
+        if (!isCrossOriginIsolated) return;
+        if (redirectHandledRef.current) return; // évite double-traitement (StrictMode)
+
+        const result = await getRedirectResult(auth);
+        if (!result || !result.user) return;
+
+        redirectHandledRef.current = true;
+        const googleUser = result.user;
+
+        const userRef = doc(db, 'users', googleUser.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          const existingData = userDoc.data() as ExistingUserData;
+
+
+          // Blocage rôle pour Google si ≠ client
+          if (existingData.role && existingData.role !== 'client') {
+            await firebaseSignOut(auth);
+            setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1, roleRestrictionBlocks: prev.roleRestrictionBlocks + 1 }));
+            const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', getDeviceInfo());
+            setError(helpText ? `${message}\n\n💡 ${helpText}` : message);
+
+            await logAuthEvent('google_login_role_restriction', {
+              userId: googleUser.uid,
+              userEmail: googleUser.email,
+              blockedRole: existingData.role
+            }, getDeviceInfo());
+            return;
+          }
+
+          await updateDoc(userRef, {
+            lastLoginAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            isActive: true,
+            lastDeviceInfo: {
+              type: getDeviceInfo().type,
+              os: getDeviceInfo().os,
+              browser: getDeviceInfo().browser,
+              loginTimestamp: new Date().toISOString()
+            },
+            ...(googleUser.photoURL && googleUser.photoURL !== existingData.photoURL && {
+              photoURL: googleUser.photoURL,
+              profilePhoto: googleUser.photoURL,
+              avatar: googleUser.photoURL
+            })
+          });
+        } else {
+          const newUserData: Partial<User> = {
+            role: 'client',
+            email: googleUser.email || '',
+            firstName: googleUser.displayName?.split(' ')[0] || '',
+            lastName: googleUser.displayName?.split(' ').slice(1).join(' ') || '',
+            profilePhoto: googleUser.photoURL || '',
+            photoURL: googleUser.photoURL || '',
+            avatar: googleUser.photoURL || '',
+            preferredLanguage: 'fr',
+            isApproved: true,
+            isActive: true,
+            provider: 'google.com',
+            isVerified: googleUser.emailVerified,
+            isVerifiedEmail: googleUser.emailVerified
+          };
+          await createUserDocumentInFirestore(googleUser, newUserData, getDeviceInfo());
+        }
+
+        await logAuthEvent('successful_google_login', {
+          userId: googleUser.uid,
+          userEmail: googleUser.email,
+          isNewUser: !userDoc.exists(),
+          deviceType: getDeviceInfo().type,
+          connectionSpeed: getDeviceInfo().connectionSpeed
+        }, getDeviceInfo());
+      } catch (e) {
+        console.warn('[Auth] getRedirectResult error', e);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    
+  }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

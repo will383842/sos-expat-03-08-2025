@@ -46,138 +46,162 @@ export interface Provider {
  * Normalise les données d'un provider pour assurer la cohérence
  * Respecte l'interface originale de Providers.tsx + extensions
  */
-export function normalizeProvider(providerData: any): Provider {
-  if (!providerData) {
+export function normalizeProvider(providerData: unknown): Provider {
+  if (typeof providerData !== 'object' || providerData === null) {
     throw new Error('Provider data is required');
   }
+  const o = providerData as Record<string, unknown>;
 
-  // Gestion du nom avec fallbacks multiples
-  const name = providerData.name || 
-               providerData.fullName || 
-               providerData.providerName ||
-               providerData.displayName ||
-               `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 
-               (providerData.id ? `Expert ${providerData.id.slice(-4)}` : 'Expert');
+  // helpers
+  const toStr = (v: unknown, fb = ''): string =>
+    typeof v === 'string' ? v : fb;
 
-  const fullName = providerData.fullName || 
-                  providerData.name || 
-                  name;
+  const toNum = (v: unknown, fb = 0): number => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fb;
+    }
+    return fb;
+  };
 
-  // Gestion du type/rôle avec fallbacks (OBLIGATOIRE dans interface originale)
-  const type = (providerData.type || 
-                providerData.role || 
-                providerData.providerType || 
-                'expat') as 'lawyer' | 'expat';
+  const toBool = (v: unknown, fb = false): boolean =>
+    typeof v === 'boolean' ? v : fb;
 
-  // Gestion du pays avec fallbacks (OBLIGATOIRE dans interface originale)
-  const country = providerData.country || 
-                 providerData.currentCountry || 
-                 providerData.currentPresenceCountry ||
-                 providerData.providerCountry || 
-                 'France';
+  const toStrArray = (v: unknown, fb: string[] = []): string[] => {
+    if (!Array.isArray(v)) return fb;
+    const arr = v.filter((x) => typeof x === 'string') as string[];
+    return arr.length ? arr : fb;
+  };
 
-  // Gestion des langues avec fallbacks (OBLIGATOIRE dans interface originale)
-  const languages = Array.isArray(providerData.languages) 
-                   ? providerData.languages 
-                   : Array.isArray(providerData.languagesSpoken)
-                     ? providerData.languagesSpoken
-                     : Array.isArray(providerData.providerLanguages)
-                       ? providerData.providerLanguages
-                       : ['fr'];
+  // id
+  const id =
+    toStr(o.id) ||
+    toStr(o.providerId) ||
+    Math.random().toString(36);
 
-  // Gestion des spécialités avec fallbacks (OBLIGATOIRE dans interface originale)
-  const specialties = Array.isArray(providerData.specialties)
-                     ? providerData.specialties
-                     : Array.isArray(providerData.providerSpecialties)
-                       ? providerData.providerSpecialties
-                       : [];
+  // type / role
+  const rawType = (o.type ?? o.role ?? o.providerType);
+  const type: 'lawyer' | 'expat' =
+    rawType === 'lawyer' || rawType === 'expat' ? rawType : 'expat';
 
-  // Prix par défaut selon le type (OBLIGATOIRE dans interface originale)
-  const price = (typeof providerData.price === 'number' && providerData.price > 0) 
-                ? providerData.price 
-                : (type === 'lawyer' ? 49 : 19);
+  // name / fullName
+  const nameCandidate =
+    toStr(o.name) ||
+    toStr(o.fullName) ||
+    toStr(o.providerName) ||
+    toStr(o.displayName) ||
+    `${toStr(o.firstName)} ${toStr(o.lastName)}`.trim();
+  const name = nameCandidate || (id ? `Expert ${id.slice(-4)}` : 'Expert');
+  const fullName = toStr(o.fullName) || toStr(o.name) || name;
 
-  // Durée par défaut selon le type (extension pour autres composants)
-  const duration = (typeof providerData.duration === 'number' && providerData.duration > 0)
-                   ? providerData.duration
-                   : (type === 'lawyer' ? 20 : 30);
+  // country
+  const country =
+    toStr(o.country) ||
+    toStr(o.currentCountry) ||
+    toStr(o.currentPresenceCountry) ||
+    toStr(o.providerCountry) ||
+    'France';
 
-  // Rating avec validation (OBLIGATOIRE dans interface originale)
-  const rating = (typeof providerData.rating === 'number' && providerData.rating >= 0 && providerData.rating <= 5)
-                 ? providerData.rating
-                 : (providerData.providerRating || 4.5);
+  // languages
+  const languages =
+    toStrArray(o.languages) ||
+    toStrArray(o.languagesSpoken) ||
+    toStrArray(o.providerLanguages, ['fr']);
 
-  // Review count avec validation (OBLIGATOIRE dans interface originale)
-  const reviewCount = (typeof providerData.reviewCount === 'number' && providerData.reviewCount >= 0)
-                      ? providerData.reviewCount
-                      : (providerData.providerReviewCount || 0);
+  // specialties
+  const specialties =
+    toStrArray(o.specialties) ||
+    toStrArray(o.providerSpecialties, []);
 
-  // Years of experience avec validation (OBLIGATOIRE dans interface originale)
-  const yearsOfExperience = (typeof providerData.yearsOfExperience === 'number' && providerData.yearsOfExperience >= 0)
-                           ? providerData.yearsOfExperience
-                           : (typeof providerData.yearsAsExpat === 'number' && providerData.yearsAsExpat >= 0)
-                             ? providerData.yearsAsExpat
-                             : 1;
+  // price / duration
+  const price =
+    toNum(o.price, type === 'lawyer' ? 49 : 19);
+  const duration =
+    toNum(o.duration, type === 'lawyer' ? 20 : 30);
 
-  // Avatar avec fallback (OBLIGATOIRE dans interface originale)
-  const avatar = providerData.avatar || 
-                 providerData.profilePhoto || 
-                 providerData.providerAvatar || 
-                 '/default-avatar.png';
+  // rating / reviews
+  const rating = (() => {
+    const r = toNum(o.rating, toNum(o.providerRating, 4.5));
+    return Math.min(Math.max(r, 0), 5);
+  })();
+  const reviewCount = Math.max(0, toNum(o.reviewCount, toNum(o.providerReviewCount, 0)));
 
-  // Description avec fallback (OBLIGATOIRE dans interface originale)
-  const description = providerData.description || providerData.bio || '';
+  // years of experience
+  const yearsOfExperience = Math.max(
+    0,
+    toNum(o.yearsOfExperience, toNum(o.yearsAsExpat, 1))
+  );
+
+  // media / description
+  const avatar = toStr(o.avatar) || toStr(o.profilePhoto) || toStr(o.providerAvatar) || '/default-avatar.png';
+  const description = toStr(o.description) || toStr(o.bio) || '';
+
+  // contact
+  const phone = toStr(o.phone) || toStr(o.phoneNumber) || toStr(o.providerPhone);
+  const phoneNumber = toStr(o.phoneNumber) || toStr(o.phone) || toStr(o.providerPhone);
+  const whatsapp = toStr(o.whatsapp) || toStr(o.whatsAppNumber);
+  const whatsAppNumber = toStr(o.whatsAppNumber) || toStr(o.whatsapp);
+  const email = toStr(o.email);
+
+  // flags
+  const isOnline = toBool(o.isOnline, false);
+  const isVisible = o.isVisible === false ? false : true;
+  const isApproved = o.isApproved === false ? false : true;
+  const isBanned = o.isBanned === true;
+
+  // autres
+  const preferredLanguage = toStr(o.preferredLanguage, 'fr');
+  const yearsAsExpat = toNum(o.yearsAsExpat, yearsOfExperience);
+  const graduationYear = toStr(o.graduationYear);
+  const expatriationYear = toStr(o.expatriationYear);
+  const currentCountry = toStr(o.currentCountry, country);
+  const currentPresenceCountry = toStr(o.currentPresenceCountry, country);
+  const firstName = toStr(o.firstName);
+  const lastName = toStr(o.lastName);
+  const profilePhoto = avatar;
+  const isActive = o.isActive === false ? false : true;
 
   return {
     // Champs obligatoires de l'interface originale Providers.tsx
-    id: providerData.id || providerData.providerId || Math.random().toString(36),
-    name: name,
-    type: type,
-    country: country,
-    languages: languages,
-    specialties: specialties,
-    rating: rating,
-    reviewCount: reviewCount,
-    yearsOfExperience: yearsOfExperience,
-    isOnline: providerData.isOnline === true,
-    avatar: avatar,
-    description: description,
-    price: price,
-    isVisible: providerData.isVisible !== false,
-    isApproved: providerData.isApproved !== false,
-    isBanned: providerData.isBanned === true,
+    id,
+    name,
+    type,
+    country,
+    languages,
+    specialties,
+    rating,
+    reviewCount,
+    yearsOfExperience,
+    isOnline,
+    avatar,
+    description,
+    price,
+    isVisible,
+    isApproved,
+    isBanned,
     
     // Champs étendus pour compatibilité avec autres composants
-    fullName: fullName,
-    firstName: providerData.firstName || '',
-    lastName: providerData.lastName || '',
-    role: type, // Alias de type
-    currentCountry: providerData.currentCountry || country,
-    currentPresenceCountry: providerData.currentPresenceCountry || country,
-    profilePhoto: avatar,
-    email: providerData.email || '',
-    phone: providerData.phone || 
-           providerData.phoneNumber || 
-           providerData.providerPhone || 
-           '',
-    phoneNumber: providerData.phoneNumber || 
-                providerData.phone || 
-                providerData.providerPhone || 
-                '',
-    whatsapp: providerData.whatsapp || 
-             providerData.whatsAppNumber || 
-             '',
-    whatsAppNumber: providerData.whatsAppNumber || 
-                   providerData.whatsapp || 
-                   '',
-    languagesSpoken: languages, // Alias de languages
-    preferredLanguage: providerData.preferredLanguage || 'fr',
-    duration: duration,
-    bio: providerData.bio || description,
-    yearsAsExpat: providerData.yearsAsExpat || yearsOfExperience,
-    graduationYear: providerData.graduationYear || '',
-    expatriationYear: providerData.expatriationYear || '',
-    isActive: providerData.isActive !== false
+    fullName,
+    firstName,
+    lastName,
+    role: type,
+    currentCountry,
+    currentPresenceCountry,
+    profilePhoto,
+    email,
+    phone,
+    phoneNumber,
+    whatsapp,
+    whatsAppNumber,
+    languagesSpoken: languages,
+    preferredLanguage,
+    duration,
+    bio: description,
+    yearsAsExpat,
+    graduationYear,
+    expatriationYear,
+    isActive
   };
 }
 

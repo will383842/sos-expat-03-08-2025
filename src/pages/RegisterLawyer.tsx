@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Scale, Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Phone,
   CheckCircle, XCircle, Users, Camera, X
@@ -8,15 +8,16 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { MultiValue } from 'react-select';
+import type { Provider } from '../types/provider';
 
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
 const MultiLanguageSelect = lazy(() => import('../components/forms-data/MultiLanguageSelect'));
 
-// ===== Theme tokens (cohérent “avocat”, continuité RegisterClient) =====
+// ===== Theme tokens =====
 const THEME = {
   gradFrom: 'from-indigo-600',
   gradTo: 'to-purple-600',
@@ -174,6 +175,7 @@ interface LawyerFormData {
   profilePhoto: string; bio: string; certifications: string[]; education: string;
   availability: 'available' | 'busy' | 'offline'; acceptTerms: boolean;
   customCertification: string;
+  
 }
 interface LanguageOption { value: string; label: string }
 interface EmailCheckStatus { isChecking: boolean; isAvailable: boolean | null; hasBeenChecked: boolean; }
@@ -309,6 +311,7 @@ const I18N = {
     uploaderHint: 'Or use the webcam with the replacement buttons',
     uploaderEmpty: 'No file chosen',
     langPlaceholder: 'Select languages',
+    
   },
 } as const;
 
@@ -354,6 +357,34 @@ SectionHeader.displayName = 'SectionHeader';
 
 const RegisterLawyer: React.FC = () => {
   const navigate = useNavigate();
+  // --- Types sûrs (pas de any) ---
+type NavState = Readonly<{ selectedProvider?: Provider }>;
+
+function isProviderLike(v: unknown): v is Provider {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === 'string'
+    && typeof o.name === 'string'
+    && (o.type === 'lawyer' || o.type === 'expat');
+}
+
+const location = useLocation();
+const [searchParams] = useSearchParams();
+const redirect = searchParams.get('redirect') || '/dashboard';
+
+useEffect(() => {
+  const rawState: unknown = location.state;
+  const state = (rawState ?? null) as NavState | null;
+  const sp = state?.selectedProvider;
+
+  if (isProviderLike(sp)) {
+    try {
+      sessionStorage.setItem('selectedProvider', JSON.stringify(sp));
+    } catch {
+  /* no-op: stockage indisponible */
+}
+  }
+}, [location.state]);
   const { register, isLoading, error } = useAuth();
   const { language } = useApp(); // 'fr' | 'en'
   const lang = (language as 'fr' | 'en') || 'fr';
@@ -367,6 +398,12 @@ const RegisterLawyer: React.FC = () => {
       let el = document.querySelector(sel) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement('meta');
+        // important: définir l'attribut name/property à la création
+        if (prop) {
+          el.setAttribute('property', name);
+        } else {
+          el.setAttribute('name', name);
+        }
         document.head.appendChild(el);
       }
       el.content = content;
@@ -515,7 +552,13 @@ const RegisterLawyer: React.FC = () => {
         const other = lang === 'en' ? 'Other' : 'Autre';
         setShowCustomCountry(value === other);
       }
-      if (fieldErrors[name]) setFieldErrors((prev) => { const { [name]: _removed, ...rest } = prev; return rest; });
+      if (fieldErrors[name]) {
+        setFieldErrors((prev) => {
+          const rest = { ...prev };
+          delete rest[name];
+          return rest;
+        });
+      }
       if (formError) setFormError('');
     },
     [fieldErrors, formError, handleEmailCheck, lang]
@@ -716,23 +759,25 @@ const RegisterLawyer: React.FC = () => {
         };
 
         await register(userData, lawyerForm.password);
-        navigate('/dashboard', {
-          state: {
-            message:
-              lang === 'en'
-                ? 'Registration successful! Your account will be validated within 24h.'
-                : 'Inscription réussie ! Votre compte sera validé sous 24h.',
-            type: 'success',
-          },
-        });
-      } catch (err: any) {
+        navigate(redirect, {
+  replace: true,
+  state: {
+    message:
+      lang === 'en'
+        ? 'Registration successful! Your account will be validated within 24h.'
+        : 'Inscription réussie ! Votre compte sera validé sous 24h.',
+    type: 'success',
+  },
+});
+      } catch (err: unknown) {
         console.error('Register lawyer error:', err);
-        setFormError(err?.message || 'Error');
+        const msg = err instanceof Error ? err.message : 'Error';
+        setFormError(msg);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [isSubmitting, validate, register, lawyerForm, selectedLanguages, navigate, lang]
+    [isSubmitting, validate, register, lawyerForm, selectedLanguages, navigate, redirect, lang]
   );
 
   // ---- Can submit ----
@@ -774,7 +819,7 @@ const RegisterLawyer: React.FC = () => {
         }}
       />
       <div className="min-h-screen bg-[linear-gradient(180deg,#f7f7ff_0%,#ffffff_35%,#f8f5ff_100%)]">
-        {/* Compact hero (évite l’espace vide sous le header) */}
+        {/* Compact hero */}
         <header className="pt-6 sm:pt-8 text-center">
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-gray-900">
             <span className={`bg-gradient-to-r ${THEME.gradFrom} ${THEME.gradTo} bg-clip-text text-transparent`}>
@@ -788,13 +833,12 @@ const RegisterLawyer: React.FC = () => {
               {lang === 'en' ? 'Multilingual' : 'Multilingue'}
             </span>
           </div>
-          <div className="mt-5 h-1 w-40 mx-auto rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.8)' }} />
-          <p className="mt-3 text-xs sm:text-sm text-gray-500">
+          <div className="mt-3 text-xs sm:text-sm text-gray-500">
             {t.already}{' '}
-            <Link to="/login" className="font-semibold underline text-indigo-700 hover:text-indigo-800">
+            <Link to={`/login?redirect=${encodeURIComponent(redirect)}`} className="font-semibold underline text-indigo-700 hover:text-indigo-800">
               {t.login}
             </Link>
-          </p>
+          </div>
         </header>
 
         <main className="max-w-2xl mx-auto px-3 sm:px-6 py-6 sm:py-8">
@@ -1241,14 +1285,23 @@ const RegisterLawyer: React.FC = () => {
                   )}
 
                   <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
-                    {/* IMPORTANT: placeholder localisé pour corriger le FR “Sélectionnez les langues” */}
                     <MultiLanguageSelect
                       value={selectedLanguages}
-                      onChange={(v: any) => {
+                      onChange={(v: MultiValue<LanguageOption>) => {
                         setSelectedLanguages(v);
-                        if (fieldErrors.languages) setFieldErrors(({ languages, ...r }) => r);
+                        if (fieldErrors.languages) {
+                          setFieldErrors((prev) => {
+                            const rest = { ...prev };
+                            delete rest.languages;
+                            return rest;
+                          });
+                        }
                       }}
+                      /* ⚠️ Si MultiLanguageSelect n'a pas la prop placeholder dans ses types,
+                         laisse la ligne suivante commentée. Décommente-la uniquement si tu as
+                         ajouté `placeholder?: string` dans MultiLanguageSelectProps.
                       placeholder={t.langPlaceholder}
+                      */
                     />
                   </Suspense>
 
@@ -1291,33 +1344,29 @@ const RegisterLawyer: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Photo (input customisé + libellés localisés) */}
+                {/* Photo */}
                 <div className={`mt-4 rounded-xl border ${THEME.border} p-4 ${THEME.subtle}`}>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                  <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
                     <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto}{' '}
                     <span className="text-red-500 ml-1">*</span>
                   </label>
 
-                <ImageUploader
-                  locale={lang} // langue dynamique
-                  currentImage={lawyerForm.profilePhoto} // affiche la photo actuelle du lawyer
-                  onImageUploaded={(url: string) => {
-                    setLawyerForm((prev) => ({
-                      ...prev,
-                      profilePhoto: url, // enregistre l'URL dans le state du lawyer
-                    }));
-                  }}
-                  labels={{
-                    title: t.uploaderTitle,
-                    button: t.uploaderCta,
-                    empty: t.uploaderEmpty,
-                    hint: t.uploaderHint,
-                  }}
-                  hideNativeFileLabel
-                  cropShape="round"
-                  outputSize={512}
-                />
-          
+                  <Suspense fallback={<div className="h-40 rounded-lg bg-gray-100 animate-pulse" />}>
+                    <ImageUploader
+                      locale={lang}
+                      currentImage={lawyerForm.profilePhoto}
+                      onImageUploaded={(url: string) => {
+                        setLawyerForm((prev) => ({
+                          ...prev,
+                          profilePhoto: url,
+                        }));
+                      }}
+                      hideNativeFileLabel
+                      cropShape="round"
+                      outputSize={512}
+                    />
+                  </Suspense>
+
                   {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                   <p className="text-xs text-gray-500 mt-1">
                     {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}

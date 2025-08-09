@@ -5,14 +5,13 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 import Layout from '../layout/Layout';
 import Button from '../common/Button';
+import { useTranslation } from 'react-i18next';
 
-// Interface pour les erreurs Firebase
-interface FirebaseError {
-  code: string;
-  message: string;
+interface FirebaseErrorLike {
+  code?: string;
+  message?: string;
 }
 
-// Types pour une meilleure sécurité
 interface FormState {
   isLoading: boolean;
   isSuccess: boolean;
@@ -20,118 +19,84 @@ interface FormState {
 }
 
 const AuthForm: React.FC = () => {
-  // Fonction de traduction temporaire - à remplacer par votre système i18n
-  const t = useCallback((key: string, params?: Record<string, string | number>) => {
-    const translations: Record<string, string> = {
-      'auth.errors.invalidEmail': 'Adresse email invalide',
-      'auth.errors.userNotFound': 'Aucun compte associé à cette adresse email',
-      'auth.errors.tooManyRequests': 'Trop de tentatives. Veuillez réessayer plus tard',
-      'auth.errors.networkError': 'Erreur de connexion. Vérifiez votre internet',
-      'auth.errors.generic': 'Une erreur est survenue. Veuillez réessayer',
-      'auth.errors.emailRequired': 'Veuillez entrer votre adresse email',
-      'auth.errors.emailInvalid': 'Format d\'email invalide',
-      'common.error': 'Erreur',
-      'auth.passwordReset.title': 'Réinitialisation du mot de passe',
-      'auth.passwordReset.subtitle': 'Entrez votre adresse email pour recevoir un lien de réinitialisation',
-      'auth.passwordReset.emailSent': 'Email envoyé',
-      'auth.passwordReset.emailSentDescription': 'Un lien de réinitialisation a été envoyé à {email}. Veuillez vérifier votre boîte de réception et vos spams.',
-      'auth.passwordReset.sendLink': 'Envoyer le lien de réinitialisation',
-      'auth.backToLogin': 'Retour à la connexion',
-      'auth.email': 'Adresse email',
-      'auth.emailPlaceholder': 'votre@email.com'
-    };
-    
-    let translation = translations[key] || key;
-    
-    // Remplacement des paramètres
-    if (params) {
-      Object.entries(params).forEach(([paramKey, value]) => {
-        translation = translation.replace(`{${paramKey}}`, String(value));
-      });
-    }
-    
-    return translation;
-  }, []);
-  
+  // i18n — appelé en haut, sans condition → pas d’erreur de hooks
+  const { t } = useTranslation();
+
   const [formState, setFormState] = useState<FormState>({
     isLoading: false,
     isSuccess: false,
-    error: null
+    error: null,
   });
-  
+
   const [email, setEmail] = useState('');
 
-  // Mémoisation des messages d'erreur pour éviter les re-rendus
-  const errorMessages = useMemo(() => ({
-    'auth/invalid-email': t('auth.errors.invalidEmail'),
-    'auth/user-not-found': t('auth.errors.userNotFound'),
-    'auth/too-many-requests': t('auth.errors.tooManyRequests'),
-    'auth/network-request-failed': t('auth.errors.networkError'),
-    'default': t('auth.errors.generic')
-  }), [t]);
+  const errorMessages = useMemo(
+    () => ({
+      'auth/invalid-email': t('auth.errors.invalidEmail'),
+      'auth/user-not-found': t('auth.errors.userNotFound'),
+      'auth/too-many-requests': t('auth.errors.tooManyRequests'),
+      'auth/network-request-failed': t('auth.errors.networkError'),
+      default: t('auth.errors.generic'),
+    }),
+    [t]
+  );
 
-  // Fonction mémorisée pour obtenir le message d'erreur
-  const getErrorMessage = useCallback((errorCode: string): string => {
-    return errorMessages[errorCode as keyof typeof errorMessages] || errorMessages.default;
-  }, [errorMessages]);
+  const getErrorMessage = useCallback(
+    (errorCode?: string): string =>
+      (errorCode && (errorMessages as Record<string, string>)[errorCode]) || errorMessages.default,
+    [errorMessages]
+  );
 
-  // Validation d'email côté client (sécurité supplémentaire)
-  const isValidEmail = useCallback((email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const isValidEmail = useCallback((val: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+    return emailRegex.test(val);
   }, []);
 
-  // Gestion du reset de mot de passe avec validation renforcée
-  const handlePasswordReset = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const trimmedEmail = email.trim();
-    
-    // Validation côté client
-    if (!trimmedEmail) {
-      setFormState(prev => ({ ...prev, error: t('auth.errors.emailRequired') }));
-      return;
-    }
-    
-    if (!isValidEmail(trimmedEmail)) {
-      setFormState(prev => ({ ...prev, error: t('auth.errors.emailInvalid') }));
-      return;
-    }
-    
-    setFormState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      await sendPasswordResetEmail(auth, trimmedEmail);
-      setFormState(prev => ({ ...prev, isSuccess: true, isLoading: false }));
-    } catch (error) {
-      const firebaseError = error as FirebaseError;
-      console.error('Erreur reset mot de passe:', firebaseError);
-      setFormState(prev => ({
-        ...prev,
-        error: getErrorMessage(firebaseError.code),
-        isLoading: false
-      }));
-    }
-  }, [email, isValidEmail, getErrorMessage, t]);
+  const handlePasswordReset = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
 
-  // Composant ErrorDisplay pour éviter la duplication
+      const trimmed = email.trim();
+
+      if (!trimmed) {
+        setFormState((prev) => ({ ...prev, error: t('auth.errors.emailRequired') }));
+        return;
+      }
+
+      if (!isValidEmail(trimmed)) {
+        setFormState((prev) => ({ ...prev, error: t('auth.errors.emailInvalid') }));
+        return;
+      }
+
+      setFormState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        await sendPasswordResetEmail(auth, trimmed);
+        setFormState((prev) => ({ ...prev, isSuccess: true, isLoading: false }));
+      } catch (err: unknown) {
+        const fb = err as FirebaseErrorLike;
+        setFormState((prev) => ({
+          ...prev,
+          error: getErrorMessage(fb.code),
+          isLoading: false,
+        }));
+      }
+    },
+    [email, isValidEmail, getErrorMessage, t]
+  );
+
   const ErrorDisplay: React.FC<{ error: string }> = ({ error }) => (
     <div className="bg-red-50 border border-red-200 rounded-md p-3 sm:p-4" role="alert">
       <div className="flex">
         <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" aria-hidden="true" />
         <div className="ml-3">
-          <h3 className="text-sm font-medium text-red-800">
-            {t('common.error')}
-          </h3>
-          <div className="mt-2 text-sm text-red-700">
-            {error}
-          </div>
+          <h3 className="text-sm font-medium text-red-800">{t('common.error')}</h3>
+          <div className="mt-2 text-sm text-red-700">{error}</div>
         </div>
       </div>
     </div>
   );
 
-  // Rendu du formulaire de réinitialisation de mot de passe
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
@@ -191,7 +156,7 @@ const AuthForm: React.FC = () => {
                       onChange={(e) => {
                         setEmail(e.target.value);
                         if (formState.error) {
-                          setFormState(prev => ({ ...prev, error: null }));
+                          setFormState((prev) => ({ ...prev, error: null }));
                         }
                       }}
                       className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 text-base sm:text-sm"

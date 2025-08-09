@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Euro, Shield, CheckCircle, AlertCircle, Phone, MessageCircle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -9,11 +9,19 @@ import { createBookingRequest } from '../utils/firestore';
 import { logLanguageMismatch } from '../services/analytics';
 import { Link } from 'react-router-dom';
 import MultiLanguageSelect from '../components/forms-data/MultiLanguageSelect';
-import { Language } from '../data/Languages-spoken';
 import languages from '../data/Languages-spoken';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../config/firebase';
-import { Provider, normalizeProvider } from '../types/Provider';
+import { functions, db } from '../config/firebase'; // 🔧 AJOUT: import db
+import type { Provider } from '../types/provider';
+import { normalizeProvider } from '../types/provider';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore'; // 🔧 AJOUT: Firestore
+
+
+// Type local pour les langues (aligné avec MultiLanguageSelect et languages-spoken.ts)
+type Language = {
+  code: string;
+  name: string;
+};
 
 const countries = [
   'Afghanistan',
@@ -303,14 +311,36 @@ interface StandardizedProviderData {
   email?: string;
   phone?: string;
 }
+// --- Fix: type du formulaire pour éviter TS2502 ---
+type BookingFormData = {
+  title: string;
+  description: string;
+  phoneCountryCode: string;
+  phoneNumber: string;
+  acceptTerms: boolean;
+  firstName: string;
+  lastName: string;
+  nationality: string;
+  currentCountry: string;
+  whatsappNumber: string;
+  whatsappCountryCode: string;
+  autrePays: string;
+};
+
+// --- Fix: type pour les docs Firestore (évite "any" avec normalizeProvider) ---
+type FirestoreProviderDoc = Partial<Provider> & { id: string };
 
 const BookingRequest: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { language } = useApp(); // 🔧 AJOUT: Récupération de la langue du contexte
+
+  // 🔧 NOUVEAU: état local du prestataire + chargement
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [providerLoading, setProviderLoading] = useState<boolean>(true);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BookingFormData>({
     title: '',
     description: '',
     phoneCountryCode: '+33',
@@ -347,23 +377,119 @@ const BookingRequest: React.FC = () => {
     }
   }, [user, authLoading, providerId, navigate]);
 
-  // Récupérer les données du prestataire depuis sessionStorage
-  const getProviderData = (): Provider | null => {
-    try {
-      const savedProvider = sessionStorage.getItem('selectedProvider');
-      if (savedProvider) {
-        const providerData = JSON.parse(savedProvider);
-        if (providerData.id === providerId) {
-          return normalizeProvider(providerData);
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing saved provider data:', error);
+  // Lecture du prestataire depuis sessionStorage
+  // Lecture du prestataire depuis sessionStorage
+const readProviderFromSession = useCallback((): Provider | null => {
+  try {
+    const saved = sessionStorage.getItem('selectedProvider');
+    if (!saved) return null;
+
+    const parsed = JSON.parse(saved) as Partial<Provider> & { id?: string };
+    if (parsed && parsed.id && parsed.id === providerId) {
+      return normalizeProvider(parsed as Partial<Provider> & { id: string });
     }
-    return null;
-  };
-  
-  const provider = getProviderData();
+  } catch (e) {
+    console.error('Error parsing selectedProvider from sessionStorage:', e);
+  }
+  return null;
+}, [providerId]);
+
+
+  // 🔧 NOUVEAU: chargement du prestataire (sessionStorage -> Firestore onSnapshot)
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+
+    const boot = async () => {
+      setProviderLoading(true);
+
+      // 1) Essayer la session
+      const fromSession = readProviderFromSession();
+      if (fromSession) {
+        setProvider(fromSession);
+        setProviderLoading(false);
+      }
+
+      // 2) Écoute temps réel Firestore (toujours, pour garder à jour + remplir session au besoin)
+      try {
+        if (!providerId) {
+          setProvider(null);
+          setProviderLoading(false);
+          return;
+        }
+        const ref = doc(db, 'sos_profiles', providerId);
+        unsub = onSnapshot(
+          ref,
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data() as Record<string, unknown>;
+              const normalized = normalizeProvider({ id: snap.id, ...(data as Partial<Provider>) } as FirestoreProviderDoc);
+              setProvider(normalized);
+              // Sync sessionStorage pour la suite du parcours
+              try {
+                sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
+              } catch (e) {
+                console.warn('Cannot write selectedProvider to sessionStorage:', e);
+              }
+            } else {
+              console.warn('Provider document not found in Firestore:', providerId);
+              // Si la session avait un provider mais le doc n’existe plus, on le retire
+              setProvider(null);
+              try {
+                const saved = sessionStorage.getItem('selectedProvider');
+                if (saved) {
+                  const parsed = JSON.parse(saved);
+                  if (parsed?.id === providerId) {
+                    sessionStorage.removeItem('selectedProvider');
+                  }
+                }
+              } catch {
+  // no-op: sessionStorage indisponible (mode privé / quota)
+}
+            }
+            setProviderLoading(false);
+          },
+          (err) => {
+            console.error('onSnapshot error:', err);
+            setProviderLoading(false);
+          }
+        );
+
+        // S’assure d’avoir au moins une tentative de getDoc si la session était vide (pour 1er paint)
+        if (!fromSession) {
+          try {
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+              const data = snap.data() as Record<string, unknown>;
+              const normalized = normalizeProvider(
+  { id: snap.id, ...(data as Partial<Provider>) } as Partial<Provider> & { id: string }
+);
+              setProvider(normalized);
+              try {
+                sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
+              } catch {
+  /* no-op: sessionStorage indisponible (mode privé / quota) */
+}
+            } else {
+              setProvider(null);
+            }
+          } catch (e) {
+            console.error('getDoc error:', e);
+          } finally {
+            setProviderLoading(false);
+          }
+        }
+      } catch (e) {
+        console.error('Error while loading provider:', e);
+        setProviderLoading(false);
+      }
+    };
+
+    boot();
+
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [providerId, readProviderFromSession])
 
   // useEffect pour vérifier le matching en temps réel
   useEffect(() => {
@@ -448,12 +574,26 @@ const BookingRequest: React.FC = () => {
     hasLanguageMatchRealTime
   ]);
 
-  // Si pas de provider, rediriger vers la liste
+  // Si pas de provider après chargement complet, rediriger vers la liste
   useEffect(() => {
-    if (!authLoading && !provider) {
+    if (!authLoading && !providerLoading && !provider) {
       navigate('/');
     }
-  }, [provider, authLoading, navigate]);
+  }, [provider, providerLoading, authLoading, navigate]);
+
+  if (providerLoading) {
+    // Loader simple (évite écran vide/redirect prématuré)
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-red-50">
+          <div className="flex items-center space-x-3 text-gray-700">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-700"></div>
+            <span>Chargement du prestataire…</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!provider) {
     return null;
@@ -598,39 +738,47 @@ const BookingRequest: React.FC = () => {
       console.error('❌ [DEBUG] Type d\'erreur:', typeof error);
       console.error('❌ [DEBUG] Erreur complète:', error);
       
-      if (error && typeof error === 'object') {
-        const errorObj = error as any;
-        console.error('❌ [DEBUG] Propriétés d\'erreur:', Object.keys(errorObj));
-        console.error('❌ [DEBUG] Code d\'erreur:', errorObj.code);
-        console.error('❌ [DEBUG] Message d\'erreur:', errorObj.message);
-        console.error('❌ [DEBUG] Détails d\'erreur:', errorObj.details);
-        console.error('❌ [DEBUG] Stack trace:', errorObj.stack);
-        
-        if (errorObj.code) {
-          switch (errorObj.code) {
-            case 'functions/invalid-argument':
-              console.error('❌ [DEBUG] Erreur: Arguments invalides envoyés à la fonction');
-              break;
-            case 'functions/unauthenticated':
-              console.error('❌ [DEBUG] Erreur: Utilisateur non authentifié');
-              break;
-            case 'functions/permission-denied':
-              console.error('❌ [DEBUG] Erreur: Permissions insuffisantes');
-              break;
-            case 'functions/not-found':
-              console.error('❌ [DEBUG] Erreur: Fonction Cloud non trouvée');
-              break;
-            case 'functions/internal':
-              console.error('❌ [DEBUG] Erreur: Erreur interne du serveur');
-              break;
-            case 'functions/unavailable':
-              console.error('❌ [DEBUG] Erreur: Service temporairement indisponible');
-              break;
-            default:
-              console.error('❌ [DEBUG] Erreur: Code d\'erreur non reconnu:', errorObj.code);
-          }
-        }
-      }
+ if (error && typeof error === 'object') {
+  const errorObj = error as Record<string, unknown>;
+  const keys = Object.keys(errorObj);
+  console.error('❌ [DEBUG] Propriétés d\'erreur:', keys);
+
+  const code = typeof (errorObj as { code?: unknown }).code === 'string' ? (errorObj as { code?: string }).code : undefined;
+  const message = typeof (errorObj as { message?: unknown }).message === 'string' ? (errorObj as { message?: string }).message : undefined;
+  const details = (errorObj as { details?: unknown }).details;
+  const stack = typeof (errorObj as { stack?: unknown }).stack === 'string' ? (errorObj as { stack?: string }).stack : undefined;
+
+  console.error('❌ [DEBUG] Code d\'erreur:', code);
+  console.error('❌ [DEBUG] Message d\'erreur:', message);
+  console.error('❌ [DEBUG] Détails d\'erreur:', details);
+  console.error('❌ [DEBUG] Stack trace:', stack);
+
+  if (code) {
+    switch (code) {
+      case 'functions/invalid-argument':
+        console.error('❌ [DEBUG] Erreur: Arguments invalides envoyés à la fonction');
+        break;
+      case 'functions/unauthenticated':
+        console.error('❌ [DEBUG] Erreur: Utilisateur non authentifié');
+        break;
+      case 'functions/permission-denied':
+        console.error('❌ [DEBUG] Erreur: Permissions insuffisantes');
+        break;
+      case 'functions/not-found':
+        console.error('❌ [DEBUG] Erreur: Fonction Cloud non trouvée');
+        break;
+      case 'functions/internal':
+        console.error('❌ [DEBUG] Erreur: Erreur interne du serveur');
+        break;
+      case 'functions/unavailable':
+        console.error('❌ [DEBUG] Erreur: Service temporairement indisponible');
+        break;
+      default:
+        console.error('❌ [DEBUG] Erreur: Code d\'erreur non reconnu:', code);
+    }
+  }
+}
+
       
       console.error('❌ [DEBUG] Context:', {
         providerId,
@@ -647,7 +795,7 @@ const BookingRequest: React.FC = () => {
 
   // 🔧 FONCTION STANDARDISÉE POUR PRÉPARER LES DONNÉES
   const prepareStandardizedData = (
-    formData: typeof formData, 
+    formData: BookingFormData, 
     provider: Provider, 
     user: { id?: string; firstName?: string; lastName?: string } | null
   ): {

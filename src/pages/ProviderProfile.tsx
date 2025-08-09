@@ -101,6 +101,7 @@ const ProviderProfile: React.FC = () => {
   const [provider, setProvider] = useState<SosProfile | null>(null);
   const [realProviderId, setRealProviderId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataLoadComplete, setDataLoadComplete] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(true);
@@ -157,6 +158,7 @@ const ProviderProfile: React.FC = () => {
     const loadProviderData = async () => {
       try {
         setIsLoading(true);
+        if (__DEV__) console.log('[Load] Starting provider load...', { id, typeParam, countryParam, langParam });
 
         let providerData: SosProfile | null = null;
         let foundProviderId: string | null = null;
@@ -175,6 +177,7 @@ const ProviderProfile: React.FC = () => {
         }
 
         // 1bis) Charge par ID si possible
+        if (__DEV__) console.log('[Load] Strategy: by explicit Firestore ID');
         if (providerId && providerId.length >= 15) {
           try {
             const docRef = doc(db, 'sos_profiles', providerId);
@@ -203,6 +206,7 @@ const ProviderProfile: React.FC = () => {
         }
 
         // 2) Sinon, tenter via les paramètres SEO (type / country / language / slug)
+        if (__DEV__) console.log('[Load] Strategy: by SEO params');
         if (!providerData && typeParam && countryParam && langParam && id) {
           const type = typeParam === 'avocat' ? 'lawyer' : typeParam === 'expatrie' ? 'expat' : null;
           const country =
@@ -256,6 +260,7 @@ const ProviderProfile: React.FC = () => {
         }
 
         // 3) Fallback : state de navigation (session / liste / carte)
+        if (__DEV__) console.log('[Load] Strategy: by navigation state');
         if (!providerData && location.state) {
           const state = location.state as any;
           const navData = state.selectedProvider || state.providerData;
@@ -308,6 +313,7 @@ const ProviderProfile: React.FC = () => {
         }
 
         if (providerData && foundProviderId) {
+          if (__DEV__) console.log('[Load] Provider found', { foundProviderId });
           if (!isMounted.current) return;
           setProvider(providerData);
           setRealProviderId(foundProviderId);
@@ -315,13 +321,18 @@ const ProviderProfile: React.FC = () => {
           // Avis
           await loadReviews(providerData.uid || foundProviderId);
         } else {
+          if (__DEV__) console.log('[Load] No provider found with any strategy.');
           if (isMounted.current) setNotFound(true);
         }
       } catch (error) {
         console.error('[Provider] Error loading data:', error);
         if (isMounted.current) setNotFound(true);
       } finally {
-        if (isMounted.current) setIsLoading(false);
+        if (isMounted.current) {
+          setIsLoading(false);
+          setDataLoadComplete(true);
+          if (__DEV__) console.log('[Load] Initial data load complete.');
+        }
       }
     };
 
@@ -407,21 +418,32 @@ const ProviderProfile: React.FC = () => {
   }, [realProviderId]);
 
   // ------------------------------------------------------------
-  // Not found -> redirection douce
+  // Not found -> redirection douce (attend la fin du chargement initial)
   // ------------------------------------------------------------
   useEffect(() => {
-    if (!isLoading && !provider) {
-      setNotFound(true);
+    if (!dataLoadComplete) {
+      if (__DEV__) console.log('[Redirect] Waiting for initial load to finish...');
+      return;
+    }
+    if (provider) {
+      if (__DEV__) console.log('[Redirect] Provider found. No redirection.');
+      return;
+    }
+    if (notFound) {
+      if (__DEV__) console.log('[Redirect] Not found after initial load. Redirecting soon...');
       const t = setTimeout(() => navigate('/sos-appel'), 3000);
       return () => clearTimeout(t);
+    } else {
+      if (__DEV__) console.log('[Redirect] Provider is null but notFound is false. No redirection.');
     }
-  }, [isLoading, provider, navigate]);
+  }, [dataLoadComplete, notFound, provider, navigate]);
 
   // ------------------------------------------------------------
   // SEO (URL + meta OG)
   // ------------------------------------------------------------
   const updateSEOMetadata = useCallback(() => {
-    if (!provider || isLoading) return;
+    // Attendre la fin du chargement initial pour éviter les URL/SEO incohérents
+    if (!provider || !dataLoadComplete) return;
 
     try {
       const isLawyer = provider.type === 'lawyer';
@@ -477,7 +499,7 @@ const ProviderProfile: React.FC = () => {
     } catch (error) {
       console.error('[SEO] Error updating metadata:', error);
     }
-  }, [provider, isLoading]);
+  }, [provider, dataLoadComplete]);
 
   useEffect(() => {
     updateSEOMetadata();

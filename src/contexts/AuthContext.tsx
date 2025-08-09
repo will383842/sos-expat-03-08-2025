@@ -9,8 +9,6 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  setPersistence,
-  browserLocalPersistence,
   updateProfile,
   reload
 } from 'firebase/auth';
@@ -802,7 +800,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setAuthMetrics(prev => ({ ...prev, loginAttempts: prev.loginAttempts + 1, googleAttempts: prev.googleAttempts + 1, lastAttempt: new Date() }));
 
     try {
-      await setPersistence(auth, browserLocalPersistence);
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');

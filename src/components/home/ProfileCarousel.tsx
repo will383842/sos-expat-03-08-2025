@@ -329,53 +329,43 @@ const ProfileCarousel: React.FC = () => {
     return fullLanguageName;
   }, []);
 
-  // ✅ CORRECTION PRINCIPALE : Navigation vers le profil avec URL SEO
-  const handleProfileClick = useCallback((provider: Provider) => {
-    console.log('🔗 Navigation vers le profil de:', provider.name);
-    
-    // Générer URL SEO standardisée compatible avec ProviderProfile.tsx
-    const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
-    const countrySlug = provider.country
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, '-');
-    const nameSlug = provider.name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, '-');
-    
-    // URL compatible avec ProviderProfile.tsx
-    const seoUrl = `/${typeSlug}/${countrySlug}/francais/${provider.id}`;
-
-    // 🔍 AJOUTER CES LOGS ICI (ligne 394)
-console.log('🔗 NAVIGATION DEBUG - ProfileCarousel.tsx');
-console.log('🔗 URL générée:', seoUrl);
-console.log('🔗 Provider ID:', provider.id);
-console.log('🔗 Provider name:', provider.name);
-console.log('🔗 Provider type:', provider.type);
-console.log('🔗 Provider country:', provider.country);
-console.log('🔗 ========================================');
-
-
-    console.log('🔗 URL générée:', seoUrl);
-    
-    // Sauvegarder pour compatibilité
-    try {
-      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
-    } catch (error) {
-      console.warn('⚠️ Erreur sessionStorage:', error);
+// ✅ CORRECTION PRINCIPALE : Navigation vers le profil avec URL SEO
+const handleProfileClick = useCallback((provider: Provider) => {
+  console.log('🔗 Navigation vers le profil de:', provider.name);
+  
+  // Générer URL SEO standardisée compatible avec ProviderProfile.tsx
+  const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
+  const countrySlug = provider.country
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, '-');
+  const nameSlug = provider.name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, '-');
+  
+  // URL compatible avec ProviderProfile.tsx ET SOSCall.tsx
+  const seoUrl = `/${typeSlug}/${countrySlug}/francais/${nameSlug}-${provider.id}`;
+  
+  console.log('🔗 URL générée:', seoUrl);
+  
+  // Sauvegarder pour compatibilité
+  try {
+    sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+  } catch (error) {
+    console.warn('⚠️ Erreur sessionStorage:', error);
+  }
+  
+  // Navigation avec données dans le state
+  navigate(seoUrl, {
+    state: {
+      selectedProvider: provider,
+      navigationSource: 'home_carousel'
     }
-    
-    // Navigation avec données dans le state
-    navigate(seoUrl, {
-      state: {
-        selectedProvider: provider,
-        navigationSource: 'home_carousel'
-      }
-    });
-  }, [navigate]);
+  });
+}, [navigate]);
 
   // Transformation des données Firestore
   const transformProviderData = useCallback(async (doc: any): Promise<Provider | null> => {

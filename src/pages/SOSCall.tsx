@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Phone, Star, MapPin, Search, Filter, ChevronDown } from 'lucide-react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { Phone, Star, MapPin, Search, ChevronDown } from 'lucide-react';
 import { collection, query, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import Layout from '../components/layout/Layout';
@@ -32,14 +32,25 @@ interface Provider {
   isBanned?: boolean;
 }
 
+const slugify = (s: string) =>
+  (s || '')
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
 const SOSCall: React.FC = () => {
   const { language } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  
-  // États principaux - CONSERVÉS de l'original
+  const location = useLocation();
+
+  // États principaux
   const [selectedType, setSelectedType] = useState<'all' | 'lawyer' | 'expat'>(
-    searchParams.get('type') === 'lawyer' ? 'lawyer' : 
+    searchParams.get('type') === 'lawyer' ? 'lawyer' :
     searchParams.get('type') === 'expat' ? 'expat' : 'all'
   );
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
@@ -53,7 +64,7 @@ const SOSCall: React.FC = () => {
   const [realProviders, setRealProviders] = useState<Provider[]>([]);
   const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
 
-  // Fonction de mapping des langues - CONSERVÉE
+  // Mapping des langues
   const getLanguageLabel = (lang: string): string => {
     const languageMap: { [key: string]: string } = {
       'Français': 'Français',
@@ -93,11 +104,10 @@ const SOSCall: React.FC = () => {
       'Thai': 'Thaï',
       'ไทย': 'Thaï'
     };
-    
     return languageMap[lang] || lang;
   };
 
-  // Options - CONSERVÉES de l'original
+  // Options pays
   const countryOptions = [
     'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne', 'Andorre', 'Angola',
     'Arabie Saoudite', 'Argentine', 'Arménie', 'Australie', 'Autriche', 'Azerbaïdjan',
@@ -131,6 +141,7 @@ const SOSCall: React.FC = () => {
     'Vietnam', 'Yémen', 'Zambie', 'Zimbabwe'
   ];
 
+  // Options langues
   const languageOptions = [
     'Afrikaans', 'Albanais', 'Allemand', 'Amharique', 'Anglais', 'Arabe', 'Arménien',
     'Azéri', 'Basque', 'Bengali', 'Biélorusse', 'Birman', 'Bosniaque', 'Bulgare',
@@ -145,223 +156,233 @@ const SOSCall: React.FC = () => {
     'Thaï', 'Tibétain', 'Turc', 'Turkmen', 'Ukrainien', 'Vietnamien', 'Gallois'
   ];
 
-  // Effet pour charger les providers - LOGIQUE ORIGINALE CONSERVÉE
+  // Charger les providers
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const typeParam = params.get('type');
+    const typeParam = searchParams.get('type');
     if (typeParam === 'lawyer' || typeParam === 'expat') {
       setSelectedType(typeParam);
       setSearchParams({ type: typeParam });
     }
-    
-    const sosProfilesQuery = query(
-      collection(db, 'sos_profiles'),
-      limit(100)
-    );
 
-    const unsubscribe = onSnapshot(sosProfilesQuery, (snapshot) => {
-      if (snapshot.empty) {
+    const sosProfilesQuery = query(collection(db, 'sos_profiles'), limit(100));
+
+    const unsubscribe = onSnapshot(
+      sosProfilesQuery,
+      (snapshot) => {
+        if (snapshot.empty) {
+          setRealProviders([]);
+          setFilteredProviders([]);
+          setIsLoadingProviders(false);
+          return;
+        }
+
+        const allProfiles = snapshot.docs.map((doc) => {
+          const data: any = doc.data();
+          const fullName =
+            data.fullName ||
+            `${data.firstName || ''} ${data.lastName || ''}`.trim() ||
+            'Expert';
+          const type: 'lawyer' | 'expat' = data.type === 'lawyer' ? 'lawyer' : 'expat';
+
+          const isApproved = data.isApproved !== false;
+          const isActive = data.isActive !== false;
+          const isOnline = data.isOnline === true;
+          const isVisible = data.isVisible !== false;
+
+          const presenceCountry = data.currentPresenceCountry || data.country || '';
+          const hasValidCountry =
+            presenceCountry && getCountryCoordinates(presenceCountry) !== null;
+
+          return {
+            id: doc.id,
+            name: fullName,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            type,
+            country: presenceCountry,
+            languages: data.languages || ['Français'],
+            specialties: data.specialties || [],
+            rating: typeof data.rating === 'number' ? data.rating : 4.5,
+            reviewCount: data.reviewCount || 0,
+            yearsOfExperience: data.yearsOfExperience || data.yearsAsExpat || 0,
+            isOnline,
+            isActive,
+            isVisible,
+            isApproved,
+            hasValidCountry,
+            isBanned: !!data.isBanned,
+            description: data.bio || '',
+            price: data.price || (type === 'lawyer' ? 49 : 19),
+            duration: data.duration,
+            avatar:
+              data.profilePhoto ||
+              'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&dpr=2',
+          } as Provider;
+        });
+
+        const onlyProviders = allProfiles.filter(
+          (p: Provider) => p.type === 'lawyer' || p.type === 'expat'
+        );
+
+        const activeProfiles = onlyProviders.filter((p: Provider) => {
+          const notBanned = p.isBanned !== true;
+          const hasBasicInfo = p.name && p.name.trim() !== '';
+          const hasCountry = p.country && p.country.trim() !== '';
+          const visible = p.isVisible !== false;
+          const lawyerApproved = p.type !== 'lawyer' || p.isApproved !== false;
+          return notBanned && hasBasicInfo && hasCountry && visible && lawyerApproved;
+        });
+
+        setRealProviders(activeProfiles);
+        setFilteredProviders(activeProfiles);
+        setIsLoadingProviders(false);
+      },
+      (error) => {
+        console.error('Erreur lors de l’écoute des profils:', error);
         setRealProviders([]);
         setFilteredProviders([]);
         setIsLoadingProviders(false);
-        return;
       }
-      
-      const allProfiles = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Expert';
-        const type = data.type || 'expat';
-        
-        const isApproved = data.isApproved !== false;
-        const isActive = data.isActive !== false;
-        const isOnline = data.isOnline === true;
-        const isVisible = data.isVisible !== false;
-        
-        const presenceCountry = data.currentPresenceCountry || data.country || '';
-        const hasValidCountry = presenceCountry && getCountryCoordinates(presenceCountry) !== null;
-        
-        return {
-          id: doc.id,
-          name: fullName,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          type,
-          country: presenceCountry,
-          languages: data.languages || ['Français'],
-          specialties: data.specialties || [],
-          rating: typeof data.rating === 'number' ? data.rating : 4.5,
-          reviewCount: data.reviewCount || 0,
-          yearsOfExperience: data.yearsOfExperience || data.yearsAsExpat || 0,
-          isOnline: isOnline,
-          isActive: isActive,
-          isVisible: isVisible,
-          isApproved: isApproved,
-          hasValidCountry: hasValidCountry,
-          isBanned: data.isBanned || false,
-          description: data.bio || '',
-          price: data.price || (type === 'lawyer' ? 49 : 19),
-          duration: data.duration,
-          avatar: data.profilePhoto || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&dpr=2'
-        };
-      });
+    );
 
-      const filteredRoles = ['lawyer', 'expat'];
-      const onlyProviders = allProfiles.filter(profile => filteredRoles.includes(profile.type));
+    return () => unsubscribe();
+  }, [searchParams, setSearchParams]);
 
-      const activeProfiles = onlyProviders.filter(profile => {
-        const notBanned = profile.isBanned !== true;
-        const hasBasicInfo = profile.name && profile.name.trim() !== '';
-        const hasValidCountry = profile.country && profile.country.trim() !== '';
-        const isVisible = profile.isVisible !== false;
-        const isApprovedLawyer = profile.type !== 'lawyer' || profile.isApproved !== false;
-
-        return notBanned && hasBasicInfo && hasValidCountry && isVisible && isApprovedLawyer;
-      });
-
-      setRealProviders(activeProfiles);
-      setFilteredProviders(activeProfiles);
-      setIsLoadingProviders(false);
-    }, (error) => {
-      console.error('Erreur lors de l\'écoute des profils:', error);
-      setRealProviders([]);
-      setFilteredProviders([]);
-      setIsLoadingProviders(false);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [setSearchParams]);
-
-  // Effet de filtrage - LOGIQUE ORIGINALE CONSERVÉE
+  // Filtrage
   useEffect(() => {
     if (realProviders.length === 0) return;
-    
-    let filtered = realProviders.filter(provider => {
+
+    let filtered = realProviders.filter((provider) => {
       const matchesType = selectedType === 'all' || provider.type === selectedType;
-      
-      const matchesCountry = selectedCountry === 'all' || 
+
+      const matchesCountry =
+        selectedCountry === 'all' ||
         provider.country === selectedCountry ||
-        (selectedCountry === 'Autre' && customCountry && provider.country.toLowerCase().includes(customCountry.toLowerCase()));
-         
-      const matchesLanguage = selectedLanguage === 'all' || 
-        (provider.languages && provider.languages.some(lang => 
-          lang === selectedLanguage
-        )) ||
-        (selectedLanguage === 'Autre' && customLanguage && provider.languages && provider.languages.some(lang =>
-          lang.toLowerCase().includes(customLanguage.toLowerCase())
-        ));
-        
+        (selectedCountry === 'Autre' &&
+          customCountry &&
+          provider.country.toLowerCase().includes(customCountry.toLowerCase()));
+
+      const matchesLanguage =
+        selectedLanguage === 'all' ||
+        (provider.languages && provider.languages.some((lang) => lang === selectedLanguage)) ||
+        (selectedLanguage === 'Autre' &&
+          customLanguage &&
+          provider.languages &&
+          provider.languages.some((lang) =>
+            lang.toLowerCase().includes(customLanguage.toLowerCase())
+          ));
+
       const matchesStatus = !onlineOnly || provider.isOnline;
-      
+
       return matchesType && matchesCountry && matchesLanguage && matchesStatus;
     });
-    
-    // TRI ORIGINAL CONSERVÉ
+
     filtered.sort((a, b) => {
       if (a.isOnline !== b.isOnline) {
         return (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
       }
-      
       if (selectedCountry !== 'all') {
         const aCountryMatch = a.country === selectedCountry;
         const bCountryMatch = b.country === selectedCountry;
-        if (aCountryMatch !== bCountryMatch) {
-          return aCountryMatch ? -1 : 1;
-        }
+        if (aCountryMatch !== bCountryMatch) return aCountryMatch ? -1 : 1;
       }
-      
       return b.rating - a.rating;
     });
-    
-    setFilteredProviders(filtered);
-  }, [realProviders, selectedType, selectedCountry, selectedLanguage, customCountry, customLanguage, onlineOnly]);
 
-  // Handlers - CONSERVÉS
+    setFilteredProviders(filtered);
+  }, [
+    realProviders,
+    selectedType,
+    selectedCountry,
+    selectedLanguage,
+    customCountry,
+    customLanguage,
+    onlineOnly
+  ]);
+
+  // Handlers
   const handleCountryChange = (value: string) => {
     setSelectedCountry(value);
     setShowCustomCountry(value === 'Autre');
-    if (value !== 'Autre') {
-      setCustomCountry('');
-    }
+    if (value !== 'Autre') setCustomCountry('');
   };
 
   const handleLanguageChange = (value: string) => {
     setSelectedLanguage(value);
     setShowCustomLanguage(value === 'Autre');
-    if (value !== 'Autre') {
-      setCustomLanguage('');
-    }
+    if (value !== 'Autre') setCustomLanguage('');
   };
 
-  // Navigation vers profil - CONSERVÉE EXACTEMENT
+  // Navigation vers profil avec GARDE anti re-navigation
   const handleProviderClick = (provider: Provider) => {
-    console.log('🔗 Navigation vers le profil de:', provider.name);
-    
-    // Générer URL SEO standardisée
     const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
-    const countrySlug = provider.country.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
-    const nameSlug = provider.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-');
-    
+    const countrySlug = slugify(provider.country);
+    const nameSlug = slugify(provider.name);
     const seoUrl = `/${typeSlug}/${countrySlug}/francais/${nameSlug}-${provider.id}`;
-    
-    console.log('🔗 URL générée:', seoUrl);
-    
-    // Sauvegarder les données du provider
-    try {
-      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
-    } catch (error) {
-      console.warn('⚠️ Erreur sessionStorage:', error);
-    }
-    
-    // Navigation vers le profil
-    navigate(seoUrl, { 
-      state: { 
-        selectedProvider: provider,
-        navigationSource: 'sos_call'
+
+    if (location.pathname !== seoUrl) {
+      try {
+        sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+      } catch {
+        /* noop */
       }
-    });
+      navigate(seoUrl, {
+        state: { selectedProvider: provider, navigationSource: 'sos_call' },
+      });
+    }
   };
 
-  // Fonction truncateText - AJOUTÉE de l'original
+  // Utilitaire
   const truncateText = (text: string, maxLength: number): { text: string; isTruncated: boolean } => {
-    if (text.length <= maxLength) {
-      return { text, isTruncated: false };
-    }
+    if (text.length <= maxLength) return { text, isTruncated: false };
     return { text: text.substring(0, maxLength) + '...', isTruncated: true };
   };
 
   return (
     <Layout>
       <SEOHead
-        title={`${selectedType === 'lawyer' ? 'Avocats' : selectedType === 'expat' ? 'Expatriés' : 'Experts'} disponibles | SOS Expat & Travelers`}
-        description={`Trouvez un ${selectedType === 'lawyer' ? 'avocat' : selectedType === 'expat' ? 'expatrié' : 'expert'} vérifié disponible immédiatement. Consultation en ligne 24h/24, 7j/7 dans plus de 120 pays.`}
+        title={`${
+          selectedType === 'lawyer'
+            ? 'Avocats'
+            : selectedType === 'expat'
+            ? 'Expatriés'
+            : 'Experts'
+        } disponibles | SOS Expat & Travelers`}
+        description={`Trouvez un ${
+          selectedType === 'lawyer' ? 'avocat' : selectedType === 'expat' ? 'expatrié' : 'expert'
+        } vérifié disponible immédiatement. Consultation en ligne 24h/24, 7j/7 dans plus de 120 pays.`}
         canonicalUrl="/sos-appel"
         structuredData={{
-          "@context": "https://schema.org",
-          "@type": "Service",
-          "name": `SOS Experts ${selectedType === 'lawyer' ? 'Juridiques' : 'Expatriation'}`,
-          "provider": {
-            "@type": "Organization",
-            "name": "SOS Expat & Travelers",
-            "url": "https://sosexpat.com"
+          '@context': 'https://schema.org',
+          '@type': 'Service',
+          name: `SOS Experts ${selectedType === 'lawyer' ? 'Juridiques' : 'Expatriation'}`,
+          provider: {
+            '@type': 'Organization',
+            name: 'SOS Expat & Travelers',
+            url: 'https://sosexpat.com',
           },
-          "serviceType": selectedType === 'lawyer' ? "Legal Consultation" : "Expat Assistance",
-          "areaServed": {
-            "@type": "Country",
-            "name": selectedCountry !== 'all' ? selectedCountry : "Worldwide"
+          serviceType: selectedType === 'lawyer' ? 'Legal Consultation' : 'Expat Assistance',
+          areaServed: {
+            '@type': 'Country',
+            name: selectedCountry !== 'all' ? selectedCountry : 'Worldwide',
           },
-          "description": `Service de consultation ${selectedType === 'lawyer' ? 'juridique' : 'expatriation'} en ligne disponible 24h/24`,
-          "availableChannel": {
-            "@type": "ServiceChannel",
-            "serviceType": "Online Video Call",
-            "availableLanguage": selectedLanguage !== 'all' ? selectedLanguage : ["French", "English", "Spanish"]
-          }
+          description: `Service de consultation ${
+            selectedType === 'lawyer' ? 'juridique' : 'expatriation'
+          } en ligne disponible 24h/24`,
+          availableChannel: {
+            '@type': 'ServiceChannel',
+            serviceType: 'Online Video Call',
+            // utilise la langue d'app si disponible pour éviter l'import "inutile"
+            availableLanguage:
+              selectedLanguage !== 'all'
+                ? selectedLanguage
+                : [language || 'French', 'English', 'Spanish'],
+          },
         }}
       />
-      
+
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        {/* Hero Section - CONSERVÉ */}
+        {/* Hero Section */}
         <section role="banner" className="relative overflow-hidden bg-gradient-to-r from-red-600 via-red-700 to-red-800">
           <div className="absolute inset-0 bg-black/10" aria-hidden="true"></div>
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
@@ -369,11 +390,11 @@ const SOSCall: React.FC = () => {
               <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white/20 backdrop-blur-sm rounded-full mb-6 sm:mb-8" aria-hidden="true">
                 <Phone className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
               </div>
-              
+
               <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 tracking-tight">
                 S.O.S Appel d'urgence
               </h1>
-              
+
               <p className="text-lg sm:text-xl lg:text-2xl text-red-100 max-w-3xl mx-auto mb-8 sm:mb-10 font-medium">
                 Obtenez une aide immédiate d'un expert vérifié en moins de 5 minutes
               </p>
@@ -389,7 +410,7 @@ const SOSCall: React.FC = () => {
                 {selectedType === 'lawyer' ? 'Avocats disponibles' : selectedType === 'expat' ? 'Expatriés disponibles' : 'Experts disponibles'}
               </h2>
 
-              {/* FILTRES ORIGINAUX CONSERVÉS - Interface exacte */}
+              {/* Filtres */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100/60 p-4 sm:p-6 max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="space-y-1">
@@ -423,7 +444,7 @@ const SOSCall: React.FC = () => {
                         className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all appearance-none text-sm"
                       >
                         <option value="all">Tous les pays</option>
-                        {countryOptions.map(country => (
+                        {countryOptions.map((country) => (
                           <option key={country} value={country}>{country}</option>
                         ))}
                         <option value="Autre">Autre</option>
@@ -453,7 +474,7 @@ const SOSCall: React.FC = () => {
                         className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all appearance-none text-sm"
                       >
                         <option value="all">Toutes</option>
-                        {languageOptions.map(lang => (
+                        {languageOptions.map((lang) => (
                           <option key={lang} value={lang}>{lang}</option>
                         ))}
                         <option value="Autre">Autre</option>
@@ -511,17 +532,20 @@ const SOSCall: React.FC = () => {
                 </div>
 
                 <div className="mt-4 text-center text-xs text-gray-500">
-                  {filteredProviders.filter(p => p.isOnline).length} en ligne • {filteredProviders.length} au total
+                  {filteredProviders.filter((p) => p.isOnline).length} en ligne • {filteredProviders.length} au total
                 </div>
               </div>
             </div>
-            
-            {/* CARTES SOS ORIGINALES CONSERVÉES */}
+
+            {/* Cartes – mobile */}
             {isLoadingProviders ? (
               <div className="overflow-x-auto pb-4">
                 <div className="flex gap-4 sm:gap-6 lg:hidden" style={{ width: 'max-content' }}>
                   {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={`loading-mobile-${index}`} className="flex-shrink-0 w-80 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
+                    <div
+                      key={`loading-mobile-${index}`}
+                      className="flex-shrink-0 w-80 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-pulse"
+                    >
                       <div className="aspect-[3/4] bg-gray-200"></div>
                       <div className="p-4 space-y-3">
                         <div className="h-4 bg-gray-200 rounded w-3/4"></div>
@@ -533,7 +557,10 @@ const SOSCall: React.FC = () => {
                 </div>
                 <div className="hidden lg:grid lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={`loading-desktop-${index}`} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
+                    <div
+                      key={`loading-desktop-${index}`}
+                      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-pulse"
+                    >
                       <div className="aspect-[3/4] bg-gray-200"></div>
                       <div className="p-4 space-y-3">
                         <div className="h-4 bg-gray-200 rounded w-3/4"></div>
@@ -546,18 +573,18 @@ const SOSCall: React.FC = () => {
               </div>
             ) : filteredProviders.length > 0 ? (
               <>
-                {/* Mobile SOS Cards - Scroll horizontal */}
+                {/* Mobile – scroll horizontal */}
                 <div className="overflow-x-auto pb-4 lg:hidden">
                   <div className="flex gap-4 sm:gap-6" style={{ width: 'max-content' }}>
                     {filteredProviders.map((provider) => {
                       const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 80);
-                      
+
                       return (
                         <article
                           key={provider.id}
                           className={`flex-shrink-0 w-80 group bg-white rounded-3xl shadow-lg overflow-hidden transition-all duration-500 hover:shadow-2xl hover:-translate-y-3 backdrop-blur-sm cursor-pointer border-[3px] ${
-                            provider.isOnline 
-                              ? 'border-green-500 shadow-green-500/20 hover:border-green-600 hover:shadow-green-600/30' 
+                            provider.isOnline
+                              ? 'border-green-500 shadow-green-500/20 hover:border-green-600 hover:shadow-green-600/30'
                               : 'border-red-500 shadow-red-500/20 hover:border-red-600 hover:shadow-red-600/30'
                           }`}
                           onClick={() => handleProviderClick(provider)}
@@ -573,23 +600,25 @@ const SOSCall: React.FC = () => {
                               loading="lazy"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
-                                target.onerror = null;
+                                (target as any).onerror = null;
                                 target.src = '/default-avatar.png';
                               }}
                             />
-                            
+
                             <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 group-hover:from-black/20 transition-all duration-500"></div>
-                            
+
                             <div className="absolute top-4 left-4">
-                              <div className={`px-4 py-2 rounded-2xl text-sm font-bold backdrop-blur-xl ${
-                                provider.type === 'lawyer' 
-                                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' 
-                                  : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/30'
-                              }`}>
+                              <div
+                                className={`px-4 py-2 rounded-2xl text-sm font-bold backdrop-blur-xl ${
+                                  provider.type === 'lawyer'
+                                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30'
+                                    : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/30'
+                                }`}
+                              >
                                 {provider.type === 'lawyer' ? '⚖️ Avocat' : '🌍 Expatrié'}
                               </div>
                             </div>
-                            
+
                             <div className="absolute top-4 right-4">
                               <div className="bg-white/95 backdrop-blur-xl px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2">
                                 <Star className="w-4 h-4 text-yellow-500 fill-current" />
@@ -598,14 +627,14 @@ const SOSCall: React.FC = () => {
                             </div>
 
                             <div className="absolute bottom-4 right-4">
-                              <div className={`w-5 h-5 rounded-full shadow-xl border-2 border-white ${
-                                provider.isOnline 
-                                  ? 'bg-green-500 shadow-green-500/60 animate-pulse' 
-                                  : 'bg-red-500 shadow-red-500/60'
-                              }`}></div>
+                              <div
+                                className={`w-5 h-5 rounded-full shadow-xl border-2 border-white ${
+                                  provider.isOnline ? 'bg-green-500 shadow-green-500/60 animate-pulse' : 'bg-red-500 shadow-red-500/60'
+                                }`}
+                              ></div>
                             </div>
                           </div>
-                          
+
                           <div className="p-6 flex flex-col h-80">
                             <div className="mb-4">
                               <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors" itemProp="name">
@@ -691,8 +720,8 @@ const SOSCall: React.FC = () => {
                                   handleProviderClick(provider);
                                 }}
                                 className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl ${
-                                  provider.type === 'lawyer' 
-                                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50' 
+                                  provider.type === 'lawyer'
+                                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50'
                                     : 'bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:to-purple-900 shadow-purple-500/30 hover:shadow-purple-500/50'
                                 } hover:shadow-2xl`}
                               >
@@ -701,7 +730,7 @@ const SOSCall: React.FC = () => {
                               </button>
                             </div>
                           </div>
-                          
+
                           <div className="sr-only">
                             <span itemProp="jobTitle">{provider.type === 'lawyer' ? 'Avocat' : 'Consultant expatriation'}</span>
                             <span itemProp="workLocation">{provider.country}</span>
@@ -713,17 +742,17 @@ const SOSCall: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Desktop SOS Cards - Grid */}
+                {/* Desktop – grid */}
                 <div className="hidden lg:grid lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredProviders.map((provider) => {
                     const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 100);
-                    
+
                     return (
                       <article
                         key={provider.id}
                         className={`group bg-white rounded-3xl shadow-lg overflow-hidden transition-all duration-500 hover:shadow-2xl hover:-translate-y-3 backdrop-blur-sm cursor-pointer border-[3px] ${
-                          provider.isOnline 
-                            ? 'border-green-500 shadow-green-500/20 hover:border-green-600 hover:shadow-green-600/30' 
+                          provider.isOnline
+                            ? 'border-green-500 shadow-green-500/20 hover:border-green-600 hover:shadow-green-600/30'
                             : 'border-red-500 shadow-red-500/20 hover:border-red-600 hover:shadow-red-600/30'
                         }`}
                         onClick={() => handleProviderClick(provider)}
@@ -739,23 +768,25 @@ const SOSCall: React.FC = () => {
                             loading="lazy"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              target.onerror = null;
+                              (target as any).onerror = null;
                               target.src = '/default-avatar.png';
                             }}
                           />
-                          
+
                           <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 group-hover:from-black/20 transition-all duration-500"></div>
-                          
+
                           <div className="absolute top-4 left-4">
-                            <div className={`px-4 py-2 rounded-2xl text-sm font-bold backdrop-blur-xl ${
-                              provider.type === 'lawyer' 
-                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' 
-                                : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/30'
-                            }`}>
+                            <div
+                              className={`px-4 py-2 rounded-2xl text-sm font-bold backdrop-blur-xl ${
+                                provider.type === 'lawyer'
+                                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30'
+                                  : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/30'
+                              }`}
+                            >
                               {provider.type === 'lawyer' ? '⚖️ Avocat' : '🌍 Expatrié'}
                             </div>
                           </div>
-                          
+
                           <div className="absolute top-4 right-4">
                             <div className="bg-white/95 backdrop-blur-xl px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2">
                               <Star className="w-4 h-4 text-yellow-500 fill-current" />
@@ -764,14 +795,14 @@ const SOSCall: React.FC = () => {
                           </div>
 
                           <div className="absolute bottom-4 right-4">
-                            <div className={`w-5 h-5 rounded-full shadow-xl border-2 border-white ${
-                              provider.isOnline 
-                                ? 'bg-green-500 shadow-green-500/60 animate-pulse' 
-                                : 'bg-red-500 shadow-red-500/60'
-                            }`}></div>
+                            <div
+                              className={`w-5 h-5 rounded-full shadow-xl border-2 border-white ${
+                                provider.isOnline ? 'bg-green-500 shadow-green-500/60 animate-pulse' : 'bg-red-500 shadow-red-500/60'
+                              }`}
+                            ></div>
                           </div>
                         </div>
-                        
+
                         <div className="p-6 flex flex-col h-80">
                           <div className="mb-4">
                             <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors" itemProp="name">
@@ -857,8 +888,8 @@ const SOSCall: React.FC = () => {
                                 handleProviderClick(provider);
                               }}
                               className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl ${
-                                provider.type === 'lawyer' 
-                                  ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50' 
+                                provider.type === 'lawyer'
+                                  ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:to-blue-900 shadow-blue-500/30 hover:shadow-blue-500/50'
                                   : 'bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:to-purple-900 shadow-purple-500/30 hover:shadow-purple-500/50'
                               } hover:shadow-2xl`}
                             >
@@ -867,7 +898,7 @@ const SOSCall: React.FC = () => {
                             </button>
                           </div>
                         </div>
-                        
+
                         <div className="sr-only">
                           <span itemProp="jobTitle">{provider.type === 'lawyer' ? 'Avocat' : 'Consultant expatriation'}</span>
                           <span itemProp="workLocation">{provider.country}</span>
@@ -909,7 +940,7 @@ const SOSCall: React.FC = () => {
               </div>
             )}
 
-            {/* Call to Action Section - CONSERVÉ */}
+            {/* CTA */}
             <section className="text-center mt-12 sm:mt-16">
               <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-3xl p-8 sm:p-12">
                 <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">

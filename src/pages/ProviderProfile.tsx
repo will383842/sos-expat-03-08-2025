@@ -384,8 +384,8 @@ if (providerId) {
       }
     };
 
-    loadProviderData();
-  }, [id, typeParam, countryParam, langParam, loadReviews, location.state]);
+ loadProviderData();
+}, [id, typeParam, countryParam, langParam]);
 
   // ------------------------------------------------------------
   // Listener temps réel (isOnline uniquement)

@@ -23,6 +23,7 @@ export interface Review {
   createdAt: number | Date
   authorName?: string
   authorId?: string
+  helpfulVotes?: number
 }
 
 export interface Testimonial {

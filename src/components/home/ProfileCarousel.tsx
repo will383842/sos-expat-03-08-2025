@@ -347,8 +347,18 @@ const ProfileCarousel: React.FC = () => {
       .replace(/[^a-z0-9]/g, '-');
     
     // URL compatible avec ProviderProfile.tsx
-    const seoUrl = `/${typeSlug}/${countrySlug}/francais/${nameSlug}-${provider.id}`;
-    
+    const seoUrl = `/${typeSlug}/${countrySlug}/francais/${provider.id}`;
+
+    // 🔍 AJOUTER CES LOGS ICI (ligne 394)
+console.log('🔗 NAVIGATION DEBUG - ProfileCarousel.tsx');
+console.log('🔗 URL générée:', seoUrl);
+console.log('🔗 Provider ID:', provider.id);
+console.log('🔗 Provider name:', provider.name);
+console.log('🔗 Provider type:', provider.type);
+console.log('🔗 Provider country:', provider.country);
+console.log('🔗 ========================================');
+
+
     console.log('🔗 URL générée:', seoUrl);
     
     // Sauvegarder pour compatibilité

@@ -742,14 +742,18 @@ export const getProviderReviews = async (providerId: string) => {
     const snapshot = await getDocs(reviewsQuery);
     console.log(`Nombre d'avis trouvés: ${snapshot.size}`);
     
-    const reviews = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      // Conversion du Timestamp en Date pour l'affichage
-      createdAt: doc.data().createdAt instanceof Timestamp ? 
-                doc.data().createdAt.toDate() : 
-                (doc.data().createdAt || new Date())
-    })) as Review[];
+    const reviews = snapshot.docs.map(d => {
+  const data = d.data();
+  return {
+    id: d.id,
+    ...data,
+    createdAt: data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate()
+      : (data.createdAt || new Date()),
+    helpfulVotes: typeof data.helpfulVotes === 'number' ? data.helpfulVotes : 0, // ✅ défaut
+  } as Review;
+});
+
     
     // Log pour débogage
     reviews.forEach(review => {

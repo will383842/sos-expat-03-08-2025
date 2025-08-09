@@ -122,8 +122,8 @@ const routeConfigs: RouteConfig[] = [
   // Routes fournisseurs publiques
   { path: '/providers', component: Providers },
   { path: '/provider/:id', component: ProviderProfile },
-  { path: '/avocat/:country/:language/:id', component: ProviderProfile },
-  { path: '/expatrie/:country/:language/:id', component: ProviderProfile },
+  { path: '/avocat/:country/:language/:nameId', component: ProviderProfile },
+  { path: '/expatrie/:country/:language/:nameId', component: ProviderProfile },
 ];
 
 // Routes protégées utilisateur

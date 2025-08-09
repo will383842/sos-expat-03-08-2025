@@ -80,17 +80,26 @@ interface SosProfile {
 }
 
 const ProviderProfile: React.FC = () => {
-  const { id, country: countryParam, language: langParam, type: typeParam } = useParams<{
-    id?: string;
-    country?: string;
-    language?: string;
-    type?: string;
-  }>();
+  const { nameId, country: countryParam, language: langParam, type: typeParam } = useParams<{
+  nameId?: string;
+  country?: string;
+  language?: string;
+  type?: string;
+}>();
+
+// Extraire l'ID depuis nameId
+const id = nameId; // Pour l'instant, on utilise nameId tel quel
+ 
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { language } = useApp();
-
+ // 🔍 AJOUTER CES LOGS ICI (ligne 134)
+console.log('🔍 PROFIL MOUNT DEBUG - ProviderProfile.tsx');
+console.log('🔍 Params reçus:', { id, typeParam, countryParam, langParam });
+console.log('🔍 Location pathname:', location.pathname);
+console.log('🔍 Location state:', location.state);
+console.log('🔍 ========================================');
   const isMounted = useRef(true);
   useEffect(() => {
     return () => {
@@ -163,25 +172,64 @@ const ProviderProfile: React.FC = () => {
         let providerData: SosProfile | null = null;
         let foundProviderId: string | null = null;
 
-        // 1) Essayer d'extraire un ID Firestore depuis le param "id"
-        let providerId: string | null = null;
-        if (id) {
-          // ID direct ?
-          if (id.length >= 15) {
-            providerId = id;
-          } else {
-            // Slug-du-nom-<uid>
-            const idMatch = id.match(/-([a-zA-Z0-9]{15,})$/);
-            if (idMatch && idMatch[1]) providerId = idMatch[1];
-          }
-        }
+// 1) Essayer d'extraire un ID Firestore depuis le param ou l'URL
+let providerId: string | null = null;
+
+console.log('🔍 ID EXTRACTION DEBUG');
+console.log('🔍 Raw ID param:', id);
+console.log('🔍 Current pathname:', location.pathname);
+
+// Cas 1: ID direct depuis les params
+if (id) {
+  console.log('🔍 Cas 1: ID depuis params');
+  if (id.length >= 10) {
+    providerId = id;
+    console.log('🔍 ID direct utilisé:', providerId);
+  } else {
+    // Essayer d'extraire l'ID du slug
+    const idMatch = id.match(/-([a-zA-Z0-9]{10,})$/);
+    if (idMatch && idMatch[1]) {
+      providerId = idMatch[1];
+      console.log('🔍 ID extrait du slug:', providerId);
+    }
+  }
+}
+
+// Cas 2: Extraire l'ID depuis l'URL complète si pas trouvé
+if (!providerId && location.pathname) {
+  console.log('🔍 Cas 2: Extraction depuis URL complète');
+  const urlSegments = location.pathname.split('/');
+  const lastSegment = urlSegments[urlSegments.length - 1];
+  
+  if (lastSegment) {
+    // Chercher un ID à la fin du dernier segment
+    const idMatch = lastSegment.match(/-([a-zA-Z0-9]{10,})$/);
+    if (idMatch && idMatch[1]) {
+      providerId = idMatch[1];
+      console.log('🔍 ID extrait de l\'URL:', providerId);
+    } else if (lastSegment.length >= 10 && /^[a-zA-Z0-9]+$/.test(lastSegment)) {
+      // Si le dernier segment ressemble à un ID
+      providerId = lastSegment;
+      console.log('🔍 Dernier segment utilisé comme ID:', providerId);
+    }
+  }
+}
+
+// Cas 3: Fallback vers le state si toujours pas trouvé
+if (!providerId && location.state?.selectedProvider) {
+  providerId = location.state.selectedProvider.id;
+  console.log('🔍 Cas 3: ID depuis state provider:', providerId);
+}
+
+console.log('🔍 Final providerId:', providerId);
+console.log('🔍 ========================================');
 
         // 1bis) Charge par ID si possible
-        if (__DEV__) console.log('[Load] Strategy: by explicit Firestore ID');
-        if (providerId && providerId.length >= 15) {
-          try {
-            const docRef = doc(db, 'sos_profiles', providerId);
-            const docSnap = await getDoc(docRef);
+        if (__DEV__) console.log('[Load] Strategy: by explicit Firestore ID:', providerId);
+if (providerId) {
+  try {
+    const docRef = doc(db, 'sos_profiles', providerId);
+    const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
               const data = docSnap.data();

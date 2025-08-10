@@ -340,9 +340,24 @@ const getLocalizedErrorMessage = (errorCode: string, deviceInfo: DeviceInfo): { 
 
 const getErrorCode = (err: unknown): string => {
   if (err && typeof err === 'object') {
-    const fb = err as Partial<FirebaseError>;
-    if (typeof fb.code === 'string') return fb.code;
+    const error = err as any;
+    
+    // Firebase Error direct
+    if (typeof error.code === 'string') return error.code;
+    
+    // Firebase Error dans l'objet
+    if (error.error && typeof error.error.code === 'string') return error.error.code;
+    
+    // Message d'erreur Firebase
+    if (typeof error.message === 'string') {
+      if (error.message.includes('weak-password')) return 'auth/weak-password';
+      if (error.message.includes('email-already-in-use')) return 'auth/email-already-in-use';
+      if (error.message.includes('invalid-email')) return 'auth/invalid-email';
+      if (error.message.includes('too-many-requests')) return 'auth/too-many-requests';
+    }
   }
+  
+  console.log('🔍 Erreur non reconnue:', err); // Pour debug
   return '';
 };
 
@@ -352,10 +367,13 @@ const getErrorCode = (err: unknown): string => {
 
 const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userData: Partial<User>, deviceInfo: DeviceInfo): Promise<User> => {
   try {
+    console.log('🔧 [Debug] Début createUserDocumentInFirestore', { uid: firebaseUser.uid, role: userData.role });
+    
     const userRef = doc(db, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userRef);
 
     if (userDoc.exists()) {
+      console.log('✅ [Debug] Utilisateur existe déjà, mise à jour...');
       const existingData = userDoc.data() as Record<string, unknown>;
       await updateDoc(userRef, {
         lastLoginAt: serverTimestamp(),
@@ -373,6 +391,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       } as User;
     }
 
+    console.log('🔧 [Debug] Nouvel utilisateur, création...');
     const userRole = userData.role;
     const provider = firebaseUser.providerData[0]?.providerId;
 
@@ -381,12 +400,14 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       throw new Error(`Rôle utilisateur invalide: ${userRole as string}`);
     }
 
+    console.log('🔧 [Debug] Traitement photo profil...');
     const finalProfilePhoto = await processProfilePhoto(
       userData.profilePhoto || firebaseUser.photoURL || undefined,
       firebaseUser.uid,
       provider === 'google.com' ? 'google' : 'manual'
     );
 
+    console.log('🔧 [Debug] Génération des données utilisateur...');
     const affiliateCode = generateAffiliateCode(firebaseUser.uid, firebaseUser.email || '');
     const displayNameParts = firebaseUser.displayName?.split(' ') || [];
     const firstName = userData.firstName || displayNameParts[0] || '';
@@ -433,7 +454,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       responseTime: userData.responseTime || '< 5 minutes',
       provider: provider || 'password',
       affiliateCode,
-      referralBy: userData.referralBy ?? undefined,
+      ...(userData.referralBy && { referralBy: userData.referralBy }),
       registrationIP: '',
       deviceInfo: {
         type: deviceInfo.type,
@@ -466,6 +487,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       })
     };
 
+    console.log('🔧 [Debug] Sauvegarde dans Firestore...');
     await setDoc(userRef, {
       ...newUser,
       createdAt: serverTimestamp(),
@@ -473,10 +495,14 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       lastLoginAt: serverTimestamp()
     });
 
+    console.log('✅ [Debug] Document utilisateur créé avec succès');
+
     if (userRole === 'lawyer' || userRole === 'expat') {
+      console.log('🔧 [Debug] Création profil SOS...');
       await createSOSProfile(firebaseUser.uid, newUser, userRole);
     }
 
+    console.log('🔧 [Debug] Log de l\'événement...');
     await logAuthEvent('user_creation', {
       userId: firebaseUser.uid,
       userRole,
@@ -484,8 +510,10 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       profilePhotoUploaded: finalProfilePhoto !== '/default-avatar.png'
     }, deviceInfo);
 
+    console.log('✅ [Debug] createUserDocumentInFirestore terminé avec succès');
     return newUser as User;
   } catch (error) {
+    console.error('❌ [Debug] Erreur dans createUserDocumentInFirestore:', error);
     if (error instanceof Error && error.message === 'GOOGLE_ROLE_RESTRICTION') throw error;
     throw new Error('Impossible de créer le profil utilisateur');
   }
@@ -937,21 +965,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
       throw new Error(errorMsg);
     }
-    if (password.length < 8) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? '🔒 Mot de passe min. 8 caractères' : 'Le mot de passe doit contenir au moins 8 caractères';
-      setError(errorMsg);
-      setIsLoading(false);
-      throw new Error(errorMsg);
-    }
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    if (!hasUpperCase || !hasLowerCase || !hasNumbers) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? '💪 Mot de passe : A-z + 0-9 requis' : 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre';
-      setError(errorMsg);
-      setIsLoading(false);
-      throw new Error(errorMsg);
-    }
+    if (password.length < 6) {
+  const errorMsg = getDeviceInfo().type === 'mobile' ? '🔒 Mot de passe min. 6 caractères' : 'Le mot de passe doit contenir au moins 6 caractères';
+  setError(errorMsg);
+  setIsLoading(false);
+  throw new Error(errorMsg);
+}
+// Suppression des contraintes de complexité - mot de passe simple accepté ! 🎉
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);

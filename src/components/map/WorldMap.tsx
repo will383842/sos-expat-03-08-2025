@@ -1289,7 +1289,7 @@ const WorldMap: React.FC<WorldMapProps> = ({
       )}
       
       {/* Container de la carte */}
-      <div className="leaflet-map-container" style={{ height: '100%', width: '100%', position: 'relative' }}>
+      <div className="leaflet-map-container" style={{ height, width, minHeight: height, position: 'relative' }\}>
         {/* ✅ RENDU DE LA CARTE AVEC LOGS DÉTAILLÉS */}
         <MapContainer 
           key={mapKey}

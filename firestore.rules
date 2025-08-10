@@ -21,7 +21,7 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.email_verified == true;
     }
     
-    // Vérifier si l'utilisateur est admin
+    // Vérifier si l'utilisateur est admin (via doc users/{uid})
     function isAdmin() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -119,14 +119,30 @@ service cloud.firestore {
                         request.resource.data.uid == request.auth.uid) ||
                        isAdmin();
       
-      // Mise à jour : propriétaire (champs limités) ou admin
-      allow update: if (isOwner(profileId) && 
-                       isEmailVerified() &&
-                       isNotBanned() &&
-                       // Interdire la modification de champs sensibles
-                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'type', 'isApproved', 'isVerified']) &&
-                       hasValidProfileFields()) ||
-                      isAdmin();
+      // >>> Mise à jour : propriétaire (toggle isVisibleOnMap seul OU édition de profil), ou admin
+      allow update: if
+        // Admin : tout modifier
+        isAdmin()
+        ||
+        // Propriétaire : deux cas autorisés
+        (
+          isOwner(profileId) &&
+          isEmailVerified() &&
+          isNotBanned() &&
+          (
+            // (1) Toggle carte UNIQUEMENT
+            (
+              request.resource.data.diff(resource.data).changedKeys().hasOnly(['isVisibleOnMap']) &&
+              request.resource.data.isVisibleOnMap is bool
+            )
+            ||
+            // (2) Édition de profil (logique existante conservée)
+            (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'type', 'isApproved', 'isVerified']) &&
+              hasValidProfileFields()
+            )
+          )
+        );
       
       // Suppression : admin uniquement
       allow delete: if isAdmin();
@@ -304,46 +320,47 @@ service cloud.firestore {
       // Suppression : admin uniquement
       allow delete: if isAdmin();
     }
+
     // ========================================
-// COLLECTION INVOICE_RECORDS
-// ========================================
-match /invoice_records/{invoiceId} {
-  // Lecture : client, prestataire ou admin
-  allow read: if isAuthenticated() && 
-                (request.auth.uid == resource.data.clientId || 
-                 request.auth.uid == resource.data.providerId) ||
-                isAdmin();
+    // COLLECTION INVOICE_RECORDS
+    // ========================================
+    match /invoice_records/{invoiceId} {
+      // Lecture : client, prestataire ou admin
+      allow read: if isAuthenticated() && 
+                    (request.auth.uid == resource.data.clientId || 
+                     request.auth.uid == resource.data.providerId) ||
+                    isAdmin();
 
-  // Création : système ou client uniquement
-  allow create: if isAuthenticated() && 
-                  (request.auth.uid == request.resource.data.clientId ||
-                   isAdmin());
+      // Création : système ou client uniquement
+      allow create: if isAuthenticated() && 
+                      (request.auth.uid == request.resource.data.clientId ||
+                       isAdmin());
 
-  // Mise à jour : admin uniquement
-  allow update: if isAdmin();
+      // Mise à jour : admin uniquement
+      allow update: if isAdmin();
 
-  // Suppression : admin uniquement
-  allow delete: if isAdmin();
-}
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
 
-// ========================================
-// COLLECTION NOTIFICATION_LOGS
-// ========================================
-match /notification_logs/{logId} {
-  // Lecture : concerné ou admin
-  allow read: if isAuthenticated() &&
-                (request.auth.uid == resource.data.recipientId || 
-                 isAdmin());
+    // ========================================
+    // COLLECTION NOTIFICATION_LOGS
+    // ========================================
+    match /notification_logs/{logId} {
+      // Lecture : concerné ou admin
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.recipientId || 
+                     isAdmin());
 
-  // Création : système ou admin
-  allow create: if isAuthenticated() && isNotBanned();
+      // Création : système ou admin
+      allow create: if isAuthenticated() && isNotBanned();
 
-  // Mise à jour : admin uniquement
-  allow update: if isAdmin();
+      // Mise à jour : admin uniquement
+      allow update: if isAdmin();
 
-  // Suppression : admin uniquement
-  allow delete: if isAdmin();
-}
+      // Suppression : admin uniquement
+      allow delete: if isAdmin();
+    }
 
     // ========================================
     // COLLECTIONS ADMINISTRATIVES

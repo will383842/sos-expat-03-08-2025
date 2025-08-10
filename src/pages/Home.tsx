@@ -44,96 +44,6 @@ interface Testimonial {
   expertType: string;
 }
 
-// Données réelles pour la production (à remplacer par API calls)
-const REAL_EXPERTS_DATA: Expert[] = [
-  {
-    id: "exp_001",
-    name: "Dr. Sarah Chen",
-    role: "Avocat International",
-    location: "Singapore",
-    rate: "€89/30min",
-    available: true,
-    specialties: ["Droit des affaires", "Immigration", "Contrats internationaux"],
-    rating: 4.9,
-    sessions: 847,
-    verified: true,
-    languages: ["Français", "Anglais", "Mandarin"]
-  },
-  {
-    id: "exp_002", 
-    name: "Marc Dubois",
-    role: "Expert Fiscal International",
-    location: "Dubai",
-    rate: "€120/30min",
-    available: true,
-    specialties: ["Fiscalité expatriés", "Optimisation fiscale", "Déclarations internationales"],
-    rating: 5.0,
-    sessions: 1203,
-    verified: true,
-    languages: ["Français", "Anglais", "Arabe"]
-  },
-  {
-    id: "exp_003",
-    name: "Dr. Lisa Anderson",
-    role: "Médecin Urgentiste",
-    location: "New York",
-    rate: "€75/30min", 
-    available: false,
-    specialties: ["Médecine d'urgence", "Téléconsultation", "Pédiatrie"],
-    rating: 4.8,
-    sessions: 654,
-    verified: true,
-    languages: ["Français", "Anglais", "Espagnol"]
-  }
-];
-
-const REAL_TESTIMONIALS_DATA: Testimonial[] = [
-  {
-    id: "test_001",
-    content: "Service exceptionnel ! J'ai trouvé un avocat spécialisé en droit du travail singapourien en 5 minutes. Mon problème de licenciement abusif a été résolu rapidement.",
-    author: "Marie Laurent",
-    location: "Bangkok, Thaïlande",
-    rating: 5,
-    impact: "Évité 5000€ d'amendes",
-    verified: true,
-    date: "2024-03-15",
-    expertType: "Avocat spécialisé"
-  },
-  {
-    id: "test_002", 
-    content: "15,000€ économisés grâce aux conseils fiscaux de Marc sur l'optimisation de ma déclaration d'impôts en tant qu'expatrié. Expertise remarquable !",
-    author: "Thomas Bertrand",
-    location: "Dubai, EAU", 
-    rating: 5,
-    impact: "15,000€ économisés",
-    verified: true,
-    date: "2024-03-10",
-    expertType: "Expert Fiscal"
-  },
-  {
-    id: "test_003",
-    content: "Support médical à 3h du matin pour mon fils malade au Japon. Le Dr Anderson m'a rassuré et guidé vers les bonnes démarches. Service salvateur !",
-    author: "Sophie Moreau", 
-    location: "Tokyo, Japon",
-    rating: 5,
-    impact: "Urgence résolue en 20min",
-    verified: true,
-    date: "2024-03-08", 
-    expertType: "Médecin urgentiste"
-  },
-  {
-    id: "test_004",
-    content: "Visa refusé un vendredi soir, expert contacté en 5 minutes via SOS Expat. Dossier réouvert et accepté le lundi suivant. Service magique !",
-    author: "Antoine Rousseau",
-    location: "Sydney, Australie",
-    rating: 5, 
-    impact: "Visa obtenu en 3 jours",
-    verified: true,
-    date: "2024-03-05",
-    expertType: "Consultant Visa"
-  }
-];
-
 /* =======================
    PWA Components Robustes
 ======================= */
@@ -239,7 +149,7 @@ const PWAInstallManager: React.FC = () => {
 };
 
 /* =======================
-   Header Robuste
+   Header du Code 2 (identique)
 ======================= */
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -369,7 +279,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 /* =======================
-   Hero Section Solide
+   Hero Section
 ======================= */
 const HeroSection: React.FC = () => {
   const [currentWord, setCurrentWord] = useState(0);
@@ -418,14 +328,14 @@ const HeroSection: React.FC = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
               </span>
-              <span className="text-white font-medium text-sm sm:text-base whitespace-nowrap">1,247 experts en ligne</span>
+              <span className="text-white font-medium text-sm sm:text-base whitespace-nowrap">Experts en ligne</span>
             </div>
             {pwaInfo.deferredPrompt && !pwaInfo.installed && (
               <PWAPrompt onInstall={pwaInfo.onInstall} style="inline" />
             )}
           </div>
 
-          {/* Titre principal - CORRIGÉ */}
+          {/* Titre principal */}
           <div className="relative mb-6 sm:mb-8">
             <h1 className="text-4xl sm:text-6xl lg:text-8xl font-black text-white mb-2 sm:mb-4 animate-slide-up">
               Aide immédiate
@@ -567,17 +477,48 @@ const ServicesSection: React.FC = () => {
 };
 
 /* =======================
-   Profile Carousel - DONNÉES RÉELLES
+   Profile Carousel (utilise vraies données via props/API)
 ======================= */
 const ProfileCarousel: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [experts, setExperts] = useState<Expert[]>([]);
+
+  // Simulation de fetch - remplacer par vraie API
+  useEffect(() => {
+    // TODO: Remplacer par fetch('/api/experts')
+    const fetchExperts = async () => {
+      // Simulation - en production, utiliser votre API
+      const mockExperts: Expert[] = [];
+      setExperts(mockExperts);
+    };
+    
+    fetchExperts();
+  }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % REAL_EXPERTS_DATA.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
+    if (experts.length > 0) {
+      const timer = setInterval(() => {
+        setActiveIndex((prev) => (prev + 1) % experts.length);
+      }, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [experts.length]);
+
+  if (experts.length === 0) {
+    return (
+      <section className="py-16 sm:py-24 bg-red-100">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h2 className="text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 mb-4">
+            Des experts d'exception
+          </h2>
+          <p className="text-lg sm:text-xl text-slate-600 leading-relaxed mb-8">
+            Chargement des experts disponibles...
+          </p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-16 sm:py-24 bg-red-100">
@@ -596,7 +537,7 @@ const ProfileCarousel: React.FC = () => {
         </div>
 
         <div className="relative h-[500px] sm:h-[600px] flex items-center justify-center">
-          {REAL_EXPERTS_DATA.map((expert, index) => {
+          {experts.map((expert, index) => {
             const isActive = index === activeIndex;
             const offset = index - activeIndex;
             
@@ -682,7 +623,7 @@ const ProfileCarousel: React.FC = () => {
         </div>
 
         <div className="flex justify-center gap-2 mt-8">
-          {REAL_EXPERTS_DATA.map((_, index) => (
+          {experts.map((_, index) => (
             <button
               key={index}
               onClick={() => setActiveIndex(index)}
@@ -700,7 +641,7 @@ const ProfileCarousel: React.FC = () => {
 };
 
 /* =======================
-   How It Works Section - CORRIGÉ
+   How It Works Section
 ======================= */
 const HowItWorksSection: React.FC = () => {
   const steps = [
@@ -767,7 +708,7 @@ const MapSection: React.FC = () => {
             Partout dans le monde
           </h2>
           <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-            Plus de 1,200 experts vérifiés dans 195 pays vous attendent
+            Des experts vérifiés dans 195 pays vous attendent
           </p>
         </div>
 
@@ -821,7 +762,7 @@ const MapSection: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {[
               { icon: Globe2, value: '195', label: 'Pays couverts' },
-              { icon: Users, value: '1,200+', label: 'Experts actifs' },
+              { icon: Users, value: 'Experts', label: 'Experts actifs' },
               { icon: Clock, value: '24/7', label: 'Disponibilité' },
               { icon: Zap, value: '<5min', label: 'Temps de connexion' }
             ].map((stat, i) => (
@@ -839,9 +780,23 @@ const MapSection: React.FC = () => {
 };
 
 /* =======================
-   Testimonials Section - DONNÉES RÉELLES
+   Testimonials Section (utilise vraies données via props/API)
 ======================= */
 const TestimonialsSection: React.FC = () => {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+  // Simulation de fetch - remplacer par vraie API
+  useEffect(() => {
+    // TODO: Remplacer par fetch('/api/testimonials')
+    const fetchTestimonials = async () => {
+      // Simulation - en production, utiliser votre API
+      const mockTestimonials: Testimonial[] = [];
+      setTestimonials(mockTestimonials);
+    };
+    
+    fetchTestimonials();
+  }, []);
+
   return (
     <section className="py-16 sm:py-24 bg-rose-50">
       <div className="max-w-7xl mx-auto px-4">
@@ -850,60 +805,67 @@ const TestimonialsSection: React.FC = () => {
             Ils nous font confiance
           </h2>
           <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-            Plus de 50,000 expatriés nous font confiance pour leurs urgences
+            Des expatriés du monde entier nous font confiance pour leurs urgences
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-          {REAL_TESTIMONIALS_DATA.map((testimonial) => (
-            <div key={testimonial.id} className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-lg hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all hover:-translate-y-2 group">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                {testimonial.verified && (
-                  <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-medium border border-blue-200">
-                    <CheckCircle className="h-3 w-3" />
-                    Vérifié
+        {testimonials.length === 0 ? (
+          <div className="text-center">
+            <p className="text-slate-600 mb-4">Chargement des témoignages...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            {testimonials.map((testimonial) => (
+              <div key={testimonial.id} className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-lg hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all hover:-translate-y-2 group">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    ))}
                   </div>
-                )}
-              </div>
-              
-              <p className="text-slate-700 mb-4 leading-relaxed text-sm sm:text-base line-clamp-4">"{testimonial.content}"</p>
-              
-              <div className="mb-4">
-                <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium border border-emerald-200">
-                  <TrendingUp className="h-3 w-3" />
-                  {testimonial.impact}
+                  {testimonial.verified && (
+                    <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-medium border border-blue-200">
+                      <CheckCircle className="h-3 w-3" />
+                      Vérifié
+                    </div>
+                  )}
+                </div>
+                
+                <p className="text-slate-700 mb-4 leading-relaxed text-sm sm:text-base line-clamp-4">"{testimonial.content}"</p>
+                
+                <div className="mb-4">
+                  <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium border border-emerald-200">
+                    <TrendingUp className="h-3 w-3" />
+                    {testimonial.impact}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2 py-1 rounded-full text-xs">
+                    <Users className="h-3 w-3" />
+                    {testimonial.expertType}
+                  </span>
+                </div>
+                
+                <div>
+                  <p className="font-bold text-slate-900 text-sm sm:text-base">{testimonial.author}</p>
+                  <p className="text-slate-600 text-xs sm:text-sm flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {testimonial.location}
+                  </p>
                 </div>
               </div>
-
-              <div className="mb-4">
-                <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2 py-1 rounded-full text-xs">
-                  <Users className="h-3 w-3" />
-                  {testimonial.expertType}
-                </span>
-              </div>
-              
-              <div>
-                <p className="font-bold text-slate-900 text-sm sm:text-base">{testimonial.author}</p>
-                <p className="text-slate-600 text-xs sm:text-sm flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {testimonial.location}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {(window as any).pwaInstall?.deferredPrompt && !(window as any).pwaInstall?.installed && (
           <div className="mt-12 sm:mt-16 text-center">
             <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-red-200 max-w-2xl mx-auto">
               <SOSIcon size="lg" className="mx-auto mb-4" />
               <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">
-                Rejoignez nos 50,000 utilisateurs satisfaits
+                Rejoignez nos utilisateurs satisfaits
               </h3>
               <p className="text-slate-600 mb-6 text-sm sm:text-base">
                 Installez l'app pour un accès ultra-rapide à nos experts 24/7
@@ -961,7 +923,7 @@ const CTASection: React.FC = () => {
           </h2>
           
           <p className="text-lg sm:text-xl lg:text-2xl text-white/80 mb-8 sm:mb-12 leading-relaxed max-w-3xl mx-auto">
-            Rejoignez l'élite des 50,000 expatriés qui ont choisi la tranquillité d'esprit.
+            Rejoignez l'élite des expatriés qui ont choisi la tranquillité d'esprit.
             <span className="block mt-2 text-base sm:text-lg text-white/60">
               Votre prochaine urgence sera votre dernière inquiétude.
             </span>

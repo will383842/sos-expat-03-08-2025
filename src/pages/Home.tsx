@@ -1,658 +1,893 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { 
-  Phone, 
   ArrowRight, 
-  Shield, 
-  Clock, 
-  Globe, 
+  Phone, 
   Users, 
+  Scale, 
   Star, 
+  MapPin, 
+  Clock, 
+  Shield, 
+  Globe,
+  ChevronRight,
   CheckCircle,
-  MapPin,
-  Zap,
-  AlertTriangle,
-  Award,
-  MessageCircle
+  Sparkles,
+  TrendingUp,
+  Heart,
+  MessageCircle,
+  Award
 } from 'lucide-react';
+import Layout from '../components/layout/Layout';
+import SEOHead from '../components/layout/SEOHead';
+import HeroSection from '../components/home/HeroSection';
+import ProfileCarousel from '../components/home/ProfileCarousel';
+import MapSection from '../components/home/MapSection';
+import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 
-// Composant de fallback pour le chargement
-const SectionLoader: React.FC<{ height?: string }> = ({ height = 'h-96' }) => (
-  <div className={`${height} flex items-center justify-center bg-gray-50 rounded-2xl animate-pulse`}>
-    <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-  </div>
-);
+// Données structurées pour le SEO
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "SOS Expat & Travelers",
+  "url": "https://sosexpats.com",
+  "logo": "https://sosexpats.com/logo.png",
+  "sameAs": [
+    "https://www.facebook.com/sosexpats",
+    "https://twitter.com/sosexpats",
+    "https://www.linkedin.com/company/sosexpats"
+  ],
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "",
+    "contactType": "customer service",
+    "availableLanguage": ["French", "English"]
+  },
+  "description": "Plateforme d'assistance urgente pour expatriés francophones. Connectez-vous avec des avocats et expatriés vérifiés partout dans le monde."
+};
 
-// Composant Stats en temps réel
-const StatsSection: React.FC = () => {
-  const [stats, setStats] = useState({
-    experts: 0,
-    countries: 0,
-    consultations: 0,
-    satisfaction: 0
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Animation des chiffres
-  const animateNumber = useCallback((target: number, setter: (value: number) => void) => {
-    let current = 0;
-    const increment = target / 50;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= target) {
-        setter(target);
-        clearInterval(timer);
-      } else {
-        setter(Math.floor(current));
-      }
-    }, 20);
-    return timer;
-  }, []);
+// Hook pour les animations au scroll
+const useIntersectionObserver = (options = {}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Simulation du chargement des vraies données
-    const loadStats = async () => {
-      try {
-        // Ici vous pourriez charger les vraies données depuis Firestore
-        await new Promise(resolve => setTimeout(resolve, 500));
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsVisible(entry.isIntersecting);
+    }, {
+      threshold: 0.1,
+      rootMargin: '50px',
+      ...options
+    });
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, isVisible] as const;
+};
+
+// Composant pour les statistiques animées
+const AnimatedCounter = ({ end, duration = 2000, suffix = '' }: { end: number; duration?: number; suffix?: string }) => {
+  const [count, setCount] = useState(0);
+  const [ref, isVisible] = useIntersectionObserver();
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    if (isVisible && !hasAnimated.current) {
+      hasAnimated.current = true;
+      let startTime: number;
+      const startCount = 0;
+      
+      const animate = (currentTime: number) => {
+        if (!startTime) startTime = currentTime;
+        const progress = Math.min((currentTime - startTime) / duration, 1);
+        const currentCount = Math.floor(progress * (end - startCount) + startCount);
         
-        const realStats = {
-          experts: 150,
-          countries: 120,
-          consultations: 2400,
-          satisfaction: 98
-        };
+        setCount(currentCount);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    }
+  }, [isVisible, end, duration]);
 
-        // Animation des chiffres
-        animateNumber(realStats.experts, (value) => 
-          setStats(prev => ({ ...prev, experts: value }))
-        );
-        setTimeout(() => {
-          animateNumber(realStats.countries, (value) => 
-            setStats(prev => ({ ...prev, countries: value }))
-          );
-        }, 200);
-        setTimeout(() => {
-          animateNumber(realStats.consultations, (value) => 
-            setStats(prev => ({ ...prev, consultations: value }))
-          );
-        }, 400);
-        setTimeout(() => {
-          animateNumber(realStats.satisfaction, (value) => 
-            setStats(prev => ({ ...prev, satisfaction: value }))
-          );
-        }, 600);
+  return (
+    <div ref={ref} className="text-4xl sm:text-5xl lg:text-6xl font-black bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+      {count.toLocaleString()}{suffix}
+    </div>
+  );
+};
 
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Erreur lors du chargement des stats:', error);
-        setIsLoading(false);
-      }
-    };
-
-    loadStats();
-  }, [animateNumber]);
-
-  const statsData = [
+// Section des statistiques
+const StatsSection = () => {
+  const { language } = useApp();
+  const [ref, isVisible] = useIntersectionObserver();
+  
+  const stats = [
     {
-      icon: <Users className="w-8 h-8 text-emerald-600" />,
-      value: stats.experts,
+      id: 'experts',
+      value: 10000,
       suffix: '+',
-      label: 'Experts vérifiés',
-      color: 'from-emerald-500 to-teal-600'
+      label: language === 'fr' ? 'Experts vérifiés' : 'Verified experts',
+      icon: Users,
+      color: 'text-blue-600'
     },
     {
-      icon: <Globe className="w-8 h-8 text-blue-600" />,
-      value: stats.countries,
+      id: 'countries', 
+      value: 120,
       suffix: '+',
-      label: 'Pays couverts',
-      color: 'from-blue-500 to-indigo-600'
+      label: language === 'fr' ? 'Pays couverts' : 'Countries covered',
+      icon: Globe,
+      color: 'text-green-600'
     },
     {
-      icon: <MessageCircle className="w-8 h-8 text-purple-600" />,
-      value: stats.consultations,
-      suffix: '+',
-      label: 'Consultations réalisées',
-      color: 'from-purple-500 to-pink-600'
-    },
-    {
-      icon: <Award className="w-8 h-8 text-yellow-600" />,
-      value: stats.satisfaction,
+      id: 'satisfaction',
+      value: 98,
       suffix: '%',
-      label: 'Taux de satisfaction',
-      color: 'from-yellow-500 to-orange-600'
+      label: language === 'fr' ? 'Satisfaction client' : 'Client satisfaction',
+      icon: Heart,
+      color: 'text-red-600'
+    },
+    {
+      id: 'response',
+      value: 5,
+      suffix: 'min',
+      label: language === 'fr' ? 'Temps de réponse moyen' : 'Average response time',
+      icon: Clock,
+      color: 'text-purple-600'
     }
   ];
 
-  if (isLoading) {
-    return <SectionLoader height="h-64" />;
-  }
-
   return (
-    <section className="py-16 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            SOS Expats en chiffres
-          </h2>
-          <div className="w-24 h-1 bg-gradient-to-r from-red-500 to-red-600 mx-auto rounded-full"></div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {statsData.map((stat, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 transform hover:scale-105 transition-all duration-300 hover:shadow-xl"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="text-center">
-                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${stat.color} mb-4 shadow-lg`}>
-                  {stat.icon}
-                </div>
-                <div className="text-4xl font-black text-gray-900 mb-2">
-                  {stat.value.toLocaleString()}{stat.suffix}
-                </div>
-                <div className="text-gray-600 font-medium">
-                  {stat.label}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+    <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-50 via-white to-blue-50 relative overflow-hidden">
+      {/* Fond décoratif */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-200 to-purple-200 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-red-200 to-orange-200 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
       </div>
-    </section>
-  );
-};
-
-// Hero Section moderne
-const HeroSection: React.FC = () => {
-  return (
-    <section className="relative min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 text-white overflow-hidden">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, white 2px, transparent 2px),
-                           radial-gradient(circle at 75% 75%, white 2px, transparent 2px)`,
-          backgroundSize: '50px 50px'
-        }} />
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
-        <div className="text-center">
-          {/* Badge d'urgence */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-8">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium">Disponible 24h/24 • 7j/7</span>
-          </div>
-
-          {/* Titre principal */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-8 tracking-tight">
-            <span className="block">Besoin d'aide à</span>
-            <span className="block bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent">
-              l'étranger ?
+      
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 mb-6">
+            {language === 'fr' ? 'Une communauté mondiale' : 'A global community'}
+            <span className="block bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+              {language === 'fr' ? 'qui vous fait confiance' : 'that trusts us'}
             </span>
-          </h1>
-
-          {/* Sous-titre */}
-          <p className="text-xl sm:text-2xl md:text-3xl text-red-100 mb-12 max-w-4xl mx-auto font-light leading-relaxed">
-            Connectez-vous en moins de <span className="font-bold text-yellow-300">5 minutes</span> avec un expert vérifié
-          </p>
-
-          {/* Stats rapides */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-2xl mx-auto mb-12">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-              <div className="text-2xl font-bold">120+</div>
-              <div className="text-red-100 text-sm">Pays couverts</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-              <div className="text-2xl font-bold">5min</div>
-              <div className="text-red-100 text-sm">Temps de réponse</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-              <div className="text-2xl font-bold">24/7</div>
-              <div className="text-red-100 text-sm">Disponibilité</div>
-            </div>
-          </div>
-
-          {/* Boutons CTA */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button className="group bg-white text-red-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-red-50 transform hover:scale-105 transition-all duration-300 shadow-2xl flex items-center gap-3 min-w-[280px] justify-center">
-              <AlertTriangle className="w-6 h-6 group-hover:animate-pulse" />
-              SOS Appel Urgent
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button className="group border-2 border-white text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white hover:text-red-600 transform hover:scale-105 transition-all duration-300 flex items-center gap-3 min-w-[280px] justify-center">
-              <Users className="w-6 h-6" />
-              Voir les experts
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-
-          {/* Note de confiance */}
-          <p className="mt-8 text-red-200 text-sm">
-            ✓ Plus de 2000 expatriés nous font déjà confiance
+          </h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            {language === 'fr' 
+              ? 'Des milliers d\'expatriés dans le monde entier nous font confiance pour leurs besoins d\'assistance et de conseils juridiques.'
+              : 'Thousands of expats worldwide trust us for their assistance and legal advisory needs.'
+            }
           </p>
         </div>
-      </div>
 
-      {/* Indicateur de scroll */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-        <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-          <div className="w-1 h-3 bg-white rounded-full mt-2 animate-pulse"></div>
+        <div 
+          ref={ref}
+          className={`grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 transition-all duration-1000 transform ${
+            isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}
+        >
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.id} className="text-center group">
+                <div className="relative mb-6">
+                  <div className={`inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white shadow-xl border-2 border-gray-100 group-hover:scale-110 transition-transform duration-300 ${stat.color}`}>
+                    <Icon className="w-10 h-10 sm:w-12 sm:h-12" />
+                  </div>
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-red-600/20 to-orange-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </div>
+                <AnimatedCounter end={stat.value} suffix={stat.suffix} />
+                <p className="text-lg sm:text-xl font-semibold text-gray-700 mt-2">{stat.label}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
   );
 };
 
-// Services Section
-const ServicesSection: React.FC = () => {
+// Section des services avec design moderne
+const ServicesSection = () => {
+  const { language } = useApp();
+  const [ref, isVisible] = useIntersectionObserver();
+
   const services = [
     {
       id: 'lawyer',
-      title: 'Appel Avocat',
-      description: 'Consultation juridique urgente avec un avocat certifié',
-      price: 49,
-      duration: 20,
-      icon: '⚖️',
-      color: 'from-blue-600 to-indigo-700',
-      features: ['Avocat certifié', 'Conseil juridique', 'Réponse immédiate']
+      title: language === 'fr' ? 'Consultation Avocat' : 'Lawyer Consultation',
+      subtitle: language === 'fr' ? 'Conseils juridiques experts' : 'Expert legal advice',
+      description: language === 'fr' 
+        ? 'Obtenez des conseils juridiques professionnels de la part d\'avocats certifiés partout dans le monde.'
+        : 'Get professional legal advice from certified lawyers worldwide.',
+      price: '49€',
+      duration: '20 min',
+      icon: Scale,
+      gradient: 'from-blue-600 to-indigo-600',
+      lightGradient: 'from-blue-50 to-indigo-50',
+      features: [
+        language === 'fr' ? 'Avocats certifiés' : 'Certified lawyers',
+        language === 'fr' ? 'Conseil personnalisé' : 'Personalized advice',
+        language === 'fr' ? 'Support multilingue' : 'Multilingual support'
+      ],
+      href: '/sos-appel?type=lawyer'
     },
     {
       id: 'expat',
-      title: 'Appel Expatrié',
-      description: 'Conseil pratique d\'un expatrié francophone expérimenté',
-      price: 19,
-      duration: 30,
-      icon: '🌍',
-      color: 'from-emerald-600 to-green-700',
-      features: ['Expert expatrié', 'Conseil pratique', 'Expérience terrain']
+      title: language === 'fr' ? 'Conseil Expatrié' : 'Expat Advice',
+      subtitle: language === 'fr' ? 'Expérience terrain' : 'Field experience',
+      description: language === 'fr'
+        ? 'Bénéficiez de l\'expérience d\'expatriés francophones qui connaissent parfaitement votre destination.'
+        : 'Benefit from the experience of French-speaking expats who know your destination perfectly.',
+      price: '19€',
+      duration: '30 min',
+      icon: Users,
+      gradient: 'from-green-600 to-emerald-600',
+      lightGradient: 'from-green-50 to-emerald-50',
+      features: [
+        language === 'fr' ? 'Expatriés expérimentés' : 'Experienced expats',
+        language === 'fr' ? 'Conseils pratiques' : 'Practical advice',
+        language === 'fr' ? 'Culture locale' : 'Local culture'
+      ],
+      href: '/sos-appel?type=expat'
     }
   ];
 
   return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-16 sm:py-24 bg-white relative overflow-hidden">
+      {/* Fond décoratif */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-red-500 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-blue-500 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Nos services d'urgence
+          <div className="inline-flex items-center bg-gradient-to-r from-red-100 to-orange-100 rounded-full px-6 py-3 mb-6">
+            <Sparkles className="w-5 h-5 text-red-600 mr-2" />
+            <span className="text-red-700 font-semibold">
+              {language === 'fr' ? 'Nos Services' : 'Our Services'}
+            </span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 mb-6">
+            {language === 'fr' ? 'L\'aide dont vous avez besoin,' : 'The help you need,'}
+            <span className="block bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+              {language === 'fr' ? 'quand vous en avez besoin' : 'when you need it'}
+            </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Choisissez le service qui correspond à vos besoins et connectez-vous immédiatement avec un expert
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {services.map((service) => (
-            <div
-              key={service.id}
-              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer relative overflow-hidden"
-            >
-              {/* Background gradient on hover */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${service.color} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
-              
-              <div className="relative z-10">
-                <div className="text-center">
-                  <div className={`inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br ${service.color} text-white text-3xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                    {service.icon}
+        <div 
+          ref={ref}
+          className={`grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 transition-all duration-1000 transform ${
+            isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}
+        >
+          {services.map((service, index) => {
+            const Icon = service.icon;
+            return (
+              <div 
+                key={service.id}
+                className={`group relative bg-gradient-to-br ${service.lightGradient} rounded-3xl p-8 lg:p-10 border border-gray-100 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 ${
+                  index === 1 ? 'lg:translate-y-8' : ''
+                }`}
+              >
+                {/* Badge prix */}
+                <div className="absolute -top-4 -right-4">
+                  <div className={`bg-gradient-to-r ${service.gradient} text-white rounded-2xl px-6 py-3 shadow-lg`}>
+                    <div className="text-2xl font-black">{service.price}</div>
+                    <div className="text-sm opacity-90">{service.duration}</div>
                   </div>
-                  
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                </div>
+
+                {/* Icône */}
+                <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r ${service.gradient} rounded-2xl text-white mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                  <Icon className="w-8 h-8" />
+                </div>
+
+                {/* Contenu */}
+                <div className="mb-6">
+                  <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-2">
                     {service.title}
                   </h3>
-                  
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-lg font-semibold text-gray-600 mb-4">
+                    {service.subtitle}
+                  </p>
+                  <p className="text-gray-700 leading-relaxed mb-6">
                     {service.description}
                   </p>
-                  
-                  <div className="flex items-center justify-center gap-8 mb-6">
-                    <div className="text-center">
-                      <div className={`text-4xl font-black bg-gradient-to-r ${service.color} bg-clip-text text-transparent`}>
-                        €{service.price}
-                      </div>
-                      <div className="text-sm text-gray-500">par consultation</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-700 flex items-center gap-2">
-                        <Clock className="w-5 h-5" />
-                        {service.duration}min
-                      </div>
-                      <div className="text-sm text-gray-500">durée</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 mb-8">
-                    {service.features.map((feature, index) => (
-                      <div key={index} className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        {feature}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <button className={`w-full bg-gradient-to-r ${service.color} text-white py-4 px-6 rounded-2xl font-bold text-lg transition-all duration-300 hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-3`}>
-                    <Phone className="w-5 h-5" />
-                    Choisir ce service
-                  </button>
                 </div>
+
+                {/* Features */}
+                <div className="mb-8 space-y-3">
+                  {service.features.map((feature, idx) => (
+                    <div key={idx} className="flex items-center">
+                      <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
+                      <span className="text-gray-700 font-medium">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* CTA */}
+                <Link
+                  to={service.href}
+                  className={`group/btn inline-flex items-center justify-center w-full bg-gradient-to-r ${service.gradient} text-white font-bold py-4 px-6 rounded-2xl hover:shadow-xl transition-all duration-300 hover:scale-105`}
+                >
+                  <Phone className="w-5 h-5 mr-3 group-hover/btn:rotate-12 transition-transform duration-300" />
+                  <span className="text-lg">
+                    {language === 'fr' ? 'Commencer maintenant' : 'Start now'}
+                  </span>
+                  <ArrowRight className="w-5 h-5 ml-3 group-hover/btn:translate-x-1 transition-transform duration-300" />
+                </Link>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
   );
 };
 
-// Section de confiance et sécurité
-const TrustSection: React.FC = () => {
-  const features = [
+// Section d'inscription pour les experts
+const ExpertSignupSection = () => {
+  const { language } = useApp();
+  const [ref, isVisible] = useIntersectionObserver();
+
+  const expertTypes = [
     {
-      icon: <Shield className="w-6 h-6" />,
-      title: 'Sécurité garantie',
-      description: 'Tous nos experts sont vérifiés et certifiés. Paiement sécurisé et remboursement automatique.',
-      color: 'from-green-500 to-emerald-600'
+      id: 'lawyer',
+      title: language === 'fr' ? 'Rejoignez-nous en tant qu\'Avocat' : 'Join us as a Lawyer',
+      subtitle: language === 'fr' ? 'Développez votre clientèle internationale' : 'Grow your international clientele',
+      description: language === 'fr'
+        ? 'Offrez vos services juridiques à des milliers d\'expatriés dans le monde et développez vos revenus.'
+        : 'Offer your legal services to thousands of expats worldwide and grow your income.',
+      icon: Scale,
+      gradient: 'from-purple-600 to-indigo-600',
+      lightBg: 'bg-gradient-to-br from-purple-50 to-indigo-50',
+      benefits: [
+        language === 'fr' ? 'Clientèle internationale' : 'International clientele',
+        language === 'fr' ? 'Revenus flexibles' : 'Flexible income',
+        language === 'fr' ? 'Support marketing' : 'Marketing support',
+        language === 'fr' ? 'Plateforme sécurisée' : 'Secure platform'
+      ],
+      href: '/register/lawyer',
+      earnings: language === 'fr' ? 'Jusqu\'à 2000€/mois' : 'Up to €2000/month'
     },
     {
-      icon: <Clock className="w-6 h-6" />,
-      title: 'Disponibilité 24/7',
-      description: 'Service disponible 24h/24 et 7j/7 dans plus de 120 pays à travers le monde.',
-      color: 'from-blue-500 to-indigo-600'
-    },
-    {
-      icon: <CheckCircle className="w-6 h-6" />,
-      title: 'Satisfaction garantie',
-      description: '98% de taux de satisfaction client. Remboursement intégral si non satisfait.',
-      color: 'from-purple-500 to-pink-600'
-    },
-    {
-      icon: <Zap className="w-6 h-6" />,
-      title: 'Réponse rapide',
-      description: 'Mise en relation en moins de 5 minutes avec un expert qualifié et disponible.',
-      color: 'from-yellow-500 to-orange-600'
+      id: 'expat',
+      title: language === 'fr' ? 'Devenez Conseiller Expatrié' : 'Become an Expat Advisor',
+      subtitle: language === 'fr' ? 'Partagez votre expérience d\'expatriation' : 'Share your expat experience',
+      description: language === 'fr'
+        ? 'Aidez d\'autres expatriés avec votre expérience locale et générez des revenus complémentaires.'
+        : 'Help other expats with your local experience and generate additional income.',
+      icon: Users,
+      gradient: 'from-emerald-600 to-green-600',
+      lightBg: 'bg-gradient-to-br from-emerald-50 to-green-50',
+      benefits: [
+        language === 'fr' ? 'Horaires flexibles' : 'Flexible hours',
+        language === 'fr' ? 'Aide communautaire' : 'Community help',
+        language === 'fr' ? 'Revenus passifs' : 'Passive income',
+        language === 'fr' ? 'Formation incluse' : 'Training included'
+      ],
+      href: '/register/expat',
+      earnings: language === 'fr' ? 'Jusqu\'à 800€/mois' : 'Up to €800/month'
     }
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Pourquoi nous faire confiance ?
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Votre sécurité et satisfaction sont nos priorités absolues
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="text-center group bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 hover:scale-105"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl text-white mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                {feature.icon}
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
-                {feature.title}
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                {feature.description}
-              </p>
-            </div>
-          ))}
-        </div>
+    <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+      {/* Fond animé */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-emerald-500 to-green-500 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
-    </section>
-  );
-};
 
-// Comment ça marche
-const HowItWorksSection: React.FC = () => {
-  const steps = [
-    {
-      number: 1,
-      title: 'Choisissez votre service',
-      description: 'Sélectionnez le type d\'aide dont vous avez besoin : avocat ou expatrié.',
-      icon: <Phone className="w-8 h-8" />,
-      color: 'from-red-500 to-red-600'
-    },
-    {
-      number: 2,
-      title: 'Connectez-vous',
-      description: 'Nous vous mettons en relation avec un expert disponible en 5-10 minutes.',
-      icon: <Users className="w-8 h-8" />,
-      color: 'from-blue-500 to-blue-600'
-    },
-    {
-      number: 3,
-      title: 'Obtenez de l\'aide',
-      description: 'Parlez directement avec votre expert et obtenez les conseils dont vous avez besoin.',
-      icon: <CheckCircle className="w-8 h-8" />,
-      color: 'from-green-500 to-green-600'
-    }
-  ];
-
-  return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Comment ça marche ?
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Obtenez de l'aide en 3 étapes simples, rapides et sécurisées
-          </p>
-        </div>
-
-        <div className="relative">
-          {/* Ligne de connexion */}
-          <div className="hidden lg:block absolute top-20 left-1/2 transform -translate-x-1/2 w-4/5 h-0.5 bg-gray-200 z-0"></div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-            {steps.map((step, index) => (
-              <div key={index} className="text-center group">
-                <div className="relative mb-8">
-                  <div className={`w-20 h-20 bg-gradient-to-br ${step.color} rounded-full flex items-center justify-center text-white mb-4 mx-auto group-hover:scale-110 transition-transform duration-300 shadow-xl`}>
-                    {step.icon}
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-lg">
-                    {step.number}
-                  </div>
-                </div>
-                
-                <h3 className="text-xl font-bold text-gray-900 mb-4">
-                  {step.title}
-                </h3>
-                
-                <p className="text-gray-600 leading-relaxed">
-                  {step.description}
-                </p>
-              </div>
-            ))}
+          <div className="inline-flex items-center bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 mb-6">
+            <TrendingUp className="w-5 h-5 text-white mr-2" />
+            <span className="text-white font-semibold">
+              {language === 'fr' ? 'Rejoignez l\'équipe' : 'Join the team'}
+            </span>
           </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
+            {language === 'fr' ? 'Devenez expert' : 'Become an expert'}
+            <span className="block bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+              {language === 'fr' ? 'et générez des revenus' : 'and generate income'}
+            </span>
+          </h2>
+          <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+            {language === 'fr'
+              ? 'Rejoignez notre réseau d\'experts et aidez des expatriés tout en développant vos revenus.'
+              : 'Join our network of experts and help expats while growing your income.'
+            }
+          </p>
+        </div>
+
+        <div 
+          ref={ref}
+          className={`grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 transition-all duration-1000 transform ${
+            isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}
+        >
+          {expertTypes.map((expert, index) => {
+            const Icon = expert.icon;
+            return (
+              <div 
+                key={expert.id}
+                className={`group relative ${expert.lightBg} rounded-3xl p-8 lg:p-10 border border-white/20 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 ${
+                  index === 1 ? 'lg:translate-y-8' : ''
+                }`}
+              >
+                {/* Badge revenus */}
+                <div className="absolute -top-4 -right-4">
+                  <div className={`bg-gradient-to-r ${expert.gradient} text-white rounded-2xl px-6 py-3 shadow-lg`}>
+                    <div className="text-sm font-bold">{expert.earnings}</div>
+                  </div>
+                </div>
+
+                {/* Icône */}
+                <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r ${expert.gradient} rounded-2xl text-white mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                  <Icon className="w-8 h-8" />
+                </div>
+
+                {/* Contenu */}
+                <div className="mb-6">
+                  <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-2">
+                    {expert.title}
+                  </h3>
+                  <p className="text-lg font-semibold text-gray-600 mb-4">
+                    {expert.subtitle}
+                  </p>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    {expert.description}
+                  </p>
+                </div>
+
+                {/* Bénéfices */}
+                <div className="mb-8 space-y-3">
+                  {expert.benefits.map((benefit, idx) => (
+                    <div key={idx} className="flex items-center">
+                      <Award className="w-5 h-5 text-amber-500 mr-3 flex-shrink-0" />
+                      <span className="text-gray-700 font-medium">{benefit}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* CTA */}
+                <Link
+                  to={expert.href}
+                  className={`group/btn inline-flex items-center justify-center w-full bg-gradient-to-r ${expert.gradient} text-white font-bold py-4 px-6 rounded-2xl hover:shadow-xl transition-all duration-300 hover:scale-105`}
+                >
+                  <span className="text-lg">
+                    {language === 'fr' ? 'Rejoindre maintenant' : 'Join now'}
+                  </span>
+                  <ChevronRight className="w-5 h-5 ml-3 group-hover/btn:translate-x-1 transition-transform duration-300" />
+                </Link>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
   );
 };
 
-// Témoignages
-const TestimonialsSection: React.FC = () => {
-  const [activeIndex, setActiveIndex] = useState(0);
+// Témoignages modernes
+const TestimonialsSection = () => {
+  const { language } = useApp();
+  const [ref, isVisible] = useIntersectionObserver();
 
   const testimonials = [
     {
       id: 1,
-      name: 'Marie D.',
-      location: 'Expatriée en Thaïlande',
+      name: 'Sophie M.',
+      role: language === 'fr' ? 'Expatriée au Canada' : 'Expat in Canada',
+      avatar: 'https://images.unsplash.com/photo-1494790108755-2616c2c6b8e6?w=150&h=150&fit=crop&crop=face',
       rating: 5,
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      comment: 'Service exceptionnel ! J\'ai pu parler à un avocat français depuis Bangkok en moins de 2 minutes. Très professionnel et rassurant dans ma situation d\'urgence.'
+      text: language === 'fr'
+        ? 'Service exceptionnel ! J\'ai trouvé un avocat spécialisé en immigration en moins de 5 minutes. Très professionnel.'
+        : 'Exceptional service! I found an immigration lawyer in less than 5 minutes. Very professional.',
+      service: language === 'fr' ? 'Consultation Avocat' : 'Lawyer Consultation'
     },
     {
       id: 2,
-      name: 'Jean L.',
-      location: 'Expatrié en Espagne',
-      rating: 5,
+      name: 'Marc D.',
+      role: language === 'fr' ? 'Expatrié en Thaïlande' : 'Expat in Thailand',
       avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      comment: 'Grâce à SOS Expats, j\'ai pu résoudre mon problème administratif en Espagne. L\'expatrié m\'a donné des conseils précieux basés sur son expérience personnelle.'
+      rating: 5,
+      text: language === 'fr'
+        ? 'L\'expatrié m\'a donné des conseils précieux pour mon installation. Une vraie aide pratique !'
+        : 'The expat gave me valuable advice for my relocation. Real practical help!',
+      service: language === 'fr' ? 'Conseil Expatrié' : 'Expat Advice'
     },
     {
       id: 3,
-      name: 'Sophie M.',
-      location: 'Expatriée au Canada',
-      rating: 5,
+      name: 'Claire L.',
+      role: language === 'fr' ? 'Expatriée en Australie' : 'Expat in Australia',
       avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-      comment: 'Interface très intuitive et service client réactif. L\'avocat était compétent et m\'a aidé à comprendre mes droits concernant mon contrat de travail au Canada.'
+      rating: 5,
+      text: language === 'fr'
+        ? 'Interface très intuitive et experts compétents. Je recommande vivement pour tous les expatriés.'
+        : 'Very intuitive interface and competent experts. I highly recommend for all expats.',
+      service: language === 'fr' ? 'Consultation Avocat' : 'Lawyer Consultation'
     }
   ];
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % testimonials.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [testimonials.length]);
-
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Ce que disent nos clients
+    <section className="py-16 sm:py-24 bg-gradient-to-br from-blue-50 via-white to-purple-50 relative overflow-hidden">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center bg-gradient-to-r from-blue-100 to-purple-100 rounded-full px-6 py-3 mb-6">
+            <MessageCircle className="w-5 h-5 text-blue-600 mr-2" />
+            <span className="text-blue-700 font-semibold">
+              {language === 'fr' ? 'Témoignages' : 'Testimonials'}
+            </span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 mb-6">
+            {language === 'fr' ? 'Ce que disent nos clients' : 'What our clients say'}
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Découvrez les expériences de nos utilisateurs partout dans le monde
-          </p>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-br-3xl flex items-center justify-center">
-              <span className="text-white text-2xl">"</span>
-            </div>
-            
-            <div className="pt-8">
-              <p className="text-xl text-gray-700 italic mb-8 leading-relaxed">
-                "{testimonials[activeIndex].comment}"
-              </p>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <img
-                    src={testimonials[activeIndex].avatar}
-                    alt={testimonials[activeIndex].name}
-                    className="w-16 h-16 rounded-full object-cover mr-4 border-4 border-red-100"
-                  />
-                  <div>
-                    <h4 className="font-bold text-lg text-gray-900">{testimonials[activeIndex].name}</h4>
-                    <div className="flex items-center text-sm text-gray-500 mb-1">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      {testimonials[activeIndex].location}
-                    </div>
-                    <div className="flex items-center">
-                      {[...Array(testimonials[activeIndex].rating)].map((_, i) => (
-                        <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex space-x-2">
-                  {testimonials.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setActiveIndex(index)}
-                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                        index === activeIndex ? 'bg-red-600 scale-125' : 'bg-gray-300 hover:bg-gray-400'
-                      }`}
-                    />
-                  ))}
+        <div 
+          ref={ref}
+          className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-1000 transform ${
+            isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}
+        >
+          {testimonials.map((testimonial, index) => (
+            <div 
+              key={testimonial.id}
+              className={`bg-white rounded-3xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-500 hover:-translate-y-2 ${
+                index === 1 ? 'md:translate-y-8' : ''
+              }`}
+            >
+              {/* Rating */}
+              <div className="flex items-center mb-6">
+                {[...Array(testimonial.rating)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                ))}
+              </div>
+
+              {/* Texte */}
+              <blockquote className="text-gray-700 mb-8 text-lg leading-relaxed">
+                "{testimonial.text}"
+              </blockquote>
+
+              {/* Profil */}
+              <div className="flex items-center">
+                <img
+                  src={testimonial.avatar}
+                  alt={testimonial.name}
+                  className="w-12 h-12 rounded-full object-cover mr-4"
+                />
+                <div>
+                  <div className="font-bold text-gray-900">{testimonial.name}</div>
+                  <div className="text-sm text-gray-600">{testimonial.role}</div>
+                  <div className="text-xs text-blue-600 font-medium mt-1">{testimonial.service}</div>
                 </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </section>
   );
 };
 
-// CTA Final
-const FinalCTA: React.FC = () => {
+// CTA Final Section
+const FinalCTASection = () => {
+  const { language } = useApp();
+  const { user } = useAuth();
+  const [ref, isVisible] = useIntersectionObserver();
+
   return (
-    <section className="py-20 bg-gradient-to-r from-red-600 via-red-700 to-red-800 text-white relative overflow-hidden">
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, white 2px, transparent 2px),
-                           radial-gradient(circle at 75% 75%, white 2px, transparent 2px)`,
-          backgroundSize: '50px 50px'
-        }} />
+    <section className="py-16 sm:py-24 bg-gradient-to-r from-red-600 via-red-700 to-orange-600 relative overflow-hidden">
+      {/* Fond animé */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-red-600/20 to-orange-600/20"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tight">
-          Prêt à obtenir de l'aide ?
-        </h2>
-        <p className="text-xl md:text-2xl text-red-100 mb-12 max-w-3xl mx-auto">
-          Rejoignez des milliers d'expatriés qui nous font confiance
-        </p>
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div 
+          ref={ref}
+          className={`transition-all duration-1000 transform ${
+            isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}
+        >
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
+            {language === 'fr' ? 'Prêt à obtenir de l\'aide ?' : 'Ready to get help?'}
+          </h2>
+          <p className="text-xl text-red-100 mb-12 max-w-2xl mx-auto leading-relaxed">
+            {language === 'fr'
+              ? 'Rejoignez des milliers d\'expatriés qui nous font confiance pour leurs urgences juridiques et pratiques.'
+              : 'Join thousands of expats who trust us for their legal and practical emergencies.'
+            }
+          </p>
 
-        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-          <button className="group bg-white text-red-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-red-50 transform hover:scale-105 transition-all duration-300 shadow-2xl flex items-center gap-3 min-w-[280px] justify-center">
-            <Phone className="w-6 h-6" />
-            Commencer maintenant
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
+          {/* Avantages rapides */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+            <div className="flex flex-col items-center text-white">
+              <div className="bg-white/20 rounded-full p-4 mb-3">
+                <Shield className="w-6 h-6" />
+              </div>
+              <span className="font-semibold">
+                {language === 'fr' ? 'Sécurité garantie' : 'Guaranteed security'}
+              </span>
+            </div>
+            <div className="flex flex-col items-center text-white">
+              <div className="bg-white/20 rounded-full p-4 mb-3">
+                <Clock className="w-6 h-6" />
+              </div>
+              <span className="font-semibold">
+                {language === 'fr' ? 'Réponse < 5 min' : 'Response < 5 min'}
+              </span>
+            </div>
+            <div className="flex flex-col items-center text-white">
+              <div className="bg-white/20 rounded-full p-4 mb-3">
+                <Globe className="w-6 h-6" />
+              </div>
+              <span className="font-semibold">
+                {language === 'fr' ? '120+ pays' : '120+ countries'}
+              </span>
+            </div>
+          </div>
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          <div className="flex items-center justify-center gap-3 text-red-100">
-            <Shield className="w-6 h-6" />
-            <span>Paiement sécurisé</span>
+          {/* CTA principal */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link
+              to="/sos-appel"
+              className="group inline-flex items-center justify-center bg-white text-red-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-50 transition-all duration-300 hover:scale-105 shadow-xl min-w-[250px]"
+            >
+              <Phone className="w-6 h-6 mr-3 group-hover:rotate-12 transition-transform duration-300" />
+              {language === 'fr' ? 'Obtenir de l\'aide maintenant' : 'Get help now'}
+              <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
+            </Link>
+            
+            {!user && (
+              <Link
+                to="/register"
+                className="group inline-flex items-center justify-center bg-transparent border-2 border-white text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white hover:text-red-600 transition-all duration-300 hover:scale-105 min-w-[250px]"
+              >
+                {language === 'fr' ? 'Créer un compte' : 'Create account'}
+                <ChevronRight className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
+              </Link>
+            )}
           </div>
-          <div className="flex items-center justify-center gap-3 text-red-100">
-            <Clock className="w-6 h-6" />
-            <span>Réponse en 5 minutes</span>
-          </div>
-          <div className="flex items-center justify-center gap-3 text-red-100">
-            <CheckCircle className="w-6 h-6" />
-            <span>Satisfaction garantie</span>
-          </div>
+
+          {/* Note de confiance */}
+          <p className="text-sm text-red-200 mt-8">
+            {language === 'fr' 
+              ? '✓ Paiement sécurisé • ✓ Remboursement si non disponible • ✓ Support 24/7'
+              : '✓ Secure payment • ✓ Refund if unavailable • ✓ 24/7 support'
+            }
+          </p>
         </div>
       </div>
     </section>
   );
 };
 
-// Composant principal Home
+// Composant principal
 const Home: React.FC = () => {
+  const { language } = useApp();
+
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
+    <Layout>
+      <SEOHead
+        title="SOS Expat & Travelers - Aide d'urgence pour expatriés francophones"
+        description="Plateforme d'assistance urgente pour expatriés francophones. Connectez-vous avec des avocats et expatriés vérifiés partout dans le monde."
+        structuredData={structuredData}
+      />
+
+      {/* Hero Section - Utilise le composant existant */}
       <HeroSection />
+
+      {/* Profile Carousel - Utilise le composant existant */}
+      <div className="bg-gradient-to-br from-red-50 via-white to-orange-50">
+        <ProfileCarousel />
+      </div>
 
       {/* Statistiques */}
       <StatsSection />
 
-      {/* Services */}
+      {/* Services modernes */}
       <ServicesSection />
 
-      {/* Section de confiance */}
-      <TrustSection />
-
-      {/* Comment ça marche */}
-      <HowItWorksSection />
+      {/* Map Section - Utilise le composant existant */}
+      <div className="bg-gradient-to-br from-gray-50 to-blue-50">
+        <MapSection />
+      </div>
 
       {/* Témoignages */}
       <TestimonialsSection />
 
+      {/* Section inscription experts */}
+      <ExpertSignupSection />
+
       {/* CTA Final */}
-      <FinalCTA />
-    </div>
+      <FinalCTASection />
+
+      {/* Styles globaux pour les animations */}
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
+          }
+        }
+
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        /* Amélioration des transitions pour mobile */
+        @media (max-width: 768px) {
+          .group:hover {
+            transform: none !important;
+          }
+          
+          .group:active {
+            transform: scale(0.95) !important;
+          }
+        }
+
+        /* Optimisation des performances */
+        * {
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+        }
+
+        /* Amélioration du scroll smooth */
+        html {
+          scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar pour webkit */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #ef4444, #f97316);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #dc2626, #ea580c);
+        }
+
+        /* Amélioration de l'accessibilité */
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+
+        /* Focus amélioré pour l'accessibilité */
+        .focus-visible:focus-visible {
+          outline: 2px solid #3b82f6;
+          outline-offset: 2px;
+          border-radius: 8px;
+        }
+
+        /* Optimisation des images */
+        img {
+          content-visibility: auto;
+        }
+
+        /* Préchargement des polices critiques */
+        @font-face {
+          font-family: 'Inter';
+          font-style: normal;
+          font-weight: 400 900;
+          font-display: swap;
+          src: url('/fonts/inter-var.woff2') format('woff2');
+        }
+
+        /* Variables CSS pour la cohérence */
+        :root {
+          --primary-red: #ef4444;
+          --primary-orange: #f97316;
+          --gradient-primary: linear-gradient(135deg, var(--primary-red), var(--primary-orange));
+          --shadow-primary: 0 10px 40px rgba(239, 68, 68, 0.2);
+          --border-radius-lg: 1.5rem;
+          --border-radius-xl: 2rem;
+          --transition-primary: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Amélioration des performances pour les animations */
+        .will-change-transform {
+          will-change: transform;
+        }
+
+        .will-change-opacity {
+          will-change: opacity;
+        }
+
+        /* Optimisation tactile */
+        .touch-manipulation {
+          touch-action: manipulation;
+        }
+
+        /* États de hover améliorés */
+        @media (hover: hover) {
+          .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-primary);
+          }
+        }
+
+        /* Safe area pour les appareils avec encoche */
+        @supports (padding: max(0px)) {
+          .safe-area-top {
+            padding-top: max(1rem, env(safe-area-inset-top));
+          }
+          
+          .safe-area-bottom {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+          }
+        }
+
+        /* Amélioration de la lisibilité */
+        .text-balance {
+          text-wrap: balance;
+        }
+
+        /* Loading state pour les images */
+        .img-loading {
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
+        }
+      `}</style>
+    </Layout>
   );
 };
 

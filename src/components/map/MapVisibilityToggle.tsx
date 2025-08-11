@@ -8,7 +8,7 @@ type SwitchProps = React.DetailedHTMLProps<React.InputHTMLAttributes<HTMLInputEl
 interface Props {
   profileId?: string;
   className?: string;
-  SwitchComponent?: React.ComponentType<SwitchProps>; // allow inject UI library switch
+  SwitchComponent?: React.ComponentType<SwitchProps>;
 }
 
 export default function MapVisibilityToggle({ profileId, className = '', SwitchComponent }: Props) {
@@ -43,21 +43,33 @@ export default function MapVisibilityToggle({ profileId, className = '', SwitchC
       setError(null);
     } catch (e: any) {
       setError(e.message);
-      setChecked(!next); // revert on error
+      setChecked(!next);
     }
   };
 
   if (!sosProfileId) return null;
 
   const SwitchEl = SwitchComponent || ((props: SwitchProps) =>
-    <input type="checkbox" {...props} />
+    <input 
+      type="checkbox" 
+      className="toggle-switch"
+      {...props} 
+    />
   );
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <SwitchEl disabled={loading} checked={checked} onChange={(e: any) => onToggle(!!e.target.checked)} />
-      <label>Apparaître sur la carte</label>
-      {error && <span style={{ color: '#dc2626', fontSize: 12 }}>{error}</span>}
+      <SwitchEl 
+        disabled={loading} 
+        checked={checked} 
+        onChange={(e: any) => onToggle(!!e.target.checked)} 
+      />
+      <label className="text-sm font-medium">Apparaître sur la carte</label>
+      {error && (
+        <span className="text-xs text-error bg-error-light px-2 py-1 rounded">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

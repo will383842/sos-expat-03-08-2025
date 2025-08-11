@@ -1,21 +1,41 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Globe, MapPin, Users, Scale, Search } from 'lucide-react';
+import { Globe, MapPin, Users, Scale } from 'lucide-react';
 import WorldMap from '../map/WorldMap';
 
-const MapSection: React.FC = () => {
-  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+// Types
+interface FeatureCard {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  bgColor: string;
+  iconColor: string;
+  title: string;
+  description: string;
+}
 
-  // Memoized translations
-  const translations = useMemo(() => ({
+interface Translations {
+  title: string;
+  subtitle: string;
+  mapTitle: string;       // conservé dans les traductions si besoin futur
+  mapSubtitle: string;    // conservé idem
+  verifiedLawyers: string;
+  verifiedLawyersDesc: string;
+  experiencedExpats: string;
+  experiencedExpatsDesc: string;
+  countriesCovered: string;
+  countriesCoveredDesc: string;
+}
+
+type Language = 'fr' | 'en';
+
+const MapSection: React.FC = () => {
+  const [language, setLanguage] = useState<Language>('fr');
+
+  const translations = useMemo((): Record<Language, Translations> => ({
     fr: {
-      title: 'Nos experts partout dans le monde',
+      title: 'Nos conseils dans votre langue',
       subtitle: 'Découvrez nos avocats et expatriés francophones disponibles dans plus de 120 pays.',
-      searchPlaceholder: 'Rechercher un pays, une langue...',
-      searchButton: 'Rechercher',
       mapTitle: 'Carte mondiale interactive',
-      mapSubtitle: 'Nos experts sont disponibles dans plus de 120 pays',
+      mapSubtitle: 'Nos conseils sont disponibles dans plus de 120 pays',
       verifiedLawyers: 'Avocats vérifiés',
       verifiedLawyersDesc: 'Tous nos avocats sont vérifiés et certifiés pour exercer dans leur pays.',
       experiencedExpats: 'Expatriés expérimentés',
@@ -24,12 +44,10 @@ const MapSection: React.FC = () => {
       countriesCoveredDesc: 'Une couverture mondiale pour vous aider où que vous soyez.'
     },
     en: {
-      title: 'Our experts worldwide',
+      title: 'Our advice in your language',
       subtitle: 'Discover our French-speaking lawyers and expats available in more than 120 countries.',
-      searchPlaceholder: 'Search for a country, language...',
-      searchButton: 'Search',
       mapTitle: 'Interactive world map',
-      mapSubtitle: 'Our experts are available in more than 120 countries',
+      mapSubtitle: 'Our advice is available in more than 120 countries',
       verifiedLawyers: 'Verified lawyers',
       verifiedLawyersDesc: 'All our lawyers are verified and certified to practice in their country.',
       experiencedExpats: 'Experienced expats',
@@ -41,28 +59,11 @@ const MapSection: React.FC = () => {
 
   const t = translations[language];
 
-  // Search handler
-  const handleSearch = useCallback(async (e: React.MouseEvent | React.KeyboardEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
-    setIsSearching(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('Searching for:', searchQuery);
-    } catch (error) {
-      console.error('Search error:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [searchQuery]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+  const handleLanguageToggle = useCallback(() => {
+    setLanguage(prev => (prev === 'fr' ? 'en' : 'fr'));
   }, []);
 
-  // Feature cards data
-  const featureCards = useMemo(() => [
+  const featureCards = useMemo((): FeatureCard[] => [
     {
       id: 'lawyers',
       icon: Scale,
@@ -90,28 +91,31 @@ const MapSection: React.FC = () => {
   ], [t]);
 
   return (
-    <section 
-      className="py-12 sm:py-16 lg:py-20" 
+    <section
+      className="py-12 sm:py-16 lg:py-20"
       aria-labelledby="map-section-title"
       role="region"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Language Toggle */}
+        
+        {/* Toggle langue */}
         <div className="text-center mb-4">
           <button
-            onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')}
-            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            onClick={handleLanguageToggle}
+            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-2 focus:ring-red-500 focus:outline-none transition-colors"
+            aria-label={`Changer la langue vers ${language === 'fr' ? 'anglais' : 'français'}`}
           >
-            🌐 {language === 'fr' ? 'EN' : 'FR'}
+            <Globe className="w-3 h-3 mr-1" aria-hidden="true" />
+            {language === 'fr' ? 'EN' : 'FR'}
           </button>
         </div>
 
-        {/* Header */}
+        {/* Header principal (au-dessus de la carte, ne masque rien) */}
         <header className="text-center mb-8 sm:mb-12">
           <div className="inline-flex items-center justify-center bg-red-100 p-2 sm:p-3 rounded-full mb-4">
             <Globe className="w-6 h-6 sm:w-8 sm:h-8 text-red-600" aria-hidden="true" />
           </div>
-          <h2 
+          <h2
             id="map-section-title"
             className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4 leading-tight"
           >
@@ -122,59 +126,21 @@ const MapSection: React.FC = () => {
           </p>
         </header>
 
-        {/* Search Bar */}
-        <div className="max-w-2xl mx-auto mb-8 sm:mb-12 px-4 sm:px-0">
-          <div role="search" aria-label="Search experts">
-            <div className="bg-white rounded-full shadow-lg border border-gray-100 p-1 sm:p-2 flex items-stretch">
-              <div className="bg-red-600 text-white p-2 sm:p-2.5 rounded-full flex-shrink-0">
-                <Search className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
-              </div>
-              <label htmlFor="expert-search" className="sr-only">
-                {t.searchPlaceholder}
-              </label>
-              <input 
-                id="expert-search"
-                type="text" 
-                value={searchQuery}
-                onChange={handleInputChange}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
-                placeholder={t.searchPlaceholder}
-                className="flex-1 px-3 sm:px-4 py-2 outline-none text-sm sm:text-base border-none focus:ring-0"
-                autoComplete="off"
-                maxLength={100}
-                disabled={isSearching}
-              />
-              <button 
-                onClick={handleSearch}
-                disabled={isSearching || !searchQuery.trim()}
-                className="bg-red-600 hover:bg-red-700 focus:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-2 rounded-full font-medium text-sm sm:text-base transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                aria-label={isSearching ? 'Recherche en cours...' : t.searchButton}
-              >
-                {isSearching ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                    <span className="hidden sm:inline">...</span>
-                  </span>
-                ) : (
-                  t.searchButton
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Interactive World Map - CORRECTION PRINCIPALE */}
+        {/* WorldMap sans bandeau blanc au-dessus */}
         <div className="mb-8 sm:mb-12">
-          <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200 bg-white">
-            {/* ✅ CORRECTION : Dimensions explicites et props nécessaires */}
-            <WorldMap 
-              height="500px" 
-              width="100%"
-              className="w-full"
-              showOnlineOnly={false}
-              filterByRole="all"
-              ariaLabel="Carte mondiale des experts disponibles"
-            />
+          {/* conteneur neutre : pas de bg blanc, pas d’en-tête interne */}
+          <div className="rounded-2xl shadow-lg border border-gray-200 overflow-hidden bg-transparent">
+            <div className="relative">
+              <WorldMap
+                height="560px"
+                width="100%"
+                className="w-full"
+                showOnlineOnly={false}
+                filterByRole="all"
+                ariaLabel="Carte mondiale des conseils disponibles"
+                allowFullscreen
+              />
+            </div>
           </div>
         </div>
 
@@ -183,21 +149,36 @@ const MapSection: React.FC = () => {
           {featureCards.map((card) => {
             const IconComponent = card.icon;
             return (
-              <article 
+              <article
                 key={card.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg border border-gray-100 p-4 sm:p-6 text-center transform hover:scale-105 transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500 focus-within:ring-offset-2"
+                className="bg-white rounded-xl shadow-md hover:shadow-lg border border-gray-100 p-4 sm:p-6 text-center transform hover:scale-105 transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500 focus-within:ring-offset-2 cursor-pointer"
                 tabIndex={0}
                 role="article"
+                aria-labelledby={`card-title-${card.id}`}
+                aria-describedby={`card-desc-${card.id}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    // action possible au clavier
+                    console.log(`Card ${card.id} activated`);
+                  }
+                }}
               >
                 <div className="flex justify-center mb-3 sm:mb-4">
-                  <div className={`${card.bgColor} rounded-full p-3 sm:p-4`}>
+                  <div className={`${card.bgColor} rounded-full p-3 sm:p-4 transition-transform group-hover:scale-110`}>
                     <IconComponent className={`w-6 h-6 sm:w-8 sm:h-8 ${card.iconColor}`} aria-hidden="true" />
                   </div>
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">
+                <h3
+                  id={`card-title-${card.id}`}
+                  className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3"
+                >
                   {card.title}
                 </h3>
-                <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                <p
+                  id={`card-desc-${card.id}`}
+                  className="text-sm sm:text-base text-gray-600 leading-relaxed"
+                >
                   {card.description}
                 </p>
               </article>
@@ -209,4 +190,4 @@ const MapSection: React.FC = () => {
   );
 };
 
-export default MapSection;
+export default React.memo(MapSection);

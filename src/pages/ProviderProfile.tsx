@@ -44,7 +44,7 @@ import Reviews from '../components/review/Reviews';
 import SEOHead from '../components/layout/SEOHead';
 import { Review } from '../types';
 import { formatLanguages } from '@/i18n';
-import MapVisibilityToggle from '../components/dashboard/MapVisibilityToggle';
+import MapVisibilityToggle from '@/components/map/MapVisibilityToggle';
 
 // --- Production switches (no on-screen debug; logs off by default) ---
 const DEBUG_LOGS = false;

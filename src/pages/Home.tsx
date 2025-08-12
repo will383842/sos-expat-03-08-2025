@@ -1,1060 +1,944 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { 
-  Menu, X, Phone, Shield, ChevronDown, Globe, User, UserPlus, 
-  Download, Home, Users, MessageCircle, Zap, DollarSign, Settings, 
-  LogOut, ArrowRight, Check, WifiOff, Wifi
+  ArrowRight, Play, Shield, Globe, Users, Zap, DollarSign, 
+  Check, Star, Quote, ChevronRight, Phone, Heart, Award,
+  TrendingUp, Clock, MapPin, Sparkles, ChevronLeft
 } from 'lucide-react';
 
-// Simulation des contextes et hooks
-const useAuth = () => ({
-  user: {
-    uid: 'user123',
-    firstName: 'Jean',
-    email: 'jean@example.com',
-    role: 'expat',
-    profilePhoto: null,
-    isOnline: true
-  },
-  logout: async () => {
-    console.log('Logout');
-    // Simulation de déconnexion
-  },
-  isLoading: false
-});
+// Note: Dans un vrai projet, vous importeriez le header depuis '../components/layout/header'
+// Pour cette démo, le header sera inclus directement ou importé selon votre structure
 
-const useApp = () => ({
-  language: 'fr',
-  setLanguage: (lang) => {
-    console.log('Language changed to:', lang);
-    // Ici vous pourriez utiliser localStorage ou un state global
-  }
-});
-
-// Simulation de la location
-const useLocation = () => ({
-  pathname: '/'
-});
-
-// Composant Link de remplacement
-const Link = ({ to, children, className, onClick, ...props }) => {
-  const handleClick = (e) => {
-    e.preventDefault();
-    if (onClick) onClick();
-    console.log('Navigate to:', to);
-    // Simulation de navigation
-  };
-
-  return (
-    <a href={to} className={className} onClick={handleClick} {...props}>
-      {children}
-    </a>
-  );
-};
-
-// Types globaux pour Analytics
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-  }
-}
-
-// Types
-interface Language {
-  code: 'fr' | 'en';
+// Types pour TypeScript
+interface Testimonial {
+  id: string;
   name: string;
-  nativeName: string;
-  flag: React.ReactNode;
+  role: string;
+  location: string;
+  avatar: string;
+  rating: number;
+  comment: string;
+  date: string;
+  verified: boolean;
+  helpful: number;
 }
 
-interface NavigationItem {
-  path: string;
-  labelKey: string;
-  icon: string;
+interface Stat {
+  value: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
 }
 
-interface User {
-  uid?: string;
-  id?: string;
-  email?: string;
-  firstName?: string;
-  displayName?: string;
-  profilePhoto?: string;
-  photoURL?: string;
-  role?: string;
-  type?: string;
-  isOnline?: boolean;
+interface Profile {
+  id: string;
+  name: string;
+  role: string;
+  specialty: string;
+  location: string;
+  avatar: string;
+  rating: number;
+  reviewCount: number;
+  responseTime: string;
+  languages: string[];
+  verified: boolean;
+  online: boolean;
+  price: string;
 }
 
-interface PWAState {
-  isInstalled: boolean;
-  canInstall: boolean;
-  isOffline: boolean;
+interface PricingPlan {
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  features: string[];
+  popular?: boolean;
+  cta: string;
+  color: string;
 }
 
-// Drapeaux optimisés (exactement comme dans l'ancien fichier)
-const FrenchFlag = memo(() => (
-  <div 
-    className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20"
-    role="img"
-    aria-label="Drapeau français"
-  >
-    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm flex">
-      <div className="w-1/3 h-full bg-blue-600" />
-      <div className="w-1/3 h-full bg-white" />
-      <div className="w-1/3 h-full bg-red-600" />
-    </div>
-    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
-  </div>
-));
-
-const BritishFlag = memo(() => (
-  <div 
-    className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20"
-    role="img"
-    aria-label="Drapeau britannique"
-  >
-    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm relative bg-blue-800">
-      {/* Croix de Saint-André (Écosse) - diagonales blanches */}
-      <div className="absolute inset-0">
-        <div className="absolute w-full h-0.5 bg-white transform rotate-45 origin-center top-1/2 left-0" style={{ transformOrigin: 'center' }} />
-        <div className="absolute w-full h-0.5 bg-white transform -rotate-45 origin-center top-1/2 left-0" style={{ transformOrigin: 'center' }} />
-      </div>
-      
-      {/* Croix de Saint-Patrick (Irlande) - diagonales rouges décalées */}
-      <div className="absolute inset-0">
-        <div className="absolute w-full h-px bg-red-600 transform rotate-45 origin-center" style={{ top: 'calc(50% - 1px)', transformOrigin: 'center' }} />
-        <div className="absolute w-full h-px bg-red-600 transform -rotate-45 origin-center" style={{ top: 'calc(50% + 1px)', transformOrigin: 'center' }} />
-      </div>
-      
-      {/* Croix de Saint-Georges (Angleterre) - croix centrale rouge */}
-      <div className="absolute top-0 left-1/2 w-0.5 h-full bg-white transform -translate-x-1/2" />
-      <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white transform -translate-y-1/2" />
-      <div className="absolute top-0 left-1/2 w-px h-full bg-red-600 transform -translate-x-1/2" />
-      <div className="absolute left-0 top-1/2 w-full h-px bg-red-600 transform -translate-y-1/2" />
-    </div>
-    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
-  </div>
-));
-
-// Configuration des langues (identique à l'ancien)
-const SUPPORTED_LANGUAGES: Language[] = [
-  { 
-    code: 'fr', 
-    name: 'French', 
-    nativeName: 'Français',
-    flag: <FrenchFlag />
+// Données des témoignages
+const TESTIMONIALS: Testimonial[] = [
+  {
+    id: '1',
+    name: 'Marie Dubois',
+    role: 'Expatriée',
+    location: 'Tokyo, Japon',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b107?w=150&h=150&fit=crop&crop=face',
+    rating: 5,
+    comment: 'SOS Expats m\'a sauvé la vie lors de mon déménagement au Japon. L\'avocat spécialisé en droit du travail international que j\'ai trouvé via la plateforme m\'a aidé à négocier mon contrat et mes conditions. Service exceptionnel, réactif 24/7 !',
+    date: '2024-12-15',
+    verified: true,
+    helpful: 47
   },
-  { 
-    code: 'en', 
-    name: 'English', 
-    nativeName: 'English',
-    flag: <BritishFlag />
+  {
+    id: '2',
+    name: 'Alexandre Martin',
+    role: 'Entrepreneur',
+    location: 'Singapour',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+    rating: 5,
+    comment: 'Incroyable ! J\'ai créé ma société à Singapour en moins de 2 semaines grâce à l\'expertise des consultants recommandés. La plateforme est intuitive, les professionnels sont vérifiés et ultra-compétents. Je recommande vivement !',
+    date: '2024-12-10',
+    verified: true,
+    helpful: 32
   },
+  {
+    id: '3',
+    name: 'Sophie Chen',
+    role: 'Directrice Marketing',
+    location: 'New York, USA',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+    rating: 5,
+    comment: 'Une urgence médicale à 3h du matin, et en 10 minutes j\'avais un avocat spécialisé en assurance santé internationale au téléphone. Problème résolu en 24h. Cette plateforme change vraiment la vie des expatriés !',
+    date: '2024-12-08',
+    verified: true,
+    helpful: 63
+  }
 ];
 
-// Configuration de navigation (identique à l'ancien)
-const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/', labelKey: 'nav.home', icon: '🏠' },
-  { path: '/sos-appel', labelKey: 'nav.viewProfiles', icon: '👥' },
-  { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💬' },
+// Données des profils d'experts
+const EXPERT_PROFILES: Profile[] = [
+  {
+    id: '1',
+    name: 'Maître Sarah Dubois',
+    role: 'Avocate',
+    specialty: 'Droit du Travail International',
+    location: 'Dubai, UAE',
+    avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
+    rating: 4.9,
+    reviewCount: 127,
+    responseTime: '< 5 min',
+    languages: ['Français', 'Anglais', 'Arabe'],
+    verified: true,
+    online: true,
+    price: 'à partir de 89€/h'
+  },
+  {
+    id: '2',
+    name: 'Alexandre Martin',
+    role: 'Consultant Fiscal',
+    specialty: 'Fiscalité Internationale',
+    location: 'Singapour',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+    rating: 4.8,
+    reviewCount: 93,
+    responseTime: '< 10 min',
+    languages: ['Français', 'Anglais', 'Mandarin'],
+    verified: true,
+    online: true,
+    price: 'à partir de 120€/h'
+  },
+  {
+    id: '3',
+    name: 'Dr. Marie Chen',
+    role: 'Consultante RH',
+    specialty: 'Expatriation & Mobilité',
+    location: 'New York, USA',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b107?w=150&h=150&fit=crop&crop=face',
+    rating: 5.0,
+    reviewCount: 156,
+    responseTime: '< 3 min',
+    languages: ['Français', 'Anglais'],
+    verified: true,
+    online: false,
+    price: 'à partir de 95€/h'
+  },
+  {
+    id: '4',
+    name: 'Jean-Pierre Rousseau',
+    role: 'Notaire',
+    specialty: 'Immobilier International',
+    location: 'Londres, UK',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    rating: 4.7,
+    reviewCount: 84,
+    responseTime: '< 15 min',
+    languages: ['Français', 'Anglais'],
+    verified: true,
+    online: true,
+    price: 'à partir de 150€/h'
+  },
+  {
+    id: '5',
+    name: 'Sophie Laurent',
+    role: 'Experte Assurance',
+    specialty: 'Assurance Santé Internationale',
+    location: 'Tokyo, Japon',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+    rating: 4.9,
+    reviewCount: 112,
+    responseTime: '< 7 min',
+    languages: ['Français', 'Anglais', 'Japonais'],
+    verified: true,
+    online: true,
+    price: 'à partir de 75€/h'
+  }
 ];
 
-const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '⚡' },
-  { path: '/pricing', labelKey: 'nav.pricing', icon: '💎' },
+// Plans de pricing
+const PRICING_PLANS: PricingPlan[] = [
+  {
+    name: 'Gratuit',
+    price: '0€',
+    period: 'par mois',
+    description: 'Pour découvrir nos services',
+    features: [
+      'Accès à la liste des experts',
+      'Recherche par spécialité',
+      'Consultation des avis',
+      'Chat communauté',
+      'Support par email'
+    ],
+    cta: 'Commencer gratuitement',
+    color: 'from-gray-600 to-gray-700'
+  },
+  {
+    name: 'Essentiel',
+    price: '29€',
+    period: 'par mois',
+    description: 'Pour les expatriés occasionnels',
+    features: [
+      'Tout du plan Gratuit',
+      '2 consultations par mois',
+      'Support prioritaire',
+      'Accès mobile offline',
+      'Notifications urgentes'
+    ],
+    cta: 'Choisir Essentiel',
+    color: 'from-blue-600 to-blue-700'
+  },
+  {
+    name: 'Premium',
+    price: '79€',
+    period: 'par mois',
+    description: 'Pour les expatriés réguliers',
+    features: [
+      'Tout du plan Essentiel',
+      'Consultations illimitées',
+      'SOS 24/7 prioritaire',
+      'Experts dédiés',
+      'Documents juridiques',
+      'Traduction certifiée'
+    ],
+    popular: true,
+    cta: 'Choisir Premium',
+    color: 'from-red-600 to-orange-600'
+  },
+  {
+    name: 'Entreprise',
+    price: 'Sur mesure',
+    period: '',
+    description: 'Pour les entreprises et familles',
+    features: [
+      'Tout du plan Premium',
+      'Multi-utilisateurs',
+      'Gestionnaire dédié',
+      'Formation équipes',
+      'API & intégrations',
+      'Rapports analytics'
+    ],
+    cta: 'Nous contacter',
+    color: 'from-purple-600 to-purple-700'
+  }
 ];
 
-const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
+// Composant principal de la page d'accueil
+const OptimizedHomePage: React.FC = () => {
+  const [currentTestimonial, setCurrentTestimonial] = useState(0);
+  const [currentProfile, setCurrentProfile] = useState(0);
 
-// Hook pour gérer le scroll (identique à l'ancien)
-const useScrolled = () => {
-  const [scrolled, setScrolled] = useState(false);
-
+  // Auto-rotation des témoignages
   useEffect(() => {
-    let ticking = false;
-    
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          setScrolled(window.scrollY > 20);
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
+    const timer = setInterval(() => {
+      setCurrentTestimonial((prev) => (prev + 1) % TESTIMONIALS.length);
+    }, 5000);
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => clearInterval(timer);
   }, []);
 
-  return scrolled;
-};
-
-// Hook PWA
-const usePWA = (): PWAState => {
-  const [pwaState, setPwaState] = useState<PWAState>({
-    isInstalled: false,
-    canInstall: false,
-    isOffline: !navigator.onLine
-  });
-
+  // Auto-rotation des profils
   useEffect(() => {
-    const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
-    
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setPwaState(prev => ({ ...prev, canInstall: true }));
-    };
+    const timer = setInterval(() => {
+      setCurrentProfile((prev) => (prev + 1) % EXPERT_PROFILES.length);
+    }, 4000);
 
-    const handleAppInstalled = () => {
-      setPwaState(prev => ({ ...prev, isInstalled: true, canInstall: false }));
-    };
-
-    const handleOffline = () => setPwaState(prev => ({ ...prev, isOffline: true }));
-    const handleOnline = () => setPwaState(prev => ({ ...prev, isOffline: false }));
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('online', handleOnline);
-
-    setPwaState(prev => ({ ...prev, isInstalled }));
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('online', handleOnline);
-    };
+    return () => clearInterval(timer);
   }, []);
 
-  return pwaState;
-};
-
-// Header Availability Toggle (logique exacte de l'ancien fichier)
-const HeaderAvailabilityToggle = memo(() => {
-  const { user } = useAuth();
-  const { language } = useApp();
-  const [isOnline, setIsOnline] = useState(user?.isOnline ?? false);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  // Vérifier si l'utilisateur est un prestataire
-  const isProvider = user?.role === 'lawyer' || user?.role === 'expat' || user?.type === 'lawyer' || user?.type === 'expat';
-
-  // Synchroniser avec les changements de l'utilisateur
-  useEffect(() => {
-    setIsOnline(user?.isOnline ?? false);
-  }, [user?.isOnline]);
-
-  const toggleOnlineStatus = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!user?.uid && !user?.id || isUpdating) return;
-    
-    setIsUpdating(true);
-    const newStatus = !isOnline;
-
-    try {
-      // Simulation de mise à jour Firebase (remplace les vrais appels)
-      console.log('Updating user status to:', newStatus);
-      
-      // Simulation d'un délai de mise à jour
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setIsOnline(newStatus);
-
-      // Analytics pour le changement de statut
-      if (typeof window !== 'undefined' && window.gtag) {
-        window.gtag('event', 'online_status_change', {
-          event_category: 'engagement',
-          event_label: newStatus ? 'online' : 'offline',
-        });
-      }
-    } catch (error) {
-      console.error('Erreur lors du changement de statut :', error);
-    } finally {
-      setIsUpdating(false);
+  // Stats impressionnantes
+  const stats: Stat[] = [
+    {
+      value: '15K+',
+      label: 'Expatriés aidés',
+      icon: <Users className="w-8 h-8" />,
+      color: 'from-blue-500 to-cyan-500'
+    },
+    {
+      value: '2K+',
+      label: 'Experts vérifiés',
+      icon: <Shield className="w-8 h-8" />,
+      color: 'from-green-500 to-emerald-500'
+    },
+    {
+      value: '50+',
+      label: 'Pays couverts',
+      icon: <Globe className="w-8 h-8" />,
+      color: 'from-purple-500 to-pink-500'
+    },
+    {
+      value: '24/7',
+      label: 'Support urgent',
+      icon: <Clock className="w-8 h-8" />,
+      color: 'from-orange-500 to-red-500'
     }
-  };
+  ];
 
-  if (!isProvider) return null;
-
-  const t = {
-    online: language === 'fr' ? 'En ligne' : 'Online',
-    offline: language === 'fr' ? 'Hors ligne' : 'Offline',
-  };
-
-  return (
-    <button
-      onClick={toggleOnlineStatus}
-      disabled={isUpdating}
-      type="button"
-      className={`group flex items-center px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] touch-manipulation ${
-        isOnline 
-          ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg' 
-          : 'bg-gray-500 hover:bg-gray-600 text-white shadow-lg'
-      } ${isUpdating ? 'opacity-75 cursor-not-allowed' : ''}`}
-      style={{ 
-        border: '2px solid white',
-        boxSizing: 'border-box'
-      }}
-      aria-label={`Changer le statut vers ${isOnline ? t.offline : t.online}`}
-    >
-      {isUpdating ? (
-        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-      ) : (
-        <>
-          {isOnline ? (
-            <Wifi className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-          ) : (
-            <WifiOff className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-          )}
-        </>
-      )}
-      <span>{isOnline ? `🟢 ${t.online}` : `🔴 ${t.offline}`}</span>
-    </button>
-  );
-});
-
-// Composant Avatar utilisateur (logique exacte de l'ancien fichier)
-const UserAvatar = memo<{ user: User | null; size?: 'sm' | 'md' }>(({ user, size = 'md' }) => {
-  const [imageError, setImageError] = useState(false);
-  const sizeClasses = size === 'sm' ? 'w-8 h-8' : 'w-9 h-9';
-
-  const photoUrl = user?.profilePhoto || user?.photoURL;
-  const displayName = user?.firstName || user?.displayName || user?.email || 'User';
-
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-  }, []);
-
-  if (!photoUrl || imageError) {
-    return (
-      <div 
-        className={`${sizeClasses} rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
-        aria-label={`Avatar de ${displayName}`}
-      >
-        {displayName.charAt(0).toUpperCase()}
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative">
-      <img
-        src={photoUrl}
-        alt={`Avatar de ${displayName}`}
-        className={`${sizeClasses} rounded-full object-cover ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
-        onError={handleImageError}
-        loading="lazy"
-      />
-      <div 
-        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white"
-        aria-label="En ligne"
-      />
-    </div>
-  );
-});
-
-// PWA Button
-const PWAButton = memo(() => {
-  const { isInstalled, canInstall } = usePWA();
-  const { language } = useApp();
-
-  const handleInstall = () => {
-    console.log('Installing PWA...');
-  };
-
-  if (isInstalled) {
-    return (
-      <div className="flex items-center space-x-2 text-green-400 text-sm">
-        <Check className="w-4 h-4" />
-        <span className="hidden md:inline">{language === 'fr' ? 'Installée' : 'Installed'}</span>
-      </div>
-    );
-  }
-
-  if (!canInstall) return null;
-
-  return (
-    <button
-      onClick={handleInstall}
-      className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors duration-200 text-sm"
-    >
-      <Download className="w-4 h-4" />
-      <span className="hidden lg:inline">{language === 'fr' ? 'Télécharger l\'app' : 'Download app'}</span>
-      <span className="lg:hidden">App</span>
-    </button>
-  );
-});
-
-// Language Dropdown (logique exacte de l'ancien fichier)
-const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
-  const { language, setLanguage } = useApp();
-  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
-  const languageMenuRef = useRef<HTMLDivElement>(null);
-
-  const currentLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === language) || SUPPORTED_LANGUAGES[0];
-
-  // Fermeture du menu au clic extérieur
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
-        setIsLanguageMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleLanguageChange = useCallback((langCode: 'fr' | 'en') => {
-    setLanguage(langCode);
-    setIsLanguageMenuOpen(false);
-    
-    // Analytics pour le changement de langue
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', 'language_change', {
-        event_category: 'engagement',
-        event_label: langCode,
-      });
+  const features = [
+    {
+      icon: <Zap className="w-8 h-8" />,
+      title: "Connexion Instantanée",
+      description: "Trouvez un expert en moins de 5 minutes, 24h/24 et 7j/7",
+      color: "from-yellow-500 to-orange-500"
+    },
+    {
+      icon: <Shield className="w-8 h-8" />,
+      title: "Experts Vérifiés",
+      description: "Tous nos professionnels sont certifiés et évalués par la communauté",
+      color: "from-green-500 to-teal-500"
+    },
+    {
+      icon: <Globe className="w-8 h-8" />,
+      title: "Couverture Mondiale",
+      description: "Plus de 50 pays couverts avec des experts locaux",
+      color: "from-blue-500 to-purple-500"
+    },
+    {
+      icon: <DollarSign className="w-8 h-8" />,
+      title: "Tarifs Transparents",
+      description: "Pas de frais cachés, consultations dès 29€",
+      color: "from-pink-500 to-red-500"
     }
-  }, [setLanguage]);
-
-  if (isMobile) {
-    return (
-      <div className="mb-6">
-        <div className="flex items-center text-sm font-semibold text-white/90 mb-3">
-          <Globe className="w-4 h-4 mr-2" />
-          {language === 'fr' ? 'Langue' : 'Language'}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {SUPPORTED_LANGUAGES.map(lang => (
-            <button
-              key={lang.code}
-              onClick={() => handleLanguageChange(lang.code)}
-              className={`group relative overflow-hidden px-6 py-4 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 ${
-                language === lang.code 
-                  ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white shadow-xl scale-105' 
-                  : 'bg-white/20 backdrop-blur-xl text-white hover:bg-white/30 border border-white/20'
-              }`}
-              aria-label={`Changer la langue vers ${lang.nativeName}`}
-              aria-pressed={language === lang.code}
-            >
-              <div className="relative z-10 flex items-center justify-center">
-                <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
-                  {lang.flag}
-                </div>
-                <span className="font-bold text-sm">{lang.nativeName}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  ];
 
   return (
-    <div className="relative" ref={languageMenuRef}>
-      <button
-        onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
-        className="group flex items-center space-x-2 text-white text-sm font-medium hover:text-yellow-200 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-3 min-h-[44px] min-w-[44px] justify-center touch-manipulation"
-        aria-expanded={isLanguageMenuOpen}
-        aria-haspopup="true"
-        aria-label="Sélectionner la langue"
-      >
-        <div className="group-hover:scale-110 transition-transform duration-300">
-          {currentLanguage.flag}
-        </div>
-        <ChevronDown className={`w-4 h-4 transition-all duration-300 ${isLanguageMenuOpen ? 'rotate-180 text-yellow-300' : ''}`} />
-      </button>
-      
-      {isLanguageMenuOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 animate-in slide-in-from-top-2 duration-300">
-          {SUPPORTED_LANGUAGES.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => handleLanguageChange(lang.code)}
-              className={`group flex items-center w-full px-4 py-3 text-sm text-left hover:bg-gray-50 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-gray-50 ${
-                language === lang.code ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-700'
-              }`}
-              aria-pressed={language === lang.code}
-            >
-              <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
-                {lang.flag}
-              </div>
-              <span>{lang.nativeName}</span>
-              {language === lang.code && (
-                <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-label="Langue actuelle" />
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-});
-
-// User Menu (logique exacte de l'ancien fichier)
-const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
-  const { user, logout } = useAuth();
-  const { language } = useApp();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Fermeture du menu au clic extérieur
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleLogout = useCallback(async () => {
-    try {
-      await logout();
-      setIsUserMenuOpen(false);
-      
-      // Analytics pour la déconnexion
-      if (typeof window !== 'undefined' && window.gtag) {
-        window.gtag('event', 'logout', {
-          event_category: 'engagement',
-        });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  }, [logout]);
-
-  // Traductions pour i18n (identiques à l'ancien)
-  const t = {
-    login: language === 'fr' ? 'Connexion' : 'Login',
-    signup: language === 'fr' ? "S'inscrire" : 'Sign up',
-    dashboard: language === 'fr' ? 'Tableau de bord' : 'Dashboard',
-    adminConsole: language === 'fr' ? 'Console Admin' : 'Admin Console',
-    logout: language === 'fr' ? 'Déconnexion' : 'Logout',
-  };
-
-  if (!user) {
-    const authLinks = (
-      <>
-        <Link 
-          to="/login" 
-          className={isMobile 
-            ? "group flex items-center justify-center w-full bg-white/15 backdrop-blur-xl text-white px-6 py-4 rounded-2xl hover:bg-white/25 hover:scale-105 transition-all duration-300 font-semibold border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
-            : "group relative p-3 rounded-full hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-          }
-          aria-label={t.login}
-        >
-          {isMobile ? (
-            <>
-              <User className="w-5 h-5 mr-3" />
-              <span>{t.login}</span>
-            </>
-          ) : (
-            <User className="w-5 h-5 text-white group-hover:text-yellow-200 transition-colors duration-300" />
-          )}
-        </Link>
-        <Link 
-          to="/register" 
-          className={isMobile
-            ? "group flex items-center justify-center w-full bg-gradient-to-r from-white via-gray-50 to-white text-red-600 px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[48px] touch-manipulation"
-            : "group relative p-3 rounded-full bg-white hover:bg-gray-50 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-          }
-          aria-label={t.signup}
-        >
-          {isMobile ? (
-            <>
-              <UserPlus className="w-5 h-5 mr-3" />
-              <span>{t.signup}</span>
-            </>
-          ) : (
-            <UserPlus className="w-5 h-5 text-red-600 group-hover:text-red-700 transition-colors duration-300" />
-          )}
-        </Link>
-      </>
-    );
-
-    return isMobile ? (
-      <div className="space-y-4">{authLinks}</div>  
-    ) : (
-      <div className="flex items-center space-x-4">{authLinks}</div>
-    );
-  }
-
-  if (isMobile) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center space-x-4 p-4 bg-white/20 backdrop-blur-sm rounded-xl">
-          <UserAvatar user={user} />
-          <div>
-            <div className="font-semibold text-white">
-              {user.firstName || user.displayName || user.email}
-            </div>
-            <div className="text-xs text-white/70 capitalize">
-              {user.role || 'Utilisateur'}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {user.role === 'admin' && (
-            <Link 
-              to="/admin/dashboard" 
-              className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50"
-              aria-label={t.adminConsole}
-            >
-              <Shield className="w-5 h-5 mr-3" />
-              <span className="font-medium">{t.adminConsole}</span>
-            </Link>
-          )}
-          <Link 
-            to="/dashboard" 
-            className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-4 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
-            aria-label={t.dashboard}
-          >
-            <Settings className="w-5 h-5 mr-3" />
-            <span className="font-medium">{t.dashboard}</span>
-          </Link>
-          <button 
-            onClick={handleLogout} 
-            className="flex items-center w-full bg-red-500/80 text-white px-4 py-4 rounded-xl hover:bg-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 min-h-[48px] touch-manipulation"
-            aria-label={t.logout}
-          >
-            <LogOut className="w-5 h-5 mr-3" />
-            <span className="font-medium">{t.logout}</span>
-          </button>
+    <div className="min-h-screen bg-gray-950">
+      {/* Header - Dans votre projet, remplacez par: <ModernHeader2025 /> */}
+      <div className="h-20 bg-gray-900 flex items-center justify-center border-b border-white/10">
+        <div className="text-white font-bold text-xl">
+          📍 Emplacement du Header - Importez votre composant ModernHeader2025 ici
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="relative" ref={userMenuRef}>
-      <button 
-        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
-        className="group flex items-center space-x-3 text-white transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 min-h-[44px] touch-manipulation"
-        aria-expanded={isUserMenuOpen}
-        aria-haspopup="true"
-        aria-label="Menu utilisateur"
-      >
-        <UserAvatar user={user} />
-        <span className="text-sm font-medium hidden md:inline">{user.firstName || user.displayName || 'User'}</span>
-        <ChevronDown className={`w-4 h-4 transition-all duration-300 ${isUserMenuOpen ? 'rotate-180 text-yellow-300' : ''}`} />
-      </button>
-      
-      {isUserMenuOpen && (
-        <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 animate-in slide-in-from-top-2 duration-300">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-red-50 to-orange-50 rounded-t-2xl">
-            <div className="flex items-center space-x-3">
-              <UserAvatar user={user} />
-              <div>
-                <div className="font-semibold text-gray-900">{user.firstName || user.displayName || user.email}</div>
-                <div className="text-xs text-gray-500 capitalize">{user.role || 'Utilisateur'}</div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="py-1">
-            {user.role === 'admin' && (
-              <Link 
-                to="/admin/dashboard" 
-                className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" 
-                onClick={() => setIsUserMenuOpen(false)}
-              >
-                <Shield className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
-                {t.adminConsole}
-              </Link>
-            )}
-            <Link 
-              to="/dashboard" 
-              className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" 
-              onClick={() => setIsUserMenuOpen(false)}
-            >
-              <Settings className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
-              {t.dashboard}
-            </Link>
-            <hr className="my-1 border-gray-100" />
-            <button 
-              onClick={handleLogout} 
-              className="group flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50"
-            >
-              <LogOut className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
-              {t.logout}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-});
-
-// Composant principal Header (style exact de l'ancien fichier)
-const Header: React.FC = () => {
-  const location = useLocation();
-  const { isLoading } = useAuth();
-  const { language } = useApp();
-  const scrolled = useScrolled();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const isActive = useCallback((path: string) => location.pathname === path, [location.pathname]);
-
-  // Fermeture du menu mobile lors du changement de route
-  useEffect(() => {
-    setIsMenuOpen(false);
-  }, [location.pathname]);
-
-  // Traductions pour i18n (exactement comme l'ancien)
-  const getNavigationLabel = useCallback((labelKey: string): string => {
-    const translations: Record<string, Record<string, string>> = {
-      'nav.home': { fr: 'Accueil', en: 'Home' },
-      'nav.viewProfiles': { fr: 'Voir les profils aidants', en: 'View helper profiles' },
-      'nav.testimonials': { fr: 'Les avis', en: 'Reviews' },
-      'nav.howItWorks': { fr: 'Comment ça marche', en: 'How it Works' },
-      'nav.pricing': { fr: 'Tarifs', en: 'Pricing' },
-    };
-    
-    return translations[labelKey]?.[language] || labelKey;
-  }, [language]);
-
-  const t = {
-    sosCall: language === 'fr' ? 'SOS Appel' : 'SOS Call',
-    tagline: language === 'fr' ? 'pour expatriés & voyageurs' : 'for expats & travelers',
-    mobileTagline: language === 'fr' ? 'expatriés' : 'expats',
-  };
-
-  return (
-    <>
-      <header 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled 
-            ? 'bg-red-600/95 backdrop-blur-xl shadow-xl' 
-            : 'bg-gradient-to-r from-red-600 to-red-500'
-        }`}
-        role="banner"
-      >
-        {/* Desktop Header */}
-        <div className="hidden lg:block">
-          <div className="w-full px-4">
-            <div className="flex items-center justify-between h-20">
-              {/* Logo + PWA */}
-              <div className="flex items-center space-x-4">
-                <Link 
-                  to="/" 
-                  className="group flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                  aria-label="SOS Expats - Accueil"
-                >
-                  <div className="transform group-hover:scale-105 transition-all duration-300">
-                    <h1 className="font-bold text-xl text-white m-0">SOS Expats</h1>
-                    <p className="text-xs text-white/80 font-medium m-0">
-                      {t.tagline}
-                    </p>
-                  </div>
-                </Link>
-                <div className="h-6 w-px bg-white/20" />
-                <PWAButton />
-              </div>
-
-              {/* Navigation complète avec bouton SOS au centre */}
-              <div className="flex-1 flex items-center justify-center">
-                {/* Navigation gauche */}
-                <div className="flex items-center space-x-8">
-                  {LEFT_NAVIGATION_ITEMS.map((item) => (
-                    <Link 
-                      key={item.path} 
-                      to={item.path} 
-                      className={`group flex flex-col items-center text-lg font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 min-w-max ${
-                        isActive(item.path) 
-                          ? 'text-white' 
-                          : 'text-white/90 hover:text-white'
-                      }`}
-                      aria-current={isActive(item.path) ? 'page' : undefined}
-                    >
-                      <span 
-                        className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
-                        role="img"
-                        aria-hidden="true"
-                      >
-                        {item.icon}
-                      </span>
-                      <span className="text-sm leading-tight text-center whitespace-nowrap">{getNavigationLabel(item.labelKey)}</span>
-                      {isActive(item.path) && (
-                        <div className="mt-1 w-1.5 h-1.5 bg-white rounded-full animate-pulse" aria-hidden="true" />
-                      )}
-                    </Link>
-                  ))}
-                </div>
-
-                {/* Bouton SOS - Principal CTA centré */}
-                <div className="mx-12">
-                  <Link 
-                    to="/sos-appel" 
-                    className="group relative overflow-hidden bg-white hover:bg-gray-50 text-red-600 px-8 py-2.5 rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-xl flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-white/50 border-2 border-white whitespace-nowrap"
-                    aria-label={t.sosCall}
-                  >
-                    <div className="relative z-10 flex items-center space-x-2">
-                      <Phone className="w-5 h-5 group-hover:rotate-6 transition-transform duration-300" />
-                      <span>{t.sosCall}</span>
-                    </div>
-                  </Link>
-                </div>
-
-                {/* Navigation droite */}
-                <div className="flex items-center space-x-8">
-                  {RIGHT_NAVIGATION_ITEMS.map((item) => (
-                    <Link 
-                      key={item.path} 
-                      to={item.path} 
-                      className={`group flex flex-col items-center text-lg font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 min-w-max ${
-                        isActive(item.path) 
-                          ? 'text-white' 
-                          : 'text-white/90 hover:text-white'
-                      }`}
-                      aria-current={isActive(item.path) ? 'page' : undefined}
-                    >
-                      <span 
-                        className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
-                        role="img"
-                        aria-hidden="true"
-                      >
-                        {item.icon}
-                      </span>
-                      <span className="text-sm leading-tight text-center whitespace-nowrap">{getNavigationLabel(item.labelKey)}</span>
-                      {isActive(item.path) && (
-                        <div className="mt-1 w-1.5 h-1.5 bg-white rounded-full animate-pulse" aria-hidden="true" />
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Actions Desktop */}
-              <div className="flex-shrink-0 flex items-center space-x-4">
-                {/* Bouton statut en ligne/hors ligne - Desktop */}
-                <HeaderAvailabilityToggle />
-                
-                <LanguageDropdown />
-
-                {isLoading ? (
-                  <div 
-                    className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"
-                    role="status"
-                    aria-label="Chargement"
-                  />
-                ) : (
-                  <UserMenu />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Header */}
-        <div className="lg:hidden">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <Link 
-              to="/" 
-              className="flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1"
-              aria-label="SOS Expats - Accueil"
-            >
-              <div className="flex flex-col">
-                <h1 className="font-bold text-lg text-white m-0">SOS Expats</h1>
-                <p className="text-xs text-white/80 m-0">{t.mobileTagline}</p>
-              </div>
-            </Link>
-
-            <div className="flex items-center space-x-3">
-              <Link 
-                to="/sos-appel" 
-                className="group bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-lg font-bold transition-all duration-300 hover:scale-105 text-sm flex items-center space-x-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 border border-white"
-                aria-label={t.sosCall}
-              >
-                <Phone className="w-4 h-4 group-hover:rotate-6 transition-transform duration-300" />
-                <span>SOS</span>
-              </Link>
-              <HeaderAvailabilityToggle />
-              <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className="p-3 rounded-lg text-white hover:bg-white/20 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-                aria-expanded={isMenuOpen}
-                aria-label="Menu de navigation"
-              >
-                {isMenuOpen ? 
-                  <X className="w-6 h-6" aria-hidden="true" /> : 
-                  <Menu className="w-6 h-6" aria-hidden="true" />
-                }
-              </button>
-            </div>
-          </div>
-
-          {/* Menu Mobile */}
-          {isMenuOpen && (
-            <div className="bg-red-700 px-6 py-6 shadow-lg border-t border-red-500" role="navigation" aria-label="Navigation mobile">
-              <nav className="flex flex-col space-y-4">
-                {ALL_NAVIGATION_ITEMS.map((item) => (
-                  <Link 
-                    key={item.path} 
-                    to={item.path} 
-                    className={`text-lg font-semibold transition-colors px-4 py-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] flex items-center touch-manipulation ${
-                      isActive(item.path) 
-                        ? 'text-white bg-white/20 font-bold' 
-                        : 'text-white/90 hover:text-white hover:bg-white/10'
-                    }`} 
-                    onClick={() => setIsMenuOpen(false)}
-                    aria-current={isActive(item.path) ? 'page' : undefined}
-                  >
-                    <span className="mr-3 text-xl" role="img" aria-hidden="true">{item.icon}</span>
-                    {getNavigationLabel(item.labelKey)}
-                  </Link>
-                ))}
-                
-                <div className="pt-6 border-t border-red-500 space-y-6">
-                  <LanguageDropdown isMobile />
-                  <UserMenu isMobile />
-                </div>
-              </nav>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Spacer pour compenser le header fixe */}
-      <div className="h-20" aria-hidden="true" />
-
-      {/* Demo Message */}
-      <div className="fixed bottom-4 left-4 bg-blue-600 text-white p-3 rounded-lg shadow-lg max-w-xs text-sm z-40">
-        🚀 Demo SOS Expats Header - Cliquez pour voir les interactions !
-      </div>
-
-      {/* Structured Data pour SEO (exactement comme l'ancien) */}
-      {typeof window !== 'undefined' && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "SOS Expats",
-              "description": language === 'fr' 
-                ? "Service d'assistance pour expatriés et voyageurs"
-                : "Assistance service for expats and travelers",
-              "url": window.location.origin,
-              "logo": `${window.location.origin}/logo.png`,
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "telephone": "+33-XXX-XXX-XXX",
-                "contactType": "customer service",
-                "availableLanguage": ["French", "English"]
-              },
-              "sameAs": [
-                "https://facebook.com/sosexpats",
-                "https://twitter.com/sosexpats",
-                "https://linkedin.com/company/sosexpats"
-              ]
-            })
-          }}
-        />
-      )}
-
-      {/* Préchargement des ressources critiques */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      
-      {/* Meta tags dynamiques pour les réseaux sociaux (exactement comme l'ancien) */}
-      {typeof window !== 'undefined' && (() => {
-        // Open Graph
-        const updateMetaTag = (property: string, content: string) => {
-          let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('property', property);
-            document.head.appendChild(meta);
-          }
-          meta.content = content;
-        };
-
-        const currentPage = location.pathname;
-        const baseTitle = 'SOS Expats';
-        const baseDescription = language === 'fr' 
-          ? 'Service d\'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés.'
-          : 'Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.';
-
-        const currentNavItem = ALL_NAVIGATION_ITEMS.find(item => item.path === currentPage);
-        const pageTitle = currentNavItem ? getNavigationLabel(currentNavItem.labelKey) : getNavigationLabel('nav.home');
-
-        updateMetaTag('og:title', `${baseTitle} - ${pageTitle}`);
-        updateMetaTag('og:description', baseDescription);
-        updateMetaTag('og:url', window.location.href);
-        updateMetaTag('og:type', 'website');
-        updateMetaTag('og:locale', language === 'fr' ? 'fr_FR' : 'en_US');
+      {/* Hero Section */}
+      <section className="relative pt-20 pb-32 overflow-hidden">
+        {/* Background Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
+        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-blue-500/10" />
         
-        // Twitter Cards
-        const updateTwitterMeta = (name: string, content: string) => {
-          let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('name', name);
-            document.head.appendChild(meta);
-          }
-          meta.content = content;
-        };
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        </div>
 
-        updateTwitterMeta('twitter:card', 'summary_large_image');
-        updateTwitterMeta('twitter:title', `${baseTitle} - ${pageTitle}`);
-        updateTwitterMeta('twitter:description', baseDescription);
+        <div className="relative z-10 max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 mb-8">
+              <Sparkles className="w-5 h-5 text-yellow-400" />
+              <span className="text-white font-medium">Nouveau : Support IA 24/7</span>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            </div>
 
-        return null;
-      })()}
-    </>
+            <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight">
+              <span className="bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
+                SOS pour
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
+                Expatriés
+              </span>
+            </h1>
+
+            <p className="text-2xl text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed">
+              <strong className="text-white">Assistance juridique et administrative instantanée</strong> pour expatriés. 
+              Trouvez un expert local en moins de 5 minutes, partout dans le monde.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+              <a
+                href="/sos-appel"
+                className="group relative overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-orange-500 hover:from-red-700 hover:via-red-600 hover:to-orange-600 text-white px-12 py-6 rounded-3xl font-black text-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-red-500/50 flex items-center space-x-4 border-2 border-red-400/50"
+              >
+                <Phone className="w-8 h-8 group-hover:animate-pulse" />
+                <span>URGENCE 24/7</span>
+                <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/30 via-orange-500/30 to-red-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </a>
+
+              <a
+                href="/experts"
+                className="group flex items-center space-x-3 px-10 py-6 rounded-3xl bg-white/10 hover:bg-white/20 text-white border-2 border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-105 backdrop-blur-sm font-bold text-lg"
+              >
+                <Play className="w-6 h-6" />
+                <span>Voir les experts</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Stats Section */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {stats.map((stat, index) => (
+              <div
+                key={index}
+                className="group text-center p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-105"
+              >
+                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r ${stat.color} mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                  <div className="text-white">
+                    {stat.icon}
+                  </div>
+                </div>
+                <div className="text-4xl font-black text-white mb-2">{stat.value}</div>
+                <div className="text-gray-400 font-medium">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black text-white mb-6">
+              Pourquoi choisir <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">SOS Expats</span> ?
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              La première plateforme mondiale d'assistance pour expatriés, conçue par des expatriés pour des expatriés.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {features.map((feature, index) => (
+              <div
+                key={index}
+                className="group relative p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-105 overflow-hidden"
+              >
+                <div className="relative z-10">
+                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r ${feature.color} mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                    <div className="text-white">
+                      {feature.icon}
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4">{feature.title}</h3>
+                  <p className="text-gray-400 leading-relaxed">{feature.description}</p>
+                </div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Profile Carousel Section */}
+      <section className="py-32 bg-gradient-to-b from-gray-950 via-red-950/20 to-gray-950 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500/20 to-orange-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-red-500/30 mb-8">
+              <Shield className="w-5 h-5 text-red-400" />
+              <span className="text-red-300 font-bold">Experts vérifiés • Disponibles 24/7</span>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            </div>
+
+            <h2 className="text-5xl font-black text-white mb-6">
+              Nos <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">experts</span> à votre service
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              Plus de 2 000 professionnels vérifiés dans 50+ pays, prêts à vous aider immédiatement
+            </p>
+          </div>
+
+          {/* Profile Carousel */}
+          <div className="relative max-w-6xl mx-auto">
+            <div className="overflow-hidden rounded-3xl">
+              <div 
+                className="flex transition-transform duration-500 ease-in-out"
+                style={{ transform: `translateX(-${currentProfile * 100}%)` }}
+              >
+                {EXPERT_PROFILES.map((profile) => (
+                  <div key={profile.id} className="w-full flex-shrink-0 px-4">
+                    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 p-8 relative overflow-hidden">
+                      <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8">
+                        {/* Avatar et Status */}
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={profile.avatar}
+                            alt={profile.name}
+                            className="w-32 h-32 rounded-3xl object-cover ring-4 ring-white/30"
+                          />
+                          
+                          {/* Status Online */}
+                          {profile.online && (
+                            <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-xl text-xs font-bold flex items-center space-x-1 shadow-lg">
+                              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                              <span>En ligne</span>
+                            </div>
+                          )}
+
+                          {/* Verified Badge */}
+                          {profile.verified && (
+                            <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                              <Check className="w-4 h-4 text-white" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Informations */}
+                        <div className="flex-1 text-center md:text-left">
+                          <div className="mb-4">
+                            <h3 className="text-2xl font-bold text-white mb-2">{profile.name}</h3>
+                            <div className="flex items-center justify-center md:justify-start space-x-2 text-red-400 font-medium mb-2">
+                              <span>{profile.role}</span>
+                              <span>•</span>
+                              <span>{profile.specialty}</span>
+                            </div>
+                            <div className="flex items-center justify-center md:justify-start space-x-2 text-gray-400 text-sm">
+                              <MapPin className="w-4 h-4" />
+                              <span>{profile.location}</span>
+                            </div>
+                          </div>
+
+                          {/* Rating et Reviews */}
+                          <div className="flex items-center justify-center md:justify-start space-x-4 mb-4">
+                            <div className="flex items-center space-x-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star 
+                                  key={i} 
+                                  className={`w-4 h-4 ${i < Math.floor(profile.rating) ? 'text-yellow-400 fill-current' : 'text-gray-600'}`} 
+                                />
+                              ))}
+                              <span className="text-white font-bold ml-2">{profile.rating}</span>
+                            </div>
+                            <div className="text-gray-400 text-sm">
+                              ({profile.reviewCount} avis)
+                            </div>
+                          </div>
+
+                          {/* Langues */}
+                          <div className="flex items-center justify-center md:justify-start space-x-2 mb-4">
+                            {profile.languages.map((lang, index) => (
+                              <span 
+                                key={index}
+                                className="bg-white/10 text-gray-300 px-2 py-1 rounded-lg text-xs font-medium"
+                              >
+                                {lang}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Temps de réponse et Prix */}
+                          <div className="flex items-center justify-center md:justify-start space-x-6 text-sm">
+                            <div className="flex items-center space-x-2 text-green-400">
+                              <Clock className="w-4 h-4" />
+                              <span className="font-medium">{profile.responseTime}</span>
+                            </div>
+                            <div className="text-white font-bold">
+                              {profile.price}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex-shrink-0 flex flex-col space-y-3">
+                          <button className="group bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white px-6 py-3 rounded-2xl font-bold transition-all duration-300 hover:scale-105 shadow-lg">
+                            Contacter maintenant
+                          </button>
+                          <button className="group bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 px-6 py-3 rounded-2xl font-medium transition-all duration-300 hover:scale-105">
+                            Voir le profil
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Background Gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-orange-500/5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Navigation Dots */}
+            <div className="flex items-center justify-center space-x-3 mt-8">
+              {EXPERT_PROFILES.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentProfile(index)}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    currentProfile === index
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 scale-125'
+                      : 'bg-white/30 hover:bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Navigation Arrows */}
+            <button
+              onClick={() => setCurrentProfile((prev) => (prev - 1 + EXPERT_PROFILES.length) % EXPERT_PROFILES.length)}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+
+            <button
+              onClick={() => setCurrentProfile((prev) => (prev + 1) % EXPERT_PROFILES.length)}
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* CTA pour voir tous les experts */}
+          <div className="text-center mt-12">
+            <a
+              href="/experts"
+              className="group inline-flex items-center space-x-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-105 shadow-xl"
+            >
+              <Users className="w-6 h-6" />
+              <span>Voir tous nos experts</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-1/3 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-8">
+              <DollarSign className="w-5 h-5 text-green-400" />
+              <span className="text-green-300 font-bold">Transparence totale • Pas de frais cachés</span>
+              <Check className="w-5 h-5 text-green-400" />
+            </div>
+
+            <h2 className="text-5xl font-black text-white mb-6">
+              Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              Choisissez le plan qui correspond à votre situation d'expatrié. Changez ou annulez à tout moment.
+            </p>
+          </div>
+
+          {/* Pricing Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {PRICING_PLANS.map((plan, index) => (
+              <div
+                key={index}
+                className={`group relative p-8 rounded-3xl border transition-all duration-300 hover:scale-105 overflow-hidden ${
+                  plan.popular
+                    ? 'bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/50 shadow-2xl shadow-red-500/25 scale-110'
+                    : 'bg-white/5 backdrop-blur-sm border-white/10 hover:border-white/20'
+                }`}
+              >
+                {/* Popular Badge */}
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
+                      ⭐ Populaire
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative z-10">
+                  {/* Header */}
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
+                    <div className="mb-4">
+                      <span className="text-4xl font-black text-white">{plan.price}</span>
+                      {plan.period && <span className="text-gray-400 ml-2">{plan.period}</span>}
+                    </div>
+                    <p className="text-gray-400">{plan.description}</p>
+                  </div>
+
+                  {/* Features */}
+                  <div className="space-y-4 mb-8">
+                    {plan.features.map((feature, featureIndex) => (
+                      <div key={featureIndex} className="flex items-center space-x-3">
+                        <div className={`w-5 h-5 rounded-full bg-gradient-to-r ${plan.color} flex items-center justify-center flex-shrink-0`}>
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                        <span className="text-gray-300 text-sm">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CTA Button */}
+                  <button
+                    className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-105 ${
+                      plan.popular
+                        ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg'
+                        : `bg-gradient-to-r ${plan.color} hover:shadow-lg text-white`
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+                </div>
+
+                {/* Background Gradient */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${plan.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+              </div>
+            ))}
+          </div>
+
+          {/* Additional Info */}
+          <div className="mt-16 text-center">
+            <div className="inline-flex items-center space-x-6 bg-white/5 backdrop-blur-sm rounded-2xl px-8 py-4 border border-white/10">
+              <div className="flex items-center space-x-2 text-green-400">
+                <Shield className="w-5 h-5" />
+                <span className="font-medium">Garantie 30 jours</span>
+              </div>
+              <div className="w-px h-6 bg-white/20" />
+              <div className="flex items-center space-x-2 text-blue-400">
+                <Globe className="w-5 h-5" />
+                <span className="font-medium">Support mondial</span>
+              </div>
+              <div className="w-px h-6 bg-white/20" />
+              <div className="flex items-center space-x-2 text-purple-400">
+                <Zap className="w-5 h-5" />
+                <span className="font-medium">Activation instantanée</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-32 bg-gradient-to-b from-gray-900 to-gray-950 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-1/4 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-yellow-500/30 mb-8">
+              <Star className="w-5 h-5 text-yellow-400 fill-current" />
+              <span className="text-yellow-300 font-bold">4.9/5 • +2,500 avis</span>
+              <Award className="w-5 h-5 text-yellow-400" />
+            </div>
+
+            <h2 className="text-5xl font-black text-white mb-6">
+              Ce que disent nos <span className="bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">utilisateurs</span>
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-8">
+              Découvrez les témoignages authentiques de notre communauté d'expatriés satisfaits
+            </p>
+
+            {/* Lien vers la page testimonials */}
+            <a
+              href="http://localhost:5177/testimonials"
+              className="group inline-flex items-center space-x-2 text-blue-400 hover:text-blue-300 font-bold transition-colors duration-300"
+            >
+              <span>Voir tous les avis</span>
+              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+            </a>
+          </div>
+
+          {/* Testimonials Carousel */}
+          <div className="relative max-w-5xl mx-auto">
+            <div className="overflow-hidden rounded-3xl">
+              <div 
+                className="flex transition-transform duration-500 ease-in-out"
+                style={{ transform: `translateX(-${currentTestimonial * 100}%)` }}
+              >
+                {TESTIMONIALS.map((testimonial) => (
+                  <div key={testimonial.id} className="w-full flex-shrink-0 px-4">
+                    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 p-8 md:p-12 relative overflow-hidden">
+                      {/* Quote Icon */}
+                      <div className="absolute top-8 right-8 opacity-20">
+                        <Quote className="w-16 h-16 text-white" />
+                      </div>
+
+                      {/* Content */}
+                      <div className="relative z-10">
+                        {/* Rating */}
+                        <div className="flex items-center space-x-1 mb-6">
+                          {[...Array(testimonial.rating)].map((_, i) => (
+                            <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
+                          ))}
+                        </div>
+
+                        {/* Comment */}
+                        <blockquote className="text-xl md:text-2xl text-white leading-relaxed mb-8 font-medium">
+                          "{testimonial.comment}"
+                        </blockquote>
+
+                        {/* Author Info */}
+                        <div className="flex items-center space-x-4">
+                          <div className="relative">
+                            <img
+                              src={testimonial.avatar}
+                              alt={testimonial.name}
+                              className="w-16 h-16 rounded-2xl object-cover ring-2 ring-white/30"
+                            />
+                            {testimonial.verified && (
+                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center border-2 border-gray-900">
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <div className="font-bold text-white text-lg">{testimonial.name}</div>
+                              {testimonial.verified && (
+                                <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-lg text-xs font-bold">
+                                  Vérifié
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-gray-400 font-medium">{testimonial.role}</div>
+                            <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{testimonial.location}</span>
+                            </div>
+                          </div>
+
+                          <div className="ml-auto text-right">
+                            <div className="flex items-center space-x-1 text-gray-400 text-sm">
+                              <Heart className="w-4 h-4" />
+                              <span>{testimonial.helpful} utiles</span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {new Date(testimonial.date).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Background Gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Navigation Dots */}
+            <div className="flex items-center justify-center space-x-3 mt-8">
+              {TESTIMONIALS.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentTestimonial(index)}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    currentTestimonial === index
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 scale-125'
+                      : 'bg-white/30 hover:bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Navigation Arrows */}
+            <button
+              onClick={() => setCurrentTestimonial((prev) => (prev - 1 + TESTIMONIALS.length) % TESTIMONIALS.length)}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+
+            <button
+              onClick={() => setCurrentTestimonial((prev) => (prev + 1) % TESTIMONIALS.length)}
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Trust Indicators */}
+          <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { 
+                icon: <TrendingUp className="w-8 h-8" />, 
+                title: "98% de satisfaction", 
+                subtitle: "Taux de résolution" 
+              },
+              { 
+                icon: <Clock className="w-8 h-8" />, 
+                title: "< 5 minutes", 
+                subtitle: "Temps de connexion moyen" 
+              },
+              { 
+                icon: <Shield className="w-8 h-8" />, 
+                title: "100% sécurisé", 
+                subtitle: "Données cryptées" 
+              }
+            ].map((indicator, index) => (
+              <div key={index} className="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 mb-4">
+                  <div className="text-white">{indicator.icon}</div>
+                </div>
+                <div className="text-2xl font-bold text-white mb-2">{indicator.title}</div>
+                <div className="text-gray-400">{indicator.subtitle}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-32 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20" />
+        
+        <div className="relative z-10 max-w-4xl mx-auto text-center px-6">
+          <h2 className="text-5xl md:text-6xl font-black text-white mb-8">
+            Prêt à être aidé ?
+          </h2>
+          <p className="text-2xl text-white/90 mb-12 leading-relaxed">
+            Rejoignez plus de <strong>15 000 expatriés</strong> qui font confiance à SOS Expats pour leurs démarches à l'étranger.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+            <a
+              href="/register"
+              className="group bg-white hover:bg-gray-100 text-red-600 px-12 py-6 rounded-3xl font-black text-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl flex items-center space-x-4"
+            >
+              <span>Commencer gratuitement</span>
+              <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
+            </a>
+
+            <a
+              href="/sos-appel"
+              className="group bg-transparent border-2 border-white hover:bg-white hover:text-red-600 text-white px-12 py-6 rounded-3xl font-bold text-xl transition-all duration-300 hover:scale-105 flex items-center space-x-4"
+            >
+              <Phone className="w-6 h-6" />
+              <span>Urgence maintenant</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer - À décommenter quand disponible */}
+      {/* <Footer /> */}
+    </div>
   );
 };
 
-// Network Status (simple et efficace)
-const NetworkStatus = memo(() => {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  if (!isOffline) return null;
-
-  return (
-    <div className="fixed top-20 left-4 right-4 z-40">
-      <div className="bg-red-600 text-white p-3 rounded-lg shadow-lg max-w-sm mx-auto text-center">
-        <div className="flex items-center justify-center space-x-2">
-          <WifiOff className="w-4 h-4" />
-          <span className="text-sm font-medium">
-            Mode hors ligne - Appelez le +33 X XX XX XX XX
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-// Amélioration des performances avec React.memo (exactement comme l'ancien)
-Header.displayName = 'Header';
-FrenchFlag.displayName = 'FrenchFlag';
-BritishFlag.displayName = 'BritishFlag';
-UserAvatar.displayName = 'UserAvatar';
-LanguageDropdown.displayName = 'LanguageDropdown';
-UserMenu.displayName = 'UserMenu';
-HeaderAvailabilityToggle.displayName = 'HeaderAvailabilityToggle';
-NetworkStatus.displayName = 'NetworkStatus';
-
-export default memo(Header);
+export default OptimizedHomePage;

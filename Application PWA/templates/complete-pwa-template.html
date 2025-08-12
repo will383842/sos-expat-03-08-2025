@@ -1,0 +1,265 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    
+    <!-- PWA MANIFEST -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- THEME COLORS -->
+    <meta name="theme-color" content="#dc2626">
+    <meta name="msapplication-TileColor" content="#dc2626">
+    
+    <!-- APPLE PWA SUPPORT -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SOS Expat">
+    <link rel="apple-touch-icon" href="/icons/icon-180x180.png">
+    
+    <!-- STANDARD ICONS -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    
+    <!-- SEO -->
+    <meta name="description" content="SOS Expat - Assistance juridique et conseil d'expatriés en urgence partout dans le monde">
+    <meta name="keywords" content="sos expat, urgence expatrié, avocat international, assistance juridique">
+    
+    <title>SOS Expat - Assistance Mondiale 24/7</title>
+    
+    <!-- TAILWIND CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* STYLES PWA */
+        .pwa-install-banner {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 1rem;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            transform: translateY(100%);
+            transition: transform 0.4s ease;
+        }
+        
+        .pwa-install-banner.show {
+            transform: translateY(0);
+        }
+        
+        .offline-indicator {
+            background: #ef4444;
+            color: white;
+            padding: 0.75rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1002;
+            transform: translateY(-100%);
+            transition: transform 0.4s ease;
+            text-align: center;
+        }
+        
+        .offline-indicator.show {
+            transform: translateY(0);
+        }
+        
+        @media (display-mode: standalone) {
+            .pwa-only { display: block !important; }
+            .browser-only { display: none !important; }
+        }
+        
+        @media not all and (display-mode: standalone) {
+            .pwa-only { display: none !important; }
+            .browser-only { display: block !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- INDICATEUR HORS LIGNE -->
+    <div id="offline-indicator" class="offline-indicator">
+        🔴 Mode hors ligne - Appelez le +33 X XX XX XX XX pour une urgence
+    </div>
+    
+    <!-- BANNIÈRE INSTALLATION PWA -->
+    <div id="pwa-install-banner" class="pwa-install-banner">
+        <div class="flex items-center justify-between max-w-6xl mx-auto">
+            <div class="flex items-center space-x-3">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    📱
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg">Installer SOS Expat</h4>
+                    <p class="text-sm opacity-90">Accès rapide à l'assistance d'urgence</p>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button id="pwa-install-btn" class="bg-yellow-400 text-red-900 px-6 py-3 rounded-xl font-bold">
+                    Installer
+                </button>
+                <button id="pwa-dismiss-btn" class="text-white/80 hover:text-white px-3 py-3">
+                    ✕
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENU PRINCIPAL -->
+    <div id="app">
+        <header class="bg-red-600 text-white">
+            <div class="max-w-7xl mx-auto px-4 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold">🆘 SOS Expat</h1>
+                        <p class="text-red-100">Assistance mondiale 24/7</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button id="header-install-btn" class="browser-only bg-white/20 text-white px-4 py-2 rounded-lg" style="display: none;">
+                            📱 Installer
+                        </button>
+                        <div class="pwa-only bg-green-500/20 text-green-100 px-3 py-1 rounded-full text-sm" style="display: none;">
+                            📱 Mode App
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <main class="p-8">
+            <div class="max-w-4xl mx-auto text-center">
+                <h2 class="text-4xl font-bold text-gray-900 mb-6">
+                    Urgence à l'étranger ?<br>
+                    <span class="text-red-600">Aide en 5 minutes !</span>
+                </h2>
+                <p class="text-xl text-gray-600 mb-8">
+                    Connectez-vous instantanément avec des avocats et expatriés francophones vérifiés
+                </p>
+                <div class="grid md:grid-cols-2 gap-8 mb-12">
+                    <div class="bg-white p-6 rounded-2xl shadow-lg">
+                        <div class="text-4xl mb-4">⚖️</div>
+                        <h3 class="text-xl font-bold mb-2">Appel Avocat</h3>
+                        <p class="text-gray-600 mb-4">Consultation juridique urgente</p>
+                        <div class="text-2xl font-bold text-gray-900 mb-4">49€</div>
+                        <button class="w-full bg-red-600 text-white py-3 rounded-xl font-bold">
+                            🆘 URGENCE
+                        </button>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-lg">
+                        <div class="text-4xl mb-4">🌍</div>
+                        <h3 class="text-xl font-bold mb-2">Conseil Expatrié</h3>
+                        <p class="text-gray-600 mb-4">Aide pratique d'expatriés expérimentés</p>
+                        <div class="text-2xl font-bold text-gray-900 mb-4">19€</div>
+                        <button class="w-full bg-green-600 text-white py-3 rounded-xl font-bold">
+                            Choisir
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-red-600 text-white p-6 rounded-2xl">
+                    <h3 class="text-lg font-bold mb-2">📞 Numéro d'urgence gratuit</h3>
+                    <p class="text-2xl font-bold text-yellow-300">+33 X XX XX XX XX</p>
+                    <p class="text-sm opacity-90">24/7 - Assistance immédiate</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SCRIPT PWA -->
+    <script>
+        // PWA Manager pour SOS Expat
+        let deferredPrompt;
+        let isInstalled = false;
+        
+        const elements = {
+            installBanner: document.getElementById('pwa-install-banner'),
+            installBtn: document.getElementById('pwa-install-btn'),
+            dismissBtn: document.getElementById('pwa-dismiss-btn'),
+            headerInstallBtn: document.getElementById('header-install-btn'),
+            offlineIndicator: document.getElementById('offline-indicator')
+        };
+        
+        // Enregistrement du Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered:', registration))
+                    .catch(error => console.log('SW registration failed:', error));
+            });
+        }
+        
+        // Gestion de l'installation
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            showInstallPrompt();
+        });
+        
+        window.addEventListener('appinstalled', () => {
+            isInstalled = true;
+            hideInstallPrompt();
+            console.log('SOS Expat installé!');
+        });
+        
+        // Gestion du statut réseau
+        window.addEventListener('online', () => {
+            elements.offlineIndicator.classList.remove('show');
+        });
+        
+        window.addEventListener('offline', () => {
+            elements.offlineIndicator.classList.add('show');
+        });
+        
+        // Fonctions d'affichage
+        function showInstallPrompt() {
+            if (isInstalled) return;
+            elements.installBanner.classList.add('show');
+            if (elements.headerInstallBtn) {
+                elements.headerInstallBtn.style.display = 'block';
+            }
+        }
+        
+        function hideInstallPrompt() {
+            elements.installBanner.classList.remove('show');
+            if (elements.headerInstallBtn) {
+                elements.headerInstallBtn.style.display = 'none';
+            }
+        }
+        
+        // Installation de l'app
+        async function installApp() {
+            if (!deferredPrompt) return;
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                console.log('Installation acceptée');
+            }
+            
+            deferredPrompt = null;
+            hideInstallPrompt();
+        }
+        
+        // Event listeners
+        elements.installBtn?.addEventListener('click', installApp);
+        elements.headerInstallBtn?.addEventListener('click', installApp);
+        elements.dismissBtn?.addEventListener('click', hideInstallPrompt);
+        
+        // Vérifier si déjà installé
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            isInstalled = true;
+            document.body.classList.add('pwa-installed');
+        }
+        
+        // Vérifier le statut hors ligne initial
+        if (!navigator.onLine) {
+            elements.offlineIndicator.classList.add('show');
+        }
+        
+        console.log('🆘 SOS Expat PWA initialisé');
+    </script>
+</body>
+</html>

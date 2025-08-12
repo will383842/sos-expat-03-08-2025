@@ -1,124 +1,72 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Settings, Phone, Shield, ChevronDown, Globe, User, UserPlus, Wifi, WifiOff } from 'lucide-react';
+import { Menu, X, Phone, Shield, ChevronDown, Globe, User, UserPlus, Wifi, WifiOff, Download, Home, Users, MessageCircle, Zap, DollarSign, Settings, LogOut, Bell, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import AvailabilityToggleButton from '../dashboard/AvailabilityToggle';
 
-// Types pour les analytics Google
+// Types globaux pour Analytics
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
   }
 }
 
-// Composants de drapeaux optimisés (déclarés en premier)
+// Composants de drapeaux optimisés 2025
 const FrenchFlag = memo(() => (
-  <div 
-    className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20"
-    role="img"
-    aria-label="Drapeau français"
-  >
-    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm flex">
-      <div className="w-1/3 h-full bg-blue-600" />
-      <div className="w-1/3 h-full bg-white" />
-      <div className="w-1/3 h-full bg-red-600" />
+  <div className="relative p-1 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg ring-1 ring-white/20 hover:scale-110 transition-transform duration-300">
+    <div className="w-7 h-5 rounded-lg overflow-hidden shadow-sm flex">
+      <div className="w-1/3 h-full bg-gradient-to-b from-blue-600 to-blue-700" />
+      <div className="w-1/3 h-full bg-gradient-to-b from-white to-gray-50" />
+      <div className="w-1/3 h-full bg-gradient-to-b from-red-600 to-red-700" />
     </div>
-    {/* Effet de brillance */}
-    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
+    <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/10 rounded-xl pointer-events-none" />
   </div>
 ));
 
 const BritishFlag = memo(() => (
-  <div 
-    className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20"
-    role="img"
-    aria-label="Drapeau britannique"
-  >
-    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm relative bg-blue-800">
-      {/* Croix de Saint-André (Écosse) - diagonales blanches */}
+  <div className="relative p-1 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg ring-1 ring-white/20 hover:scale-110 transition-transform duration-300">
+    <div className="w-7 h-5 rounded-lg overflow-hidden shadow-sm relative bg-gradient-to-b from-blue-800 to-blue-900">
       <div className="absolute inset-0">
-        <div className="absolute w-full h-0.5 bg-white transform rotate-45 origin-center top-1/2 left-0" style={{ transformOrigin: 'center' }} />
-        <div className="absolute w-full h-0.5 bg-white transform -rotate-45 origin-center top-1/2 left-0" style={{ transformOrigin: 'center' }} />
+        <div className="absolute w-full h-0.5 bg-white transform rotate-45 origin-center top-1/2 left-0" />
+        <div className="absolute w-full h-0.5 bg-white transform -rotate-45 origin-center top-1/2 left-0" />
       </div>
-      
-      {/* Croix de Saint-Patrick (Irlande) - diagonales rouges décalées */}
       <div className="absolute inset-0">
-        <div className="absolute w-full h-px bg-red-600 transform rotate-45 origin-center" style={{ top: 'calc(50% - 1px)', transformOrigin: 'center' }} />
-        <div className="absolute w-full h-px bg-red-600 transform -rotate-45 origin-center" style={{ top: 'calc(50% + 1px)', transformOrigin: 'center' }} />
+        <div className="absolute w-full h-px bg-red-600 transform rotate-45 origin-center" style={{ top: 'calc(50% - 1px)' }} />
+        <div className="absolute w-full h-px bg-red-600 transform -rotate-45 origin-center" style={{ top: 'calc(50% + 1px)' }} />
       </div>
-      
-      {/* Croix de Saint-Georges (Angleterre) - croix centrale rouge */}
       <div className="absolute top-0 left-1/2 w-0.5 h-full bg-white transform -translate-x-1/2" />
       <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white transform -translate-y-1/2" />
       <div className="absolute top-0 left-1/2 w-px h-full bg-red-600 transform -translate-x-1/2" />
       <div className="absolute left-0 top-1/2 w-full h-px bg-red-600 transform -translate-y-1/2" />
     </div>
-    {/* Effet de brillance */}
-    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
+    <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/10 rounded-xl pointer-events-none" />
   </div>
 ));
 
-// Types pour TypeScript et i18n
-interface Language {
-  code: 'fr' | 'en';
-  name: string;
-  nativeName: string;
-  flag: React.ReactNode;
-}
-
-interface NavigationItem {
-  path: string;
-  labelKey: string;
-  icon: string;
-}
-
-interface User {
-  uid?: string;
-  id?: string;
-  email?: string;
-  firstName?: string;
-  displayName?: string;
-  profilePhoto?: string;
-  photoURL?: string;
-  role?: string;
-  type?: string;
-  isOnline?: boolean;
-}
-
-// Configuration des langues pour i18n
-const SUPPORTED_LANGUAGES: Language[] = [
-  { 
-    code: 'fr', 
-    name: 'French', 
-    nativeName: 'Français',
-    flag: <FrenchFlag />
-  },
-  { 
-    code: 'en', 
-    name: 'English', 
-    nativeName: 'English',
-    flag: <BritishFlag />
-  },
+// Configuration des langues
+const SUPPORTED_LANGUAGES = [
+  { code: 'fr', name: 'Français', nativeName: 'Français', flag: <FrenchFlag /> },
+  { code: 'en', name: 'English', nativeName: 'English', flag: <BritishFlag /> }
 ];
 
-// Configuration de navigation pour i18n avec emojis modernes
-const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/', labelKey: 'nav.home', icon: '🏡' },
-  { path: '/sos-appel', labelKey: 'nav.viewProfiles', icon: '🤝' },
-  { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💎' },
+// Navigation items selon votre structure existante
+const LEFT_NAVIGATION_ITEMS = [
+  { path: '/', labelKey: 'nav.home', icon: '🏠', color: 'text-blue-600', bgColor: 'bg-blue-50 hover:bg-blue-100' },
+  { path: '/sos-appel', labelKey: 'nav.viewProfiles', icon: '👥', color: 'text-purple-600', bgColor: 'bg-purple-50 hover:bg-purple-100' },
+  { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💬', color: 'text-green-600', bgColor: 'bg-green-50 hover:bg-green-100' },
 ];
 
-const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '🚀' },
-  { path: '/pricing', labelKey: 'nav.pricing', icon: '⚡' },
+const RIGHT_NAVIGATION_ITEMS = [
+  { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '⚡', color: 'text-orange-600', bgColor: 'bg-orange-50 hover:bg-orange-100' },
+  { path: '/pricing', labelKey: 'nav.pricing', icon: '💎', color: 'text-pink-600', bgColor: 'bg-pink-50 hover:bg-pink-100' },
 ];
 
 const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
 
-// Hook pour la gestion du scroll
+// Hook scroll optimisé
 const useScrolled = () => {
   const [scrolled, setScrolled] = useState(false);
 
@@ -142,104 +90,108 @@ const useScrolled = () => {
   return scrolled;
 };
 
-// Composant pour le statut en ligne/hors ligne intégré au header
-const HeaderAvailabilityToggle = memo(() => {
-  const { user } = useAuth();
+// PWA Install Button moderne
+const PWAInstallButton = memo(() => {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
   const { language } = useApp();
-  const [isOnline, setIsOnline] = useState(user?.isOnline ?? false);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  // Vérifier si l'utilisateur est un prestataire
-  const isProvider = user?.role === 'lawyer' || user?.role === 'expat' || user?.type === 'lawyer' || user?.type === 'expat';
-
-  // Synchroniser avec les changements de l'utilisateur
+  
   useEffect(() => {
-    setIsOnline(user?.isOnline ?? false);
-  }, [user?.isOnline]);
-
-  const toggleOnlineStatus = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!user?.uid && !user?.id || isUpdating) return;
-    
-    setIsUpdating(true);
-    const newStatus = !isOnline;
-
-    try {
-      const userId = user.uid || user.id;
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
       
-      // Met à jour le profil dans 'users'
-      await updateDoc(doc(db, 'users', userId), {
-        isOnline: newStatus,
-        lastSeen: new Date(),
-      });
-
-      // Met aussi à jour 'sos_profiles' (pour l'affichage public)
-      await updateDoc(doc(db, 'sos_profiles', userId), {
-        isOnline: newStatus,
-        lastSeen: new Date(),
-      });
-
-      // Met à jour l'état seulement après succès
-      setIsOnline(newStatus);
-
-      // Analytics pour le changement de statut
-      if (typeof window !== 'undefined' && window.gtag) {
-        window.gtag('event', 'online_status_change', {
+      if (window.gtag) {
+        window.gtag('event', 'pwa_install_prompt_shown', {
           event_category: 'engagement',
-          event_label: newStatus ? 'online' : 'offline',
         });
       }
+    };
+    
+    window.addEventListener('beforeinstallprompt', handler);
+    
+    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstallButton(false);
+    }
+    
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+  
+  const handleInstallClick = async () => {
+    if (!deferredPrompt || isInstalling) return;
+    
+    setIsInstalling(true);
+    
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (window.gtag) {
+        window.gtag('event', 'pwa_install_result', {
+          event_category: 'engagement',
+          event_label: outcome,
+        });
+      }
+      
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setShowInstallButton(false);
+      }
     } catch (error) {
-      console.error('Erreur lors du changement de statut :', error);
+      console.error('PWA install error:', error);
     } finally {
-      setIsUpdating(false);
+      setIsInstalling(false);
     }
   };
-
-  if (!isProvider) return null;
-
+  
+  if (!showInstallButton) return null;
+  
   const t = {
-    online: language === 'fr' ? 'En ligne' : 'Online',
-    offline: language === 'fr' ? 'Hors ligne' : 'Offline',
+    install: language === 'fr' ? 'App' : 'App'
   };
-
+  
   return (
     <button
-      onClick={toggleOnlineStatus}
-      disabled={isUpdating}
-      type="button"
-      className={`group flex items-center px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] touch-manipulation ${
-        isOnline 
-          ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg' 
-          : 'bg-gray-500 hover:bg-gray-600 text-white shadow-lg'
-      } ${isUpdating ? 'opacity-75 cursor-not-allowed' : ''}`}
-      style={{ 
-        border: '2px solid white',
-        boxSizing: 'border-box'
-      }}
-      aria-label={`Changer le statut vers ${isOnline ? t.offline : t.online}`}
+      onClick={handleInstallClick}
+      disabled={isInstalling}
+      className="group relative overflow-hidden bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-4 py-2 rounded-2xl font-bold text-sm transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl active:scale-95 disabled:opacity-75 disabled:cursor-not-allowed touch-manipulation"
     >
-      {isUpdating ? (
-        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-      ) : (
-        <>
-          {isOnline ? (
-            <Wifi className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-          ) : (
-            <WifiOff className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-          )}
-        </>
-      )}
-      <span>{isOnline ? `🟢 ${t.online}` : `⚫ ${t.offline}`}</span>
+      <div className="relative z-10 flex items-center space-x-2">
+        {isInstalling ? (
+          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        ) : (
+          <Download className="w-4 h-4 group-hover:animate-bounce" />
+        )}
+        <span>{isInstalling ? '...' : t.install}</span>
+        <Sparkles className="w-3 h-3 group-hover:animate-pulse" />
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </button>
   );
 });
 
-const UserAvatar = memo<{ user: User | null; size?: 'sm' | 'md' }>(({ user, size = 'md' }) => {
+// Header Availability Toggle utilisant votre composant existant
+const HeaderAvailabilityToggle = memo(() => {
+  const { user } = useAuth();
+  
+  const isProvider = user?.role === 'lawyer' || user?.role === 'expat' || user?.type === 'lawyer' || user?.type === 'expat';
+  
+  if (!isProvider) return null;
+  
+  // Utilise votre composant existant mais avec un style compact pour le header
+  return (
+    <div className="scale-90">
+      <AvailabilityToggleButton />
+    </div>
+  );
+});
+
+// User Avatar selon votre style
+const UserAvatar = memo(({ user, size = 'md' }) => {
   const [imageError, setImageError] = useState(false);
-  const sizeClasses = size === 'sm' ? 'w-8 h-8' : 'w-9 h-9';
+  const sizeClasses = size === 'sm' ? 'w-8 h-8' : size === 'lg' ? 'w-12 h-12' : 'w-10 h-10';
 
   const photoUrl = user?.profilePhoto || user?.photoURL;
   const displayName = user?.firstName || user?.displayName || user?.email || 'User';
@@ -251,8 +203,7 @@ const UserAvatar = memo<{ user: User | null; size?: 'sm' | 'md' }>(({ user, size
   if (!photoUrl || imageError) {
     return (
       <div 
-        className={`${sizeClasses} rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
-        aria-label={`Avatar de ${displayName}`}
+        className={`${sizeClasses} rounded-2xl bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300 hover:scale-110`}
       >
         {displayName.charAt(0).toUpperCase()}
       </div>
@@ -264,30 +215,28 @@ const UserAvatar = memo<{ user: User | null; size?: 'sm' | 'md' }>(({ user, size
       <img
         src={photoUrl}
         alt={`Avatar de ${displayName}`}
-        className={`${sizeClasses} rounded-full object-cover ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
+        className={`${sizeClasses} rounded-2xl object-cover ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300 hover:scale-110`}
         onError={handleImageError}
         loading="lazy"
       />
-      <div 
-        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white"
-        aria-label="En ligne"
-      />
+      {user?.isOnline && (
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse" />
+      )}
     </div>
   );
 });
 
-// Composant Dropdown Langue
-const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
+// Language Dropdown selon votre structure
+const LanguageDropdown = memo(({ isMobile = false }) => {
   const { language, setLanguage } = useApp();
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
-  const languageMenuRef = useRef<HTMLDivElement>(null);
+  const languageMenuRef = useRef(null);
 
   const currentLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === language) || SUPPORTED_LANGUAGES[0];
 
-  // Fermeture du menu au clic extérieur
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event) => {
+      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target)) {
         setIsLanguageMenuOpen(false);
       }
     };
@@ -296,12 +245,11 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLanguageChange = useCallback((langCode: 'fr' | 'en') => {
+  const handleLanguageChange = useCallback((langCode) => {
     setLanguage(langCode);
     setIsLanguageMenuOpen(false);
     
-    // Analytics pour le changement de langue
-    if (typeof window !== 'undefined' && window.gtag) {
+    if (window.gtag) {
       window.gtag('event', 'language_change', {
         event_category: 'engagement',
         event_label: langCode,
@@ -326,8 +274,6 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
                   ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white shadow-xl scale-105' 
                   : 'bg-white/20 backdrop-blur-xl text-white hover:bg-white/30 border border-white/20'
               }`}
-              aria-label={`Changer la langue vers ${lang.nativeName}`}
-              aria-pressed={language === lang.code}
             >
               <div className="relative z-10 flex items-center justify-center">
                 <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
@@ -347,9 +293,6 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
       <button
         onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
         className="group flex items-center space-x-2 text-white text-sm font-medium hover:text-yellow-200 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-3 min-h-[44px] min-w-[44px] justify-center touch-manipulation"
-        aria-expanded={isLanguageMenuOpen}
-        aria-haspopup="true"
-        aria-label="Sélectionner la langue"
       >
         <div className="group-hover:scale-110 transition-transform duration-300">
           {currentLanguage.flag}
@@ -366,14 +309,13 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
               className={`group flex items-center w-full px-4 py-3 text-sm text-left hover:bg-gray-50 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-gray-50 ${
                 language === lang.code ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-700'
               }`}
-              aria-pressed={language === lang.code}
             >
               <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
                 {lang.flag}
               </div>
               <span>{lang.nativeName}</span>
               {language === lang.code && (
-                <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-label="Langue actuelle" />
+                <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               )}
             </button>
           ))}
@@ -383,18 +325,17 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
   );
 });
 
-// Composant Menu Utilisateur
-const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
+// User Menu selon votre structure
+const UserMenu = memo(({ isMobile = false }) => {
   const { user, logout } = useAuth();
   const { language } = useApp();
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef(null);
 
-  // Fermeture du menu au clic extérieur
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
       }
     };
@@ -409,8 +350,7 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
       setIsUserMenuOpen(false);
       navigate('/');
       
-      // Analytics pour la déconnexion
-      if (typeof window !== 'undefined' && window.gtag) {
+      if (window.gtag) {
         window.gtag('event', 'logout', {
           event_category: 'engagement',
         });
@@ -420,7 +360,6 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
     }
   }, [logout, navigate]);
 
-  // Traductions pour i18n
   const t = {
     login: language === 'fr' ? 'Connexion' : 'Login',
     signup: language === 'fr' ? "S'inscrire" : 'Sign up',
@@ -435,10 +374,9 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
         <Link 
           to="/login" 
           className={isMobile 
-            ? "group flex items-center justify-center w-full bg-white/15 backdrop-blur-xl text-white px-6 py-4 rounded-2xl hover:bg-white/25 hover:scale-105 transition-all duration-300 font-semibold border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
-            : "group relative p-3 rounded-full hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+            ? "group flex items-center justify-center w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl active:scale-95 touch-manipulation"
+            : "group relative p-3 rounded-2xl hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
           }
-          aria-label={t.login}
         >
           {isMobile ? (
             <>
@@ -452,10 +390,9 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
         <Link 
           to="/register" 
           className={isMobile
-            ? "group flex items-center justify-center w-full bg-gradient-to-r from-white via-gray-50 to-white text-red-600 px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[48px] touch-manipulation"
-            : "group relative p-3 rounded-full bg-white hover:bg-gray-50 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+            ? "group flex items-center justify-center w-full bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl active:scale-95 touch-manipulation"
+            : "group relative p-3 rounded-2xl bg-white hover:bg-gray-50 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
           }
-          aria-label={t.signup}
         >
           {isMobile ? (
             <>
@@ -496,7 +433,6 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
             <Link 
               to="/admin/dashboard" 
               className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50"
-              aria-label={t.adminConsole}
             >
               <Shield className="w-5 h-5 mr-3" />
               <span className="font-medium">{t.adminConsole}</span>
@@ -505,7 +441,6 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
           <Link 
             to="/dashboard" 
             className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-4 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
-            aria-label={t.dashboard}
           >
             <Settings className="w-5 h-5 mr-3" />
             <span className="font-medium">{t.dashboard}</span>
@@ -513,7 +448,6 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
           <button 
             onClick={handleLogout} 
             className="flex items-center w-full bg-red-500/80 text-white px-4 py-4 rounded-xl hover:bg-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 min-h-[48px] touch-manipulation"
-            aria-label={t.logout}
           >
             <LogOut className="w-5 h-5 mr-3" />
             <span className="font-medium">{t.logout}</span>
@@ -528,9 +462,6 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
       <button 
         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
         className="group flex items-center space-x-3 text-white transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 min-h-[44px] touch-manipulation"
-        aria-expanded={isUserMenuOpen}
-        aria-haspopup="true"
-        aria-label="Menu utilisateur"
       >
         <UserAvatar user={user} />
         <span className="text-sm font-medium hidden md:inline">{user.firstName || user.displayName || 'User'}</span>
@@ -583,24 +514,38 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
   );
 });
 
+// Notification Badge
+const NotificationBadge = memo(() => {
+  const [notifications] = useState(3);
+  
+  return (
+    <button className="relative p-3 rounded-2xl hover:bg-white/10 transition-all duration-300 group hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 touch-manipulation">
+      <Bell className="w-5 h-5 text-white group-hover:text-yellow-200 transition-colors duration-300 group-hover:animate-pulse" />
+      {notifications > 0 && (
+        <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse shadow-lg">
+          {notifications > 9 ? '9+' : notifications}
+        </div>
+      )}
+    </button>
+  );
+});
+
 // Composant principal Header
-const Header: React.FC = () => {
+const Header = () => {
   const location = useLocation();
   const { isLoading } = useAuth();
   const { language } = useApp();
   const scrolled = useScrolled();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const isActive = useCallback((path: string) => location.pathname === path, [location.pathname]);
+  const isActive = useCallback((path) => location.pathname === path, [location.pathname]);
 
-  // Fermeture du menu mobile lors du changement de route
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
 
-  // Traductions pour i18n
-  const getNavigationLabel = useCallback((labelKey: string): string => {
-    const translations: Record<string, Record<string, string>> = {
+  const getNavigationLabel = useCallback((labelKey) => {
+    const translations = {
       'nav.home': { fr: 'Accueil', en: 'Home' },
       'nav.viewProfiles': { fr: 'Voir les profils aidants', en: 'View helper profiles' },
       'nav.testimonials': { fr: 'Les avis', en: 'Reviews' },
@@ -623,7 +568,7 @@ const Header: React.FC = () => {
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
           scrolled 
             ? 'bg-red-600/95 backdrop-blur-xl shadow-xl' 
-            : 'bg-gradient-to-r from-red-600 to-red-500'
+            : 'bg-white border-b border-gray-100'
         }`}
         role="banner"
       >
@@ -636,11 +581,10 @@ const Header: React.FC = () => {
                 <Link 
                   to="/" 
                   className="group flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                  aria-label="SOS Expats - Accueil"
                 >
                   <div className="transform group-hover:scale-105 transition-all duration-300">
-                    <h1 className="font-bold text-xl text-white m-0">SOS Expats</h1>
-                    <p className="text-xs text-white/80 font-medium m-0">
+                    <h1 className={`font-bold text-xl ${scrolled ? 'text-white' : 'text-gray-900'} m-0`}>SOS Expats</h1>
+                    <p className={`text-xs ${scrolled ? 'text-white/80' : 'text-gray-600'} font-medium m-0`}>
                       {t.tagline}
                     </p>
                   </div>
@@ -657,10 +601,9 @@ const Header: React.FC = () => {
                       to={item.path} 
                       className={`group flex flex-col items-center text-lg font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 min-w-max ${
                         isActive(item.path) 
-                          ? 'text-white' 
-                          : 'text-white/90 hover:text-white'
+                          ? (scrolled ? 'text-white' : item.color)
+                          : (scrolled ? 'text-white/90 hover:text-white' : 'text-gray-600 hover:text-gray-900')
                       }`}
-                      aria-current={isActive(item.path) ? 'page' : undefined}
                     >
                       <span 
                         className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
@@ -671,7 +614,7 @@ const Header: React.FC = () => {
                       </span>
                       <span className="text-sm leading-tight text-center whitespace-nowrap">{getNavigationLabel(item.labelKey)}</span>
                       {isActive(item.path) && (
-                        <div className="mt-1 w-1.5 h-1.5 bg-white rounded-full animate-pulse" aria-hidden="true" />
+                        <div className="mt-1 w-1.5 h-1.5 bg-current rounded-full animate-pulse" aria-hidden="true" />
                       )}
                     </Link>
                   ))}
@@ -681,13 +624,14 @@ const Header: React.FC = () => {
                 <div className="mx-12">
                   <Link 
                     to="/sos-appel" 
-                    className="group relative overflow-hidden bg-white hover:bg-gray-50 text-red-600 px-8 py-2.5 rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-xl flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-white/50 border-2 border-white whitespace-nowrap"
-                    aria-label={t.sosCall}
+                    className="group relative overflow-hidden bg-gradient-to-r from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-110 hover:shadow-2xl flex items-center space-x-3 focus:outline-none focus:ring-2 focus:ring-white/50 whitespace-nowrap shadow-xl"
                   >
-                    <div className="relative z-10 flex items-center space-x-2">
-                      <Phone className="w-5 h-5 group-hover:rotate-6 transition-transform duration-300" />
-                      <span>{t.sosCall}</span>
+                    <div className="relative z-10 flex items-center space-x-3">
+                      <Phone className="w-6 h-6 group-hover:animate-pulse transition-transform duration-300" />
+                      <span className="font-black">{t.sosCall}</span>
                     </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+                    <div className="absolute -inset-2 bg-gradient-to-r from-red-500 to-red-700 opacity-30 blur-xl group-hover:opacity-60 transition-opacity duration-300 rounded-2xl" />
                   </Link>
                 </div>
 
@@ -699,10 +643,9 @@ const Header: React.FC = () => {
                       to={item.path} 
                       className={`group flex flex-col items-center text-lg font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 min-w-max ${
                         isActive(item.path) 
-                          ? 'text-white' 
-                          : 'text-white/90 hover:text-white'
+                          ? (scrolled ? 'text-white' : item.color)
+                          : (scrolled ? 'text-white/90 hover:text-white' : 'text-gray-600 hover:text-gray-900')
                       }`}
-                      aria-current={isActive(item.path) ? 'page' : undefined}
                     >
                       <span 
                         className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
@@ -713,7 +656,7 @@ const Header: React.FC = () => {
                       </span>
                       <span className="text-sm leading-tight text-center whitespace-nowrap">{getNavigationLabel(item.labelKey)}</span>
                       {isActive(item.path) && (
-                        <div className="mt-1 w-1.5 h-1.5 bg-white rounded-full animate-pulse" aria-hidden="true" />
+                        <div className="mt-1 w-1.5 h-1.5 bg-current rounded-full animate-pulse" aria-hidden="true" />
                       )}
                     </Link>
                   ))}
@@ -722,9 +665,9 @@ const Header: React.FC = () => {
 
               {/* Actions Desktop */}
               <div className="flex-shrink-0 flex items-center space-x-4">
-                {/* Bouton statut en ligne/hors ligne - Desktop */}
                 <HeaderAvailabilityToggle />
-                
+                <PWAInstallButton />
+                <NotificationBadge />
                 <LanguageDropdown />
 
                 {isLoading ? (
@@ -747,29 +690,29 @@ const Header: React.FC = () => {
             <Link 
               to="/" 
               className="flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1"
-              aria-label="SOS Expats - Accueil"
             >
               <div className="flex flex-col">
-                <h1 className="font-bold text-lg text-white m-0">SOS Expats</h1>
-                <p className="text-xs text-white/80 m-0">{t.mobileTagline}</p>
+                <h1 className={`font-bold text-lg ${scrolled ? 'text-white' : 'text-gray-900'} m-0`}>SOS Expats</h1>
+                <p className={`text-xs ${scrolled ? 'text-white/80' : 'text-gray-600'} m-0`}>{t.mobileTagline}</p>
               </div>
             </Link>
 
             <div className="flex items-center space-x-3">
               <Link 
                 to="/sos-appel" 
-                className="group bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-lg font-bold transition-all duration-300 hover:scale-105 text-sm flex items-center space-x-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 border border-white"
-                aria-label={t.sosCall}
+                className="group bg-gradient-to-r from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 hover:scale-105 text-sm flex items-center space-x-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50"
               >
-                <Phone className="w-4 h-4 group-hover:rotate-6 transition-transform duration-300" />
+                <Phone className="w-4 h-4 group-hover:animate-pulse transition-transform duration-300" />
                 <span>SOS</span>
               </Link>
               <HeaderAvailabilityToggle />
+              <PWAInstallButton />
+              <NotificationBadge />
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className="p-3 rounded-lg text-white hover:bg-white/20 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-                aria-expanded={isMenuOpen}
-                aria-label="Menu de navigation"
+                className={`p-3 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation ${
+                  scrolled ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'
+                }`}
               >
                 {isMenuOpen ? 
                   <X className="w-6 h-6" aria-hidden="true" /> : 
@@ -781,7 +724,7 @@ const Header: React.FC = () => {
 
           {/* Menu Mobile */}
           {isMenuOpen && (
-            <div className="bg-red-700 px-6 py-6 shadow-lg border-t border-red-500" role="navigation" aria-label="Navigation mobile">
+            <div className={`px-6 py-6 shadow-lg border-t ${scrolled ? 'bg-red-700 border-red-500' : 'bg-white border-gray-100'}`} role="navigation">
               <nav className="flex flex-col space-y-4">
                 {ALL_NAVIGATION_ITEMS.map((item) => (
                   <Link 
@@ -789,18 +732,17 @@ const Header: React.FC = () => {
                     to={item.path} 
                     className={`text-lg font-semibold transition-colors px-4 py-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] flex items-center touch-manipulation ${
                       isActive(item.path) 
-                        ? 'text-white bg-white/20 font-bold' 
-                        : 'text-white/90 hover:text-white hover:bg-white/10'
+                        ? (scrolled ? 'text-white bg-white/20 font-bold' : `${item.color} ${item.bgColor} font-bold`)
+                        : (scrolled ? 'text-white/90 hover:text-white hover:bg-white/10' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50')
                     }`} 
                     onClick={() => setIsMenuOpen(false)}
-                    aria-current={isActive(item.path) ? 'page' : undefined}
                   >
                     <span className="mr-3 text-xl" role="img" aria-hidden="true">{item.icon}</span>
                     {getNavigationLabel(item.labelKey)}
                   </Link>
                 ))}
                 
-                <div className="pt-6 border-t border-red-500 space-y-6">
+                <div className={`pt-6 border-t ${scrolled ? 'border-red-500' : 'border-gray-200'} space-y-6`}>
                   <LanguageDropdown isMobile />
                   <UserMenu isMobile />
                 </div>
@@ -812,6 +754,47 @@ const Header: React.FC = () => {
 
       {/* Spacer pour compenser le header fixe */}
       <div className="h-20" aria-hidden="true" />
+
+      {/* PWA Install Banner - Sticky bottom */}
+      <div className="fixed bottom-4 left-4 right-4 lg:left-auto lg:right-4 lg:max-w-sm z-40">
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white p-4 rounded-2xl shadow-2xl border border-white/20 backdrop-blur-sm transform hover:scale-105 transition-all duration-300">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Download className="w-6 h-6 animate-bounce" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-sm">📱 {language === 'fr' ? 'Installer SOS Expats' : 'Install SOS Expats'}</h4>
+              <p className="text-xs opacity-90">
+                {language === 'fr' ? 'Accès rapide & notifications push' : 'Quick access & push notifications'}
+              </p>
+            </div>
+            <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 active:scale-95">
+              {language === 'fr' ? 'Installer' : 'Install'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-24 right-4 z-30 space-y-3">
+        <Link 
+          to="/sos-appel?urgent=true"
+          className="group w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-red-500/50"
+        >
+          <Phone className="w-7 h-7 group-hover:animate-pulse" />
+        </Link>
+        
+        <button className="group w-14 h-14 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-xl hover:scale-110 transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-500/50">
+          <MessageCircle className="w-6 h-6" />
+        </button>
+        
+        <button 
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="group w-12 h-12 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-full shadow-lg hover:scale-110 transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-gray-500/50"
+        >
+          <ChevronDown className="w-5 h-5 rotate-180" />
+        </button>
+      </div>
 
       {/* Structured Data pour SEO */}
       {typeof window !== 'undefined' && (
@@ -843,55 +826,52 @@ const Header: React.FC = () => {
         />
       )}
 
-      {/* Préchargement des ressources critiques */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      
-      {/* Meta tags dynamiques pour les réseaux sociaux */}
-      {typeof window !== 'undefined' && (() => {
-        // Open Graph
-        const updateMetaTag = (property: string, content: string) => {
-          let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('property', property);
-            document.head.appendChild(meta);
-          }
-          meta.content = content;
-        };
-
-        const currentPage = location.pathname;
-        const baseTitle = 'SOS Expats';
-        const baseDescription = language === 'fr' 
-          ? 'Service d\'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés.'
-          : 'Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.';
-
-        const currentNavItem = ALL_NAVIGATION_ITEMS.find(item => item.path === currentPage);
-        const pageTitle = currentNavItem ? getNavigationLabel(currentNavItem.labelKey) : getNavigationLabel('nav.home');
-
-        updateMetaTag('og:title', `${baseTitle} - ${pageTitle}`);
-        updateMetaTag('og:description', baseDescription);
-        updateMetaTag('og:url', window.location.href);
-        updateMetaTag('og:type', 'website');
-        updateMetaTag('og:locale', language === 'fr' ? 'fr_FR' : 'en_US');
-        
-        // Twitter Cards
-        const updateTwitterMeta = (name: string, content: string) => {
-          let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('name', name);
-            document.head.appendChild(meta);
-          }
-          meta.content = content;
-        };
-
-        updateTwitterMeta('twitter:card', 'summary_large_image');
-        updateTwitterMeta('twitter:title', `${baseTitle} - ${pageTitle}`);
-        updateTwitterMeta('twitter:description', baseDescription);
-
-        return null;
-      })()}
+      {/* Progressive Web App Enhancement Script */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            // Service Worker Registration
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                  .then((registration) => {
+                    console.log('SW registered: ', registration);
+                  })
+                  .catch((registrationError) => {
+                    console.log('SW registration failed: ', registrationError);
+                  });
+              });
+            }
+            
+            // PWA Install Prompt Enhancement
+            let deferredPrompt;
+            window.addEventListener('beforeinstallprompt', (e) => {
+              e.preventDefault();
+              deferredPrompt = e;
+            });
+            
+            // Performance monitoring
+            window.addEventListener('load', () => {
+              if ('PerformanceObserver' in window) {
+                new PerformanceObserver((entryList) => {
+                  for (const entry of entryList.getEntries()) {
+                    console.log('LCP:', entry.startTime);
+                  }
+                }).observe({entryTypes: ['largest-contentful-paint']});
+              }
+            });
+            
+            // Network status monitoring
+            window.addEventListener('online', () => {
+              console.log('App is online');
+            });
+            
+            window.addEventListener('offline', () => {
+              console.log('App is offline');
+            });
+          `
+        }}
+      />
     </>
   );
 };
@@ -904,5 +884,7 @@ UserAvatar.displayName = 'UserAvatar';
 LanguageDropdown.displayName = 'LanguageDropdown';
 UserMenu.displayName = 'UserMenu';
 HeaderAvailabilityToggle.displayName = 'HeaderAvailabilityToggle';
+PWAInstallButton.displayName = 'PWAInstallButton';
+NotificationBadge.displayName = 'NotificationBadge';
 
 export default memo(Header);

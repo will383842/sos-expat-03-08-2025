@@ -2,236 +2,326 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ========================================
-    // FONCTIONS UTILITAIRES DE SÉCURITÉ
-    // ========================================
+    // ============
+    // Utilitaires
+    // ============
     function isAuthenticated() {
       return request.auth != null;
     }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
+
     function isEmailVerified() {
       return isAuthenticated() && request.auth.token.email_verified == true;
     }
+
     function isAdmin() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    function isProvider() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['lawyer', 'expat'];
-    }
-    function hasRole(role) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-    }
-    function isApproved() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
-    }
-    function isNotBanned() {
-      return isAuthenticated() && 
-             (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
-              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
-    }
-    function hasValidUserFields() {
-      return request.resource.data.keys().hasAll(['email', 'role', 'firstName', 'lastName']) &&
-             request.resource.data.email is string &&
-             request.resource.data.role in ['client', 'lawyer', 'expat', 'admin'] &&
-             request.resource.data.firstName is string &&
-             request.resource.data.lastName is string;
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // ========================================
-    // COLLECTION USERS
-    // ========================================
+    function isNotBanned() {
+      return isAuthenticated() &&
+        (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
+    }
+
+    // Propriétaire basé sur le champ uid du document (pas l'ID du doc)
+    function isDocOwner() {
+      return isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // Pour la création, on valide sur request.resource
+    function creatingOwnDoc() {
+      return isAuthenticated() && request.resource.data.uid == request.auth.uid;
+    }
+
+    function isProviderRole() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['lawyer', 'expat'];
+    }
+
+    function hasValidUserFields() {
+      return request.resource.data.keys().hasAll(['email','role','firstName','lastName']) &&
+        request.resource.data.email is string &&
+        request.resource.data.role in ['client','lawyer','expat','admin'] &&
+        request.resource.data.firstName is string &&
+        request.resource.data.lastName is string;
+    }
+
+    // Champs sensibles qui ne doivent pas être modifiés par l’utilisateur
+    function hasNoSensitiveChanges() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['role','isAdmin','isApproved','isBanned','uid','email','type','isVerified']);
+    }
+
+    // Lecture publique d’une fiche visible (pour la page d’accueil / carrousel)
+    function isPublicProfile() {
+      return (resource.data.isVisible == true || resource.data.isVisibleOnMap == true) &&
+             (resource.data.type in ['lawyer','expat']);
+    }
+
+    // ===============
+    // USERS
+    // ===============
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || (resource.data.isApproved == true && resource.data.role in ['lawyer', 'expat']);
-      allow create: if isOwner(userId) && isEmailVerified() && hasValidUserFields() &&
-                      request.resource.data.uid == request.auth.uid &&
-                      request.resource.data.email == request.auth.token.email;
-      allow update: if isOwner(userId) && isEmailVerified() && isNotBanned() &&
-                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isAdmin', 'isApproved', 'isBanned', 'uid', 'email']) ||
-                      isAdmin();
+      allow read: if (isAuthenticated() && request.auth.uid == userId) ||
+                   isAdmin() ||
+                   // profils approvés de prestataires consultables (si tu veux afficher des fiches publiques depuis /users)
+                   (resource.data.isApproved == true && resource.data.role in ['lawyer','expat']);
+
+      allow create: if isAuthenticated() &&
+                     request.auth.uid == userId &&
+                     isEmailVerified() &&
+                     hasValidUserFields() &&
+                     request.resource.data.uid == request.auth.uid &&
+                     request.resource.data.email == request.auth.token.email;
+
+      allow update: if (isAuthenticated() && request.auth.uid == userId &&
+                        isEmailVerified() && isNotBanned() && hasNoSensitiveChanges()) ||
+                     isAdmin();
+
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTION SOS_PROFILES
-    // ========================================
+    // ======================
+    // SOS_PROFILES (ancien)
+    // ======================
     match /sos_profiles/{profileId} {
+      // champs minimum requis pour créer/éditer
       function hasValidProfileFields() {
-        return request.resource.data.keys().hasAll(['uid', 'type', 'fullName']) &&
+        return request.resource.data.keys().hasAll(['uid','type','fullName']) &&
                request.resource.data.uid is string &&
-               request.resource.data.type in ['lawyer', 'expat'] &&
+               request.resource.data.type in ['lawyer','expat'] &&
                request.resource.data.fullName is string;
       }
-      allow read: if (resource.data.isVisible == true && resource.data.type in ['lawyer', 'expat']) ||
-                    isOwner(profileId) || isAdmin();
-      allow create: if (isOwner(profileId) && isEmailVerified() && isProvider() &&
-                        hasValidProfileFields() && request.resource.data.uid == request.auth.uid) ||
-                       isAdmin();
-      allow update: if isAdmin() ||
-        (isOwner(profileId) && isEmailVerified() && isNotBanned() &&
-          (
-            (request.resource.data.diff(resource.data).changedKeys().hasOnly(['isVisibleOnMap']) &&
-              request.resource.data.isVisibleOnMap is bool)
-            ||
-            (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'type', 'isApproved', 'isVerified']) &&
-              hasValidProfileFields())
-          )
-        );
+
+      // Lecture publique si visible, ou propriétaire, ou admin
+      allow read: if isPublicProfile() || isDocOwner() || isAdmin();
+
+      // Création par le propriétaire (basé sur request.resource.data.uid) ou admin
+      allow create: if creatingOwnDoc() && isEmailVerified() && isProviderRole() && hasValidProfileFields()
+                    || isAdmin();
+
+      // Mise à jour : admin OU propriétaire (sans toucher aux champs sensibles)
+      // On autorise les toggles (ex.: isVisible, isVisibleOnMap, isOnline) et l’édition de profil “classique”
+      allow update: if isAdmin()
+                    ||
+                    (isDocOwner() && isEmailVerified() && isNotBanned() && hasValidProfileFields() && hasNoSensitiveChanges());
+
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTION CALLS
-    // ========================================
+    // ==================
+    // PROVIDERS (actuel)
+    // ==================
+    match /providers/{providerId} {
+      function hasValidProviderFields() {
+        return request.resource.data.keys().hasAll(['uid','type','fullName']) &&
+               request.resource.data.uid is string &&
+               request.resource.data.type in ['lawyer','expat'] &&
+               request.resource.data.fullName is string;
+      }
+
+      // Lecture publique si visible, ou propriétaire, ou admin
+      allow read: if isPublicProfile() || isDocOwner() || isAdmin();
+
+      // Création par le propriétaire (uid) ou admin
+      allow create: if creatingOwnDoc() && isEmailVerified() && isProviderRole() && hasValidProviderFields()
+                    || isAdmin();
+
+      // Mise à jour : admin OU propriétaire (sans modifier les champs sensibles)
+      // => permet de passer en ligne/hors-ligne (isOnline), ou visibilité (isVisible / isVisibleOnMap), etc.
+      allow update: if isAdmin()
+                    ||
+                    (isDocOwner() && isEmailVerified() && isNotBanned() && hasValidProviderFields() && hasNoSensitiveChanges());
+
+      allow delete: if isAdmin();
+    }
+
+    // =========
+    // CALLS
+    // =========
     match /calls/{callId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.clientId ||
+                     request.auth.uid == resource.data.providerId) ||
+                  isAdmin();
+
       allow create: if isAuthenticated() && isEmailVerified() && isNotBanned() &&
-                      request.resource.data.clientId == request.auth.uid &&
-                      request.resource.data.keys().hasAll(['clientId', 'providerId', 'serviceType']);
-      allow update: if isAuthenticated() && isNotBanned() &&
-                      (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
+                     request.resource.data.clientId == request.auth.uid &&
+                     request.resource.data.keys().hasAll(['clientId','providerId','serviceType']);
+
+      allow update: if (isAuthenticated() && isNotBanned() &&
+                        (request.auth.uid == resource.data.clientId ||
+                         request.auth.uid == resource.data.providerId)) ||
+                     isAdmin();
+
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTION PAYMENTS
-    // ========================================
+    // ============
+    // PAYMENTS
+    // ============
     match /payments/{paymentId} {
       function hasValidPaymentFields() {
-        return request.resource.data.keys().hasAll(['clientId', 'providerId', 'amount', 'status']) &&
-               request.resource.data.amount is number && request.resource.data.amount > 0 &&
-               request.resource.data.status in ['pending', 'authorized', 'captured', 'failed', 'refunded', 'canceled'];
+        return request.resource.data.keys().hasAll(['clientId','providerId','amount','status']) &&
+               request.resource.data.amount is number &&
+               request.resource.data.amount > 0 &&
+               request.resource.data.status in ['pending','authorized','captured','failed','refunded','canceled'];
       }
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
+
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.clientId ||
+                     request.auth.uid == resource.data.providerId) ||
+                  isAdmin();
+
       allow create: if isAuthenticated() && isEmailVerified() && isNotBanned() &&
-                      request.resource.data.clientId == request.auth.uid && hasValidPaymentFields();
+                     request.resource.data.clientId == request.auth.uid &&
+                     hasValidPaymentFields();
+
       allow update: if isAdmin() && hasValidPaymentFields();
+
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTION REVIEWS
-    // ========================================
+    // ==========
+    // REVIEWS
+    // ==========
     match /reviews/{reviewId} {
       function hasValidReviewFields() {
-        return request.resource.data.keys().hasAll(['clientId', 'providerId', 'rating', 'comment']) &&
-               request.resource.data.rating is number && request.resource.data.rating >= 1 &&
-               request.resource.data.rating <= 5 &&
+        return request.resource.data.keys().hasAll(['clientId','providerId','rating','comment']) &&
+               request.resource.data.rating is number &&
+               request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
                request.resource.data.comment is string && request.resource.data.comment.size() > 0;
       }
+
       allow read: if resource.data.isPublic == true ||
-                    isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
+                   (isAuthenticated() &&
+                    (request.auth.uid == resource.data.clientId ||
+                     request.auth.uid == resource.data.providerId)) ||
+                   isAdmin();
+
       allow create: if isAuthenticated() && isEmailVerified() && isNotBanned() &&
-                      request.resource.data.clientId == request.auth.uid && hasValidReviewFields();
-      allow update: if (isOwner(resource.data.clientId) &&
-                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId', 'providerId', 'isPublic']) &&
-                       hasValidReviewFields()) || isAdmin();
-      allow delete: if isOwner(resource.data.clientId) || isAdmin();
+                     request.resource.data.clientId == request.auth.uid &&
+                     hasValidReviewFields();
+
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.clientId &&
+                        hasValidReviewFields() &&
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['clientId','providerId','isPublic'])) ||
+                        isAdmin();
+
+      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin();
     }
 
-    // ========================================
-    // COLLECTION DOCUMENTS
-    // ========================================
+    // ============
+    // DOCUMENTS
+    // ============
     match /documents/{documentId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
       allow create: if isAuthenticated() && isEmailVerified() &&
-                      request.resource.data.userId == request.auth.uid &&
-                      request.resource.data.keys().hasAll(['userId', 'type', 'filename']);
+                     request.resource.data.userId == request.auth.uid &&
+                     request.resource.data.keys().hasAll(['userId','type','filename']);
       allow update: if isAdmin();
-      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId) || isAdmin();
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
     }
 
-    // ========================================
-    // COLLECTION NOTIFICATIONS
-    // ========================================
+    // ===============
+    // NOTIFICATIONS
+    // ===============
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
       allow create: if isAdmin();
-      allow update: if isAuthenticated() &&
-                      request.auth.uid == resource.data.userId &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) || isAdmin();
-      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId) || isAdmin();
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.userId &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead','readAt'])) ||
+                       isAdmin();
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
     }
 
-    // ========================================
-    // COLLECTION CALL_SESSIONS
-    // ========================================
+    // =================
+    // CALL_SESSIONS
+    // =================
     match /call_sessions/{sessionId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.clientId ||
+                     request.auth.uid == resource.data.providerId) ||
+                  isAdmin();
+
       allow create: if isAuthenticated() && isEmailVerified() && isNotBanned() &&
-                      request.resource.data.clientId == request.auth.uid;
-      allow update: if isAuthenticated() && isNotBanned() &&
-                      (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
+                     request.resource.data.clientId == request.auth.uid;
+
+      allow update: if (isAuthenticated() && isNotBanned() &&
+                        (request.auth.uid == resource.data.clientId ||
+                         request.auth.uid == resource.data.providerId)) ||
+                     isAdmin();
+
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTION INVOICE_RECORDS
-    // ========================================
+    // ==================
+    // INVOICE_RECORDS
+    // ==================
     match /invoice_records/{invoiceId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId) || isAdmin();
-      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.clientId || isAdmin());
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.clientId ||
+                     request.auth.uid == resource.data.providerId) ||
+                  isAdmin();
+
+      allow create: if isAuthenticated() &&
+                      (request.auth.uid == request.resource.data.clientId || isAdmin());
+
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTION NOTIFICATION_LOGS
-    // ========================================
+    // ===================
+    // NOTIFICATION_LOGS
+    // ===================
     match /notification_logs/{logId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.recipientId || isAdmin());
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.recipientId || isAdmin());
       allow create: if isAuthenticated() && isNotBanned();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ========================================
-    // COLLECTIONS ADMINISTRATIVES
-    // ========================================
+    // =======================
+    // Collections Admin
+    // =======================
     match /logs/{logId} { allow read, write: if isAdmin(); }
     match /analytics/{analyticsId} { allow read, write: if isAdmin(); }
     match /app_settings/{settingId} { allow read, write: if isAdmin(); }
     match /admin_settings/{settingId} { allow read, write: if isAdmin(); }
     match /backups/{backupId} { allow read, write: if isAdmin(); }
+
+    // Messages de contact
     match /contact_messages/{messageId} {
       allow read: if isAdmin();
       allow create: if true;
       allow update, delete: if isAdmin();
     }
+
+    // Docs légaux (pied de page): PUBLIC
     match /legal_documents/{docId} {
-      allow read: if resource.data.published == true;
+      allow read: if true;
       allow write: if isAdmin();
     }
+
+    // Coupons
     match /coupons/{couponId} {
       allow read: if resource.data.active == true || isAdmin();
       allow write: if isAdmin();
     }
+
+    // Usage de coupons
     match /coupon_usages/{usageId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
-    // ========================================
-    // PUBLIC ACCESS FOR HOME PAGE
-    // ========================================
-    match /providers/{id} {
-      allow read: if resource.data.approved == true && resource.data.published == true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    // ========================================
-    // RÈGLE PAR DÉFAUT - TOUT REFUSER
-    // ========================================
+    // Par défaut : refuser
     match /{document=**} {
       allow read, write: if false;
     }

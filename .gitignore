@@ -1,33 +1,50 @@
-# Logs
-logs
-*.log
+# --- Dépendances ---
+node_modules/
+**/node_modules/
+
+# --- Builds / artefacts ---
+/dist/
+/dist-ssr/
+/build/
+/.vite/
+coverage/
+
+# --- Environnements & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Logs (racine) ---
+/logs/
+/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dépendances locales
-node_modules
-dist
-dist-ssr
-
-# Fichiers d’environnement
-.env
-.env.local
-
-# Firebase
+# --- Firebase ---
 firebase-debug.log
-.firebaserc
+.firebase/            # état local émulateur
+# Garder en repo (utile CI/CD & config projet)
+!.firebaserc
+!firebase.json
+!firestore.rules
+!storage.rules
 
-# Vite
-.vite/
+# --- Firebase Functions (si tu en as) ---
+functions/lib/
+functions/node_modules/
+functions/.env
+functions/.env.*
 
-# Éditeurs
-.vscode/*
-!.vscode/extensions.json
-.idea
+# --- Éditeurs & OS ---
+/.vscode/*
+!/.vscode/extensions.json
+.idea/
 .DS_Store
+Thumbs.db
+desktop.ini
 *.suo
 *.ntvs*
 *.njsproj

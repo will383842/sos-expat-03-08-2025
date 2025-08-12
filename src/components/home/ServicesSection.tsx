@@ -22,11 +22,7 @@ const ServicesSection: React.FC = () => {
     }
   };
 
-  const handleServiceSelect = (serviceType: string) => {
-    const url = serviceType === 'lawyer_call' ? '/sos-appel?type=lawyer' : '/sos-appel?type=expat';
-    window.location.href = url;
-  };
-
+  // ✅ SUPPRESSION de handleServiceSelect - utiliser liens directs
   const features = [
     {
       icon: Phone,
@@ -85,8 +81,7 @@ const ServicesSection: React.FC = () => {
             return (
               <div
                 key={service.id}
-                className={`bg-white border-2 ${isLawyer ? 'border-red-200' : 'border-blue-200'} rounded-2xl p-8 hover:shadow-xl transition-all cursor-pointer group transform hover:scale-105`}
-                onClick={() => handleServiceSelect(service.type)}
+                className="bg-white border-2 border-red-200 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer group"
               >
                 <div className="flex flex-col items-center">
                   <div className={`${isLawyer ? 'bg-red-100' : 'bg-blue-100'} p-5 rounded-full mb-6 group-hover:${isLawyer ? 'bg-red-200' : 'bg-blue-200'} transition-colors`}>
@@ -114,22 +109,22 @@ const ServicesSection: React.FC = () => {
                     </div>
                   </div>
                   
-                  <button 
-                    className={`w-full ${isLawyer ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors`}
-                    onClick={() => window.location.href = isLawyer ? '/sos-appel?type=lawyer' : '/sos-appel?type=expat'}
+                  <a 
+                    href={isLawyer ? '/sos-appel?type=lawyer' : '/sos-appel?type=expat'}
+                    className={`w-full ${isLawyer ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors text-center block`}
                   >
                     {language === 'fr' ? 'Choisir ce service' : 'Choose this service'}
-                  </button>
+                  </a>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Features */}
+        {/* ✅ Features modernisées */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
           {features.map((feature, index) => (
-            <div key={index} className="bg-gray-50 rounded-xl p-6 text-center">
+            <div key={index} className="bg-white rounded-2xl p-6 text-center hover:shadow-lg hover:-translate-y-1 transition-all border border-slate-100">
               <div className="flex justify-center mb-4">
                 <div className="bg-red-100 rounded-full p-3">
                   <feature.icon className="w-6 h-6 text-red-600" />
@@ -150,3 +145,4 @@ const ServicesSection: React.FC = () => {
 };
 
 export default ServicesSection;
+

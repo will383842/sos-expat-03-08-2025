@@ -10,7 +10,7 @@ import { logLanguageMismatch } from '../services/analytics';
 import { Link } from 'react-router-dom';
 import MultiLanguageSelect from '../components/forms-data/MultiLanguageSelect';
 import languages from '../data/Languages-spoken';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, HttpsCallable } from 'firebase/functions';
 import { functions, db } from '../config/firebase'; // 🔧 AJOUT: import db
 import type { Provider } from '../types/provider';
 import { normalizeProvider } from '../types/provider';
@@ -1584,13 +1584,15 @@ const readProviderFromSession = useCallback((): Provider | null => {
                     <Phone size={16} className="inline mr-1" />
                     Numéro de téléphone <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex space-x-2">
+
+                  {/* ⚙️ FIX MOBILE: empiler sur mobile, côte à côte dès sm */}
+                  <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
                     <select
                       id="phoneCountryCode"
                       name="phoneCountryCode"
                       value={formData.phoneCountryCode}
                       onChange={handleInputChange}
-                      className={`${inputClass('phoneNumber')} w-20 sm:w-24 text-sm`}
+                      className={`${inputClass('phoneNumber')} w-full sm:w-24 text-sm`}
                     >
                       {countryCodeOptions.map(({ code, flag }) => (
                         <option key={code} value={code}>
@@ -1605,12 +1607,13 @@ const readProviderFromSession = useCallback((): Provider | null => {
                       required
                       value={formData.phoneNumber}
                       onChange={handleInputChange}
-                      className={`flex-1 ${inputClass('phoneNumber')} ${fieldErrors.phoneNumber ? 'error-field' : ''}`}
+                      className={`w-full sm:flex-1 ${inputClass('phoneNumber')} ${fieldErrors.phoneNumber ? 'error-field' : ''}`}
                       data-error={!!fieldErrors.phoneNumber}
                       placeholder="612 345 678"
                       maxLength={20}
                     />
                   </div>
+
                   {fieldErrors.phoneNumber && (
                     <p className="mt-2 text-sm text-red-600 flex items-center">
                       <AlertCircle size={16} className="mr-1 flex-shrink-0" />
@@ -1628,13 +1631,15 @@ const readProviderFromSession = useCallback((): Provider | null => {
                     <MessageCircle size={16} className="inline mr-1" />
                     Numéro WhatsApp (optionnel)
                   </label>
-                  <div className="flex space-x-2">
+
+                  {/* ⚙️ FIX MOBILE: empiler sur mobile, côte à côte dès sm */}
+                  <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
                     <select
                       id="whatsappCountryCode"
                       name="whatsappCountryCode"
                       value={formData.whatsappCountryCode}
                       onChange={handleInputChange}
-                      className={`${inputClass('whatsappNumber')} w-20 sm:w-24 text-sm`}
+                      className={`${inputClass('whatsappNumber')} w-full sm:w-24 text-sm`}
                     >
                       {countryCodeOptions.map(({ code, flag }) => (
                         <option key={code} value={code}>
@@ -1648,11 +1653,12 @@ const readProviderFromSession = useCallback((): Provider | null => {
                       type="tel"
                       value={formData.whatsappNumber}
                       onChange={handleInputChange}
-                      className={`flex-1 ${inputClass('whatsappNumber')}`}
+                      className={`w-full sm:flex-1 ${inputClass('whatsappNumber')}`}
                       placeholder="612 345 678"
                       maxLength={20}
                     />
                   </div>
+
                   <div className="mt-2 text-sm text-gray-600">
                     💬 Pour recevoir les mises à jour en temps réel
                   </div>
@@ -1789,3 +1795,5 @@ const readProviderFromSession = useCallback((): Provider | null => {
 };
 
 export default BookingRequest;
+
+

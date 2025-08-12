@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, UserCheck, Clock3, Languages, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, UserCheck, Clock3, Languages, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,6 +34,67 @@ interface FormData {
   customLanguage: string;
 }
 
+// Interface pour les erreurs de champs
+interface FieldErrors {
+  firstName?: string;
+  email?: string;
+  password?: string;
+  languagesSpoken?: string;
+  terms?: string;
+  general?: string;
+}
+
+// Interface pour l'état des champs
+interface FieldValidation {
+  firstName: boolean;
+  email: boolean;
+  password: boolean;
+  languagesSpoken: boolean;
+  terms: boolean;
+}
+
+// Fonction pour calculer la force du mot de passe (réaliste mais sans contraintes)
+const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
+  if (password.length === 0) return { score: 0, label: '', color: '' };
+  
+  let score = 0;
+  let label = '';
+  let color = '';
+  
+  // Base sur la longueur (réaliste)
+  if (password.length >= 6) score += 30;
+  if (password.length >= 8) score += 20;
+  if (password.length >= 10) score += 15;
+  if (password.length >= 12) score += 15;
+  
+  // Bonus pour la diversité (optionnel, pas requis)
+  if (/[a-z]/.test(password)) score += 5;
+  if (/[A-Z]/.test(password)) score += 5;
+  if (/[0-9]/.test(password)) score += 5;
+  if (/[^a-zA-Z0-9]/.test(password)) score += 5;
+  
+  // Labels réalistes
+  if (password.length < 6) {
+    label = 'Trop court 😅';
+    color = 'bg-red-500';
+    score = Math.min(score, 25);
+  } else if (score < 40) {
+    label = 'Faible 🙂';
+    color = 'bg-orange-500';
+  } else if (score < 55) {
+    label = 'Moyen 👍';
+    color = 'bg-yellow-500';
+  } else if (score < 70) {
+    label = 'Bon 🔥';
+    color = 'bg-blue-500';
+  } else {
+    label = 'Excellent 🚀';
+    color = 'bg-green-500';
+  }
+  
+  return { score: Math.min(100, score), label, color };
+};
+
 // --- Types sûrs (pas de any) — en dehors du composant pour éviter toute erreur de parsing ---
 type NavState = Readonly<{ selectedProvider?: Provider }>;
 
@@ -45,7 +106,7 @@ function isProviderLike(v: unknown): v is Provider {
     && (o.type === 'lawyer' || o.type === 'expat');
 }
 
-// Configuration i18n complète - Préparée pour l'internationalisation
+// Configuration i18n avec messages fun pour les clients
 const i18nConfig = {
   fr: {
     // Métadonnées SEO
@@ -63,42 +124,56 @@ const i18nConfig = {
       subtitle: 'Créez votre compte pour accéder à notre réseau d\'experts',
       alreadyRegistered: 'Déjà inscrit ?',
       login: 'Se connecter',
-      personalInfo: 'Informations personnelles',
+      personalInfo: 'Vos infos perso',
       acceptTerms: 'J\'accepte les',
       termsLink: 'conditions générales pour clients',
-      createAccount: 'Créer mon compte client',
+      createAccount: 'C\'est parti ! 🚀',
       required: 'obligatoire',
-      loading: 'Création en cours...',
-      progressHint: 'Veuillez remplir tous les champs obligatoires (*)'
+      loading: 'Création magique en cours...',
+      progressHint: 'Encore quelques petites choses à remplir ! ⭐',
+      passwordStrength: 'Force de votre mot de passe'
     },
     // Champs du formulaire
     fields: {
-      firstName: 'Prénom',
-      email: 'Adresse email',
-      password: 'Mot de passe',
-      languagesSpoken: 'Langues parlées'
+      firstName: 'Votre prénom',
+      email: 'Votre email',
+      password: 'Votre mot de passe',
+      languagesSpoken: 'Langues que vous parlez'
     },
     // Actions
     actions: {
       addLanguage: 'Ajouter une langue',
       remove: 'Supprimer',
-      specifyLanguage: 'Précisez la langue',
+      specifyLanguage: 'Dites-nous quelle langue !',
       add: 'Ajouter'
     },
     // Textes d'aide
     help: {
-      minPassword: 'Minimum 6 caractères',
+      minPassword: '6 caractères minimum (aucune autre contrainte !)',
       emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'Votre prénom'
+      firstNamePlaceholder: 'Comment vous appelez-vous ?'
     },
-    // Messages d'erreur
+    // Messages d'erreur fun et encourageants
     errors: {
-      title: 'Erreur d\'inscription',
-      allFieldsRequired: 'Tous les champs obligatoires doivent être remplis',
-      passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
-      invalidEmail: 'Veuillez saisir une adresse email valide',
-      selectLanguage: 'Veuillez sélectionner au moins une langue parlée',
-      registrationError: 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.'
+      title: 'Petites corrections à faire :',
+      firstNameRequired: 'On aimerait connaître votre prénom ! 😊',
+      firstNameTooShort: 'Votre prénom mérite plus de 2 caractères pour briller ! ✨',
+      emailRequired: 'Il nous faut votre email pour vous contacter ! 📧',
+      emailInvalid: 'Cette adresse email a l\'air bizarre... Essayez quelque chose comme nom@exemple.com 🤔',
+      passwordRequired: 'Il faut un petit mot de passe pour sécuriser votre compte ! 🔐',
+      passwordTooShort: 'Juste 6 caractères minimum, c\'est tout ce qu\'on demande ! 😉',
+      languagesRequired: 'Dites-nous quelles langues vous parlez, ça nous aide ! 🌍',
+      termsRequired: 'Un petit clic sur les conditions pour finaliser ! ✅',
+      registrationError: 'Oups ! Un petit souci technique. Réessayez dans un instant ! 🔧',
+      emailAlreadyExists: 'Cette adresse est déjà prise ! Vous pouvez vous connecter à la place ? 🔄',
+      networkError: 'Problème de connexion ! Vérifiez votre wifi et on reessaie ? 📶'
+    },
+    // Messages de succès fun
+    success: {
+      fieldValid: 'Parfait ! ✨',
+      emailValid: 'Super email ! 👌',
+      passwordValid: 'Mot de passe au top ! 🔒',
+      allFieldsValid: 'Tout est parfait ! Vous êtes prêt(e) ! 🎉'
     },
     termsHref: '/cgu-clients',
     jsonLdName: 'Inscription Client'
@@ -117,38 +192,51 @@ const i18nConfig = {
       subtitle: 'Create your account to access our network of experts',
       alreadyRegistered: 'Already registered?',
       login: 'Log in',
-      personalInfo: 'Personal information',
+      personalInfo: 'Your personal info',
       acceptTerms: 'I accept the',
       termsLink: 'general terms for clients',
-      createAccount: 'Create my client account',
+      createAccount: 'Let\'s go! 🚀',
       required: 'required',
-      loading: 'Creating account...',
-      progressHint: 'Please complete all required fields (*)'
+      loading: 'Creating magic...',
+      progressHint: 'Just a few more things to fill! ⭐',
+      passwordStrength: 'Your password strength'
     },
     fields: {
-      firstName: 'First name',
-      email: 'Email address',
-      password: 'Password',
-      languagesSpoken: 'Spoken languages'
+      firstName: 'Your first name',
+      email: 'Your email',
+      password: 'Your password',
+      languagesSpoken: 'Languages you speak'
     },
     actions: {
       addLanguage: 'Add a language',
       remove: 'Remove',
-      specifyLanguage: 'Specify the language',
+      specifyLanguage: 'Tell us which language!',
       add: 'Add'
     },
     help: {
-      minPassword: 'Minimum 6 characters',
+      minPassword: '6 characters minimum (no other requirements!)',
       emailPlaceholder: 'your@email.com',
-      firstNamePlaceholder: 'Your first name'
+      firstNamePlaceholder: 'What\'s your name?'
     },
     errors: {
-      title: 'Registration error',
-      allFieldsRequired: 'All required fields must be filled',
-      passwordTooShort: 'Password must contain at least 6 characters',
-      invalidEmail: 'Please enter a valid email address',
-      selectLanguage: 'Please select at least one spoken language',
-      registrationError: 'An error occurred during registration. Please try again.'
+      title: 'Small fixes needed:',
+      firstNameRequired: 'We\'d love to know your first name! 😊',
+      firstNameTooShort: 'Your name deserves more than 2 characters to shine! ✨',
+      emailRequired: 'We need your email to contact you! 📧',
+      emailInvalid: 'This email looks weird... Try something like name@example.com 🤔',
+      passwordRequired: 'You need a little password to secure your account! 🔐',
+      passwordTooShort: 'Just 6 characters minimum, that\'s all we ask! 😉',
+      languagesRequired: 'Tell us what languages you speak, it helps us! 🌍',
+      termsRequired: 'A quick click on the terms to finalize! ✅',
+      registrationError: 'Oops! A little technical hiccup. Try again in a moment! 🔧',
+      emailAlreadyExists: 'This address is already taken! Can you log in instead? 🔄',
+      networkError: 'Connection problem! Check your wifi and let\'s try again? 📶'
+    },
+    success: {
+      fieldValid: 'Perfect! ✨',
+      emailValid: 'Great email! 👌',
+      passwordValid: 'Password on point! 🔒',
+      allFieldsValid: 'Everything is perfect! You\'re ready! 🎉'
     },
     termsHref: '/terms-conditions-clients',
     jsonLdName: 'Client Registration'
@@ -161,13 +249,15 @@ const CustomFieldInput = React.memo(({
   value,
   onChange,
   onAdd,
-  disabled
+  disabled,
+  addLabel
 }: {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
   onAdd: () => void;
   disabled: boolean;
+  addLabel: string;
 }) => (
   <div className="mt-3 flex flex-col sm:flex-row gap-2">
     <input
@@ -184,12 +274,64 @@ const CustomFieldInput = React.memo(({
       disabled={disabled}
       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 whitespace-nowrap"
     >
-      Ajouter
+      {addLabel}
     </button>
   </div>
 ));
 
 CustomFieldInput.displayName = 'CustomFieldInput';
+
+// Composant pour afficher les erreurs de champ individuel (style fun)
+const FieldError = React.memo(({ error, show }: { error?: string; show: boolean }) => {
+  if (!show || !error) return null;
+  
+  return (
+    <div className="mt-1 flex items-center gap-1 text-sm text-red-600 bg-red-50 rounded-lg px-2 py-1">
+      <XCircle className="h-4 w-4 flex-shrink-0" />
+      <span>{error}</span>
+    </div>
+  );
+});
+
+FieldError.displayName = 'FieldError';
+
+// Composant pour afficher la validation positive (style fun)
+const FieldSuccess = React.memo(({ show, message }: { show: boolean; message: string }) => {
+  if (!show) return null;
+  
+  return (
+    <div className="mt-1 flex items-center gap-1 text-sm text-green-600 bg-green-50 rounded-lg px-2 py-1">
+      <CheckCircle className="h-4 w-4 flex-shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+});
+
+FieldSuccess.displayName = 'FieldSuccess';
+
+// Composant pour la barre de force du mot de passe (fun et sans contraintes)
+const PasswordStrengthBar = React.memo(({ password, label }: { password: string; label: string }) => {
+  const strength = useMemo(() => calculatePasswordStrength(password), [password]);
+  
+  if (password.length === 0) return null;
+  
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+        <span>{label}</span>
+        <span className="font-medium">{strength.label}</span>
+      </div>
+      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div 
+          className={`h-full transition-all duration-500 ${strength.color}`}
+          style={{ width: `${strength.score}%` }}
+        />
+      </div>
+    </div>
+  );
+});
+
+PasswordStrengthBar.displayName = 'PasswordStrengthBar';
 
 // Composant principal
 const RegisterClient: React.FC = () => {
@@ -233,8 +375,17 @@ const RegisterClient: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [selectedLanguages, setSelectedLanguages] = useState<MultiValue<{ value: string; label: string }>>([]);
   const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldValidation, setFieldValidation] = useState<FieldValidation>({
+    firstName: false,
+    email: false,
+    password: false,
+    languagesSpoken: false,
+    terms: false
+  });
   const [showCustomLanguage, setShowCustomLanguage] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // SEO - Mise à jour des métadonnées complète
   useEffect(() => {
@@ -299,15 +450,26 @@ const RegisterClient: React.FC = () => {
     []
   );
 
-  const inputNeutral = useMemo(
-    () => `${inputBase} bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400`,
-    [inputBase]
-  );
-
-  const inputWithIcon = useMemo(() =>
-    `${inputNeutral} pl-11`,
-    [inputNeutral]
-  );
+  const getInputClassName = useCallback((fieldName: string, hasIcon: boolean = false) => {
+    const isValid = fieldValidation[fieldName as keyof FieldValidation];
+    const hasError = fieldErrors[fieldName as keyof FieldErrors] && touched[fieldName];
+    
+    let className = inputBase;
+    
+    if (hasIcon) {
+      className += ' pl-11';
+    }
+    
+    if (hasError) {
+      className += ' bg-red-50/50 border-red-300 focus:ring-4 focus:ring-red-500/20 focus:border-red-500';
+    } else if (isValid && touched[fieldName]) {
+      className += ' bg-green-50/50 border-green-300 focus:ring-4 focus:ring-green-500/20 focus:border-green-500';
+    } else {
+      className += ' bg-white/90 border-gray-300 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-400';
+    }
+    
+    return className;
+  }, [inputBase, fieldValidation, fieldErrors, touched]);
 
   // Validation email optimisée avec regex pré-compilée
   const isValidEmail = useCallback((email: string): boolean => {
@@ -319,16 +481,86 @@ const RegisterClient: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Validation en temps réel des champs
+  const validateField = useCallback((fieldName: string, value: string | string[] | boolean) => {
+    const errors: FieldErrors = {};
+    const validation: Partial<FieldValidation> = {};
+
+    switch (fieldName) {
+      case 'firstName':
+        if (!value || (typeof value === 'string' && !value.trim())) {
+          errors.firstName = t.errors.firstNameRequired;
+          validation.firstName = false;
+        } else if (typeof value === 'string' && value.trim().length < 2) {
+          errors.firstName = t.errors.firstNameTooShort;
+          validation.firstName = false;
+        } else {
+          validation.firstName = true;
+        }
+        break;
+
+      case 'email':
+        if (!value || (typeof value === 'string' && !value.trim())) {
+          errors.email = t.errors.emailRequired;
+          validation.email = false;
+        } else if (typeof value === 'string' && !isValidEmail(value)) {
+          errors.email = t.errors.emailInvalid;
+          validation.email = false;
+        } else {
+          validation.email = true;
+        }
+        break;
+
+      case 'password':
+        if (!value) {
+          errors.password = t.errors.passwordRequired;
+          validation.password = false;
+        } else if (typeof value === 'string' && value.length < 6) {
+          errors.password = t.errors.passwordTooShort;
+          validation.password = false;
+        } else {
+          validation.password = true;
+        }
+        break;
+
+      case 'languagesSpoken':
+        if (!value || (Array.isArray(value) && value.length === 0)) {
+          errors.languagesSpoken = t.errors.languagesRequired;
+          validation.languagesSpoken = false;
+        } else {
+          validation.languagesSpoken = true;
+        }
+        break;
+
+      case 'terms':
+        if (!value) {
+          errors.terms = t.errors.termsRequired;
+          validation.terms = false;
+        } else {
+          validation.terms = true;
+        }
+        break;
+    }
+
+    return { errors, validation };
+  }, [t.errors, isValidEmail]);
+
+  // Gestionnaire pour marquer un champ comme "touché"
+  const handleFieldBlur = useCallback((fieldName: string) => {
+    setTouched(prev => ({ ...prev, [fieldName]: true }));
+  }, []);
+
   // Gestionnaire générique pour les changements d'input - optimisé
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
-    // Clear errors when user starts typing
-    if (formError) {
-      setFormError('');
-    }
-  }, [formError]);
+    // Validation en temps réel
+    const { errors, validation } = validateField(name, value);
+    
+    setFieldErrors(prev => ({ ...prev, [name]: errors[name as keyof FieldErrors] }));
+    setFieldValidation(prev => ({ ...prev, ...validation }));
+  }, [validateField]);
 
   // Gestion des langues avec MultiLanguageSelect - optimisée
   const handleAddCustomLanguage = useCallback(() => {
@@ -342,58 +574,118 @@ const RegisterClient: React.FC = () => {
         languagesSpoken: [...prev.languagesSpoken, customLang]
       }));
       setShowCustomLanguage(false);
+      
+      // Validation des langues
+      const newLanguages = [...formData.languagesSpoken, customLang];
+      const { errors, validation } = validateField('languagesSpoken', newLanguages);
+      setFieldErrors(prev => ({ ...prev, languagesSpoken: errors.languagesSpoken }));
+      setFieldValidation(prev => ({ ...prev, ...validation }));
     }
-  }, [formData.customLanguage, selectedLanguages]);
+  }, [formData.customLanguage, formData.languagesSpoken, selectedLanguages, validateField]);
 
   // Gestion du changement des langues sélectionnées
   const handleLanguagesChange = useCallback((newValue: MultiValue<{ value: string; label: string }>) => {
     setSelectedLanguages(newValue);
+    const languagesArray = newValue.map(lang => lang.value);
     setFormData(prev => ({
       ...prev,
-      languagesSpoken: newValue.map(lang => lang.value)
+      languagesSpoken: languagesArray
     }));
+
+    // Validation des langues
+    const { errors, validation } = validateField('languagesSpoken', languagesArray);
+    setFieldErrors(prev => ({ ...prev, languagesSpoken: errors.languagesSpoken }));
+    setFieldValidation(prev => ({ ...prev, ...validation }));
 
     // Vérifier si "Autre" est sélectionné
     setShowCustomLanguage(newValue.some(lang => lang.value === 'other'));
-  }, []);
+  }, [validateField]);
 
-  // Validation du formulaire - optimisée
-  const validateForm = useCallback((): boolean => {
-    const { firstName, email, password, languagesSpoken } = formData;
+  // Gestion des conditions générales
+  const handleTermsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = e.target.checked;
+    setTermsAccepted(isChecked);
+    
+    const { errors, validation } = validateField('terms', isChecked);
+    setFieldErrors(prev => ({ ...prev, terms: errors.terms }));
+    setFieldValidation(prev => ({ ...prev, ...validation }));
+  }, [validateField]);
 
-    if (!firstName?.trim() || !email?.trim() || !password) {
-      setFormError(t.errors.allFieldsRequired);
-      scrollToTop();
-      return false;
+  // Validation complète du formulaire
+  const validateAllFields = useCallback((): boolean => {
+    const allErrors: FieldErrors = {};
+    const allValidation: FieldValidation = {
+      firstName: false,
+      email: false,
+      password: false,
+      languagesSpoken: false,
+      terms: false
+    };
+
+    // Valider tous les champs
+    const fields = [
+      { name: 'firstName', value: formData.firstName },
+      { name: 'email', value: formData.email },
+      { name: 'password', value: formData.password },
+      { name: 'languagesSpoken', value: formData.languagesSpoken },
+      { name: 'terms', value: termsAccepted }
+    ];
+
+    fields.forEach(({ name, value }) => {
+      const { errors, validation } = validateField(name, value);
+      Object.assign(allErrors, errors);
+      Object.assign(allValidation, validation);
+    });
+
+    setFieldErrors(allErrors);
+    setFieldValidation(allValidation);
+    
+    // Marquer tous les champs comme touchés
+    setTouched({
+      firstName: true,
+      email: true,
+      password: true,
+      languagesSpoken: true,
+      terms: true
+    });
+
+    return Object.keys(allErrors).length === 0;
+  }, [formData, termsAccepted, validateField]);
+
+  // Traitement des erreurs spécifiques de Firebase/Auth
+  const getErrorMessage = useCallback((errorCode: string, originalMessage?: string): string => {
+    switch (errorCode) {
+      case 'auth/email-already-in-use':
+        return t.errors.emailAlreadyExists;
+      case 'auth/network-request-failed':
+        return t.errors.networkError;
+      case 'auth/too-many-requests':
+        return language === 'en' 
+          ? 'Too many attempts! Take a breather and try again in a few minutes! ⏰'
+          : 'Trop de tentatives ! Prenez une pause et réessayez dans quelques minutes ! ⏰';
+      case 'auth/weak-password':
+        // Remplacer le message Firebase par le nôtre (pas de contraintes)
+        return t.errors.passwordTooShort;
+      case 'auth/invalid-password':
+        // Aussi pour ce cas
+        return t.errors.passwordTooShort;
+      default:
+        // Si le message original contient des contraintes, on utilise le nôtre
+        if (originalMessage && (originalMessage.includes('majuscule') || originalMessage.includes('minuscule') || originalMessage.includes('chiffre'))) {
+          return t.errors.passwordTooShort;
+        }
+        return t.errors.registrationError;
     }
-
-    if (!isValidEmail(email)) {
-      setFormError(t.errors.invalidEmail);
-      scrollToTop();
-      return false;
-    }
-
-    if (password.length < 6) {
-      setFormError(t.errors.passwordTooShort);
-      scrollToTop();
-      return false;
-    }
-
-    if (languagesSpoken.length === 0) {
-      setFormError(t.errors.selectLanguage);
-      scrollToTop();
-      return false;
-    }
-
-    return true;
-  }, [formData, t.errors, scrollToTop, isValidEmail]);
+  }, [t.errors, language]);
 
   // Soumission du formulaire - optimisée
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
 
-    if (!validateForm()) return;
+    if (!validateAllFields()) {
+      scrollToTop();
+      return;
+    }
 
     try {
       const userData: CreateUserData = {
@@ -409,21 +701,30 @@ const RegisterClient: React.FC = () => {
 
       await register(userData as unknown as Parameters<typeof register>[0], formData.password);
       navigate(redirect, { replace: true });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('❌ Erreur lors de l\'inscription client:', err);
-      setFormError(t.errors.registrationError);
+      
+      const error = err as { code?: string; message?: string };
+      const errorMessage = getErrorMessage(error?.code || 'unknown', error?.message);
+      setFieldErrors(prev => ({ ...prev, general: errorMessage }));
       scrollToTop();
     }
-  }, [formData, validateForm, register, navigate, redirect, t.errors.registrationError, scrollToTop]);
+  }, [formData, validateAllFields, register, navigate, redirect, getErrorMessage, scrollToTop]);
 
   // Vérification si le formulaire peut être soumis
   const canSubmit = useMemo(() => {
-    return formData.email &&
-      formData.password &&
-      formData.firstName &&
-      formData.languagesSpoken.length > 0 &&
+    return fieldValidation.firstName &&
+      fieldValidation.email &&
+      fieldValidation.password &&
+      fieldValidation.languagesSpoken &&
+      fieldValidation.terms &&
       !isLoading;
-  }, [formData.email, formData.password, formData.firstName, formData.languagesSpoken.length, isLoading]);
+  }, [fieldValidation, isLoading]);
+
+  // Compter les erreurs pour affichage
+  const errorCount = useMemo(() => {
+    return Object.values(fieldErrors).filter(Boolean).length;
+  }, [fieldErrors]);
 
   return (
     <Layout>
@@ -476,31 +777,73 @@ const RegisterClient: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8 px-5 py-6 sm:px-8 sm:py-8" noValidate>
-              {/* Messages d'erreur améliorés */}
-              {(error || formError) && (
+              {/* Messages d'erreur globaux fun et colorés */}
+              {(error || fieldErrors.general || errorCount > 0) && (
                 <div
-                  className="rounded-xl border border-red-2 00 bg-red-50/80 p-4"
+                  className="rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-pink-50 p-4"
                   role="alert"
                   aria-live="polite"
                 >
                   <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                    <div className="ml-3">
+                    <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="ml-3 flex-1">
                       <h3 className="text-sm font-semibold text-red-800">{t.errors.title}</h3>
-                      <p className="mt-1 text-sm text-red-700">{error || formError}</p>
+                      {(error || fieldErrors.general) && (
+                        <p className="mt-1 text-sm text-red-700">{error || fieldErrors.general}</p>
+                      )}
+                      {errorCount > 0 && !error && !fieldErrors.general && (
+                        <div className="mt-2 text-sm text-red-700">
+                          <ul className="list-none space-y-1">
+                            {fieldErrors.firstName && <li>• {fieldErrors.firstName}</li>}
+                            {fieldErrors.email && <li>• {fieldErrors.email}</li>}
+                            {fieldErrors.password && <li>• {fieldErrors.password}</li>}
+                            {fieldErrors.languagesSpoken && <li>• {fieldErrors.languagesSpoken}</li>}
+                            {fieldErrors.terms && <li>• {fieldErrors.terms}</li>}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Section: Informations personnelles */}
+              {/* Indicateur de progression fun avec emojis */}
+              {!error && !fieldErrors.general && (
+                <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-800 flex items-center gap-1">
+                      🎯 Progression
+                    </span>
+                    <span className="text-sm text-blue-600 font-bold">
+                      {Object.values(fieldValidation).filter(Boolean).length}/5
+                    </span>
+                  </div>
+                  <div className="h-3 bg-blue-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out"
+                      style={{ 
+                        width: `${(Object.values(fieldValidation).filter(Boolean).length / 5) * 100}%` 
+                      }}
+                    />
+                  </div>
+                  {canSubmit && (
+                    <div className="mt-2 flex items-center gap-1 text-sm text-green-600 bg-green-50 rounded-lg px-2 py-1">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>{t.success.allFieldsValid}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section: Informations personnelles avec style fun */}
               <section>
                 <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
                   <UserCheck className="h-5 w-5 text-blue-600" />
                   {t.ui.personalInfo}
                 </h3>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Prénom */}
                   <div>
                     <label htmlFor="firstName" className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.firstName} <span className="text-red-500">*</span>
@@ -513,12 +856,22 @@ const RegisterClient: React.FC = () => {
                       autoComplete="given-name"
                       value={formData.firstName}
                       onChange={handleInputChange}
+                      onBlur={() => handleFieldBlur('firstName')}
                       placeholder={t.help.firstNamePlaceholder}
-                      className={inputNeutral}
-                      aria-describedby="firstName-required"
+                      className={getInputClassName('firstName')}
+                      aria-describedby="firstName-error firstName-success"
+                    />
+                    <FieldError 
+                      error={fieldErrors.firstName} 
+                      show={!!(fieldErrors.firstName && touched.firstName)} 
+                    />
+                    <FieldSuccess 
+                      show={fieldValidation.firstName && touched.firstName && !fieldErrors.firstName}
+                      message={t.success.fieldValid}
                     />
                   </div>
 
+                  {/* Email */}
                   <div>
                     <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.email} <span className="text-red-500">*</span>
@@ -533,13 +886,23 @@ const RegisterClient: React.FC = () => {
                         autoComplete="email"
                         value={formData.email}
                         onChange={handleInputChange}
+                        onBlur={() => handleFieldBlur('email')}
                         placeholder={t.help.emailPlaceholder}
-                        className={inputWithIcon}
-                        aria-describedby="email-required"
+                        className={getInputClassName('email', true)}
+                        aria-describedby="email-error email-success"
                       />
                     </div>
+                    <FieldError 
+                      error={fieldErrors.email} 
+                      show={!!(fieldErrors.email && touched.email)} 
+                    />
+                    <FieldSuccess 
+                      show={fieldValidation.email && touched.email && !fieldErrors.email}
+                      message={t.success.emailValid}
+                    />
                   </div>
 
+                  {/* Mot de passe fun et sans contraintes */}
                   <div>
                     <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
                       {t.fields.password} <span className="text-red-500">*</span>
@@ -554,19 +917,32 @@ const RegisterClient: React.FC = () => {
                         autoComplete="new-password"
                         value={formData.password}
                         onChange={handleInputChange}
+                        onBlur={() => handleFieldBlur('password')}
                         placeholder={t.help.minPassword}
-                        className={`${inputWithIcon} pr-11`}
-                        aria-describedby="password-requirements"
+                        className={`${getInputClassName('password', true)} pr-11`}
+                        aria-describedby="password-error password-success password-strength"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+                        className="absolute right-3 top-2.5 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95 transition-all"
                         aria-label={showPassword ? (language === 'en' ? 'Hide password' : 'Masquer le mot de passe') : (language === 'en' ? 'Show password' : 'Afficher le mot de passe')}
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
+                    <PasswordStrengthBar 
+                      password={formData.password} 
+                      label={t.ui.passwordStrength}
+                    />
+                    <FieldError 
+                      error={fieldErrors.password} 
+                      show={!!(fieldErrors.password && touched.password)} 
+                    />
+                    <FieldSuccess 
+                      show={fieldValidation.password && touched.password && !fieldErrors.password}
+                      message={t.success.passwordValid}
+                    />
                   </div>
 
                   {/* Langues parlées avec MultiLanguageSelect */}
@@ -577,13 +953,17 @@ const RegisterClient: React.FC = () => {
 
                     <Suspense fallback={
                       <div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100 flex items-center px-3">
-                        <div className="text-gray-500 text-sm">Chargement des langues...</div>
+                        <div className="text-gray-500 text-sm">
+                          {language === 'en' ? 'Loading languages...' : 'Chargement des langues...'}
+                        </div>
                       </div>
                     }>
-                      <MultiLanguageSelect
-                        value={selectedLanguages}
-                        onChange={handleLanguagesChange}
-                      />
+                      <div className={`${getInputClassName('languagesSpoken')} p-0`}>
+                        <MultiLanguageSelect
+                          value={selectedLanguages}
+                          onChange={handleLanguagesChange}
+                        />
+                      </div>
                     </Suspense>
 
                     {showCustomLanguage && (
@@ -593,43 +973,70 @@ const RegisterClient: React.FC = () => {
                         onChange={(value) => setFormData(prev => ({ ...prev, customLanguage: value }))}
                         onAdd={handleAddCustomLanguage}
                         disabled={!formData.customLanguage.trim()}
+                        addLabel={t.actions.add}
                       />
                     )}
 
-                    {/* Note de sécurité */}
-                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                    <FieldError 
+                      error={fieldErrors.languagesSpoken} 
+                      show={!!(fieldErrors.languagesSpoken && touched.languagesSpoken)} 
+                    />
+                    <FieldSuccess 
+                      show={fieldValidation.languagesSpoken && touched.languagesSpoken && !fieldErrors.languagesSpoken}
+                      message={t.success.fieldValid}
+                    />
+
+                    {/* Note de sécurité fun */}
+                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 bg-green-50 rounded-lg px-2 py-1">
                       <ShieldCheck className="h-4 w-4 text-green-600" />
-                      <span>SSL • {language === 'en' ? 'Encrypted data' : 'Données chiffrées'}</span>
+                      <span>🔒 SSL • {language === 'en' ? 'Your data is encrypted & secure' : 'Vos données sont chiffrées et sécurisées'}</span>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Conditions générales */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              {/* Conditions générales avec style fun */}
+              <div className="rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50 px-4 py-3">
                 <div className="flex items-start gap-3">
                   <input
                     id="acceptClientTerms"
                     type="checkbox"
                     required
-                    className="h-5 w-5 text-blue-600 border-gray-300 rounded mt-0.5"
+                    checked={termsAccepted}
+                    onChange={handleTermsChange}
+                    onBlur={() => handleFieldBlur('terms')}
+                    className={`h-5 w-5 border-gray-300 rounded mt-0.5 transition-colors ${
+                      fieldErrors.terms && touched.terms
+                        ? 'border-red-500 text-red-600'
+                        : 'text-blue-600'
+                    }`}
                   />
-                  <label htmlFor="acceptClientTerms" className="text-sm text-gray-700">
-                    {t.ui.acceptTerms}{' '}
-                    <Link
-                      to={t.termsHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700"
-                    >
-                      {t.ui.termsLink}
-                    </Link>{' '}
-                    <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex-1">
+                    <label htmlFor="acceptClientTerms" className="text-sm text-gray-700">
+                      {t.ui.acceptTerms}{' '}
+                      <Link
+                        to={t.termsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700 transition-colors"
+                      >
+                        {t.ui.termsLink}
+                      </Link>{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <FieldError 
+                      error={fieldErrors.terms} 
+                      show={!!(fieldErrors.terms && touched.terms)} 
+                    />
+                    <FieldSuccess 
+                      show={fieldValidation.terms && touched.terms && !fieldErrors.terms}
+                      message={t.success.fieldValid}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Bouton de soumission optimisé */}
+              {/* Bouton de soumission fun et coloré */}
               <div>
                 <Button
                   type="submit"
@@ -637,24 +1044,79 @@ const RegisterClient: React.FC = () => {
                   fullWidth
                   size="large"
                   disabled={!canSubmit}
-                  className="min-h-[52px] rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 font-bold text-white shadow-lg shadow-blue-500/20 transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-blue-600/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`min-h-[52px] rounded-xl font-bold text-white shadow-lg transition-all duration-300 active:scale-[0.98] transform ${
+                    canSubmit
+                      ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 shadow-blue-500/30 hover:from-blue-700 hover:via-purple-700 hover:to-blue-800 hover:shadow-blue-600/40 hover:scale-[1.02]'
+                      : 'bg-gray-400 cursor-not-allowed shadow-gray-400/20'
+                  }`}
                 >
-                  {isLoading ? t.ui.loading : t.ui.createAccount}
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      {t.ui.loading}
+                    </span>
+                  ) : (
+                    t.ui.createAccount
+                  )}
                 </Button>
 
-                {/* Indicateur de progression visuel */}
-                {!canSubmit && (
-                  <p className="mt-3 text-center text-xs text-gray-500">{t.ui.progressHint}</p>
+                {/* Indicateur de progression détaillé avec emojis */}
+                {!canSubmit && !isLoading && (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-center text-xs text-gray-500 font-medium">{t.ui.progressHint}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className={`flex items-center gap-1 transition-colors ${fieldValidation.firstName ? 'text-green-600' : 'text-gray-400'}`}>
+                        {fieldValidation.firstName ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 border border-gray-300 rounded-full" />
+                        )}
+                        <span>{t.fields.firstName}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 transition-colors ${fieldValidation.email ? 'text-green-600' : 'text-gray-400'}`}>
+                        {fieldValidation.email ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 border border-gray-300 rounded-full" />
+                        )}
+                        <span>{t.fields.email}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 transition-colors ${fieldValidation.password ? 'text-green-600' : 'text-gray-400'}`}>
+                        {fieldValidation.password ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 border border-gray-300 rounded-full" />
+                        )}
+                        <span>{t.fields.password}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 transition-colors ${fieldValidation.languagesSpoken ? 'text-green-600' : 'text-gray-400'}`}>
+                        {fieldValidation.languagesSpoken ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 border border-gray-300 rounded-full" />
+                        )}
+                        <span>{t.fields.languagesSpoken}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 col-span-2 transition-colors ${fieldValidation.terms ? 'text-green-600' : 'text-gray-400'}`}>
+                        {fieldValidation.terms ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 border border-gray-300 rounded-full" />
+                        )}
+                        <span>{t.ui.termsLink}</span>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </form>
           </div>
 
-          {/* Footer informatif */}
-          <div className="mt-6 text-center text-xs text-gray-500">
+          {/* Footer informatif fun */}
+          <div className="mt-6 text-center text-xs text-gray-500 bg-white/50 rounded-lg px-4 py-2">
             {language === 'en'
-              ? 'By registering, you join our network and quickly access qualified help.'
-              : "En vous inscrivant, vous rejoignez notre réseau et accédez rapidement à de l'aide qualifiée."}
+              ? '🌟 By registering, you join our amazing community and get instant access to qualified help!'
+              : "🌟 En vous inscrivant, vous rejoignez notre super communauté et accédez instantanément à de l'aide qualifiée !"}
           </div>
         </main>
       </div>
@@ -664,3 +1126,4 @@ const RegisterClient: React.FC = () => {
 
 // Export avec React.memo pour optimiser les re-renders
 export default React.memo(RegisterClient);
+

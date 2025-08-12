@@ -19,42 +19,42 @@ const useTranslation = () => {
   const dict: Record<string, Record<'fr' | 'en', string>> = {
     // Meta
     'meta.title': {
-      fr: "Inscription - SOS Expats | Choisissez votre profil",
-      en: 'Sign up - SOS Expats | Choose your profile',
+      fr: "Inscription - SOS Expats | Choisissez votre profil ✨",
+      en: 'Sign up - SOS Expats | Choose your profile ✨',
     },
     'meta.description': {
-      fr: "Rejoignez SOS Expats : choisissez un profil (Client, Avocat, Expatrie) pour acceder a nos services. 24/7, multi-langues.",
-      en: 'Join SOS Expats: choose a profile (Client, Lawyer, Expat) to access our services. 24/7, multilingual.',
+      fr: "Rejoignez SOS Expats : choisissez un profil (Client, Avocat, Expatrié) pour profiter d’une aide sympa et efficace, 24/7 et multilingue 🌍.",
+      en: 'Join SOS Expats: choose a profile (Client, Lawyer, Expat) to get friendly and effective help, 24/7 and multilingual 🌍.',
     },
     'og.title': {
-      fr: 'Inscription SOS Expats - Choisissez votre profil',
-      en: 'SOS Expats Sign up - Choose your profile',
+      fr: 'Inscription SOS Expats - Choisissez votre profil 🌴',
+      en: 'SOS Expats Sign up - Choose your profile 🌴',
     },
     'og.description': {
-      fr: 'Plateforme d\'assistance aux expatries et conseils juridiques. 24/7.',
-      en: 'Expat assistance & legal advisory platform. 24/7.',
+      fr: "Plateforme d’aide sympa et efficace pour expatriés & conseils juridiques. Toujours là pour vous, même en vacances 😎.",
+      en: 'Friendly and effective help for expats & legal advisory. Here for you, even on holiday 😎.',
     },
 
     // Header
-    'register.title': { fr: 'Choisissez votre profil', en: 'Choose your profile' },
-    'register.subtitle': { fr: 'Rejoignez notre communaute', en: 'Join our community' },
+    'register.title': { fr: 'Choisissez votre profil 🌞', en: 'Choose your profile 🌞' },
+    'register.subtitle': { fr: 'Rejoignez notre communauté ensoleillée', en: 'Join our sunny community' },
     'register.description': {
-      fr: 'Choisissez votre profil pour vous inscrire sur la plateforme',
-      en: 'Choose your profile to register on the platform',
+      fr: 'Sélectionnez le rôle qui vous ressemble et embarquez avec nous ✈️',
+      en: 'Pick the role that fits you and come aboard ✈️',
     },
     'register.loginPrompt': {
-      fr: 'connectez-vous a votre compte existant',
+      fr: 'connectez-vous à votre compte existant',
       en: 'sign in to your existing account',
     },
     'register.bookingMessage': {
-      fr: 'Apres inscription, vous serez redirige pour finaliser votre reservation',
-      en: 'After sign-up, you\'ll be redirected to finish your booking',
+      fr: 'Après inscription, vous serez redirigé pour finaliser votre réservation 🧭',
+      en: "After sign-up, you'll be redirected to finish your booking 🧭",
     },
-    'register.needHelp': { fr: "Besoin d'aide ? ", en: 'Need help? ' },
-    'register.contactUs': { fr: 'Contactez-nous', en: 'Contact us' },
+    'register.needHelp': { fr: "Besoin d'un coup de main ? ", en: 'Need a hand? ' },
+    'register.contactUs': { fr: 'Contactez-nous 💬', en: 'Contact us 💬' },
     'register.termsAccept': { fr: 'En vous inscrivant, vous acceptez nos', en: 'By signing up, you agree to our' },
     'register.termsLink': { fr: "conditions d'utilisation", en: 'terms of use' },
-    'register.secureData': { fr: 'Donnees securisees', en: 'Secure data' },
+    'register.secureData': { fr: 'Données sécurisées', en: 'Secure data' },
     'register.freeRegistration': { fr: 'Inscription gratuite', en: 'Free registration' },
 
     // Role titles/descriptions
@@ -62,45 +62,46 @@ const useTranslation = () => {
     'role.lawyer': { fr: 'Avocat', en: 'Lawyer' },
     'role.expat':  { fr: 'Expatrié', en: 'Expat' },
 
+    // CLIENT => "conseils", pas "experts"
     'role.client.desc': {
-      fr: "Conseils et experts dans toutes les langues, dans le monde entier",
-      en: 'Advice and experts in all languages, worldwide',
+      fr: "Des conseils qui parlent votre langue, où que vous soyez dans le monde🌍",
+      en: 'Guidance that speaks your language, wherever you are 🌍',
     },
     'role.lawyer.desc': {
-      fr: 'Expert juridique international, toutes nationalités',
-      en: 'International legal expert, all nationalities',
+      fr: 'Partagez votre expertise juridique avec le monde entier ⚖️',
+      en: 'Share your legal expertise with the world ⚖️',
     },
     'role.expat.desc': {
-      fr: "Partagez votre experience d'expatriation",
-      en: 'Share your expatriation know-how',
+      fr: "Partagez vos bons plans et votre vécu d’expatrié ☀️",
+      en: 'Share your tips and expat experience ☀️',
     },
 
     // Role micro-CTA (revenus)
     'role.lawyer.cta': {
-      fr: "Offrez vos conseils juridiques a des expatriés, voyageurs, vacanciers ou que vous soyez dans le monde et developpez votre chiffre d'affaires.",
-      en: "Offer your legal expertise to expats, travelers, vacationers wherever you are in the world and grow your income.",
+      fr: "Offrez vos conseils juridiques à des expatriés, voyageurs et vacanciers partout dans le monde 🌎 — et faites exploser votre chiffre d’affaires 🚀",
+      en: "Offer your legal advice to expats, travelers, and holidaymakers worldwide 🌎 — and skyrocket your revenue 🚀",
     },
     'role.expat.cta': {
-      fr: "Aidez par telephone des expatriés, voyageurs, vacanciers ou que vous soyez dans le monde et gagnez des revenus.",
-      en: "Help expats, travelers, vacationers by phone wherever you are in the world and earn income.",
+      fr: "Aidez par téléphone des expatriés, voyageurs et vacanciers où que vous soyez 🌍 — et gagnez un vrai revenu selon votre implication 📞🌴",
+      en: "Help expats, travelers, and holidaymakers by phone from anywhere 🌍 — and earn a real income based on your involvement 📞🌴",
     },
 
-    // Role features
-    'role.client.f1': { fr: 'Experts dans toutes les langues',    en: 'Experts in all languages' },
-    'role.client.f2': { fr: 'Disponible 24/7 partout',             en: 'Available 24/7 worldwide' },
-    'role.client.f3': { fr: 'Conseils juridiques rapides',         en: 'Fast legal guidance' },
+    // Role features (CLIENT = conseils)
+    'role.client.f1': { fr: 'Conseils multilingues', en: 'Multilingual guidance' },
+    'role.client.f2': { fr: 'Disponible 24/7', en: 'Available 24/7' },
+    'role.client.f3': { fr: 'Conseils juridiques rapides', en: 'Fast legal guidance' },
 
-    'role.lawyer.f1': { fr: 'Clients internationaux',              en: 'International clients' },
-    'role.lawyer.f2': { fr: 'Consultations multilingues',          en: 'Multilingual consultations' },
-    'role.lawyer.f3': { fr: 'Revenus flexibles',                   en: 'Flexible income' },
+    'role.lawyer.f1': { fr: 'Clients internationaux', en: 'International clients' },
+    'role.lawyer.f2': { fr: 'Consultations multilingues', en: 'Multilingual consultations' },
+    'role.lawyer.f3': { fr: 'Revenus flexibles', en: 'Flexible income' },
 
-    'role.expat.f1':  { fr: 'Aide pratique terrain',               en: 'Hands-on help' },
-    'role.expat.f2':  { fr: "Partage d'experience",                en: 'Experience sharing' },
-    'role.expat.f3':  { fr: "Revenus d'entraide",                  en: 'Support-based earnings' },
+    'role.expat.f1':  { fr: 'Aide concrète terrain', en: 'Hands-on help' },
+    'role.expat.f2':  { fr: "Partage d’expérience", en: 'Experience sharing' },
+    'role.expat.f3':  { fr: "Vrai revenu possible", en: 'Real earning potential' },
 
-    // Top badges (2)
-    'badge.24_7': { fr: 'Disponible 24/7', en: 'Available 24/7' },
-    'badge.multi': { fr: 'Multi-langues',  en: 'Multilingual'   },
+    // Badges
+    'badge.24_7': { fr: 'Disponible 24/7 ⏰', en: 'Available 24/7 ⏰' },
+    'badge.multi': { fr: 'Multi-langues 🌍',  en: 'Multilingual 🌍' },
   };
 
   const t = (key: string) => dict[key]?.[lang] ?? dict[key]?.fr ?? key;
@@ -148,7 +149,7 @@ const Register: React.FC = () => {
         chipBg: 'bg-blue-100',
         chipText: 'text-blue-800',
         features: [t('role.client.f1'), t('role.client.f2'), t('role.client.f3')],
-        cta: '', // pas de micro-CTA revenus pour Client
+        cta: '',
       },
       {
         id: 'lawyer' as const,
@@ -338,7 +339,7 @@ const Register: React.FC = () => {
               <p className="text-gray-600 text-sm leading-relaxed max-w-sm mx-auto">{t('register.description')}</p>
             </div>
 
-            {/* Role cards — FOND PASTEL par carte */}
+            {/* Role cards — pas de mots coupés ni de troncature */}
             <div className="space-y-4">
               {roles.map((role) => {
                 const Icon = role.icon;
@@ -347,15 +348,16 @@ const Register: React.FC = () => {
                     <button
                       onClick={() => handleRoleSelect(role.id)}
                       className={[
-                        'w-full text-left border-2 rounded-xl overflow-hidden',
+                        'w-full text-left border-2 rounded-xl',
                         'transition-all duration-300 hover:shadow-lg hover:scale-[1.005] active:scale-[0.99]',
                         'focus:outline-none focus:ring-4 focus:ring-black/5',
                         role.border,
                         role.bg,
+                        'p-0' // on gère les paddings à l’intérieur
                       ].join(' ')}
                       aria-label={`${language === 'fr' ? "S'inscrire en tant que" : 'Sign up as'} ${role.title}. ${role.description}`}
                     >
-                      <div className="p-4 sm:p-6 flex items-center gap-4">
+                      <div className="p-4 sm:p-6 flex items-start gap-4">
                         {/* Icône sur fond doux */}
                         <div className={`flex-shrink-0 p-3 sm:p-4 rounded-xl shadow-inner bg-gradient-to-br ${role.iconWrap}`}>
                           <Icon className={`h-6 w-6 sm:h-7 sm:w-7 ${role.iconColor}`} aria-hidden="true" />
@@ -363,33 +365,33 @@ const Register: React.FC = () => {
 
                         {/* Texte */}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-extrabold text-gray-900 text-lg sm:text-xl mb-0.5 text-center">{role.title}</h3>
+                          <h3 className="font-extrabold text-gray-900 text-lg sm:text-xl mb-1">{role.title}</h3>
 
-                          {/* Description principale */}
-                          <p className="text-xs sm:text-sm text-gray-800 leading-snug mb-2 line-clamp-2 break-words hyphens-none">
+                          {/* Description principale — pas de line-clamp */}
+                          <p className="text-xs sm:text-sm text-gray-800 leading-snug mb-2 break-words hyphens-none">
                             {role.description}
                           </p>
 
                           {/* Micro-CTA revenus (uniquement Avocat/Expatrié) */}
                           {role.cta && (
-                            <p className="text-[11px] sm:text-xs text-gray-700 mb-2">
+                            <p className="text-[11px] sm:text-xs text-gray-700 mb-3">
                               {role.cta}
                             </p>
                           )}
 
-                          {/* Features — desktop list */}
+                          {/* Features — desktop list (pas de truncate) */}
                           <ul className="hidden sm:grid sm:grid-cols-3 sm:gap-2">
                             {role.features.map((f, idx) => (
                               <li key={idx} className="flex items-center text-xs text-gray-700">
                                 <span className={`mr-2 inline-block w-1.5 h-1.5 rounded-full ${role.dot}`} />
-                                <span className="truncate">{f}</span>
+                                <span>{f}</span>
                               </li>
                             ))}
                           </ul>
 
-                          {/* Features — mobile chips */}
+                          {/* Features — mobile chips : on montre TOUT (pas de slice) */}
                           <div className="sm:hidden flex flex-wrap gap-1.5">
-                            {role.features.slice(0, 2).map((f, idx) => (
+                            {role.features.map((f, idx) => (
                               <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border ${role.chipBg} ${role.chipText} border-black/10`}>
                                 {f}
                               </span>
@@ -398,7 +400,7 @@ const Register: React.FC = () => {
                         </div>
 
                         {/* Flèche */}
-                        <div className="ml-2 sm:ml-4 flex-shrink-0">
+                        <div className="ml-2 sm:ml-4 flex-shrink-0 self-center pr-4 sm:pr-6">
                           <ArrowRight size={20} className="text-gray-700 group-hover:translate-x-1 transition-transform duration-300" aria-hidden="true" />
                         </div>
                       </div>
@@ -456,3 +458,5 @@ const Register: React.FC = () => {
 };
 
 export default Register;
+
+

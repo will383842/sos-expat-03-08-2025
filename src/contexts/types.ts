@@ -25,6 +25,7 @@ export interface User {
   id: string;
   uid?: string;
   email: string;
+  emailLower?: string;
   
   // Informations personnelles
   firstName?: string;

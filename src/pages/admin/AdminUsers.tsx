@@ -31,6 +31,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { logError } from '../../utils/logging';
+import AdminMapVisibilityToggle from '../../components/admin/AdminMapVisibilityToggle';
 
 const AdminUsers = () => {
   const navigate = useNavigate();
@@ -969,3 +970,4 @@ const AdminUsers = () => {
 };
 
 export default AdminUsers;
+

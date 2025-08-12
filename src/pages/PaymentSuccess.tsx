@@ -586,3 +586,4 @@ Montant: ${paidAmount}€
 };
 
 export default PaymentSuccess;
+

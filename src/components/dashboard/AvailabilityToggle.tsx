@@ -74,7 +74,6 @@ const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({ className = '' 
       lastStatusChange: serverTimestamp(),
       updatedAt: serverTimestamp(),
       isVisible: true,
-      isVisibleOnMap: true
     };
 
     try {
@@ -190,7 +189,6 @@ const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({ className = '' 
         const profileUpdate = {
           ...userUpdateData,
           isVisible: true,
-          isVisibleOnMap: true
         };
 
         if (sosSnap.exists()) {
@@ -486,3 +484,4 @@ const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({ className = '' 
 };
 
 export default AvailabilityToggle;
+

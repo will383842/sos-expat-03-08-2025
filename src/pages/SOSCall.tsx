@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Phone, Star, MapPin, Search, ChevronDown } from 'lucide-react';
-import { collection, query, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import Layout from '../components/layout/Layout';
 import SEOHead from '../components/layout/SEOHead';
@@ -164,7 +164,12 @@ const SOSCall: React.FC = () => {
       setSearchParams({ type: typeParam });
     }
 
-    const sosProfilesQuery = query(collection(db, 'sos_profiles'), limit(100));
+    const sosProfilesQuery = query(
+  collection(db, 'sos_profiles'),
+  where('type', 'in', ['lawyer', 'expat']),
+  where('isVisible', '==', true),
+  limit(100)
+);
 
     const unsubscribe = onSnapshot(
       sosProfilesQuery,
@@ -966,3 +971,5 @@ const SOSCall: React.FC = () => {
 };
 
 export default SOSCall;
+
+

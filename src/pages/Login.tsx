@@ -295,8 +295,8 @@ const Login: React.FC = () => {
       setInstallPrompt(e as BeforeInstallPromptEvent);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    // PWA install prompt removed
+    return () => window.removeEventListener('', handleBeforeInstallPrompt);
   }, []);
 
   // Online/offline status
@@ -1196,3 +1196,4 @@ const Login: React.FC = () => {
 
 // Export with React.memo for performance optimization - COMPLET
 export default React.memo(Login);
+

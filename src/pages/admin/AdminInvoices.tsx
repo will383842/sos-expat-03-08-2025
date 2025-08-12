@@ -184,3 +184,4 @@ const AdminInvoices = () => {
 };
 
 export default AdminInvoices;
+

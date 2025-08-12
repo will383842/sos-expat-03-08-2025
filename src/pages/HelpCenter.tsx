@@ -714,3 +714,4 @@ We guarantee your satisfaction. If you're not satisfied, contact us within 24h.
 };
 
 export default HelpCenter;
+

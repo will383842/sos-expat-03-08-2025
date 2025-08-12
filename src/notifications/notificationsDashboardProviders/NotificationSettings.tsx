@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const NotificationSettings: React.FC = () => {
   const { user } = useAuth();
 
-  // âŒ Ne pas afficher pour les clients
+  // ? Ne pas afficher pour les clients
   const isProvider = user?.role === 'lawyer' || user?.role === 'expat';
   if (!isProvider) return null;
 
@@ -29,7 +29,7 @@ const NotificationSettings: React.FC = () => {
 
   return (
     <div className="p-4 bg-white rounded-lg shadow space-y-4 max-w-md">
-      <h2 className="text-lg font-semibold text-gray-800">PrÃ©fÃ©rences de notifications</h2>
+      <h2 className="text-lg font-semibold text-gray-800">Préférences de notifications</h2>
 
       <div className="space-y-2 text-sm text-gray-700">
         <label className="flex items-center gap-2">
@@ -56,7 +56,7 @@ const NotificationSettings: React.FC = () => {
             checked={prefs.enableModal}
             onChange={() => handleChange('enableModal')}
           />
-          Affichage de la fenÃªtre de rappel (popup)
+          Affichage de la fenêtre de rappel (popup)
         </label>
       </div>
     </div>
@@ -64,3 +64,6 @@ const NotificationSettings: React.FC = () => {
 };
 
 export default NotificationSettings;
+
+
+

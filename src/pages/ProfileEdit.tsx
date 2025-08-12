@@ -832,3 +832,4 @@ if (user.role !== "client") {
 };
 
 export default ProfileEdit;
+

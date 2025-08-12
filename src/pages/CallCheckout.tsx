@@ -4,9 +4,18 @@ import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle, CreditCard, Lock, 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { functions } from '../config/firebase';
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  CardElement,
+  useStripe,
+  useElements
+} from '@stripe/react-stripe-js';
+import { functions, db } from '../config/firebase';
 import { httpsCallable, HttpsCallable } from 'firebase/functions';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
 
@@ -295,9 +304,30 @@ const useSEO = (meta: {
   }, [meta]);
 };
 
-/* -------------------------- Phone validation utils ----------------------- */
+/* ------------------------ Helpers: device & phone utils ------------------ */
 const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
 const isValidE164ish = (val: string) => /^\+?[1-9]\d{6,14}$/.test(val); // simple, robuste
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 640px), (pointer: coarse)');
+    const update = () => setIsMobile(!!mq.matches);
+    update();
+    if ('addEventListener' in mq) {
+      mq.addEventListener('change', update);
+      return () => mq.removeEventListener('change', update);
+    } else {
+      // Safari < 14 fallback
+      // @ts-ignore
+      mq.addListener(update);
+      // @ts-ignore
+      return () => mq.removeListener(update);
+    }
+  }, []);
+  return isMobile;
+};
 
 /* -------------------------- Stripe card element opts --------------------- */
 const cardElementOptions = {
@@ -315,6 +345,11 @@ const cardElementOptions = {
   },
 } as const;
 
+const singleCardElementOptions = {
+  style: cardElementOptions.style,
+  hidePostalCode: true,
+} as const;
+
 /* ------------------------------ Payment Form ----------------------------- */
 interface PaymentFormProps {
   user: User;
@@ -325,10 +360,11 @@ interface PaymentFormProps {
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
   clientWhatsapp?: string;
+  isMobile: boolean;
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
-  user, provider, service, onSuccess, onError, isProcessing, setIsProcessing, clientWhatsapp
+  user, provider, service, onSuccess, onError, isProcessing, setIsProcessing, clientWhatsapp, isMobile
 }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -346,8 +382,51 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     if (Math.abs(amountRounded - total) > 0.01) throw new Error(t('err.amountSplit'));
   }, [stripe, elements, user, provider, service, t]);
 
+  const persistPaymentDocs = useCallback(
+    async (paymentIntentId: string) => {
+      // Enregistrements Firestore (robustes, non bloquants pour l'UX si jamais ça échoue)
+      const baseDoc = {
+        paymentIntentId,
+        providerId: provider.id,
+        providerName: provider.fullName || provider.name || '',
+        providerRole: provider.role || provider.type || 'expat',
+        clientId: user.uid!,
+        clientEmail: user.email || '',
+        clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        clientPhone: service.clientPhone,
+        clientWhatsapp: clientWhatsapp || '',
+        serviceType: service.serviceType,
+        duration: service.duration,
+        amount: service.amount,
+        commissionAmount: service.commissionAmount,
+        providerAmount: service.providerAmount,
+        currency: 'eur',
+        status: 'succeeded',
+        createdAt: serverTimestamp(),
+      };
+
+      try {
+        await setDoc(doc(db, 'payments', paymentIntentId), baseDoc, { merge: true });
+      } catch (e) {
+        console.warn('payments doc write error:', e);
+      }
+      try {
+        await setDoc(doc(db, 'users', user.uid!, 'payments', paymentIntentId), baseDoc, { merge: true });
+      } catch (e) {
+        console.warn('user payments mirror write error:', e);
+      }
+      try {
+        await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true });
+      } catch (e) {
+        console.warn('provider payments mirror write error:', e);
+      }
+    },
+    [clientWhatsapp, provider, service, user]
+  );
+
   const handlePaymentSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessing) return; // anti double-click
     try {
       setIsProcessing(true);
       validatePaymentData();
@@ -382,12 +461,16 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
       const clientSecret = res.data.clientSecret;
       if (!clientSecret) throw new Error(t('err.noClientSecret'));
 
-      const cardNumberElement = elements!.getElement(CardNumberElement);
-      if (!cardNumberElement) throw new Error(t('err.noCardElement'));
+      // Choix de l'élément carte : mobile => CardElement (champ unique) / desktop => CardNumberElement
+      const chosenCardElement = isMobile
+        ? elements!.getElement(CardElement)
+        : elements!.getElement(CardNumberElement);
+
+      if (!chosenCardElement) throw new Error(t('err.noCardElement'));
 
       const result = await stripe!.confirmCardPayment(clientSecret, {
         payment_method: {
-          card: cardNumberElement,
+          card: chosenCardElement,
           billing_details: {
             name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
             email: user.email || '',
@@ -406,6 +489,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         if (status === 'canceled') throw new Error(t('err.canceled'));
         throw new Error(`${t('err.unexpectedStatus')}: ${status}`);
       }
+
+      // Ecritures Firestore (best-effort)
+      await persistPaymentDocs(paymentIntent.id);
 
       const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
         httpsCallable(functions, 'createAndScheduleCall');
@@ -442,7 +528,23 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     } finally {
       setIsProcessing(false);
     }
-  }, [setIsProcessing, validatePaymentData, service, provider, user, elements, stripe, t, onSuccess, onError, clientWhatsapp, language]);
+  }, [
+    isProcessing,
+    setIsProcessing,
+    validatePaymentData,
+    service,
+    provider,
+    user,
+    elements,
+    stripe,
+    t,
+    onSuccess,
+    onError,
+    clientWhatsapp,
+    language,
+    isMobile,
+    persistPaymentDocs
+  ]);
 
   const providerDisplayName = useMemo(
     () => provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert',
@@ -458,59 +560,84 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
   return (
     <form onSubmit={handlePaymentSubmit} className="space-y-4" noValidate>
-      {/* Champs carte séparés */}
+      {/* Champs carte : mobile = champ unique / desktop = 3 champs comme avant */}
       <div className="space-y-4">
         <label className="block text-sm font-semibold text-gray-700">
           <div className="flex items-center space-x-2">
             <CreditCard className="w-4 h-4 text-blue-600" aria-hidden="true" />
-            <span>{/* accessibilité + pas de doublon */}{/* Texte d'aide implicite */}</span>
+            <span className="sr-only">{t('card.title')}</span>
           </div>
         </label>
 
-        {/* Numéro de carte */}
-        <div className="space-y-2">
-          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-            {t('card.number')}
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <CreditCard className="h-4 w-4 text-gray-400" aria-hidden="true" />
-            </div>
-            <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
-              <CardNumberElement options={cardElementOptions} />
+        {isMobile ? (
+          // ********* MOBILE: champ unique pour une UX ultra simple *********
+          <div className="space-y-2" aria-live="polite">
+            <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+              {t('card.number')}
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <CreditCard className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              </div>
+              <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
+                <CardElement options={singleCardElementOptions} />
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                {language === 'fr'
+                  ? 'Saisie simplifiée pour mobile. Sécurisé par Stripe.'
+                  : 'Simplified entry on mobile. Secured by Stripe.'}
+              </p>
             </div>
           </div>
-        </div>
+        ) : (
+          // ********* DESKTOP: on garde EXACTEMENT les 3 champs *********
+          <>
+            {/* Numéro de carte */}
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                {t('card.number')}
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <CreditCard className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                </div>
+                <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
+                  <CardNumberElement options={cardElementOptions} />
+                </div>
+              </div>
+            </div>
 
-        {/* Expiration / CVC */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-              {t('card.expiry')}
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Calendar className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            {/* Expiration / CVC */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                  {t('card.expiry')}
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  </div>
+                  <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
+                    <CardExpiryElement options={cardElementOptions} />
+                  </div>
+                </div>
               </div>
-              <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
-                <CardExpiryElement options={cardElementOptions} />
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                  {t('card.cvc')}
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Shield className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  </div>
+                  <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
+                    <CardCvcElement options={cardElementOptions} />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-              {t('card.cvc')}
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Shield className="h-4 w-4 text-gray-400" aria-hidden="true" />
-              </div>
-              <div className="pl-10 pr-3 py-3.5 border-2 border-gray-200 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200 hover:border-gray-300">
-                <CardCvcElement options={cardElementOptions} />
-              </div>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Récapitulatif */}
@@ -567,12 +694,12 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
       {/* Bouton payer */}
       <button
         type="submit"
-        disabled={!useStripe() || isProcessing}
+        disabled={!stripe || isProcessing}
         className={`
           w-full py-4 rounded-xl font-bold text-white transition-all duration-300 
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
           active:scale-[0.98] touch-manipulation relative overflow-hidden
-          ${(!useStripe() || isProcessing)
+          ${(!stripe || isProcessing)
             ? 'bg-gray-400 cursor-not-allowed opacity-60'
             : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-lg hover:shadow-xl'
           }
@@ -611,6 +738,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   // Récup provider (pas de mocks)
   const provider = useMemo<Provider | null>(() => {
@@ -668,8 +796,30 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   }, [serviceData, provider, user]);
 
   /* ------------------------ Phone/WhatsApp visibles mobile ------------------------ */
-  const [clientPhone, setClientPhone] = useState<string>(normalizePhone(baseService?.clientPhone || ''));
-  const [clientWhatsapp, setClientWhatsapp] = useState<string>('');
+  const [clientPhone, setClientPhone] = useState<string>(() => {
+    const initial = normalizePhone(baseService?.clientPhone || '');
+    try {
+      const saved = sessionStorage.getItem('clientPhone');
+      return saved ? normalizePhone(saved) : initial;
+    } catch {
+      return initial;
+    }
+  });
+  const [clientWhatsapp, setClientWhatsapp] = useState<string>(() => {
+    try {
+      return normalizePhone(sessionStorage.getItem('clientWhatsapp') || '');
+    } catch {
+      return '';
+    }
+  });
+
+  useEffect(() => {
+    // autosave léger pour reprise checkout
+    try {
+      sessionStorage.setItem('clientPhone', clientPhone);
+      sessionStorage.setItem('clientWhatsapp', clientWhatsapp);
+    } catch {/* noop */}
+  }, [clientPhone, clientWhatsapp]);
 
   const service: ServiceData | null = useMemo(() => {
     if (!baseService) return null;
@@ -919,7 +1069,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 />
                 <p className="mt-2 text-xs text-gray-500">{t('form.phoneHelp')}</p>
                 {!isValidE164ish(clientPhone) && clientPhone.length > 0 && (
-                  <p className="mt-1 text-xs text-red-600">{t('err.invalidPhone')}</p>
+                  <p className="mt-1 text-xs text-red-600" role="alert" aria-live="assertive">{t('err.invalidPhone')}</p>
                 )}
               </div>
 
@@ -954,7 +1104,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
 
                 {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg" role="alert" aria-live="assertive">
                     <div className="flex items-center">
                       <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" aria-hidden="true" />
                       <span className="text-sm text-red-700">{error}</span>
@@ -980,6 +1130,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                       setIsProcessing(p);
                     }}
                     clientWhatsapp={clientWhatsapp}
+                    isMobile={isMobile}
                   />
                 </Elements>
               </div>
@@ -1123,3 +1274,5 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
 CallCheckout.displayName = 'CallCheckout';
 export default React.memo(CallCheckout);
+
+

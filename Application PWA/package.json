@@ -1,0 +1,26 @@
+﻿{
+  "name": "sos-expat-pwa",
+  "version": "1.0.0",
+  "description": "Application PWA pour l'assistance d'expatriés SOS Expat",
+  "main": "public/sw.js",
+  "scripts": {
+    "serve": "python -m http.server 8000",
+    "validate": "node tools/validate-pwa.js",
+    "test": "node tools/test-pwa.js",
+    "cleanup": "node tools/cleanup-old-pwa.js",
+    "generate-icons": "bash tools/generate-icons.sh"
+  },
+  "keywords": [
+    "pwa",
+    "sos-expat",
+    "assistance",
+    "urgence",
+    "expatrie"
+  ],
+  "author": "SOS Expat",
+  "license": "MIT",
+  "devDependencies": {
+    "lighthouse": "^10.0.0",
+    "puppeteer": "^21.0.0"
+  }
+}

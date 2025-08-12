@@ -18,10 +18,6 @@ interface FormErrors {
   general?: string;
 }
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): void;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
 
 /** gtag typé (évite any et les redéclarations globales) */
 type GtagFunction = (...args: unknown[]) => void;
@@ -311,7 +307,6 @@ const PasswordReset: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [submitAttempts, setSubmitAttempts] = useState(0);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [lastSentEmail, setLastSentEmail] = useState<string>('');
   const [cooldownTime, setCooldownTime] = useState(0);
 
@@ -328,16 +323,6 @@ const PasswordReset: React.FC = () => {
     };
   }, []);
 
-  // PWA install prompt handling
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    // PWA install prompt removed
-    return () => window.removeEventListener('', handleBeforeInstallPrompt);
-  }, []);
 
   // Online/offline status
   useEffect(() => {
@@ -714,22 +699,6 @@ const PasswordReset: React.FC = () => {
     setCooldownTime(0);
   }, []);
 
-  // PWA install handler
-  const handleInstallApp = useCallback(() => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      installPrompt.userChoice.then((choiceResult) => {
-        const gtag = getGtag();
-        if (gtag) {
-          gtag('event', 'pwa_install_prompt', {
-            choice: choiceResult.outcome,
-            page: 'password-reset'
-          });
-        }
-        setInstallPrompt(null);
-      });
-    }
-  }, [installPrompt]);
 
   // Classes CSS pour inputs (clé typée)
   const inputClass = useCallback(

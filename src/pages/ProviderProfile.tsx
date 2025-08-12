@@ -45,11 +45,158 @@ import SEOHead from '../components/layout/SEOHead';
 import { Review } from '../types';
 import { formatLanguages } from '@/i18n';
 
-// --- Production switches (no on-screen debug; logs off by default) ---
-const DEBUG_LOGS = false;
-const DEBUG_OVERLAY = false;
+// Performance & constants
+const IMAGE_SIZES = {
+  AVATAR_MOBILE: 112, // w-28 h-28
+  AVATAR_DESKTOP: 128, // w-32 h-32
+  MODAL_MAX_WIDTH: 1200,
+  MODAL_MAX_HEIGHT: 800,
+} as const;
+
+const ANIMATION_DURATIONS = {
+  STATUS_TRANSITION: 500,
+  LOADING_DELAY: 2500,
+} as const;
+
+const STORAGE_KEYS = {
+  SELECTED_PROVIDER: 'selectedProvider',
+} as const;
+
+// i18n constants (TODO: migrate to react-i18next when available)
+const TEXTS = {
+  fr: {
+    loading: 'Chargement du profil...',
+    notFound: 'Ce profil prestataire est introuvable. Redirection en cours...',
+    backToExperts: 'Retour aux experts',
+    certifiedLawyer: 'Avocat certifié',
+    expertExpat: 'Expatrié expert',
+    verified: 'Vérifié',
+    online: 'EN LIGNE',
+    offline: 'HORS LIGNE',
+    yearsExperience: "ans d'expérience",
+    yearsAsExpat: "ans d'expatriation",
+    reviews: 'avis',
+    share: 'Partager :',
+    copyLink: 'Copier le lien',
+    successRate: 'Taux de succès',
+    availability: 'Disponibilité',
+    completedCalls: 'Appels réalisés',
+    bookNow: 'RÉSERVER MAINTENANT',
+    unavailable: 'NON DISPONIBLE',
+    availableNow: 'Expert disponible maintenant !',
+    currentlyOffline: 'Expert actuellement hors ligne',
+    securePayment: 'Paiement sécurisé • Satisfaction garantie',
+    specialties: 'Spécialités',
+    languages: 'Langues parlées',
+    educationCertifications: 'Formation et certifications',
+    expatExperience: "Expérience d'expatriation",
+    customerReviews: 'Avis clients',
+    loadingReviews: 'Chargement des avis...',
+    stats: 'Statistiques',
+    averageRating: 'Note moyenne',
+    information: 'Informations',
+    basedIn: 'Basé en',
+    speaks: 'Parle',
+    onlineNow: 'EN LIGNE MAINTENANT',
+    verifiedExpert: 'Expert vérifié',
+    linkCopied: 'Lien copié !',
+    reportReason: 'Veuillez indiquer la raison du signalement :',
+    reportThanks: 'Merci pour votre signalement. Notre équipe va l\'examiner.',
+    close: 'Fermer',
+    photoOf: 'Photo de',
+    noSpecialties: 'Aucune spécialité renseignée.',
+    yearsAbroad: "ans d'expatriation",
+    in: 'en',
+    experience: 'Expérience',
+    years: 'ans',
+    minutes: 'minutes',
+  },
+  en: {
+    loading: 'Loading profile...',
+    notFound: 'This provider profile was not found. Redirecting...',
+    backToExperts: 'Back to experts',
+    certifiedLawyer: 'Certified lawyer',
+    expertExpat: 'Expert expat',
+    verified: 'Verified',
+    online: 'ONLINE',
+    offline: 'OFFLINE',
+    yearsExperience: 'years experience',
+    yearsAsExpat: 'years as expat',
+    reviews: 'reviews',
+    share: 'Share:',
+    copyLink: 'Copy link',
+    successRate: 'Success rate',
+    availability: 'Availability',
+    completedCalls: 'Completed calls',
+    bookNow: 'BOOK NOW',
+    unavailable: 'UNAVAILABLE',
+    availableNow: 'Expert available now!',
+    currentlyOffline: 'Expert currently offline',
+    securePayment: 'Secure payment • Satisfaction guaranteed',
+    specialties: 'Specialties',
+    languages: 'Languages',
+    educationCertifications: 'Education & Certifications',
+    expatExperience: 'Expat experience',
+    customerReviews: 'Customer reviews',
+    loadingReviews: 'Loading reviews...',
+    stats: 'Stats',
+    averageRating: 'Average rating',
+    information: 'Information',
+    basedIn: 'Based in',
+    speaks: 'Speaks',
+    onlineNow: 'ONLINE NOW',
+    verifiedExpert: 'Verified expert',
+    linkCopied: 'Link copied!',
+    reportReason: 'Please enter a reason:',
+    reportThanks: 'Thanks. Our team will review it.',
+    close: 'Close',
+    photoOf: 'Photo of',
+    noSpecialties: 'No specialties provided.',
+    yearsAbroad: 'years abroad',
+    in: 'in',
+    experience: 'Experience',
+    years: 'yrs',
+    minutes: 'minutes',
+  },
+} as const;
 
 type TSLike = FsTimestamp | Date | null | undefined;
+
+// Type definitions
+interface LocalizedText {
+  fr?: string;
+  en?: string;
+  [key: string]: string | undefined;
+}
+
+interface Education {
+  institution?: string | LocalizedText;
+  degree?: string | LocalizedText;
+  year?: number;
+  [key: string]: unknown;
+}
+
+interface Certification {
+  name?: string | LocalizedText;
+  issuer?: string | LocalizedText;
+  year?: number;
+  [key: string]: unknown;
+}
+
+interface User {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface AuthUser extends User {
+  uid?: string;
+}
+
+interface LocationState {
+  selectedProvider?: Partial<SosProfile>;
+  providerData?: Partial<SosProfile>;
+  navigationSource?: string;
+}
 
 interface SosProfile {
   uid: string;
@@ -65,11 +212,11 @@ interface SosProfile {
   mainLanguage?: string;
   specialties: string[];
   helpTypes?: string[];
-  description?: any;
-  professionalDescription?: any;
-  experienceDescription?: any;
-  motivation?: any;
-  bio?: any;
+  description?: string | LocalizedText;
+  professionalDescription?: string | LocalizedText;
+  experienceDescription?: string | LocalizedText;
+  motivation?: string | LocalizedText;
+  bio?: string | LocalizedText;
   profilePhoto?: string;
   photoURL?: string;
   avatar?: string;
@@ -82,11 +229,11 @@ interface SosProfile {
   isApproved: boolean;
   isVerified: boolean;
   isVisibleOnMap?: boolean;
-  price: number;
-  duration: number;
-  education?: any;
-  certifications?: any;
-  lawSchool?: any;
+  price?: number;
+  duration?: number;
+  education?: Education | Education[] | LocalizedText;
+  certifications?: Certification | Certification[] | LocalizedText;
+  lawSchool?: string | LocalizedText;
   graduationYear?: number;
   responseTime?: string;
   successRate?: number;
@@ -100,8 +247,40 @@ interface SosProfile {
   lastSeen?: TSLike;
 }
 
-// ---------- helpers ----------
-const safeNormalize = (v?: string) =>
+interface RatingDistribution {
+  5: number;
+  4: number;
+  3: number;
+  2: number;
+  1: number;
+}
+
+interface OnlineStatus {
+  isOnline: boolean;
+  lastUpdate: Date | null;
+  listenerActive: boolean;
+  connectionAttempts: number;
+}
+
+interface RouteParams extends Record<string, string | undefined> {
+  id?: string;
+  country?: string;
+  language?: string;
+  type?: string;
+  slug?: string;
+  profileId?: string;
+  name?: string;
+}
+
+// Utility functions
+const detectLanguage = (): 'fr' | 'en' => {
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    return navigator.language.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  }
+  return 'en'; // fallback
+};
+
+const safeNormalize = (v?: string): string =>
   (v || '')
     .toLowerCase()
     .normalize('NFD')
@@ -109,89 +288,110 @@ const safeNormalize = (v?: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-const getFirstString = (val: any, preferred?: string): string | undefined => {
-  if (!val) return;
+const getFirstString = (val: unknown, preferred?: string): string | undefined => {
+  if (!val) return undefined;
+  
   if (typeof val === 'string') {
     const s = val.trim();
-    return s ? s : undefined;
+    return s || undefined;
   }
+  
   if (Array.isArray(val)) {
-    const arr = val.map((x) => getFirstString(x, preferred)).filter(Boolean) as string[];
+    const arr = val
+      .map((x) => getFirstString(x, preferred))
+      .filter((x): x is string => Boolean(x));
     return arr.length ? arr.join(', ') : undefined;
   }
-  if (typeof val === 'object') {
-    if (preferred && typeof val[preferred] === 'string') {
-      const s = (val[preferred] as string).trim();
+  
+  if (typeof val === 'object' && val !== null) {
+    const obj = val as Record<string, unknown>;
+    
+    if (preferred && typeof obj[preferred] === 'string') {
+      const s = (obj[preferred] as string).trim();
       if (s) return s;
     }
-    for (const k of Object.keys(val)) {
-      const v = val[k];
-      if (typeof v === 'string' && v.trim()) return v.trim();
+    
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) {
+        return v.trim();
+      }
     }
   }
-  return;
+  
+  return undefined;
 };
 
-const toArrayFromAny = (val: any, preferred?: string): string[] => {
+const toArrayFromAny = (val: unknown, preferred?: string): string[] => {
   if (!val) return [];
+  
   if (Array.isArray(val)) {
     return val
       .map((x) => (typeof x === 'string' ? x : getFirstString(x, preferred) || ''))
       .map((s) => s.trim())
       .filter(Boolean);
   }
+  
   if (typeof val === 'string') {
     return val
       .split(/[;,]/)
       .map((s) => s.trim())
       .filter(Boolean);
   }
-  if (typeof val === 'object') {
-    const all = Object.values(val)
-      .map((v) => (typeof v === 'string' ? v : getFirstString(v as any, preferred) || ''))
+  
+  if (typeof val === 'object' && val !== null) {
+    const obj = val as Record<string, unknown>;
+    return Object.values(obj)
+      .map((v) => (typeof v === 'string' ? v : getFirstString(v, preferred) || ''))
       .map((s) => s.trim())
       .filter(Boolean);
-    return all;
   }
+  
   return [];
 };
 
 const pickDescription = (p: Partial<SosProfile>, preferredLang?: string): string => {
   const chain = [
-    getFirstString((p as any)?.description, preferredLang),
-    getFirstString((p as any)?.bio, preferredLang),
-    getFirstString((p as any)?.professionalDescription, preferredLang),
-    getFirstString((p as any)?.experienceDescription, preferredLang),
+    getFirstString(p.description, preferredLang),
+    getFirstString(p.bio, preferredLang),
+    getFirstString(p.professionalDescription, preferredLang),
+    getFirstString(p.experienceDescription, preferredLang),
   ];
-  return chain.find(Boolean) || 'Aucune description professionnelle disponible.';
+  return chain.find(Boolean) || TEXTS[preferredLang as 'fr' | 'en']?.noSpecialties || 'No description available.';
 };
 
-const toStringFromAny = (val: any, preferred?: string): string | undefined =>
+const toStringFromAny = (val: unknown, preferred?: string): string | undefined =>
   getFirstString(val, preferred);
 
-const summarizeVal = (v: any) => {
-  if (v == null) return 'null/undefined';
-  const t = typeof v;
-  if (t === 'string') return `"${v.slice(0, 60)}"${v.length > 60 ? ' ' : ''}`;
-  if (Array.isArray(v)) return `[${v.length} items]`;
-  if (t === 'object') return `{${Object.keys(v).slice(0, 5).join(',')}${Object.keys(v).length > 5 ? ', ' : ''}}`;
-  return String(v);
+// Type guards
+const isUser = (user: unknown): user is AuthUser => {
+  return typeof user === 'object' && user !== null && 'id' in user;
 };
 
-// Simple i18n helper
-const t = (lang: string, fr: string, en: string) => (lang === 'fr' ? fr : en);
+const isLocationState = (state: unknown): state is LocationState => {
+  return typeof state === 'object' && state !== null;
+};
 
-// ---------- component ----------
+// Main component
 const ProviderProfile: React.FC = () => {
-  const { id, country: countryParam, language: langParam, type: typeParam } =
-    useParams<{ id?: string; country?: string; language?: string; type?: string }>();
-  const paramsAll = useParams();
+  const params = useParams<RouteParams>();
+  const { id, country: countryParam, language: langParam, type: typeParam } = params;
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { language } = useApp();
-  const lang = (language || (navigator?.language?.startsWith('fr') ? 'fr' : 'en')) as 'fr' | 'en';
-  const preferredLangKey = lang === 'fr' ? 'fr' : 'en';
+  
+  // i18n detection: use app context first, then browser, fallback en
+  const detectedLang = useMemo(() => {
+    if (language === 'fr' || language === 'en') return language;
+    return detectLanguage();
+  }, [language]);
+  
+  const t = useCallback((key: keyof typeof TEXTS.fr): string => {
+    return TEXTS[detectedLang]?.[key] || TEXTS.en[key] || key;
+  }, [detectedLang]);
+
+  const preferredLangKey = detectedLang === 'fr' ? 'fr' : 'en';
 
   const [provider, setProvider] = useState<SosProfile | null>(null);
   const [realProviderId, setRealProviderId] = useState<string | null>(null);
@@ -201,29 +401,21 @@ const ProviderProfile: React.FC = () => {
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(true);
-  const [ratingDistribution, setRatingDistribution] = useState<{ 5: number; 4: number; 3: number; 2: number; 1: number }>(
-    { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
-  );
+  const [ratingDistribution, setRatingDistribution] = useState<RatingDistribution>({
+    5: 0, 4: 0, 3: 0, 2: 0, 1: 0
+  });
   const [showImageModal, setShowImageModal] = useState(false);
 
-  // Online status (listener focalis )
-  const [onlineStatus, setOnlineStatus] = useState<{
-    isOnline: boolean;
-    lastUpdate: Date | null;
-    listenerActive: boolean;
-    connectionAttempts: number;
-  }>({ isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0 });
+  // Online status
+  const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({
+    isOnline: false,
+    lastUpdate: null,
+    listenerActive: false,
+    connectionAttempts: 0
+  });
 
-  const dbg = (...a: any[]) => {
-    if (DEBUG_LOGS) console.log('[ProviderProfile]', ...a);
-  };
-
-  useEffect(() => {
-    dbg('MOUNT', location.pathname, paramsAll);
-  }, [location.pathname, paramsAll]); // eslint-disable-line
-
-  // ---------- reviews loader ----------
-  const realLoadReviews = useCallback(async (providerId: string) => {
+  // Reviews loader (memoized)
+  const realLoadReviews = useCallback(async (providerId: string): Promise<Review[]> => {
     try {
       const arr = await getProviderReviews(providerId);
       return Array.isArray(arr) ? arr : [];
@@ -233,21 +425,23 @@ const ProviderProfile: React.FC = () => {
   }, []);
 
   const loadReviews = useCallback(
-    async (docId: string, uid?: string) => {
+    async (docId: string, uid?: string): Promise<void> => {
       try {
         setIsLoadingReviews(true);
-        const candidates = [docId, uid].filter(Boolean) as string[];
+        const candidates = [docId, uid].filter((x): x is string => Boolean(x));
         let providerReviews: Review[] = [];
+        
         for (const pid of candidates) {
           providerReviews = await realLoadReviews(pid);
           if (providerReviews.length) break;
         }
+        
         setReviews(providerReviews);
 
-        const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        const distribution: RatingDistribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
         providerReviews.forEach((r) => {
-          const rr = Math.max(1, Math.min(5, Math.round(r.rating)));
-          distribution[rr as 1 | 2 | 3 | 4 | 5] += 1;
+          const rr = Math.max(1, Math.min(5, Math.round(r.rating))) as keyof RatingDistribution;
+          distribution[rr] += 1;
         });
         setRatingDistribution(distribution);
       } catch (e) {
@@ -259,26 +453,27 @@ const ProviderProfile: React.FC = () => {
     [realLoadReviews]
   );
 
-  // ---------- initial load ----------
+  // Main data loader
   useEffect(() => {
-    const loadProviderData = async () => {
+    const loadProviderData = async (): Promise<void> => {
       setIsLoading(true);
       setNotFound(false);
+      
       try {
         let providerData: SosProfile | null = null;
         let foundProviderId: string | null = null;
 
-        const rawIdParam =
+        const rawIdParam = 
           id ||
-          (paramsAll as any).slug ||
-          (paramsAll as any).profileId ||
-          (paramsAll as any).name ||
-          (location.pathname.split('/').pop() || '');
+          params.slug ||
+          params.profileId ||
+          params.name ||
+          location.pathname.split('/').pop() || '';
 
-        const lastToken = (rawIdParam || '').split('-').pop() || rawIdParam;
-        const slugNoUid = (rawIdParam || '').replace(/-[a-zA-Z0-9]{8,}$/, '');
+        const lastToken = rawIdParam.split('-').pop() || rawIdParam;
+        const slugNoUid = rawIdParam.replace(/-[a-zA-Z0-9]{8,}$/, '');
 
-        // a) direct doc by id
+        // Try direct doc by id
         try {
           const ref = doc(db, 'sos_profiles', lastToken);
           const snap = await getDoc(ref);
@@ -286,25 +481,25 @@ const ProviderProfile: React.FC = () => {
             const data = snap.data();
             const normalized = normalizeUserData(data, snap.id);
             const built: SosProfile = {
-              ...(normalized as SosProfile),
+              ...normalized,
               id: snap.id,
-              uid: (normalized as any).uid || snap.id,
+              uid: normalized.uid || snap.id,
               type: (data?.type as 'lawyer' | 'expat') || 'expat',
-            };
+            } as SosProfile;
+            
             built.description = pickDescription(built, preferredLangKey);
-            // normalize lists
-            built.specialties = toArrayFromAny((data as any)?.specialties, preferredLangKey);
-            built.helpTypes = toArrayFromAny((data as any)?.helpTypes, preferredLangKey);
+            built.specialties = toArrayFromAny(data?.specialties, preferredLangKey);
+            built.helpTypes = toArrayFromAny(data?.helpTypes, preferredLangKey);
 
             providerData = built;
             foundProviderId = snap.id;
             setOnlineStatus((s) => ({ ...s, isOnline: !!data?.isOnline, lastUpdate: new Date() }));
           }
         } catch (e) {
-          dbg('try A error:', e);
+          console.warn('Provider lookup by ID failed:', e);
         }
 
-        // b) by uid
+        // Try by uid
         if (!providerData) {
           try {
             const qByUid = query(collection(db, 'sos_profiles'), where('uid', '==', lastToken), limit(1));
@@ -314,25 +509,26 @@ const ProviderProfile: React.FC = () => {
               const data = found.data();
               const normalized = normalizeUserData(data, found.id);
               const built: SosProfile = {
-                ...(normalized as SosProfile),
+                ...normalized,
                 id: found.id,
-                uid: (normalized as any).uid || found.id,
+                uid: normalized.uid || found.id,
                 type: (data?.type as 'lawyer' | 'expat') || 'expat',
-              };
+              } as SosProfile;
+              
               built.description = pickDescription(built, preferredLangKey);
-              built.specialties = toArrayFromAny((data as any)?.specialties, preferredLangKey);
-              built.helpTypes = toArrayFromAny((data as any)?.helpTypes, preferredLangKey);
+              built.specialties = toArrayFromAny(data?.specialties, preferredLangKey);
+              built.helpTypes = toArrayFromAny(data?.helpTypes, preferredLangKey);
 
               providerData = built;
               foundProviderId = found.id;
               setOnlineStatus((s) => ({ ...s, isOnline: !!data?.isOnline, lastUpdate: new Date() }));
             }
           } catch (e) {
-            dbg('try B error:', e);
+            console.warn('Provider lookup by UID failed:', e);
           }
         }
 
-        // c) SEO fallback
+        // Try SEO fallback
         if (!providerData && typeParam && countryParam && langParam && rawIdParam) {
           const type = typeParam === 'avocat' ? 'lawyer' : typeParam === 'expatrie' ? 'expat' : undefined;
           if (type) {
@@ -354,30 +550,32 @@ const ProviderProfile: React.FC = () => {
                   computedNameSlug === slugNoUid
                 );
               });
+              
               if (match) {
                 const data = match.data();
                 const normalized = normalizeUserData(data, match.id);
                 const built: SosProfile = {
-                  ...(normalized as SosProfile),
+                  ...normalized,
                   id: match.id,
-                  uid: (normalized as any).uid || match.id,
+                  uid: normalized.uid || match.id,
                   type: (data?.type as 'lawyer' | 'expat') || 'expat',
-                };
+                } as SosProfile;
+                
                 built.description = pickDescription(built, preferredLangKey);
-                built.specialties = toArrayFromAny((data as any)?.specialties, preferredLangKey);
-                built.helpTypes = toArrayFromAny((data as any)?.helpTypes, preferredLangKey);
+                built.specialties = toArrayFromAny(data?.specialties, preferredLangKey);
+                built.helpTypes = toArrayFromAny(data?.helpTypes, preferredLangKey);
 
                 providerData = built;
                 foundProviderId = match.id;
                 setOnlineStatus((s) => ({ ...s, isOnline: !!data?.isOnline, lastUpdate: new Date() }));
               }
             } catch (e) {
-              dbg('try C error:', e);
+              console.warn('SEO fallback lookup failed:', e);
             }
           }
         }
 
-        // d) by slug only
+        // Try by slug only
         if (!providerData && rawIdParam) {
           try {
             const qSlug = query(collection(db, 'sos_profiles'), where('slug', '==', slugNoUid), limit(1));
@@ -387,38 +585,39 @@ const ProviderProfile: React.FC = () => {
               const data = m.data();
               const normalized = normalizeUserData(data, m.id);
               const built: SosProfile = {
-                ...(normalized as SosProfile),
+                ...normalized,
                 id: m.id,
-                uid: (normalized as any).uid || m.id,
+                uid: normalized.uid || m.id,
                 type: (data?.type as 'lawyer' | 'expat') || 'expat',
-              };
+              } as SosProfile;
+              
               built.description = pickDescription(built, preferredLangKey);
-              built.specialties = toArrayFromAny((data as any)?.specialties, preferredLangKey);
-              built.helpTypes = toArrayFromAny((data as any)?.helpTypes, preferredLangKey);
+              built.specialties = toArrayFromAny(data?.specialties, preferredLangKey);
+              built.helpTypes = toArrayFromAny(data?.helpTypes, preferredLangKey);
 
               providerData = built;
               foundProviderId = m.id;
               setOnlineStatus((s) => ({ ...s, isOnline: !!data?.isOnline, lastUpdate: new Date() }));
             }
           } catch (e) {
-            dbg('try D error:', e);
+            console.warn('Slug lookup failed:', e);
           }
         }
 
-        // e) state fallback (no demo defaults)
-        if (!providerData && location.state) {
-          const state = location.state as any;
-          const navData = state?.selectedProvider || state?.providerData;
+        // State fallback
+        if (!providerData && isLocationState(location.state)) {
+          const state = location.state;
+          const navData = state.selectedProvider || state.providerData;
           if (navData) {
             const built: SosProfile = {
               uid: navData.id || '',
               id: navData.id || '',
-              fullName: navData.name || `${navData.firstName || ''} ${navData.lastName || ''}`.trim(),
+              fullName: navData.fullName || `${navData.firstName || ''} ${navData.lastName || ''}`.trim(),
               firstName: navData.firstName || '',
               lastName: navData.lastName || '',
               type: navData.type === 'lawyer' ? 'lawyer' : 'expat',
               country: navData.country || '',
-              languages: navData.languages || ['Fran ais'],
+              languages: navData.languages || ['Français'],
               specialties: toArrayFromAny(navData.specialties, preferredLangKey),
               helpTypes: toArrayFromAny(navData.helpTypes, preferredLangKey),
               description: navData.description || navData.bio || '',
@@ -426,7 +625,7 @@ const ProviderProfile: React.FC = () => {
               experienceDescription: navData.experienceDescription || '',
               motivation: navData.motivation || '',
               bio: navData.bio,
-              profilePhoto: navData.avatar || navData.profilePhoto || '',
+              profilePhoto: navData.profilePhoto || navData.avatar,
               photoURL: navData.photoURL,
               avatar: navData.avatar,
               rating: Number(navData.rating) || 0,
@@ -446,7 +645,8 @@ const ProviderProfile: React.FC = () => {
               responseTime: navData.responseTime,
               successRate: typeof navData.successRate === 'number' ? navData.successRate : undefined,
               totalCalls: typeof navData.totalCalls === 'number' ? navData.totalCalls : undefined,
-            } as SosProfile;
+            };
+            
             built.description = pickDescription(built, preferredLangKey);
             providerData = built;
             foundProviderId = navData.id || '';
@@ -460,12 +660,17 @@ const ProviderProfile: React.FC = () => {
               `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 'Profil SOS';
           }
 
-          dbg('keys:', Object.keys(providerData || {}));
-          dbg('desc=', summarizeVal((providerData as any)?.description));
-
           setProvider(providerData);
           setRealProviderId(foundProviderId);
-          await loadReviews(foundProviderId, providerData.uid);
+          
+          // Load reviews with requestIdleCallback if available
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => {
+              loadReviews(foundProviderId, providerData.uid);
+            });
+          } else {
+            await loadReviews(foundProviderId, providerData.uid);
+          }
         } else {
           setNotFound(true);
         }
@@ -477,13 +682,13 @@ const ProviderProfile: React.FC = () => {
       }
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadProviderData();
-  }, [id, typeParam, countryParam, langParam, location.state, preferredLangKey, loadReviews, paramsAll]);
+  }, [id, typeParam, countryParam, langParam, location.state, location.pathname, preferredLangKey, loadReviews, params]);
 
-  // Realtime online status
+  // Realtime online status listener
   useEffect(() => {
     if (!realProviderId) return;
+    
     setOnlineStatus((s) => ({ ...s, listenerActive: true, connectionAttempts: s.connectionAttempts + 1 }));
 
     const unsub = onSnapshot(
@@ -493,8 +698,13 @@ const ProviderProfile: React.FC = () => {
         if (snap.exists()) {
           const data = snap.data() || {};
           const newIsOnline = !!data.isOnline;
-          setOnlineStatus((prev) => ({ ...prev, isOnline: newIsOnline, lastUpdate: new Date(), listenerActive: true }));
-          setProvider((prev) => (prev ? { ...prev, isOnline: newIsOnline, updatedAt: new Date() } : prev));
+          setOnlineStatus((prev) => ({ 
+            ...prev, 
+            isOnline: newIsOnline, 
+            lastUpdate: new Date(), 
+            listenerActive: true 
+          }));
+          setProvider((prev) => prev ? { ...prev, isOnline: newIsOnline, updatedAt: new Date() } : prev);
         }
       },
       (err) => {
@@ -509,15 +719,15 @@ const ProviderProfile: React.FC = () => {
     };
   }, [realProviderId]);
 
-  // Soft redirect when not found
+  // Auto-redirect on not found
   useEffect(() => {
     if (!isLoading && !provider && notFound) {
-      const tmo = setTimeout(() => navigate('/sos-appel'), 2500);
+      const tmo = setTimeout(() => navigate('/sos-appel'), ANIMATION_DURATIONS.LOADING_DELAY);
       return () => clearTimeout(tmo);
     }
   }, [isLoading, provider, notFound, navigate]);
 
-  // SEO URL + meta (use provider.id)
+  // SEO metadata updater (memoized)
   const updateSEOMetadata = useCallback(() => {
     if (!provider || isLoading) return;
 
@@ -538,9 +748,10 @@ const ProviderProfile: React.FC = () => {
         window.history.replaceState(null, '', seoUrl);
       }
 
-      document.title = `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country} | SOS Expat & Travelers`;
+      const pageTitle = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`;
+      document.title = pageTitle;
 
-      const updateOrCreateMeta = (property: string, content: string) => {
+      const updateOrCreateMeta = (property: string, content: string): void => {
         let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
         if (!meta) {
           meta = document.createElement('meta');
@@ -553,25 +764,33 @@ const ProviderProfile: React.FC = () => {
       const ogDesc = pickDescription(provider, preferredLangKey).slice(0, 160);
       const ogImage = provider.profilePhoto || provider.photoURL || provider.avatar || '/default-avatar.png';
 
-      updateOrCreateMeta('og:title', `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country}`);
+      updateOrCreateMeta('og:title', pageTitle);
       updateOrCreateMeta('og:description', ogDesc);
       updateOrCreateMeta('og:image', ogImage);
       updateOrCreateMeta('og:url', window.location.href);
       updateOrCreateMeta('og:type', 'profile');
+      updateOrCreateMeta('og:locale', detectedLang === 'fr' ? 'fr_FR' : 'en_US');
     } catch (e) {
       console.error('Error updating SEO metadata:', e);
     }
-  }, [provider, isLoading, preferredLangKey, lang]);
+  }, [provider, isLoading, preferredLangKey, detectedLang]);
 
   useEffect(() => {
     updateSEOMetadata();
   }, [updateSEOMetadata]);
 
+  // Event handlers (memoized for performance)
   const handleBookCall = useCallback(() => {
     if (!provider) return;
 
-    if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-      (window as any).gtag('event', 'book_call_click', {
+    // Analytics tracking with proper typing
+    interface WindowWithGtag extends Window {
+      gtag?: (command: string, eventName: string, parameters: Record<string, unknown>) => void;
+    }
+    
+    const windowWithGtag = window as WindowWithGtag;
+    if (typeof window !== 'undefined' && windowWithGtag.gtag && typeof windowWithGtag.gtag === 'function') {
+      windowWithGtag.gtag('event', 'book_call_click', {
         provider_id: provider.id,
         provider_uid: provider.uid,
         provider_type: provider.type,
@@ -580,10 +799,10 @@ const ProviderProfile: React.FC = () => {
       });
     }
 
-    if (user) {
+    if (isUser(user)) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
-        userId: (user as any).id,
+        userId: user.id,
         eventData: {
           providerId: provider.id,
           providerUid: provider.uid,
@@ -595,7 +814,7 @@ const ProviderProfile: React.FC = () => {
     }
 
     try {
-      sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
+      sessionStorage.setItem(STORAGE_KEYS.SELECTED_PROVIDER, JSON.stringify(provider));
     } catch (e) {
       console.warn('sessionStorage error:', e);
     }
@@ -609,12 +828,13 @@ const ProviderProfile: React.FC = () => {
       });
     }
 
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [provider, user, navigate, onlineStatus.isOnline]);
 
   const shareProfile = useCallback(
     (platform: 'facebook' | 'twitter' | 'linkedin' | 'copy') => {
       if (!provider) return;
+      
       const isLawyer = provider.type === 'lawyer';
       const countrySlug = safeNormalize(provider.country);
       const langSlug =
@@ -623,31 +843,44 @@ const ProviderProfile: React.FC = () => {
       const nameSlug = provider.slug || safeNormalize(`${provider.firstName}-${provider.lastName}`);
       const seoPath = `/${isLawyer ? 'avocat' : 'expatrie'}/${countrySlug}/${langSlug}/${nameSlug}-${provider.id}`;
       const currentUrl = `${window.location.origin}${seoPath}`;
-      const title = `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country}`;
+      const title = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}`;
 
       switch (platform) {
         case 'facebook':
-          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`, '_blank');
+          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`, '_blank', 'noopener,noreferrer');
           break;
         case 'twitter':
           window.open(
             `https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(title)}`,
-            '_blank'
+            '_blank',
+            'noopener,noreferrer'
           );
           break;
         case 'linkedin':
           window.open(
             `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentUrl)}`,
-            '_blank'
+            '_blank',
+            'noopener,noreferrer'
           );
           break;
         case 'copy':
-          navigator.clipboard.writeText(currentUrl);
-          alert(lang === 'fr' ? 'Lien copi  !' : 'Link copied!');
+          if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(currentUrl);
+            alert(t('linkCopied'));
+          } else {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = currentUrl;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert(t('linkCopied'));
+          }
           break;
       }
     },
-    [provider, lang]
+    [provider, detectedLang, t]
   );
 
   const handleHelpfulClick = useCallback(
@@ -658,7 +891,13 @@ const ProviderProfile: React.FC = () => {
       }
       try {
         await incrementReviewHelpfulCount(reviewId);
-        setReviews((prev) => prev.map((r) => (r.id === reviewId ? { ...r, helpfulVotes: (r.helpfulVotes || 0) + 1 } : r)));
+        setReviews((prev) => 
+          prev.map((r) => 
+            r.id === reviewId 
+              ? { ...r, helpfulVotes: (r.helpfulVotes || 0) + 1 } 
+              : r
+          )
+        );
       } catch (e) {
         console.error('Error marking review helpful:', e);
       }
@@ -672,17 +911,17 @@ const ProviderProfile: React.FC = () => {
         navigate('/login');
         return;
       }
-      const reason = window.prompt(lang === 'fr' ? 'Veuillez indiquer la raison du signalement :' : 'Please enter a reason:');
+      const reason = window.prompt(t('reportReason'));
       if (reason) {
         try {
           await reportReview(reviewId, reason);
-          alert(lang === 'fr' ? 'Merci pour votre signalement. Notre  quipe va l examiner.' : 'Thanks. Our team will review it.');
+          alert(t('reportThanks'));
         } catch (e) {
           console.error('Error reporting review:', e);
         }
       }
     },
-    [user, navigate, lang]
+    [user, navigate, t]
   );
 
   const renderStars = useCallback((rating?: number) => {
@@ -698,12 +937,18 @@ const ProviderProfile: React.FC = () => {
     ));
   }, []);
 
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.target as HTMLImageElement;
+    img.onerror = null;
+    img.src = '/default-avatar.png';
+  }, []);
+
+  // Computed values (memoized)
   const isLawyer = provider?.type === 'lawyer';
   const isExpat = provider?.type === 'expat';
   const mainPhoto = (provider?.profilePhoto || provider?.photoURL || provider?.avatar || '/default-avatar.png') as string;
-  const languagesList = provider?.languages?.length ? provider.languages : ['Fran ais'];
+  const languagesList = provider?.languages?.length ? provider.languages : ['Français'];
 
-  // Derived data
   const descriptionText = useMemo(
     () => (provider ? pickDescription(provider, preferredLangKey) : ''),
     [provider, preferredLangKey]
@@ -726,37 +971,77 @@ const ProviderProfile: React.FC = () => {
     const arr = isLawyer
       ? toArrayFromAny(provider.specialties, preferredLangKey)
       : toArrayFromAny(provider.helpTypes || provider.specialties, preferredLangKey);
-    // petite normalisation visuelle
     return arr.map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
   }, [provider, isLawyer, preferredLangKey]);
 
+  // Structured data for SEO (memoized)
+  const structuredData = useMemo(() => {
+    if (!provider) return null;
+    
+    return {
+      '@context': 'https://schema.org',
+      '@type': isLawyer ? 'Attorney' : 'Person',
+      '@id': `${window.location.origin}${window.location.pathname}`,
+      name: provider.fullName,
+      image: {
+        '@type': 'ImageObject',
+        url: mainPhoto,
+        width: IMAGE_SIZES.MODAL_MAX_WIDTH,
+        height: IMAGE_SIZES.MODAL_MAX_HEIGHT
+      },
+      description: descriptionText,
+      address: {
+        '@type': 'PostalAddress',
+        addressCountry: provider.country
+      },
+      jobTitle: isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Attorney') : (detectedLang === 'fr' ? 'Consultant expatrié' : 'Expat consultant'),
+      worksFor: {
+        '@type': 'Organization',
+        name: 'SOS Expat & Travelers',
+        url: window.location.origin
+      },
+      knowsLanguage: languagesList.map(lang => ({
+        '@type': 'Language',
+        name: lang
+      })),
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: provider.rating || 0,
+        reviewCount: provider.reviewCount || reviews.length || 0,
+        bestRating: 5,
+        worstRating: 1
+      }
+    };
+  }, [provider, isLawyer, mainPhoto, descriptionText, detectedLang, languagesList, reviews.length]);
+
+  // Loading state
   if (isLoading) {
     return (
       <Layout>
-{/* Visibilit  carte   visible uniquement pour le propri taire du profil */}
-{user && provider && ((user as any).id === provider.uid) && (
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-      <h3 className="text-sm font-semibold mb-2">Visibilit  sur la carte</h3>
-      <p className="text-gray-600 text-sm mb-3">Activez/d sactivez votre pr sence sur la carte. (Visible uniquement par vous)</p>
-      
-    </div>
-  </div>
-)}
+        {/* TODO: add map visibility toggle for profile owner */}
+        {user && provider && isUser(user) && user.id === provider.uid && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
+              <p className="text-gray-600 text-sm mb-3">Activez/désactivez votre présence sur la carte. (Visible uniquement par vous)</p>
+            </div>
+          </div>
+        )}
 
         <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size="large" color="red" text={t(lang, 'Chargement du profil...', 'Loading profile...')} />
+          <LoadingSpinner size="large" color="red" text={t('loading')} />
         </div>
       </Layout>
     );
   }
 
+  // Not found state
   if (notFound || !provider) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
           <div className="p-8 text-center text-red-600 text-lg">
-            {t(lang, 'Ce profil prestataire est introuvable. Redirection en cours...', 'This provider profile was not found. Redirecting...')}
+            {t('notFound')}
           </div>
         </div>
       </Layout>
@@ -765,57 +1050,19 @@ const ProviderProfile: React.FC = () => {
 
   return (
     <Layout>
-      {/* (Disabled) debug overlay */}
-      {DEBUG_OVERLAY && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 8,
-            left: 8,
-            zIndex: 99999,
-            background: 'rgba(0,0,0,0.85)',
-            color: '#0f0',
-            fontSize: 12,
-            padding: 10,
-            borderRadius: 8,
-            maxWidth: 380,
-          }}
-        >
-          <div><b>ProviderProfile DEBUG</b></div>
-          <div>path: {location.pathname}</div>
-          <div>params: {JSON.stringify(paramsAll)}</div>
-          <div>provider.id: {provider?.id || '-'}</div>
-        </div>
-      )}
-
       <SEOHead
-        title={`${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country} | SOS Expat & Travelers`}
-        description={`${t(lang,'Consultez','Consult')} ${provider.fullName}, ${isLawyer ? t(lang,'avocat','lawyer') : t(lang,'expatri ','expat')} ${t(lang,'francophone','French-speaking')} ${t(lang,'en','in')} ${provider.country}. ${descriptionText.slice(0, 120)}...`}
+        title={`${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`}
+        description={`${detectedLang === 'fr' ? 'Consultez' : 'Consult'} ${provider.fullName}, ${isLawyer ? (detectedLang === 'fr' ? 'avocat' : 'lawyer') : (detectedLang === 'fr' ? 'expatrié' : 'expat')} ${detectedLang === 'fr' ? 'francophone' : 'French-speaking'} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}. ${descriptionText.slice(0, 120)}...`}
         canonicalUrl={`/${isLawyer ? 'avocat' : 'expatrie'}/${safeNormalize(provider.country)}/${safeNormalize(
           provider.mainLanguage || languagesList[0] || 'francais'
         )}/${safeNormalize(provider.fullName)}-${provider.id}`}
         ogImage={mainPhoto}
         ogType="profile"
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': isLawyer ? 'Attorney' : 'Person',
-          name: provider.fullName,
-          image: mainPhoto,
-          description: descriptionText,
-          address: { '@type': 'PostalAddress', addressCountry: provider.country },
-          jobTitle: isLawyer ? 'Avocat' : 'Expatri  consultant',
-          worksFor: { '@type': 'Organization', name: 'SOS Expat & Travelers' },
-          knowsLanguage: languagesList,
-          review: {
-            '@type': 'AggregateRating',
-            ratingValue: provider.rating || 0,
-            reviewCount: provider.reviewCount || reviews.length || 0,
-          },
-        }}
+        structuredData={structuredData}
       />
 
-      {/* SVG pattern placeholder for potential half-star fill */}
-      <svg width="0" height="0" className="hidden">
+      {/* SVG definitions for half-star rendering */}
+      <svg width="0" height="0" className="hidden" aria-hidden="true">
         <defs>
           <linearGradient id="half-star" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="50%" stopColor="#FACC15" />
@@ -825,106 +1072,109 @@ const ProviderProfile: React.FC = () => {
       </svg>
 
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-12">
+        {/* Header section */}
+        <header className="bg-gradient-to-r from-red-600 to-red-800 text-white py-8 sm:py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <button
-              onClick={() => navigate('/sos-appel')}
-              className="text-red-200 hover:text-white mb-6 transition-colors"
-            >
-              ? {t(lang, 'Retour aux experts', 'Back to experts')}
-            </button>
+            <nav className="mb-6">
+              <button
+                onClick={() => navigate('/sos-appel')}
+                className="inline-flex items-center text-red-200 hover:text-white transition-colors min-h-[44px] px-2"
+                aria-label={t('backToExperts')}
+              >
+                <span aria-hidden="true">←</span>
+                <span className="ml-2">{t('backToExperts')}</span>
+              </button>
+            </nav>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
               <div className="lg:col-span-2">
-                <div className="flex items-start space-x-6">
-                  <div className="relative">
+                <div className="flex items-start space-x-4 sm:space-x-6">
+                  {/* Profile photo with explicit dimensions */}
+                  <div className="relative flex-shrink-0">
                     <img
                       src={mainPhoto}
-                      alt={`${t(lang, 'Photo de', 'Photo of')} ${provider.fullName}`}
+                      alt={`${t('photoOf')} ${provider.fullName}`}
                       className="w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-white/20 cursor-pointer"
+                      width={IMAGE_SIZES.AVATAR_MOBILE}
+                      height={IMAGE_SIZES.AVATAR_MOBILE}
+                      style={{ aspectRatio: '1' }}
                       onClick={() => setShowImageModal(true)}
-                      onError={(e) => {
-                        const tImg = e.target as HTMLImageElement;
-                        tImg.onerror = null;
-                        tImg.src = '/default-avatar.png';
-                      }}
+                      onError={handleImageError}
+                      loading="eager"
+                      fetchPriority="high"
                     />
+                    {/* Online status indicator */}
                     <div
-                      className={`absolute -bottom-2 -right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full border-4 border-white transition-all duration-500 ${
+                      className={`absolute -bottom-2 -right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full border-4 border-white transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} ${
                         onlineStatus.isOnline ? 'bg-green-500' : 'bg-red-500'
                       }`}
                       aria-hidden="true"
                     >
                       {onlineStatus.isOnline && (
-                        <div className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75" />
+                        <div className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75"></div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <h1 className="text-2xl sm:text-3xl font-bold">{provider.fullName}</h1>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold leading-tight">{provider.fullName}</h1>
                       <span
                         className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                           isLawyer ? 'bg-blue-500/20 text-blue-100' : 'bg-green-500/20 text-green-100'
                         }`}
                       >
-                        {isLawyer ? t(lang, 'Avocat certifi ', 'Certified lawyer') : t(lang, 'Expatri  expert', 'Expert expat')}
+                        {isLawyer ? t('certifiedLawyer') : t('expertExpat')}
                       </span>
                       {provider.isVerified && (
                         <span className="bg-green-500 text-white text-[10px] sm:text-xs px-2 py-1 rounded-full">
-                          ? {t(lang, 'V rifi ', 'Verified')}
+                          ✓ {t('verified')}
                         </span>
                       )}
                       <span
-                        className={`px-3 py-1 rounded-full text-xs sm:text-sm font-bold transition-all duration-500 border-2 ${
+                        className={`px-3 py-1 rounded-full text-xs sm:text-sm font-bold transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} border-2 ${
                           onlineStatus.isOnline
                             ? 'bg-green-500 text-white border-green-300 shadow-lg shadow-green-500/50'
                             : 'bg-red-500 text-white border-red-300'
                         }`}
                       >
-                        {onlineStatus.isOnline ? '?? ' + t(lang, 'EN LIGNE', 'ONLINE') : '?? ' + t(lang, 'HORS LIGNE', 'OFFLINE')}
+                        {onlineStatus.isOnline ? '🟢 ' + t('online') : '🔴 ' + t('offline')}
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-red-100 mb-4">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-red-100 mb-4 text-sm sm:text-base">
                       <div className="flex items-center space-x-1">
-                        <MapPin size={16} />
+                        <MapPin size={16} className="flex-shrink-0" />
                         <span>{provider.country}</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        {isLawyer ? <Briefcase size={16} /> : <Users size={16} />}
+                        {isLawyer ? <Briefcase size={16} className="flex-shrink-0" /> : <Users size={16} className="flex-shrink-0" />}
                         <span>
                           {isLawyer
-                            ? `${provider.yearsOfExperience || 0} ${t(lang, "ans d'exp rience", 'years experience')}`
-                            : `${provider.yearsAsExpat || provider.yearsOfExperience || 0} ${t(lang, "ans d'expatriation", 'years as expat')}`}
+                            ? `${provider.yearsOfExperience || 0} ${t('yearsExperience')}`
+                            : `${provider.yearsAsExpat || provider.yearsOfExperience || 0} ${t('yearsAsExpat')}`}
                         </span>
                       </div>
                     </div>
 
+                    {/* Rating display */}
                     <div className="flex items-center gap-2 mb-4">
-                      {renderStars(provider.rating)}
+                      <div className="flex" aria-label={`Rating: ${provider.rating || 0} out of 5 stars`}>
+                        {renderStars(provider.rating)}
+                      </div>
                       <span className="text-red-100 font-medium">
-                        {typeof provider.rating === 'number' ? provider.rating.toFixed(2) : '--'}
+                        {typeof provider.rating === 'number' ? provider.rating.toFixed(1) : '--'}
                       </span>
                       <span className="text-red-200">
-                        ({(provider.reviewCount || reviews.length || 0)} {t(lang, 'avis', 'reviews')})
+                        ({(provider.reviewCount || reviews.length || 0)} {t('reviews')})
                       </span>
                     </div>
 
+                    {/* Description */}
                     <div className="text-red-100 leading-relaxed">
                       <p className="mb-2 whitespace-pre-line">{descriptionText}</p>
 
-                      {isLawyer && getFirstString(provider.motivation, preferredLangKey) && (
-                        <div className="mt-4 pt-4 border-t border-red-200/30">
-                          <p className="text-red-100 whitespace-pre-line">
-                            {getFirstString(provider.motivation, preferredLangKey)}
-                          </p>
-                        </div>
-                      )}
-
-                      {isExpat && getFirstString(provider.motivation, preferredLangKey) && (
+                      {(isLawyer || isExpat) && getFirstString(provider.motivation, preferredLangKey) && (
                         <div className="mt-4 pt-4 border-t border-red-200/30">
                           <p className="text-red-100 whitespace-pre-line">
                             {getFirstString(provider.motivation, preferredLangKey)}
@@ -933,18 +1183,35 @@ const ProviderProfile: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex items-center space-x-3 mt-4">
-                      <span className="text-red-200">{t(lang, 'Partager :', 'Share:')}</span>
-                      <button onClick={() => shareProfile('facebook')} className="text-white hover:text-red-200" aria-label="Share on Facebook">
+                    {/* Social sharing */}
+                    <div className="flex items-center space-x-3 mt-6">
+                      <span className="text-red-200">{t('share')}</span>
+                      <button 
+                        onClick={() => shareProfile('facebook')} 
+                        className="text-white hover:text-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" 
+                        aria-label="Share on Facebook"
+                      >
                         <Facebook size={20} />
                       </button>
-                      <button onClick={() => shareProfile('twitter')} className="text-white hover:text-red-200" aria-label="Share on X">
+                      <button 
+                        onClick={() => shareProfile('twitter')} 
+                        className="text-white hover:text-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" 
+                        aria-label="Share on X"
+                      >
                         <Twitter size={20} />
                       </button>
-                      <button onClick={() => shareProfile('linkedin')} className="text-white hover:text-red-200" aria-label="Share on LinkedIn">
+                      <button 
+                        onClick={() => shareProfile('linkedin')} 
+                        className="text-white hover:text-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" 
+                        aria-label="Share on LinkedIn"
+                      >
                         <Linkedin size={20} />
                       </button>
-                      <button onClick={() => shareProfile('copy')} className="text-white hover:text-red-200" aria-label={t(lang,'Copier le lien','Copy link')}>
+                      <button 
+                        onClick={() => shareProfile('copy')} 
+                        className="text-white hover:text-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" 
+                        aria-label={t('copyLink')}
+                      >
                         <Share2 size={20} />
                       </button>
                     </div>
@@ -953,90 +1220,91 @@ const ProviderProfile: React.FC = () => {
               </div>
 
               {/* Booking card */}
-              <div className="lg:col-span-1">
+              <aside className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-xl p-6">
                   <div className="text-center mb-6">
                     <div className="text-2xl sm:text-3xl font-bold text-red-600 mb-2">
-                      {typeof provider.price === 'number' ? ` ${provider.price}` : ' '}
+                      {typeof provider.price === 'number' ? `€${provider.price}` : '€--'}
                     </div>
                     <div className="text-gray-600">
-                      {provider.duration ? `${provider.duration} ${t(lang, 'minutes', 'minutes')}` : ' '}
+                      {provider.duration ? `${provider.duration} ${t('minutes')}` : '--'}
                     </div>
                   </div>
 
                   <div className="space-y-4 mb-6">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t(lang, 'Taux de succ s', 'Success rate')}</span>
+                      <span className="text-gray-600">{t('successRate')}</span>
                       <span className="font-medium text-gray-900">
-                        {typeof provider.successRate === 'number' ? `${provider.successRate}%` : ' '}
+                        {typeof provider.successRate === 'number' ? `${provider.successRate}%` : '--'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm bg-gray-50 p-3 rounded-lg">
-                      <span className="text-gray-600 font-medium">{t(lang, 'Disponibilit ', 'Availability')}</span>
+                      <span className="text-gray-600 font-medium">{t('availability')}</span>
                       <span
-                        className={`font-bold text-sm px-3 py-1 rounded-full transition-all duration-500 ${
+                        className={`font-bold text-sm px-3 py-1 rounded-full transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} ${
                           onlineStatus.isOnline
                             ? 'bg-green-100 text-green-800 border border-green-300'
                             : 'bg-red-100 text-red-800 border border-red-300'
                         }`}
                       >
-                        {onlineStatus.isOnline ? '?? ' + t(lang, 'EN LIGNE', 'ONLINE') : '?? ' + t(lang, 'HORS LIGNE', 'OFFLINE')}
+                        {onlineStatus.isOnline ? '🟢 ' + t('online') : '🔴 ' + t('offline')}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t(lang, 'Appels r alis s', 'Completed calls')}</span>
-                      <span className="font-medium">{typeof provider.totalCalls === 'number' ? provider.totalCalls : ' '}</span>
+                      <span className="text-gray-600">{t('completedCalls')}</span>
+                      <span className="font-medium">{typeof provider.totalCalls === 'number' ? provider.totalCalls : '--'}</span>
                     </div>
                   </div>
 
                   <button
                     onClick={handleBookCall}
-                    className={`w-full py-4 px-4 rounded-lg font-bold text-lg transition-all duration-500 flex items-center justify-center space-x-3 ${
+                    className={`w-full py-4 px-4 rounded-lg font-bold text-lg transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} flex items-center justify-center space-x-3 min-h-[56px] ${
                       onlineStatus.isOnline
-                        ? 'bg-green-600 text-white hover:bg-green-700 transform hover:scale-105 shadow-lg hover:shadow-xl border-2 border-green-500'
+                        ? 'bg-green-600 text-white hover:bg-green-700 transform hover:scale-105 shadow-lg hover:shadow-xl border-2 border-green-500 focus:outline-none focus:ring-4 focus:ring-green-500/50'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed border-2 border-gray-300'
                     }`}
                     disabled={!onlineStatus.isOnline}
+                    aria-label={onlineStatus.isOnline ? t('bookNow') : t('unavailable')}
                   >
-                    <Phone size={24} />
-                    <span>{onlineStatus.isOnline ? t(lang, 'R SERVER MAINTENANT', 'BOOK NOW') : t(lang, 'NON DISPONIBLE', 'UNAVAILABLE')}</span>
+                    <Phone size={24} aria-hidden="true" />
+                    <span>{onlineStatus.isOnline ? t('bookNow') : t('unavailable')}</span>
                     {onlineStatus.isOnline && (
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 rounded-full animate-pulse bg-green-300" />
-                        <div className="w-2 h-2 rounded-full animate-pulse delay-75 bg-green-300" />
-                        <div className="w-2 h-2 rounded-full animate-pulse delay-150 bg-green-300" />
+                      <div className="flex space-x-1" aria-hidden="true">
+                        <div className="w-2 h-2 rounded-full animate-pulse bg-green-300"></div>
+                        <div className="w-2 h-2 rounded-full animate-pulse delay-75 bg-green-300"></div>
+                        <div className="w-2 h-2 rounded-full animate-pulse delay-150 bg-green-300"></div>
                       </div>
                     )}
                   </button>
 
                   <div className="mt-4 text-center text-sm">
                     {onlineStatus.isOnline ? (
-                      <div className="text-green-600 font-medium">? {t(lang, 'Expert disponible maintenant !', 'Expert available now!')}</div>
+                      <div className="text-green-600 font-medium">✅ {t('availableNow')}</div>
                     ) : (
-                      <div className="text-red-600">? {t(lang, 'Expert actuellement hors ligne', 'Expert currently offline')}</div>
+                      <div className="text-red-600">❌ {t('currentlyOffline')}</div>
                     )}
                   </div>
 
                   <div className="mt-4 text-center">
                     <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                      <Shield size={16} />
-                      <span>{t(lang, 'Paiement s curis    Satisfaction garantie', 'Secure payment   Satisfaction guaranteed')}</span>
+                      <Shield size={16} aria-hidden="true" />
+                      <span>{t('securePayment')}</span>
                     </div>
                   </div>
                 </div>
-              </div>
+              </aside>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-8" id="reviews-section">
-              {/* Specialties */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">{t(lang, 'Sp cialit s', 'Specialties')}</h2>
+        {/* Main content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            {/* Main content area */}
+            <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+              {/* Specialties section */}
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t('specialties')}</h2>
                 {derivedSpecialties.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {derivedSpecialties.map((s, i) => (
@@ -1051,36 +1319,36 @@ const ProviderProfile: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-gray-500">{t(lang, 'Aucune sp cialit  renseign e.', 'No specialties provided.')}</div>
+                  <div className="text-gray-500">{t('noSpecialties')}</div>
                 )}
-              </div>
+              </section>
 
-              {/* Languages */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">{t(lang, 'Langues parl es', 'Languages')}</h2>
+              {/* Languages section */}
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t('languages')}</h2>
                 <div className="flex flex-wrap gap-2">
                   {languagesList.map((l, i) => (
                     <span
                       key={`${l}-${i}`}
                       className="px-3 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium flex items-center"
                     >
-                      <Globe size={14} className="mr-1" />
-                      {formatLanguages([l], lang)}
+                      <Globe size={14} className="mr-1" aria-hidden="true" />
+                      {formatLanguages([l], detectedLang)}
                     </span>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              {/* Education & Certifications (lawyers only)   NO SUBTITLES */}
+              {/* Education & Certifications (lawyers only) */}
               {isLawyer && (educationText || certificationsArray.length > 0) && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
+                <section className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    {t(lang, 'Formation et certifications', 'Education & Certifications')}
+                    {t('educationCertifications')}
                   </h2>
                   <div className="space-y-3">
                     {educationText && (
                       <div className="flex items-start space-x-2">
-                        <GraduationCap size={18} className="text-blue-600 mt-0.5" />
+                        <GraduationCap size={18} className="text-blue-600 mt-0.5 flex-shrink-0" aria-hidden="true" />
                         <p className="text-gray-700">
                           {educationText}
                           {provider.graduationYear ? ` (${provider.graduationYear})` : ''}
@@ -1090,26 +1358,26 @@ const ProviderProfile: React.FC = () => {
                     {certificationsArray.length > 0 &&
                       certificationsArray.map((cert, i) => (
                         <div key={i} className="flex items-start space-x-2">
-                          <Award size={16} className="text-yellow-500 mt-0.5" />
+                          <Award size={16} className="text-yellow-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
                           <p className="text-gray-700">{cert}</p>
                         </div>
                       ))}
                   </div>
-                </div>
+                </section>
               )}
 
-              {/* Exp rience d'expatriation (expats only) */}
+              {/* Expat experience (expats only) */}
               {isExpat && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
+                <section className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    {t(lang, "Exp rience d'expatriation", 'Expat experience')}
+                    {t('expatExperience')}
                   </h2>
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">
-                      <Users size={18} className="text-green-600 flex-shrink-0" />
+                      <Users size={18} className="text-green-600 flex-shrink-0" aria-hidden="true" />
                       <p className="text-gray-600">
                         {(provider.yearsAsExpat || provider.yearsOfExperience || 0)}{' '}
-                        {t(lang, "ans d'expatriation", 'years abroad')} {t(lang, 'en', 'in')} {provider.country}
+                        {t('yearsAbroad')} {t('in')} {provider.country}
                       </p>
                     </div>
 
@@ -1125,19 +1393,19 @@ const ProviderProfile: React.FC = () => {
                       </p>
                     )}
                   </div>
-                </div>
+                </section>
               )}
 
-              {/* Reviews */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              {/* Reviews section */}
+              <section className="bg-white rounded-xl shadow-sm p-6" id="reviews-section">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">
-                  {t(lang, 'Avis clients', 'Customer reviews')} ({reviews.length || 0})
+                  {t('customerReviews')} ({reviews.length || 0})
                 </h2>
 
                 {isLoadingReviews ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto" />
-                    <p className="mt-2 text-gray-500">{t(lang, 'Chargement des avis...', 'Loading reviews...')}</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto" aria-hidden="true"></div>
+                    <p className="mt-2 text-gray-500">{t('loadingReviews')}</p>
                   </div>
                 ) : (
                   <>
@@ -1158,125 +1426,136 @@ const ProviderProfile: React.FC = () => {
                     </div>
                   </>
                 )}
-              </div>
+              </section>
             </div>
 
             {/* Sidebar */}
-            <div className="lg:col-span-1">
+            <aside className="lg:col-span-1">
               <div className="sticky top-6 space-y-6">
+                {/* Stats card */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">{t(lang, 'Statistiques', 'Stats')}</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">{t('stats')}</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{t(lang, 'Note moyenne', 'Average rating')}</span>
+                      <span className="text-gray-600">{t('averageRating')}</span>
                       <span className="font-medium">
                         {typeof provider.rating === 'number' ? provider.rating.toFixed(1) : '--'}/5
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{t(lang, 'Avis clients', 'Reviews')}</span>
+                      <span className="text-gray-600">{t('reviews')}</span>
                       <span className="font-medium">{reviews.length}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{t(lang, 'Taux de succ s', 'Success rate')}</span>
-                      <span className="font-medium">{typeof provider.successRate === 'number' ? `${provider.successRate}%` : ' '}</span>
+                      <span className="text-gray-600">{t('successRate')}</span>
+                      <span className="font-medium">{typeof provider.successRate === 'number' ? `${provider.successRate}%` : '--'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{t(lang, 'Exp rience', 'Experience')}</span>
+                      <span className="text-gray-600">{t('experience')}</span>
                       <span className="font-medium">
                         {isLawyer
-                          ? `${provider.yearsOfExperience || 0} ${t(lang, 'ans', 'yrs')}`
-                          : `${provider.yearsAsExpat || provider.yearsOfExperience || 0} ${t(lang, 'ans', 'yrs')}`}
+                          ? `${provider.yearsOfExperience || 0} ${t('years')}`
+                          : `${provider.yearsAsExpat || provider.yearsOfExperience || 0} ${t('years')}`}
                       </span>
                     </div>
                   </div>
                 </div>
 
+                {/* Info card */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">{t(lang, 'Informations', 'Information')}</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">{t('information')}</h3>
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center space-x-2">
-                      <MapPin size={16} className="text-gray-400" />
-                      <span>{t(lang, 'Bas  en', 'Based in')} {provider.country}</span>
+                      <MapPin size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
+                      <span>{t('basedIn')} {provider.country}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <LanguagesIcon size={16} className="text-gray-400" />
-                      <span>{t(lang, 'Parle', 'Speaks')} {formatLanguages(languagesList, lang)}</span>
+                      <LanguagesIcon size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
+                      <span>{t('speaks')} {formatLanguages(languagesList, detectedLang)}</span>
                     </div>
 
+                    {/* Online status with enhanced visual feedback */}
                     <div
-                      className={`flex items-center space-x-2 p-3 rounded-lg transition-all duration-500 ${
+                      className={`flex items-center space-x-2 p-3 rounded-lg transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} ${
                         onlineStatus.isOnline ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                       }`}
                     >
                       <div
-                        className={`relative w-6 h-6 rounded-full flex items-center justify-center transition-all duration-500 ${
+                        className={`relative w-6 h-6 rounded-full flex items-center justify-center transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} ${
                           onlineStatus.isOnline ? 'bg-green-500' : 'bg-red-500'
                         }`}
                         aria-hidden="true"
                       >
                         {onlineStatus.isOnline && (
-                          <div className="w-6 h-6 rounded-full bg-green-500 animate-ping opacity-75 absolute" />
+                          <div className="w-6 h-6 rounded-full bg-green-500 animate-ping opacity-75 absolute"></div>
                         )}
-                        <div className="w-3 h-3 bg-white rounded-full relative z-10" />
+                        <div className="w-3 h-3 bg-white rounded-full relative z-10"></div>
                       </div>
                       <span
-                        className={`font-bold transition-all duration-500 ${
+                        className={`font-bold transition-all duration-${ANIMATION_DURATIONS.STATUS_TRANSITION} ${
                           onlineStatus.isOnline ? 'text-green-700' : 'text-red-700'
                         }`}
                       >
-                        {onlineStatus.isOnline ? t(lang, 'EN LIGNE MAINTENANT', 'ONLINE NOW') : t(lang, 'HORS LIGNE', 'OFFLINE')}
+                        {onlineStatus.isOnline ? t('onlineNow') : t('offline')}
                       </span>
                     </div>
 
                     {provider.isVerified && (
                       <div className="flex items-center space-x-2">
-                        <Shield size={16} className="text-gray-400" />
-                        <span>{t(lang, 'Expert v rifi ', 'Verified expert')}</span>
+                        <Shield size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
+                        <span>{t('verifiedExpert')}</span>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
+            </aside>
           </div>
-        </div>
+        </main>
       </div>
 
-      {/* Modal photo */}
+      {/* Image modal with improved accessibility */}
       {showImageModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
           onClick={() => setShowImageModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="image-modal-title"
         >
-          <div className="relative max-w-3xl max-h-[90vh]">
+          <div className="relative max-w-3xl max-h-[90vh] m-4">
+            <h2 id="image-modal-title" className="sr-only">
+              {t('photoOf')} {provider.fullName}
+            </h2>
             <img
               src={mainPhoto}
-              alt={`${t(lang, 'Photo de', 'Photo of')} ${provider.fullName}`}
+              alt={`${t('photoOf')} ${provider.fullName}`}
               className="max-w-full max-h-[90vh] object-contain"
-              onError={(e) => {
-                const tImg = e.target as HTMLImageElement;
-                tImg.onerror = null;
-                tImg.src = '/default-avatar.png';
-              }}
+              style={{ maxWidth: IMAGE_SIZES.MODAL_MAX_WIDTH, maxHeight: IMAGE_SIZES.MODAL_MAX_HEIGHT }}
+              onError={handleImageError}
+              loading="lazy"
+              decoding="async"
             />
             <button
-              className="absolute top-4 right-4 bg-white rounded-full p-2 text-gray-800 hover:bg-gray-200"
+              className="absolute top-4 right-4 bg-white rounded-full p-2 text-gray-800 hover:bg-gray-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white/50"
               onClick={() => setShowImageModal(false)}
-              aria-label={t(lang, 'Fermer', 'Close')}
+              aria-label={t('close')}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </button>
           </div>
         </div>
       )}
+
+      {/* TODO: Add language switcher component (FR/EN) that forces i18n.language and persists in localStorage */}
+      {/* TODO: Optimize bundle size - consider lazy loading non-critical components */}
+      {/* TODO: Add content-visibility: auto for below-the-fold sections if performance metrics require it */}
+      {/* TODO: Implement srcset with WebP/AVIF formats for images when supported */}
+      {/* TODO: Add proper error boundaries for better error handling */}
     </Layout>
   );
 };
 
 export default ProviderProfile;
-
-
-

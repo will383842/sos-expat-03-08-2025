@@ -160,59 +160,12 @@
 
     <!-- 📱 SERVICE WORKER UI ONLY (no double register) -->
     <script>
-      // ❗ On n’enregistre PAS le SW ici (fait par registerSW() dans le code).
-      // On gère uniquement l’UI quand une mise à jour est dispo.
+      // ❗ On n'enregistre PAS le SW ici (fait par registerSW() dans le code).
+      // On gère uniquement l'UI quand une mise à jour est dispo.
       window.addEventListener('sw-update-available', () => {
         const ok = confirm('Nouvelle version disponible. Actualiser maintenant ?');
         if (ok) window.location.reload();
       });
-    </script>
-
-    <!-- 📱 PWA Install prompt -->
-    <script>
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-
-        const installBanner = document.createElement('div');
-        installBanner.innerHTML = `
-          <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #dc2626; color: white; padding: 16px; border-radius: 12px; text-align: center; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            <div style="margin-bottom: 8px; font-weight: bold;">📱 Installer l'app SOS Expat</div>
-            <div style="margin-bottom: 12px; font-size: 14px;">Accès rapide à l'assistance d'urgence</div>
-            <button id="install-app-btn" style="background: white; color: #dc2626; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-right: 8px;">Installer</button>
-            <button id="install-later-btn" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 6px;">Plus tard</button>
-          </div>
-        `;
-        document.body.appendChild(installBanner);
-
-        const installBtn = document.getElementById('install-app-btn');
-        const laterBtn = document.getElementById('install-later-btn');
-
-        installBtn?.addEventListener('click', async () => {
-          if (!deferredPrompt) return;
-          deferredPrompt.prompt();
-          await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          installBanner.remove();
-        });
-        laterBtn?.addEventListener('click', () => installBanner.remove());
-      });
-    </script>
-
-    <!-- 🔎 Perf monitor (guarded) -->
-    <script>
-      if ('performance' in window) {
-        window.addEventListener('load', () => {
-          setTimeout(() => {
-            const nav = performance.getEntriesByType('navigation')[0];
-            if (nav && Number.isFinite(nav.loadEventEnd) && Number.isFinite(nav.loadEventStart)) {
-              const delta = nav.loadEventEnd - nav.loadEventStart;
-              if (delta > 3000) console.info('Mobile: Chargement lent détecté');
-            }
-          }, 0);
-        });
-      }
     </script>
   </body>
 </html>

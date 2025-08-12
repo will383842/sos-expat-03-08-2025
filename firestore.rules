@@ -87,30 +87,26 @@ service cloud.firestore {
     // ======================
     // SOS_PROFILES (ancien)
     // ======================
-    match /sos_profiles/{profileId} {
-      // champs minimum requis pour créer/éditer
-      function hasValidProfileFields() {
-        return request.resource.data.keys().hasAll(['uid','type','fullName']) &&
-               request.resource.data.uid is string &&
-               request.resource.data.type in ['lawyer','expat'] &&
-               request.resource.data.fullName is string;
-      }
+match /sos_profiles/{profileId} {
+  // Lecture : public
+  allow read: if true;
+  
+  // Création : seulement lawyer ou expat
+  allow create: if isAuthenticated() &&
+                  request.resource.data.type in ['lawyer', 'expat'] &&
+                  request.resource.data.uid == request.auth.uid;
+  
+  // Mise à jour : seulement lawyer ou expat, en tenant compte de la valeur existante
+  allow update: if isAuthenticated() &&
+                  ((request.resource.data.type ?? resource.data.type) in ['lawyer', 'expat']) &&
+                  (request.auth.uid == resource.data.uid || 
+                   request.auth.uid == profileId ||
+                   isAdmin());
+  
+  // Suppression : admin uniquement
+  allow delete: if isAdmin();
+}
 
-      // Lecture publique si visible, ou propriétaire, ou admin
-      allow read: if isPublicProfile() || isDocOwner() || isAdmin();
-
-      // Création par le propriétaire (basé sur request.resource.data.uid) ou admin
-      allow create: if creatingOwnDoc() && isEmailVerified() && isProviderRole() && hasValidProfileFields()
-                    || isAdmin();
-
-      // Mise à jour : admin OU propriétaire (sans toucher aux champs sensibles)
-      // On autorise les toggles (ex.: isVisible, isVisibleOnMap, isOnline) et l’édition de profil “classique”
-      allow update: if isAdmin()
-                    ||
-                    (isDocOwner() && isEmailVerified() && isNotBanned() && hasValidProfileFields() && hasNoSensitiveChanges());
-
-      allow delete: if isAdmin();
-    }
 
     // ==================
     // PROVIDERS (actuel)

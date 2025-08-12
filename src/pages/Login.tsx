@@ -32,10 +32,6 @@ interface FormErrors {
   general?: string;
 }
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): void;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
 
 interface ExistingUserData {
   role?: string;
@@ -222,7 +218,6 @@ const Login: React.FC = () => {
   const [isFormTouched, setIsFormTouched] = useState<boolean>(false);
   const [submitAttempts, setSubmitAttempts] = useState<number>(0);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
   const encodedRedirectUrl = encodeURIComponent(redirectUrl);
@@ -288,16 +283,7 @@ const Login: React.FC = () => {
     };
   }, []);
 
-  // PWA install prompt handling
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    // PWA install prompt removed
-    return () => window.removeEventListener('', handleBeforeInstallPrompt);
-  }, []);
+  
 
   // Online/offline status
   useEffect(() => {
@@ -732,19 +718,7 @@ const Login: React.FC = () => {
     });
   }, []);
 
-  // PWA install handler - COMPLET
-  const handleInstallApp = useCallback(() => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      installPrompt.userChoice.then(choiceResult => {
-        const gtag = getGtag();
-        if (gtag) {
-          gtag('event', 'pwa_install_prompt', { choice: choiceResult.outcome });
-        }
-        setInstallPrompt(null);
-      });
-    }
-  }, [installPrompt]);
+  
 
   // 🔁 RÉCUPÉRER LE RÉSULTAT GOOGLE EN COOP/COEP (Redirect flow) - COMPLET
   const redirectHandledRef = useRef(false);
@@ -861,36 +835,7 @@ const Login: React.FC = () => {
             </div>
           )}
 
-          {/* PWA Install Banner - COMPLET */}
-          {installPrompt && (
-            <div className="fixed bottom-4 left-4 right-4 bg-red-600 text-white p-4 rounded-2xl shadow-2xl z-40 sm:max-w-md sm:mx-auto border border-red-500">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Smartphone className="h-5 w-5 mr-3 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold">{t('pwa.install')}</p>
-                    <p className="text-xs text-red-100">Accès rapide et hors ligne</p>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleInstallApp}
-                    className="bg-white text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 transition-colors duration-200"
-                  >
-                    {t('pwa.install_button')}
-                  </button>
-                  <button
-                    onClick={() => setInstallPrompt(null)}
-                    className="text-red-100 hover:text-white p-2 rounded-lg hover:bg-red-700 transition-colors duration-200"
-                    aria-label="Fermer"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
+          
           {/* Progress bar mobile - COMPLET */}
           <div className="sm:mx-auto sm:w-full sm:max-w-md mb-4 sm:mb-6">
             <div className="flex items-center justify-between mb-2">

@@ -659,7 +659,7 @@ const RegisterExpat: React.FC = () => {
     const clean = email.trim().toLowerCase();
     if (!EMAIL_REGEX.test(clean)) return false;
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', clean));
+    const q = query(usersRef, where('emailLower', '==', clean));
     const snap = await getDocs(q);
     return snap.empty;
   }, []);

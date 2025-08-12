@@ -22,7 +22,7 @@ import Layout from '../components/layout/Layout';
 import SEOHead from '../components/layout/SEOHead';
 import HeroSection from '../components/home/HeroSection';
 import ProfileCarousel from '../components/home/ProfileCarousel';
-import MapSection from '../components/home/MapSection';
+import { WorldMap } from '../components/map/WorldMap';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -708,7 +708,7 @@ const Home: React.FC = () => {
 
       {/* Map Section - Utilise le composant existant */}
       <div className="bg-gradient-to-br from-gray-50 to-blue-50">
-        <MapSection />
+        <WorldMap />
       </div>
 
       {/* Témoignages */}

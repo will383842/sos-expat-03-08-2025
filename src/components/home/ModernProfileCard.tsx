@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Star, MapPin, Globe, Users, Zap, Eye, ArrowRight, Sparkles } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { Star, MapPin, Globe, Users, Zap, Eye, ArrowRight, Wifi, WifiOff } from 'lucide-react';
 
 // Types
 interface Provider {
   id: string;
   name: string;
-  type: 'lawyer' | 'expat';
+  type: 'lawyer' | 'expat' | 'accountant' | 'notary' | 'tax_consultant' | 'real_estate' | 'translator' | 'hr_consultant' | 'financial_advisor' | 'insurance_broker';
   country: string;
   nationality?: string;
   languages: string[];
@@ -25,9 +25,9 @@ interface Provider {
 interface ModernProfileCardProps {
   provider: Provider;
   onProfileClick: (provider: Provider) => void;
-  getLanguageLabel: (lang: string) => string;
   isUserConnected: boolean;
   index?: number;
+  language?: 'fr' | 'en';
 }
 
 const LANGUAGE_MAP: Record<string, string> = {
@@ -74,9 +74,9 @@ const LANGUAGE_MAP: Record<string, string> = {
   'AR': 'Arabe'
 } as const;
 
-const DEFAULT_AVATAR = '/default-avatar.png';
+const DEFAULT_AVATAR = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%23f1f5f9"/%3E%3Ccircle cx="200" cy="160" r="60" fill="%23cbd5e1"/%3E%3Cpath d="M100 350c0-55 45-100 100-100s100 45 100 100" fill="%23cbd5e1"/%3E%3C/svg%3E';
 
-// Flag emojis map
+// Flag emojis map - Version HD avec plus de pays
 const FLAG_MAP: Record<string, string> = {
   'France': '🇫🇷',
   'Espagne': '🇪🇸',
@@ -90,7 +90,156 @@ const FLAG_MAP: Record<string, string> = {
   'Belgique': '🇧🇪',
   'Belgium': '🇧🇪',
   'Suisse': '🇨🇭',
-  'Switzerland': '🇨🇭'
+  'Switzerland': '🇨🇭',
+  'Royaume-Uni': '🇬🇧',
+  'United Kingdom': '🇬🇧',
+  'États-Unis': '🇺🇸',
+  'United States': '🇺🇸',
+  'Pays-Bas': '🇳🇱',
+  'Netherlands': '🇳🇱',
+  'Autriche': '🇦🇹',
+  'Austria': '🇦🇹',
+  'Luxembourg': '🇱🇺',
+  'Maroc': '🇲🇦',
+  'Morocco': '🇲🇦',
+  'Tunisie': '🇹🇳',
+  'Tunisia': '🇹🇳',
+  'Algérie': '🇩🇿',
+  'Algeria': '🇩🇿',
+  'Sénégal': '🇸🇳',
+  'Senegal': '🇸🇳',
+  'Côte d\'Ivoire': '🇨🇮',
+  'Ivory Coast': '🇨🇮'
+};
+
+// Système i18n - Traductions FR/EN
+const TRANSLATIONS = {
+  fr: {
+    professions: {
+      lawyer: 'Avocat',
+      expat: 'Expat',
+      accountant: 'Comptable',
+      notary: 'Notaire',
+      tax_consultant: 'Fiscaliste',
+      real_estate: 'Immobilier',
+      translator: 'Traducteur',
+      hr_consultant: 'RH',
+      financial_advisor: 'Finance',
+      insurance_broker: 'Assurance'
+    },
+    labels: {
+      online: 'En ligne',
+      offline: 'Hors ligne',
+      languages: 'Langues',
+      specialties: 'Spécialités',
+      years: 'ans',
+      reviews: 'avis',
+      viewProfile: 'Voir le profil',
+      others: 'autres'
+    }
+  },
+  en: {
+    professions: {
+      lawyer: 'Lawyer',
+      expat: 'Expat',
+      accountant: 'Accountant',
+      notary: 'Notary',
+      tax_consultant: 'Tax Advisor',
+      real_estate: 'Real Estate',
+      translator: 'Translator',
+      hr_consultant: 'HR',
+      financial_advisor: 'Finance',
+      insurance_broker: 'Insurance'
+    },
+    labels: {
+      online: 'Online',
+      offline: 'Offline',
+      languages: 'Languages',
+      specialties: 'Specialties',
+      years: 'years',
+      reviews: 'reviews',
+      viewProfile: 'View profile',
+      others: 'others'
+    }
+  }
+};
+
+// Icônes métiers avec plus de professions
+const PROFESSION_ICONS: Record<string, { icon: string; bgColor: string; textColor: string }> = {
+  'lawyer': { 
+    icon: '⚖️', 
+    bgColor: 'bg-slate-100', 
+    textColor: 'text-slate-700' 
+  },
+  'expat': { 
+    icon: '🌍', 
+    bgColor: 'bg-blue-100', 
+    textColor: 'text-blue-700' 
+  },
+  'accountant': { 
+    icon: '🧮', 
+    bgColor: 'bg-green-100', 
+    textColor: 'text-green-700' 
+  },
+  'notary': { 
+    icon: '📜', 
+    bgColor: 'bg-amber-100', 
+    textColor: 'text-amber-700' 
+  },
+  'tax_consultant': { 
+    icon: '💰', 
+    bgColor: 'bg-yellow-100', 
+    textColor: 'text-yellow-700' 
+  },
+  'real_estate': { 
+    icon: '🏠', 
+    bgColor: 'bg-orange-100', 
+    textColor: 'text-orange-700' 
+  },
+  'translator': { 
+    icon: '📝', 
+    bgColor: 'bg-purple-100', 
+    textColor: 'text-purple-700' 
+  },
+  'hr_consultant': { 
+    icon: '👥', 
+    bgColor: 'bg-pink-100', 
+    textColor: 'text-pink-700' 
+  },
+  'financial_advisor': { 
+    icon: '📊', 
+    bgColor: 'bg-indigo-100', 
+    textColor: 'text-indigo-700' 
+  },
+  'insurance_broker': { 
+    icon: '🛡️', 
+    bgColor: 'bg-cyan-100', 
+    textColor: 'text-cyan-700' 
+  }
+};
+
+// Fonction pour détecter la langue (navigateur ou prop)
+const getLanguage = (userLanguage?: string): 'fr' | 'en' => {
+  if (userLanguage) return userLanguage as 'fr' | 'en';
+  if (typeof window !== 'undefined') {
+    const browserLang = window.navigator.language;
+    return browserLang.startsWith('fr') ? 'fr' : 'en';
+  }
+  return 'fr';
+};
+
+// Fonction de traduction
+const t = (lang: 'fr' | 'en', key: string, subKey?: string): string => {
+  const translation = TRANSLATIONS[lang];
+  if (subKey) {
+    return (translation as any)[key]?.[subKey] || key;
+  }
+  return (translation as any)[key] || key;
+};
+
+// Fonction pour obtenir l'icône métier
+const getProfessionInfo = (type: string) => {
+  return PROFESSION_ICONS[type] || PROFESSION_ICONS['expat'];
 };
 
 // Fonction utilitaire pour obtenir le label de langue
@@ -98,27 +247,20 @@ const getLanguageLabel = (language: string): string => {
   return LANGUAGE_MAP[language] || language;
 };
 
-// Composant ModernProfileCard - Production Ready & Clean
+// Composant ModernProfileCard - Version corrigée
 const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({ 
   provider, 
   onProfileClick, 
-  getLanguageLabel, 
-  isUserConnected, 
-  index = 0 
+  isUserConnected,
+  index = 0,
+  language 
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const cardRef = useRef<HTMLElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // Effet de suivie de souris
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setMousePosition({ x, y });
-  }, []);
+  // Langue utilisée (prop ou détection auto)
+  const currentLang = getLanguage(language);
 
   const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.currentTarget;
@@ -131,241 +273,238 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
     onProfileClick(provider);
   }, [provider, onProfileClick]);
 
-  // Couleurs épurées pour 2026
-  const getThemeColors = () => {
-    if (provider.type === 'lawyer') {
-      return {
-        primary: 'from-red-500 to-red-600',
-        accent: 'text-red-300',
-        badge: 'bg-red-500',
-        glow: 'shadow-red-500/20'
-      };
-    } else {
-      return {
-        primary: 'from-emerald-500 to-emerald-600',
-        accent: 'text-emerald-300',
-        badge: 'bg-emerald-500',
-        glow: 'shadow-emerald-500/20'
-      };
-    }
+  // Couleurs basées sur le statut en ligne - Avec ombre autour du trait
+  const statusColors = provider.isOnline ? {
+    border: 'border-green-300',
+    shadow: 'shadow-green-100',
+    glow: 'shadow-green-200/50',
+    borderShadow: 'drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]',
+    badge: 'bg-green-100 text-green-800 border-green-300',
+    button: 'bg-green-700 hover:bg-green-800 border-green-700',
+    accent: 'text-green-700'
+  } : {
+    border: 'border-red-500',
+    shadow: 'shadow-red-100',
+    glow: 'shadow-red-200/50',
+    borderShadow: 'drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]',
+    badge: 'bg-red-100 text-red-800 border-red-300',
+    button: 'bg-red-700 hover:bg-red-800 border-red-700',
+    accent: 'text-red-700'
   };
 
-  const colors = getThemeColors();
-
   return (
-    <>
+    <div className="flex-shrink-0 p-4">
       <article
         ref={cardRef}
-        className={`group relative w-80 h-[600px] overflow-hidden cursor-pointer transform transition-all duration-700 ease-out ${
-          isHovered ? 'scale-105 rotate-1 z-30' : 'z-10'
-        }`}
+        className={`
+          relative w-80 h-[520px] bg-white rounded-2xl overflow-hidden cursor-pointer
+          transition-all duration-300 ease-out border-2 shadow-lg
+          ${statusColors.border} ${statusColors.shadow} ${statusColors.borderShadow}
+          ${isHovered ? `scale-[1.02] ${statusColors.glow} shadow-xl` : ''}
+        `}
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onMouseMove={handleMouseMove}
         style={{
-          animationDelay: `${index * 100}ms`,
-          animation: `morphIn 1s cubic-bezier(0.165, 0.84, 0.44, 1) forwards`
+          animationDelay: `${index * 100}ms`
         }}
       >
-        {/* Halo subtil */}
-        <div 
-          className={`absolute -inset-2 bg-gradient-to-r ${colors.primary} opacity-0 group-hover:opacity-20 blur-xl transition-all duration-700 rounded-3xl`}
-        />
-
-        {/* Carte principale - Design épuré */}
-        <div className={`relative h-full rounded-3xl overflow-hidden backdrop-blur-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 ${colors.glow} shadow-xl transition-all duration-700`}>
+        
+        {/* Header avec photo et statut - Format portrait plus grand */}
+        <div className="relative h-72 overflow-hidden bg-slate-100">
+          <img
+            src={provider.avatar || provider.profilePhoto || DEFAULT_AVATAR}
+            alt={`Photo de ${provider.name}`}
+            className={`
+              w-full h-full object-cover transition-all duration-300
+              ${imageLoaded ? 'opacity-100' : 'opacity-0'}
+              ${isHovered ? 'scale-105' : ''}
+            `}
+            onLoad={() => setImageLoaded(true)}
+            onError={handleImageError}
+            loading="lazy"
+          />
           
-          {/* Background simple */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${colors.primary} opacity-90`} />
+          {/* Overlay gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
           
-          {/* Image de profil avec masque */}
-          <div className="relative h-[340px] overflow-hidden">
-            <svg viewBox="0 0 400 200" className="absolute inset-0 w-full h-full z-10">
-              <defs>
-                <clipPath id={`liquidMask-${provider.id}`}>
-                  <path d="M0,0 L400,0 L400,150 Q200,180 0,150 Z" />
-                </clipPath>
-              </defs>
-            </svg>
-
-            <img
-              src={provider.avatar || provider.profilePhoto || DEFAULT_AVATAR}
-              alt={`Photo de ${provider.name}`}
-              className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${
-                imageLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{ clipPath: `url(#liquidMask-${provider.id})` }}
-              onLoad={() => setImageLoaded(true)}
-              onError={handleImageError}
-              loading="lazy"
-            />
-            
-            {/* Overlay simple */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            
-            {/* STATUT ULTRA VISIBLE - Top priorité */}
-            <div className="absolute top-4 left-4 z-20">
-              <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-full font-bold text-sm shadow-lg border-2 backdrop-blur-xl ${
-                provider.isOnline 
-                  ? 'bg-green-500/30 text-green-100 border-green-400/50 shadow-green-400/30' 
-                  : 'bg-slate-600/30 text-slate-100 border-slate-500/50 shadow-slate-400/30'
-              }`}>
-                <span className={`w-3 h-3 rounded-full ${
-                  provider.isOnline ? 'bg-green-400 animate-pulse' : 'bg-slate-400'
-                } border border-white`} />
-                <span className="uppercase tracking-wide text-xs font-black">
-                  {provider.isOnline ? 'EN LIGNE' : 'HORS LIGNE'}
-                </span>
-              </div>
-            </div>
-            
-            {/* Type badge épuré */}
-            <div className="absolute top-4 right-4 z-20">
-              <div className={`px-3 py-2 rounded-full ${colors.badge} text-white text-sm font-bold shadow-lg backdrop-blur-xl border border-white/20`}>
-                {provider.type === 'lawyer' ? '⚖️ Avocat' : '🌍 Expert'}
-              </div>
-            </div>
-            
-            {/* Rating simple */}
-            <div className="absolute bottom-6 right-6 z-20">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-yellow-500/20 backdrop-blur-xl border border-yellow-400/30 shadow-lg">
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="text-yellow-100 text-sm font-bold">{provider.rating.toFixed(1)}</span>
-              </div>
+          {/* Statut en ligne avec icône WiFi - Angles très arrondis */}
+          <div className="absolute top-4 left-4">
+            <div className={`
+              inline-flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium
+              backdrop-blur-sm border shadow-sm
+              ${statusColors.badge}
+            `}>
+              {provider.isOnline ? (
+                <Wifi className="w-4 h-4" />
+              ) : (
+                <WifiOff className="w-4 h-4" />
+              )}
+              <span>{provider.isOnline ? t(currentLang, 'labels', 'online') : t(currentLang, 'labels', 'offline')}</span>
             </div>
           </div>
           
-          {/* Contenu épuré */}
-          <div className="relative z-10 p-6 space-y-4">
-            
-            {/* Nom */}
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-white truncate group-hover:text-yellow-300 transition-colors duration-500">
+          {/* Type badge avec icône métier - Même hauteur que le statut */}
+          <div className="absolute top-4 right-4">
+            {(() => {
+              const professionInfo = getProfessionInfo(provider.type);
+              return (
+                <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-full backdrop-blur-sm border shadow-sm ${professionInfo.bgColor} ${professionInfo.textColor} border-white/20`}>
+                  <span className="text-sm font-medium">
+                    {professionInfo.icon} {t(currentLang, 'professions', provider.type)}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+          
+          {/* Note avec étoile */}
+          <div className="absolute bottom-4 right-4">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-slate-200 shadow-sm">
+              <Star className="w-4 h-4 text-amber-500 fill-current" />
+              <span className="text-slate-700 text-sm font-medium">{provider.rating.toFixed(1)}</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Contenu principal - Plus d'espace pour le bouton */}
+        <div className="p-3 flex flex-col h-[232px]">
+          
+          {/* Nom avec ancienneté encadrée à droite */}
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800 truncate flex-1 pr-2">
                 {provider.name}
               </h3>
-              
-              {/* Nationalité */}
-              {provider.nationality && (
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{FLAG_MAP[provider.country] || '🌍'}</span>
-                  <span className="text-white/90 text-sm">{provider.nationality}</span>
-                </div>
-              )}
-            </div>
-            
-            {/* Pays */}
-            <div className="flex items-center gap-2">
-              <MapPin className={`w-4 h-4 ${colors.accent}`} />
-              <span className="text-white text-sm">{provider.country}</span>
-            </div>
-            
-            {/* Langues */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Globe className={`w-4 h-4 ${colors.accent}`} />
-                <span className="text-white font-semibold text-sm">Langues</span>
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-teal-50 border border-teal-200 flex-shrink-0">
+                <Zap className="w-3 h-3 text-teal-600" />
+                <span className="text-teal-600 text-xs font-medium">{provider.yearsOfExperience}{t(currentLang, 'labels', 'years')}</span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {provider.languages.slice(0, 3).map((lang, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2 py-1 rounded-lg bg-white/15 text-white text-xs font-medium"
-                  >
-                    {getLanguageLabel(lang)}
+            </div>
+            
+            {provider.nationality && (
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{FLAG_MAP[provider.country] || FLAG_MAP[provider.nationality] || '🌍'}</span>
+                <span className="text-slate-600 text-xs font-medium">{provider.nationality}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Contenu organisé et aéré */}
+          <div className="space-y-2 h-28 overflow-hidden">
+            
+            {/* Pays avec drapeau plus visible */}
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{FLAG_MAP[provider.country] || '🌍'}</span>
+              <span className="text-blue-600 text-xs font-medium truncate">{provider.country}</span>
+            </div>
+            
+            {/* Langues - Format compact avec i18n */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Globe className="w-3 h-3 text-indigo-600" />
+                <span className="text-slate-700 font-semibold text-xs">{t(currentLang, 'labels', 'languages')}</span>
+              </div>
+              <div className="pl-5">
+                {provider.languages.length <= 3 ? (
+                  <span className="text-indigo-600 text-xs">
+                    {provider.languages.map(lang => getLanguageLabel(lang)).join(' • ')}
                   </span>
-                ))}
-                {provider.languages.length > 3 && (
-                  <span className="px-2 py-1 rounded-lg bg-white/10 text-white/70 text-xs">
-                    +{provider.languages.length - 3}
+                ) : (
+                  <span className="text-indigo-600 text-xs">
+                    {provider.languages.slice(0, 2).map(lang => getLanguageLabel(lang)).join(' • ')}
+                    <span className="text-indigo-500 ml-1">+{provider.languages.length - 2} {t(currentLang, 'labels', 'others')}</span>
                   </span>
                 )}
               </div>
             </div>
             
-            {/* Stats */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1">
-                  <Users className={`w-4 h-4 ${colors.accent}`} />
-                  <span className="text-white/90 text-sm">{provider.reviewCount}</span>
+            {/* Spécialités - Format compact avec i18n */}
+            {provider.specialties && provider.specialties.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-3 h-3 text-purple-600" />
+                  <span className="text-slate-700 font-semibold text-xs">{t(currentLang, 'labels', 'specialties')}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Zap className={`w-4 h-4 ${colors.accent}`} />
-                  <span className="text-white/90 text-sm">{provider.yearsOfExperience}ans</span>
+                <div className="pl-5">
+                  {provider.specialties.length <= 2 ? (
+                    <span className="text-purple-600 text-xs">
+                      {provider.specialties.join(' • ')}
+                    </span>
+                  ) : (
+                    <span className="text-purple-600 text-xs">
+                      {provider.specialties.slice(0, 2).join(' • ')}
+                      <span className="text-purple-500 ml-1">+{provider.specialties.length - 2}</span>
+                    </span>
+                  )}
                 </div>
               </div>
+            )}
+          </div>
+          
+          {/* Stats en bas - TOUJOURS VISIBLE */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3 text-amber-600" />
+              <span className="text-amber-600 text-xs font-medium">{provider.reviewCount} {t(currentLang, 'labels', 'reviews')}</span>
+            </div>
+            <div className="text-slate-400 text-xs">
+              {t(currentLang, 'professions', provider.type)}
             </div>
           </div>
           
-          {/* Bouton d'action */}
-          <div className="absolute bottom-6 left-6 right-6 z-20">
+          {/* BOUTON CTA - POSITION ABSOLUE POUR GARANTIR LA VISIBILITÉ */}
+          <div className="mt-3">
             <button 
-              className="w-full py-3 px-4 rounded-xl font-bold text-sm transition-all duration-500 backdrop-blur-xl border flex items-center justify-center gap-2 bg-white/15 border-white/20 text-white hover:bg-white/25 hover:scale-105 hover:shadow-xl relative overflow-hidden group/btn"
+              className={`
+                w-full py-3 px-4 rounded-lg font-bold text-sm text-white
+                transition-all duration-300 flex items-center justify-center gap-2
+                border-2 shadow-lg relative overflow-hidden group
+                ${statusColors.button}
+                hover:scale-105 hover:shadow-xl
+              `}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClick();
               }}
               type="button"
             >
-              <Eye className="w-4 h-4 transition-transform duration-300 group-hover/btn:scale-110" />
-              <span>Voir le profil</span>
-              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
-              
-              {/* Effet subtil */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700" />
+              <Eye className="w-4 h-4" />
+              <span className="font-bold">{t(currentLang, 'labels', 'viewProfile')}</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          
-          {/* Particules légères au hover */}
-          {isHovered && (
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              {[...Array(3)].map((_, i) => (
-                <Sparkles 
-                  key={i}
-                  className="absolute w-2 h-2 text-white/30 animate-pulse"
-                  style={{
-                    left: `${30 + (i * 20)}%`,
-                    top: `${40 + (i * 10)}%`,
-                    animationDelay: `${i * 300}ms`
-                  }}
-                />
-              ))}
-            </div>
-          )}
         </div>
       </article>
 
-      {/* Styles épurés */}
+      {/* Styles intégrés pour éviter les conflits */}
       <style>{`
-        @keyframes morphIn {
-          0% {
-            opacity: 0;
-            transform: translateY(50px) scale(0.9);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+        article {
+          animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          opacity: 0;
+          transform: translateY(20px);
         }
         
-        .backdrop-blur-xl {
-          backdrop-filter: blur(16px) saturate(150%);
+        @keyframes slideInUp {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         
         @media (prefers-reduced-motion: reduce) {
-          * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
+          article {
+            animation: none;
+            opacity: 1;
+            transform: none;
           }
           
-          article {
-            animation: none !important;
+          * {
+            transition-duration: 0.01ms !important;
           }
         }
       `}</style>
-    </>
+    </div>
   );
 });
 

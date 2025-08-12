@@ -367,6 +367,7 @@ const getErrorCode = (err: unknown): string => {
 
 const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userData: Partial<User>, deviceInfo: DeviceInfo): Promise<User> => {
   try {
+    const emailLower = (firebaseUser.email || '').trim().toLowerCase();
     console.log('🔧 [Debug] Début createUserDocumentInFirestore', { uid: firebaseUser.uid, role: userData.role });
     
     const userRef = doc(db, 'users', firebaseUser.uid);
@@ -422,7 +423,8 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
     } = {
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
-      email: firebaseUser.email || '',
+      email: emailLower,
+      emailLower: emailLower,
       firstName,
       lastName,
       displayName: fullDisplayName,
@@ -1214,7 +1216,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             isVerified: googleUser.emailVerified,
             isVerifiedEmail: googleUser.emailVerified
           };
-          await createUserDocumentInFirestore(googleUser, newUserData, getDeviceInfo());
+          try {
+      await createUserDocumentInFirestore(googleUser, newUserData, getDeviceInfo());
+    } catch (err) {
+      try {
+        const { deleteUser } = await import('firebase/auth');
+        await deleteUser(userCredential.user);
+      } catch {}
+      throw err;
+    }
         }
 
         await logAuthEvent('successful_google_login', {

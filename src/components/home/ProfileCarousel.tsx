@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,7 +8,7 @@ import { getDownloadURL, ref } from 'firebase/storage';
 import { storage } from '../../config/firebase';
 import ModernProfileCard, { Provider } from './ModernProfileCard';
 
-// Fonction utilitaire pour les langues (définie localement)
+// Fonction utilitaire pour les langues (VOTRE CODE EXACT)
 const getLanguageLabel = (language: string): string => {
   const LANGUAGE_MAP: Record<string, string> = {
     'Français': 'Français',
@@ -59,119 +59,7 @@ const getLanguageLabel = (language: string): string => {
 
 const DEFAULT_AVATAR = '/default-avatar.png';
 
-// Données de test pour le développement
-const TEST_PROVIDERS: Provider[] = [
-  {
-    id: "test-lawyer-1",
-    name: "Marie Dubois",
-    type: "lawyer",
-    country: "France",
-    nationality: "Française",
-    languages: ["Français", "Anglais", "Espagnol"],
-    specialties: ["Droit international", "Immigration"],
-    rating: 4.8,
-    reviewCount: 127,
-    yearsOfExperience: 8,
-    isOnline: true,
-    avatar: "https://images.unsplash.com/photo-1494790108755-2616b332c108?w=400",
-    description: "Avocate spécialisée en droit international",
-    price: 49,
-    duration: 30,
-    isApproved: true
-  },
-  {
-    id: "test-expat-1",
-    name: "Jean Martin",
-    type: "expat",
-    country: "Canada",
-    nationality: "Française",
-    languages: ["Français", "Anglais"],
-    specialties: ["Immigration", "Logement"],
-    rating: 4.6,
-    reviewCount: 89,
-    yearsOfExperience: 5,
-    isOnline: true,
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
-    description: "Expatrié depuis 5 ans au Canada",
-    price: 19,
-    duration: 25,
-    isApproved: true
-  },
-  {
-    id: "test-lawyer-2",
-    name: "Sophie Chen",
-    type: "lawyer",
-    country: "Allemagne",
-    nationality: "Franco-Chinoise",
-    languages: ["Français", "Allemand", "Chinois"],
-    specialties: ["Droit des affaires", "Immigration"],
-    rating: 4.9,
-    reviewCount: 203,
-    yearsOfExperience: 12,
-    isOnline: false,
-    avatar: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400",
-    description: "Avocate franco-chinoise en Allemagne",
-    price: 59,
-    duration: 45,
-    isApproved: true
-  },
-  {
-    id: "test-expat-2",
-    name: "Lucas Silva",
-    type: "expat",
-    country: "Espagne",
-    nationality: "Française",
-    languages: ["Français", "Espagnol", "Portugais"],
-    specialties: ["Entrepreneuriat", "Fiscalité"],
-    rating: 4.7,
-    reviewCount: 156,
-    yearsOfExperience: 7,
-    isOnline: true,
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400",
-    description: "Entrepreneur français en Espagne",
-    price: 29,
-    duration: 30,
-    isApproved: true
-  },
-  {
-    id: "test-lawyer-3",
-    name: "Emma Thompson",
-    type: "lawyer",
-    country: "Canada",
-    nationality: "Franco-Britannique",
-    languages: ["Français", "Anglais"],
-    specialties: ["Droit familial", "Immigration"],
-    rating: 4.5,
-    reviewCount: 94,
-    yearsOfExperience: 6,
-    isOnline: true,
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400",
-    description: "Avocate spécialisée en droit familial",
-    price: 45,
-    duration: 35,
-    isApproved: true
-  },
-  {
-    id: "test-expat-3",
-    name: "Ahmed Benali",
-    type: "expat",
-    country: "Portugal",
-    nationality: "Franco-Marocaine",
-    languages: ["Français", "Arabe", "Portugais"],
-    specialties: ["Tech", "Startups"],
-    rating: 4.8,
-    reviewCount: 78,
-    yearsOfExperience: 4,
-    isOnline: false,
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400",
-    description: "Expert tech au Portugal",
-    price: 25,
-    duration: 20,
-    isApproved: true
-  }
-];
-
-// Debug Firebase
+// Debug Firebase (VOTRE FONCTION EXACTE)
 const debugFirebaseConnection = async (): Promise<{ success: boolean; totalDocs: number; error?: string }> => {
   console.log('🔍 === DEBUG FIREBASE CONNECTION ===');
   
@@ -202,7 +90,12 @@ interface ProfileCarouselProps {
   pageSize?: number;
 }
 
-// Composant ProfileCarousel - LOGIQUE SEULEMENT
+// === CONFIGURATION OPTIMISÉE ===
+const MAX_VISIBLE = 20;
+const ROTATE_INTERVAL_MS = 30000;
+const ROTATE_COUNT = 8;
+
+// Composant ProfileCarousel - VOTRE LOGIQUE MÉTIER EXACTE SANS TEST_PROVIDERS
 const ProfileCarousel: React.FC<ProfileCarouselProps> = ({ 
   className = "",
   showStats = false,
@@ -212,14 +105,19 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [onlineProviders, setOnlineProviders] = useState<Provider[]>([]);
+  const [visibleProviders, setVisibleProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rotationIndex, setRotationIndex] = useState(0);
+
+  const rotationTimer = useRef<NodeJS.Timeout | null>(null);
+  const recentlyShown = useRef<Set<string>>(new Set());
 
   const isUserConnected = useMemo(() => {
     return !authLoading && !!user;
   }, [authLoading, user]);
 
-  // Navigation avec URL SEO
+  // Navigation avec URL SEO (VOTRE LOGIQUE EXACTE)
   const handleProfileClick = useCallback((provider: Provider) => {
     console.log('🔗 Navigation vers le profil de:', provider.name);
     
@@ -251,7 +149,45 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     });
   }, [navigate]);
 
-  // Chargement des providers avec Firebase
+  // Algorithme de sélection intelligente pour la rotation
+  const selectVisibleProviders = useCallback((allProviders: Provider[]): Provider[] => {
+    if (allProviders.length === 0) return [];
+
+    // Séparer en ligne et hors ligne
+    const online = allProviders.filter(p => p.isOnline);
+    const offline = allProviders.filter(p => !p.isOnline);
+
+    // Mélanger chaque groupe
+    const shuffledOnline = online.sort(() => Math.random() - 0.5);
+    const shuffledOffline = offline.sort(() => Math.random() - 0.5);
+
+    // Prioriser les profils en ligne, puis compléter avec offline
+    const prioritized = [...shuffledOnline, ...shuffledOffline];
+
+    // Éviter les profils récemment affichés si possible
+    const notRecent = prioritized.filter(p => !recentlyShown.current.has(p.id));
+    
+    let selected = notRecent.slice(0, MAX_VISIBLE);
+    
+    // Si pas assez, compléter avec tous les profils
+    if (selected.length < MAX_VISIBLE) {
+      const remaining = prioritized.filter(p => !selected.includes(p));
+      selected = [...selected, ...remaining].slice(0, MAX_VISIBLE);
+    }
+
+    // Mémoriser les profils affichés
+    selected.forEach(p => recentlyShown.current.add(p.id));
+    
+    // Nettoyer le cache de récence s'il devient trop grand
+    if (recentlyShown.current.size > 40) {
+      const oldEntries = Array.from(recentlyShown.current).slice(0, 20);
+      oldEntries.forEach(id => recentlyShown.current.delete(id));
+    }
+
+    return selected;
+  }, []);
+
+  // Chargement des providers avec Firebase (VOTRE LOGIQUE MÉTIER EXACTE)
   const loadInitialProviders = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -259,21 +195,22 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
       console.log('🚀 === DÉBUT CHARGEMENT PROVIDERS ===');
 
-      // Debug Firebase
+      // Debug Firebase (VOTRE FONCTION EXACTE)
       const debugResult = await debugFirebaseConnection();
       
       if (!debugResult.success) {
         throw new Error(debugResult.error || 'Échec de connexion Firebase');
       }
 
-      // Si pas de documents, utiliser les données test
+      // Si pas de documents, ne rien afficher (PAS DE TEST_PROVIDERS)
       if (debugResult.totalDocs === 0) {
-        console.log('📋 Aucun document Firebase, utilisation des données test');
-        setOnlineProviders(TEST_PROVIDERS.slice(0, pageSize));
+        console.log('📋 Aucun document Firebase trouvé');
+        setOnlineProviders([]);
+        setVisibleProviders([]);
         return;
       }
 
-      // Charger depuis Firebase
+      // Charger depuis Firebase (VOTRE LOGIQUE EXACTE)
       const sosProfilesQuery = query(
         collection(db, 'sos_profiles'),
         where('isVisible', '==', true),
@@ -285,12 +222,13 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       console.log('📊 Documents avec filtres:', snapshot.size);
       
       if (snapshot.empty) {
-        console.log('⚠️ Aucun document avec filtres, utilisation données test');
-        setOnlineProviders(TEST_PROVIDERS.slice(0, pageSize));
+        console.log('⚠️ Aucun document avec filtres');
+        setOnlineProviders([]);
+        setVisibleProviders([]);
         return;
       }
 
-      // Transformer les données
+      // Transformer les données (VOTRE LOGIQUE EXACTE)
       const transformedProviders: Provider[] = [];
       
       for (const doc of snapshot.docs) {
@@ -303,7 +241,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
           if (!country) continue;
 
-          // Gérer l'avatar
+          // Gérer l'avatar (VOTRE LOGIQUE EXACTE)
           let avatar = data.profilePhoto || data.photoURL || data.avatar || '';
           if (avatar && avatar.startsWith('user_uploads/')) {
             try {
@@ -336,7 +274,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             isApproved: data.isApproved === true
           };
 
-          // Validation
+          // Validation (VOTRE LOGIQUE EXACTE)
           const isLawyer = provider.type === 'lawyer';
           const isExpat = provider.type === 'expat';
           const approved = !isLawyer || (isLawyer && provider.isApproved === true);
@@ -350,25 +288,63 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         }
       }
 
-      if (transformedProviders.length === 0) {
-        setOnlineProviders(TEST_PROVIDERS.slice(0, pageSize));
-      } else {
-        setOnlineProviders(transformedProviders.slice(0, pageSize));
-      }
+      console.log('✅ Profils transformés:', transformedProviders.length);
+      setOnlineProviders(transformedProviders.slice(0, pageSize));
+      
+      // Sélection initiale intelligente pour la rotation
+      const initialVisible = selectVisibleProviders(transformedProviders);
+      setVisibleProviders(initialVisible);
 
     } catch (err) {
       console.error('❌ Erreur lors du chargement:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(`Erreur de chargement: ${errorMessage}`);
       
-      // Fallback avec données test
-      setOnlineProviders(TEST_PROVIDERS.slice(0, pageSize));
+      // Pas de fallback - afficher l'erreur uniquement
+      setOnlineProviders([]);
+      setVisibleProviders([]);
     } finally {
       setIsLoading(false);
     }
-  }, [pageSize]);
+  }, [pageSize, selectVisibleProviders]);
 
-  // Mise à jour du statut en ligne en temps réel
+  // Rotation intelligente des profils visibles
+  const rotateVisibleProviders = useCallback(() => {
+    if (onlineProviders.length === 0) return;
+
+    console.log('🔄 Rotation des profils...');
+    
+    // Garder une partie des profils actuels, remplacer le reste
+    const keepCount = Math.max(0, MAX_VISIBLE - ROTATE_COUNT);
+    const toKeep = visibleProviders.slice(0, keepCount);
+    
+    // Sélectionner de nouveaux profils du pool
+    const availableForRotation = onlineProviders.filter(p => 
+      !toKeep.find(kept => kept.id === p.id) && 
+      !recentlyShown.current.has(p.id)
+    );
+    
+    // Si pas assez de nouveaux profils, relâcher la contrainte de récence
+    let newProviders = availableForRotation.slice(0, ROTATE_COUNT);
+    if (newProviders.length < ROTATE_COUNT) {
+      const fallback = onlineProviders.filter(p => !toKeep.find(kept => kept.id === p.id));
+      newProviders = [...newProviders, ...fallback].slice(0, ROTATE_COUNT);
+    }
+    
+    // Mélanger les nouveaux profils
+    const shuffledNew = newProviders.sort(() => Math.random() - 0.5);
+    
+    // Combiner et mélanger le résultat final
+    const rotated = [...toKeep, ...shuffledNew].sort(() => Math.random() - 0.5);
+    
+    setVisibleProviders(rotated.slice(0, MAX_VISIBLE));
+    setRotationIndex(prev => prev + 1);
+    
+    // Mémoriser les nouveaux profils affichés
+    shuffledNew.forEach(p => recentlyShown.current.add(p.id));
+  }, [onlineProviders, visibleProviders]);
+
+  // Mise à jour du statut en ligne en temps réel (VOTRE LOGIQUE EXACTE)
   const updateProviderOnlineStatus = useCallback((providerId: string, isOnline: boolean) => {
     setOnlineProviders(prevProviders => 
       prevProviders.map(provider => 
@@ -377,17 +353,25 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           : provider
       )
     );
+
+    setVisibleProviders(prevVisible => 
+      prevVisible.map(provider => 
+        provider.id === providerId 
+          ? { ...provider, isOnline }
+          : provider
+      )
+    );
   }, []);
 
-  // Configuration de l'écoute en temps réel
+  // Configuration de l'écoute en temps réel (VOTRE LOGIQUE EXACTE)
   const setupRealtimeListeners = useCallback(() => {
-    if (!isUserConnected || onlineProviders.length === 0) {
+    if (!isUserConnected || visibleProviders.length === 0) {
       return () => {};
     }
 
     const unsubscribeFunctions: (() => void)[] = [];
 
-    onlineProviders.forEach(provider => {
+    visibleProviders.forEach(provider => {
       const providerRef = collection(db, 'sos_profiles');
       const providerQuery = query(providerRef, where('__name__', '==', provider.id));
       
@@ -416,7 +400,26 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return () => {
       unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
     };
-  }, [onlineProviders, updateProviderOnlineStatus, isUserConnected]);
+  }, [visibleProviders, updateProviderOnlineStatus, isUserConnected]);
+
+  // Timer de rotation
+  useEffect(() => {
+    if (rotationTimer.current) {
+      clearInterval(rotationTimer.current);
+    }
+
+    if (visibleProviders.length > 0 && onlineProviders.length > MAX_VISIBLE) {
+      rotationTimer.current = setInterval(() => {
+        rotateVisibleProviders();
+      }, ROTATE_INTERVAL_MS);
+    }
+
+    return () => {
+      if (rotationTimer.current) {
+        clearInterval(rotationTimer.current);
+      }
+    };
+  }, [rotateVisibleProviders, visibleProviders.length, onlineProviders.length]);
 
   // Effects
   useEffect(() => {
@@ -424,12 +427,12 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
   }, [loadInitialProviders]);
 
   useEffect(() => {
-    if (onlineProviders.length === 0) return;
+    if (visibleProviders.length === 0) return;
     const cleanup = setupRealtimeListeners();
     return cleanup;
-  }, [setupRealtimeListeners, onlineProviders.length]);
+  }, [setupRealtimeListeners, visibleProviders.length]);
 
-  // Stats calculées (exposées si showStats est true)
+  // Stats calculées (VOTRE LOGIQUE EXACTE)
   const stats = useMemo(() => ({
     total: onlineProviders.length,
     online: onlineProviders.filter(p => p.isOnline).length,
@@ -437,16 +440,16 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     experts: onlineProviders.filter(p => p.type === 'expat').length
   }), [onlineProviders]);
 
-  // Si loading, on retourne un indicateur simple
+  // Gestion des états (VOTRE LOGIQUE EXACTE)
   if (isLoading) {
     return (
       <div className={`flex justify-center items-center py-8 ${className}`}>
         <div className="w-8 h-8 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
+        <span className="ml-3 text-gray-600">Chargement des experts...</span>
       </div>
     );
   }
 
-  // Si erreur, on retourne un message simple
   if (error) {
     return (
       <div className={`text-center py-8 ${className}`}>
@@ -461,27 +464,40 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     );
   }
 
-  // Si pas de données
-  if (onlineProviders.length === 0) {
+  // Utiliser visibleProviders au lieu d'onlineProviders pour l'affichage
+  const displayProviders = visibleProviders.length > 0 ? visibleProviders : onlineProviders;
+
+  if (displayProviders.length === 0) {
     return (
       <div className={`text-center py-8 ${className}`}>
-        <p className="text-gray-600 mb-4">Aucun expert disponible</p>
-        <button 
-          onClick={() => setOnlineProviders(TEST_PROVIDERS.slice(0, pageSize))}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-        >
-          Charger données test
-        </button>
+        <div className="max-w-md mx-auto">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+            Aucun expert disponible
+          </h3>
+          <p className="text-gray-600 text-sm mb-4">
+            Aucun profil n'a été trouvé dans la base de données Firebase.
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+            <h4 className="font-semibold text-blue-800 mb-2">Vérifications :</h4>
+            <ul className="text-blue-700 text-sm space-y-1">
+              <li>• Firebase est-il correctement configuré ?</li>
+              <li>• Y a-t-il des profils dans 'sos_profiles' ?</li>
+              <li>• Les profils ont-ils isVisible: true ?</li>
+              <li>• Les types sont-ils 'lawyer' ou 'expat' ?</li>
+            </ul>
+          </div>
+        </div>
       </div>
     );
   }
 
   // Pour le scroll infini, on duplique les providers
-  const displayProviders = [...onlineProviders, ...onlineProviders, ...onlineProviders];
+  const infiniteProviders = [...displayProviders, ...displayProviders, ...displayProviders];
 
   return (
     <div className={className}>
-      {/* Stats optionnelles */}
+      {/* Stats optionnelles (VOTRE DESIGN EXACT) */}
       {showStats && (
         <div className="mb-8 flex justify-center gap-6">
           <div className="text-center">
@@ -499,10 +515,19 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         </div>
       )}
 
-      {/* Mobile: Scroll horizontal */}
+      {/* Indicateur de rotation si active */}
+      {onlineProviders.length > MAX_VISIBLE && (
+        <div className="flex justify-center mb-4">
+          <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+            Rotation automatique • {displayProviders.filter(p => p.isOnline).length}/{displayProviders.length} en ligne
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: Scroll horizontal (VOTRE DESIGN EXACT) */}
       <div className="flex gap-6 overflow-x-auto pb-6 snap-x snap-mandatory scrollbar-hide md:hidden">
-        {onlineProviders.map((provider, index) => (
-          <div key={provider.id} className="flex-shrink-0 snap-start">
+        {displayProviders.map((provider, index) => (
+          <div key={`${provider.id}-${rotationIndex}`} className="flex-shrink-0 snap-start">
             <ModernProfileCard
               provider={provider}
               onProfileClick={handleProfileClick}
@@ -514,22 +539,22 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         ))}
       </div>
 
-      {/* Desktop: Animation infinie */}
+      {/* Desktop: Animation infinie (VOTRE DESIGN EXACT) */}
       <div className="hidden md:flex gap-8 animate-infinite-scroll">
-        {displayProviders.map((provider, index) => (
-          <div key={`${provider.id}-${index}`} className="flex-shrink-0">
+        {infiniteProviders.map((provider, index) => (
+          <div key={`${provider.id}-${index}-${rotationIndex}`} className="flex-shrink-0">
             <ModernProfileCard
               provider={provider}
               onProfileClick={handleProfileClick}
               getLanguageLabel={getLanguageLabel}
               isUserConnected={isUserConnected}
-              index={index % onlineProviders.length}
+              index={index % displayProviders.length}
             />
           </div>
         ))}
       </div>
 
-      {/* Styles pour l'animation */}
+      {/* Styles pour l'animation (VOTRE CSS EXACT) */}
       <style>{`
         @keyframes infinite-scroll {
           0% { transform: translateX(0); }

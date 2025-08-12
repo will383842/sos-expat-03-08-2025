@@ -10,8 +10,50 @@ import AvailabilityToggleButton from '../dashboard/AvailabilityToggle';
 // Types globaux pour Analytics
 declare global {
   interface Window {
-    gtag?: (...args: unknown[]) => void;
+    gtag?: (...args: any[]) => void;
   }
+}
+
+// Interfaces TypeScript
+interface User {
+  uid?: string;
+  id?: string;
+  email?: string;
+  firstName?: string;
+  displayName?: string;
+  profilePhoto?: string;
+  photoURL?: string;
+  role?: string;
+  type?: string;
+  isOnline?: boolean;
+}
+
+interface Language {
+  code: 'fr' | 'en';
+  name: string;
+  nativeName: string;
+  flag: React.ReactNode;
+}
+
+interface NavigationItem {
+  path: string;
+  labelKey: string;
+  icon: string;
+  color: string;
+  bgColor: string;
+}
+
+interface UserAvatarProps {
+  user: User | null;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+interface LanguageDropdownProps {
+  isMobile?: boolean;
+}
+
+interface UserMenuProps {
+  isMobile?: boolean;
 }
 
 // Composants de drapeaux optimisés 2025
@@ -47,33 +89,33 @@ const BritishFlag = memo(() => (
 ));
 
 // Configuration des langues
-const SUPPORTED_LANGUAGES = [
+const SUPPORTED_LANGUAGES: Language[] = [
   { code: 'fr', name: 'Français', nativeName: 'Français', flag: <FrenchFlag /> },
   { code: 'en', name: 'English', nativeName: 'English', flag: <BritishFlag /> }
 ];
 
 // Navigation items selon votre structure existante
-const LEFT_NAVIGATION_ITEMS = [
+const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
   { path: '/', labelKey: 'nav.home', icon: '🏠', color: 'text-blue-600', bgColor: 'bg-blue-50 hover:bg-blue-100' },
   { path: '/sos-appel', labelKey: 'nav.viewProfiles', icon: '👥', color: 'text-purple-600', bgColor: 'bg-purple-50 hover:bg-purple-100' },
   { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💬', color: 'text-green-600', bgColor: 'bg-green-50 hover:bg-green-100' },
 ];
 
-const RIGHT_NAVIGATION_ITEMS = [
+const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
   { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '⚡', color: 'text-orange-600', bgColor: 'bg-orange-50 hover:bg-orange-100' },
   { path: '/pricing', labelKey: 'nav.pricing', icon: '💎', color: 'text-pink-600', bgColor: 'bg-pink-50 hover:bg-pink-100' },
 ];
 
-const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
+const ALL_NAVIGATION_ITEMS: NavigationItem[] = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
 
 // Hook scroll optimisé
-const useScrolled = () => {
-  const [scrolled, setScrolled] = useState(false);
+const useScrolled = (): boolean => {
+  const [scrolled, setScrolled] = useState<boolean>(false);
 
   useEffect(() => {
     let ticking = false;
     
-    const handleScroll = () => {
+    const handleScroll = (): void => {
       if (!ticking) {
         requestAnimationFrame(() => {
           setScrolled(window.scrollY > 20);
@@ -91,87 +133,6 @@ const useScrolled = () => {
 };
 
 // PWA Install Button moderne
-const PWAInstallButton = memo(() => {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallButton, setShowInstallButton] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
-  const { language } = useApp();
-  
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallButton(true);
-      
-      if (window.gtag) {
-        window.gtag('event', 'pwa_install_prompt_shown', {
-          event_category: 'engagement',
-        });
-      }
-    };
-    
-    window.addEventListener('beforeinstallprompt', handler);
-    
-    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
-      setShowInstallButton(false);
-    }
-    
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-  
-  const handleInstallClick = async () => {
-    if (!deferredPrompt || isInstalling) return;
-    
-    setIsInstalling(true);
-    
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      if (window.gtag) {
-        window.gtag('event', 'pwa_install_result', {
-          event_category: 'engagement',
-          event_label: outcome,
-        });
-      }
-      
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setShowInstallButton(false);
-      }
-    } catch (error) {
-      console.error('PWA install error:', error);
-    } finally {
-      setIsInstalling(false);
-    }
-  };
-  
-  if (!showInstallButton) return null;
-  
-  const t = {
-    install: language === 'fr' ? 'App' : 'App'
-  };
-  
-  return (
-    <button
-      onClick={handleInstallClick}
-      disabled={isInstalling}
-      className="group relative overflow-hidden bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-4 py-2 rounded-2xl font-bold text-sm transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl active:scale-95 disabled:opacity-75 disabled:cursor-not-allowed touch-manipulation"
-    >
-      <div className="relative z-10 flex items-center space-x-2">
-        {isInstalling ? (
-          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        ) : (
-          <Download className="w-4 h-4 group-hover:animate-bounce" />
-        )}
-        <span>{isInstalling ? '...' : t.install}</span>
-        <Sparkles className="w-3 h-3 group-hover:animate-pulse" />
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-    </button>
-  );
-});
-
 // Header Availability Toggle utilisant votre composant existant
 const HeaderAvailabilityToggle = memo(() => {
   const { user } = useAuth();
@@ -189,14 +150,14 @@ const HeaderAvailabilityToggle = memo(() => {
 });
 
 // User Avatar selon votre style
-const UserAvatar = memo(({ user, size = 'md' }) => {
-  const [imageError, setImageError] = useState(false);
+const UserAvatar = memo<UserAvatarProps>(({ user, size = 'md' }) => {
+  const [imageError, setImageError] = useState<boolean>(false);
   const sizeClasses = size === 'sm' ? 'w-8 h-8' : size === 'lg' ? 'w-12 h-12' : 'w-10 h-10';
 
   const photoUrl = user?.profilePhoto || user?.photoURL;
   const displayName = user?.firstName || user?.displayName || user?.email || 'User';
 
-  const handleImageError = useCallback(() => {
+  const handleImageError = useCallback((): void => {
     setImageError(true);
   }, []);
 
@@ -227,16 +188,16 @@ const UserAvatar = memo(({ user, size = 'md' }) => {
 });
 
 // Language Dropdown selon votre structure
-const LanguageDropdown = memo(({ isMobile = false }) => {
+const LanguageDropdown = memo<LanguageDropdownProps>(({ isMobile = false }) => {
   const { language, setLanguage } = useApp();
-  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
-  const languageMenuRef = useRef(null);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState<boolean>(false);
+  const languageMenuRef = useRef<HTMLDivElement>(null);
 
   const currentLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === language) || SUPPORTED_LANGUAGES[0];
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
         setIsLanguageMenuOpen(false);
       }
     };
@@ -245,7 +206,7 @@ const LanguageDropdown = memo(({ isMobile = false }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLanguageChange = useCallback((langCode) => {
+  const handleLanguageChange = useCallback((langCode: 'fr' | 'en'): void => {
     setLanguage(langCode);
     setIsLanguageMenuOpen(false);
     
@@ -274,6 +235,8 @@ const LanguageDropdown = memo(({ isMobile = false }) => {
                   ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white shadow-xl scale-105' 
                   : 'bg-white/20 backdrop-blur-xl text-white hover:bg-white/30 border border-white/20'
               }`}
+              aria-label={`Changer la langue vers ${lang.nativeName}`}
+              aria-pressed={language === lang.code}
             >
               <div className="relative z-10 flex items-center justify-center">
                 <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
@@ -293,6 +256,9 @@ const LanguageDropdown = memo(({ isMobile = false }) => {
       <button
         onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
         className="group flex items-center space-x-2 text-white text-sm font-medium hover:text-yellow-200 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-3 min-h-[44px] min-w-[44px] justify-center touch-manipulation"
+        aria-expanded={isLanguageMenuOpen}
+        aria-haspopup="true"
+        aria-label="Sélectionner la langue"
       >
         <div className="group-hover:scale-110 transition-transform duration-300">
           {currentLanguage.flag}
@@ -309,13 +275,14 @@ const LanguageDropdown = memo(({ isMobile = false }) => {
               className={`group flex items-center w-full px-4 py-3 text-sm text-left hover:bg-gray-50 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-gray-50 ${
                 language === lang.code ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-700'
               }`}
+              aria-pressed={language === lang.code}
             >
               <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
                 {lang.flag}
               </div>
               <span>{lang.nativeName}</span>
               {language === lang.code && (
-                <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-label="Langue actuelle" />
               )}
             </button>
           ))}
@@ -326,16 +293,16 @@ const LanguageDropdown = memo(({ isMobile = false }) => {
 });
 
 // User Menu selon votre structure
-const UserMenu = memo(({ isMobile = false }) => {
+const UserMenu = memo<UserMenuProps>(({ isMobile = false }) => {
   const { user, logout } = useAuth();
   const { language } = useApp();
   const navigate = useNavigate();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const userMenuRef = useRef(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
     };
@@ -344,7 +311,7 @@ const UserMenu = memo(({ isMobile = false }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = useCallback(async () => {
+  const handleLogout = useCallback(async (): Promise<void> => {
     try {
       await logout();
       setIsUserMenuOpen(false);
@@ -377,6 +344,7 @@ const UserMenu = memo(({ isMobile = false }) => {
             ? "group flex items-center justify-center w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl active:scale-95 touch-manipulation"
             : "group relative p-3 rounded-2xl hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
           }
+          aria-label={t.login}
         >
           {isMobile ? (
             <>
@@ -393,6 +361,7 @@ const UserMenu = memo(({ isMobile = false }) => {
             ? "group flex items-center justify-center w-full bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl active:scale-95 touch-manipulation"
             : "group relative p-3 rounded-2xl bg-white hover:bg-gray-50 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
           }
+          aria-label={t.signup}
         >
           {isMobile ? (
             <>
@@ -433,6 +402,7 @@ const UserMenu = memo(({ isMobile = false }) => {
             <Link 
               to="/admin/dashboard" 
               className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50"
+              aria-label={t.adminConsole}
             >
               <Shield className="w-5 h-5 mr-3" />
               <span className="font-medium">{t.adminConsole}</span>
@@ -441,6 +411,7 @@ const UserMenu = memo(({ isMobile = false }) => {
           <Link 
             to="/dashboard" 
             className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-4 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
+            aria-label={t.dashboard}
           >
             <Settings className="w-5 h-5 mr-3" />
             <span className="font-medium">{t.dashboard}</span>
@@ -448,6 +419,7 @@ const UserMenu = memo(({ isMobile = false }) => {
           <button 
             onClick={handleLogout} 
             className="flex items-center w-full bg-red-500/80 text-white px-4 py-4 rounded-xl hover:bg-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 min-h-[48px] touch-manipulation"
+            aria-label={t.logout}
           >
             <LogOut className="w-5 h-5 mr-3" />
             <span className="font-medium">{t.logout}</span>
@@ -462,6 +434,9 @@ const UserMenu = memo(({ isMobile = false }) => {
       <button 
         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
         className="group flex items-center space-x-3 text-white transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 min-h-[44px] touch-manipulation"
+        aria-expanded={isUserMenuOpen}
+        aria-haspopup="true"
+        aria-label="Menu utilisateur"
       >
         <UserAvatar user={user} />
         <span className="text-sm font-medium hidden md:inline">{user.firstName || user.displayName || 'User'}</span>
@@ -516,7 +491,7 @@ const UserMenu = memo(({ isMobile = false }) => {
 
 // Notification Badge
 const NotificationBadge = memo(() => {
-  const [notifications] = useState(3);
+  const [notifications] = useState<number>(3);
   
   return (
     <button className="relative p-3 rounded-2xl hover:bg-white/10 transition-all duration-300 group hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 touch-manipulation">
@@ -531,21 +506,21 @@ const NotificationBadge = memo(() => {
 });
 
 // Composant principal Header
-const Header = () => {
+const Header: React.FC = () => {
   const location = useLocation();
   const { isLoading } = useAuth();
   const { language } = useApp();
   const scrolled = useScrolled();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
-  const isActive = useCallback((path) => location.pathname === path, [location.pathname]);
+  const isActive = useCallback((path: string): boolean => location.pathname === path, [location.pathname]);
 
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
 
-  const getNavigationLabel = useCallback((labelKey) => {
-    const translations = {
+  const getNavigationLabel = useCallback((labelKey: string): string => {
+    const translations: Record<string, Record<string, string>> = {
       'nav.home': { fr: 'Accueil', en: 'Home' },
       'nav.viewProfiles': { fr: 'Voir les profils aidants', en: 'View helper profiles' },
       'nav.testimonials': { fr: 'Les avis', en: 'Reviews' },
@@ -581,6 +556,7 @@ const Header = () => {
                 <Link 
                   to="/" 
                   className="group flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
+                  aria-label="SOS Expats - Accueil"
                 >
                   <div className="transform group-hover:scale-105 transition-all duration-300">
                     <h1 className={`font-bold text-xl ${scrolled ? 'text-white' : 'text-gray-900'} m-0`}>SOS Expats</h1>
@@ -604,6 +580,7 @@ const Header = () => {
                           ? (scrolled ? 'text-white' : item.color)
                           : (scrolled ? 'text-white/90 hover:text-white' : 'text-gray-600 hover:text-gray-900')
                       }`}
+                      aria-current={isActive(item.path) ? 'page' : undefined}
                     >
                       <span 
                         className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
@@ -625,6 +602,7 @@ const Header = () => {
                   <Link 
                     to="/sos-appel" 
                     className="group relative overflow-hidden bg-gradient-to-r from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-110 hover:shadow-2xl flex items-center space-x-3 focus:outline-none focus:ring-2 focus:ring-white/50 whitespace-nowrap shadow-xl"
+                    aria-label={t.sosCall}
                   >
                     <div className="relative z-10 flex items-center space-x-3">
                       <Phone className="w-6 h-6 group-hover:animate-pulse transition-transform duration-300" />
@@ -646,6 +624,7 @@ const Header = () => {
                           ? (scrolled ? 'text-white' : item.color)
                           : (scrolled ? 'text-white/90 hover:text-white' : 'text-gray-600 hover:text-gray-900')
                       }`}
+                      aria-current={isActive(item.path) ? 'page' : undefined}
                     >
                       <span 
                         className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
@@ -665,9 +644,7 @@ const Header = () => {
 
               {/* Actions Desktop */}
               <div className="flex-shrink-0 flex items-center space-x-4">
-                <HeaderAvailabilityToggle />
-                <PWAInstallButton />
-                <NotificationBadge />
+                <HeaderAvailabilityToggle /> <NotificationBadge />
                 <LanguageDropdown />
 
                 {isLoading ? (
@@ -690,6 +667,7 @@ const Header = () => {
             <Link 
               to="/" 
               className="flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1"
+              aria-label="SOS Expats - Accueil"
             >
               <div className="flex flex-col">
                 <h1 className={`font-bold text-lg ${scrolled ? 'text-white' : 'text-gray-900'} m-0`}>SOS Expats</h1>
@@ -701,18 +679,19 @@ const Header = () => {
               <Link 
                 to="/sos-appel" 
                 className="group bg-gradient-to-r from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 hover:scale-105 text-sm flex items-center space-x-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50"
+                aria-label={t.sosCall}
               >
                 <Phone className="w-4 h-4 group-hover:animate-pulse transition-transform duration-300" />
                 <span>SOS</span>
               </Link>
-              <HeaderAvailabilityToggle />
-              <PWAInstallButton />
-              <NotificationBadge />
+              <HeaderAvailabilityToggle /> <NotificationBadge />
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)} 
                 className={`p-3 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation ${
                   scrolled ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'
                 }`}
+                aria-expanded={isMenuOpen}
+                aria-label="Menu de navigation"
               >
                 {isMenuOpen ? 
                   <X className="w-6 h-6" aria-hidden="true" /> : 
@@ -724,7 +703,7 @@ const Header = () => {
 
           {/* Menu Mobile */}
           {isMenuOpen && (
-            <div className={`px-6 py-6 shadow-lg border-t ${scrolled ? 'bg-red-700 border-red-500' : 'bg-white border-gray-100'}`} role="navigation">
+            <div className={`px-6 py-6 shadow-lg border-t ${scrolled ? 'bg-red-700 border-red-500' : 'bg-white border-gray-100'}`} role="navigation" aria-label="Navigation mobile">
               <nav className="flex flex-col space-y-4">
                 {ALL_NAVIGATION_ITEMS.map((item) => (
                   <Link 
@@ -736,6 +715,7 @@ const Header = () => {
                         : (scrolled ? 'text-white/90 hover:text-white hover:bg-white/10' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50')
                     }`} 
                     onClick={() => setIsMenuOpen(false)}
+                    aria-current={isActive(item.path) ? 'page' : undefined}
                   >
                     <span className="mr-3 text-xl" role="img" aria-hidden="true">{item.icon}</span>
                     {getNavigationLabel(item.labelKey)}
@@ -845,9 +825,7 @@ const Header = () => {
             
             // PWA Install Prompt Enhancement
             let deferredPrompt;
-            window.addEventListener('beforeinstallprompt', (e) => {
-              e.preventDefault();
-              deferredPrompt = e;
+            deferredPrompt = e;
             });
             
             // Performance monitoring
@@ -884,7 +862,7 @@ UserAvatar.displayName = 'UserAvatar';
 LanguageDropdown.displayName = 'LanguageDropdown';
 UserMenu.displayName = 'UserMenu';
 HeaderAvailabilityToggle.displayName = 'HeaderAvailabilityToggle';
-PWAInstallButton.displayName = 'PWAInstallButton';
+
 NotificationBadge.displayName = 'NotificationBadge';
 
 export default memo(Header);

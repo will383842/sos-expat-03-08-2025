@@ -512,4 +512,3 @@ ModernProfileCard.displayName = 'ModernProfileCard';
 
 export default ModernProfileCard;
 export type { Provider, ModernProfileCardProps };
-

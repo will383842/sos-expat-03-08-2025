@@ -172,9 +172,9 @@ const toStringFromAny = (val: any, preferred?: string): string | undefined =>
 const summarizeVal = (v: any) => {
   if (v == null) return 'null/undefined';
   const t = typeof v;
-  if (t === 'string') return `"${v.slice(0, 60)}"${v.length > 60 ? '…' : ''}`;
+  if (t === 'string') return `"${v.slice(0, 60)}"${v.length > 60 ? ' ' : ''}`;
   if (Array.isArray(v)) return `[${v.length} items]`;
-  if (t === 'object') return `{${Object.keys(v).slice(0, 5).join(',')}${Object.keys(v).length > 5 ? ',…' : ''}}`;
+  if (t === 'object') return `{${Object.keys(v).slice(0, 5).join(',')}${Object.keys(v).length > 5 ? ', ' : ''}}`;
   return String(v);
 };
 
@@ -206,7 +206,7 @@ const ProviderProfile: React.FC = () => {
   );
   const [showImageModal, setShowImageModal] = useState(false);
 
-  // Online status (listener focalisé)
+  // Online status (listener focalis )
   const [onlineStatus, setOnlineStatus] = useState<{
     isOnline: boolean;
     lastUpdate: Date | null;
@@ -418,7 +418,7 @@ const ProviderProfile: React.FC = () => {
               lastName: navData.lastName || '',
               type: navData.type === 'lawyer' ? 'lawyer' : 'expat',
               country: navData.country || '',
-              languages: navData.languages || ['Français'],
+              languages: navData.languages || ['Fran ais'],
               specialties: toArrayFromAny(navData.specialties, preferredLangKey),
               helpTypes: toArrayFromAny(navData.helpTypes, preferredLangKey),
               description: navData.description || navData.bio || '',
@@ -538,7 +538,7 @@ const ProviderProfile: React.FC = () => {
         window.history.replaceState(null, '', seoUrl);
       }
 
-      document.title = `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatrié','Expat')} ${t(lang,'en','in')} ${provider.country} | SOS Expat & Travelers`;
+      document.title = `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country} | SOS Expat & Travelers`;
 
       const updateOrCreateMeta = (property: string, content: string) => {
         let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
@@ -553,7 +553,7 @@ const ProviderProfile: React.FC = () => {
       const ogDesc = pickDescription(provider, preferredLangKey).slice(0, 160);
       const ogImage = provider.profilePhoto || provider.photoURL || provider.avatar || '/default-avatar.png';
 
-      updateOrCreateMeta('og:title', `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatrié','Expat')} ${t(lang,'en','in')} ${provider.country}`);
+      updateOrCreateMeta('og:title', `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country}`);
       updateOrCreateMeta('og:description', ogDesc);
       updateOrCreateMeta('og:image', ogImage);
       updateOrCreateMeta('og:url', window.location.href);
@@ -623,7 +623,7 @@ const ProviderProfile: React.FC = () => {
       const nameSlug = provider.slug || safeNormalize(`${provider.firstName}-${provider.lastName}`);
       const seoPath = `/${isLawyer ? 'avocat' : 'expatrie'}/${countrySlug}/${langSlug}/${nameSlug}-${provider.id}`;
       const currentUrl = `${window.location.origin}${seoPath}`;
-      const title = `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatrié','Expat')} ${t(lang,'en','in')} ${provider.country}`;
+      const title = `${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country}`;
 
       switch (platform) {
         case 'facebook':
@@ -643,7 +643,7 @@ const ProviderProfile: React.FC = () => {
           break;
         case 'copy':
           navigator.clipboard.writeText(currentUrl);
-          alert(lang === 'fr' ? 'Lien copié !' : 'Link copied!');
+          alert(lang === 'fr' ? 'Lien copi  !' : 'Link copied!');
           break;
       }
     },
@@ -676,7 +676,7 @@ const ProviderProfile: React.FC = () => {
       if (reason) {
         try {
           await reportReview(reviewId, reason);
-          alert(lang === 'fr' ? 'Merci pour votre signalement. Notre équipe va l’examiner.' : 'Thanks. Our team will review it.');
+          alert(lang === 'fr' ? 'Merci pour votre signalement. Notre  quipe va l examiner.' : 'Thanks. Our team will review it.');
         } catch (e) {
           console.error('Error reporting review:', e);
         }
@@ -701,7 +701,7 @@ const ProviderProfile: React.FC = () => {
   const isLawyer = provider?.type === 'lawyer';
   const isExpat = provider?.type === 'expat';
   const mainPhoto = (provider?.profilePhoto || provider?.photoURL || provider?.avatar || '/default-avatar.png') as string;
-  const languagesList = provider?.languages?.length ? provider.languages : ['Français'];
+  const languagesList = provider?.languages?.length ? provider.languages : ['Fran ais'];
 
   // Derived data
   const descriptionText = useMemo(
@@ -733,12 +733,12 @@ const ProviderProfile: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-{/* Visibilité carte — visible uniquement pour le propriétaire du profil */}
+{/* Visibilit  carte   visible uniquement pour le propri taire du profil */}
 {user && provider && ((user as any).id === provider.uid) && (
   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
     <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-      <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
-      <p className="text-gray-600 text-sm mb-3">Activez/désactivez votre présence sur la carte. (Visible uniquement par vous)</p>
+      <h3 className="text-sm font-semibold mb-2">Visibilit  sur la carte</h3>
+      <p className="text-gray-600 text-sm mb-3">Activez/d sactivez votre pr sence sur la carte. (Visible uniquement par vous)</p>
       
     </div>
   </div>
@@ -789,8 +789,8 @@ const ProviderProfile: React.FC = () => {
       )}
 
       <SEOHead
-        title={`${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatrié','Expat')} ${t(lang,'en','in')} ${provider.country} | SOS Expat & Travelers`}
-        description={`${t(lang,'Consultez','Consult')} ${provider.fullName}, ${isLawyer ? t(lang,'avocat','lawyer') : t(lang,'expatrié','expat')} ${t(lang,'francophone','French-speaking')} ${t(lang,'en','in')} ${provider.country}. ${descriptionText.slice(0, 120)}...`}
+        title={`${provider.fullName} - ${isLawyer ? t(lang,'Avocat','Lawyer') : t(lang,'Expatri ','Expat')} ${t(lang,'en','in')} ${provider.country} | SOS Expat & Travelers`}
+        description={`${t(lang,'Consultez','Consult')} ${provider.fullName}, ${isLawyer ? t(lang,'avocat','lawyer') : t(lang,'expatri ','expat')} ${t(lang,'francophone','French-speaking')} ${t(lang,'en','in')} ${provider.country}. ${descriptionText.slice(0, 120)}...`}
         canonicalUrl={`/${isLawyer ? 'avocat' : 'expatrie'}/${safeNormalize(provider.country)}/${safeNormalize(
           provider.mainLanguage || languagesList[0] || 'francais'
         )}/${safeNormalize(provider.fullName)}-${provider.id}`}
@@ -803,7 +803,7 @@ const ProviderProfile: React.FC = () => {
           image: mainPhoto,
           description: descriptionText,
           address: { '@type': 'PostalAddress', addressCountry: provider.country },
-          jobTitle: isLawyer ? 'Avocat' : 'Expatrié consultant',
+          jobTitle: isLawyer ? 'Avocat' : 'Expatri  consultant',
           worksFor: { '@type': 'Organization', name: 'SOS Expat & Travelers' },
           knowsLanguage: languagesList,
           review: {
@@ -870,11 +870,11 @@ const ProviderProfile: React.FC = () => {
                           isLawyer ? 'bg-blue-500/20 text-blue-100' : 'bg-green-500/20 text-green-100'
                         }`}
                       >
-                        {isLawyer ? t(lang, 'Avocat certifié', 'Certified lawyer') : t(lang, 'Expatrié expert', 'Expert expat')}
+                        {isLawyer ? t(lang, 'Avocat certifi ', 'Certified lawyer') : t(lang, 'Expatri  expert', 'Expert expat')}
                       </span>
                       {provider.isVerified && (
                         <span className="bg-green-500 text-white text-[10px] sm:text-xs px-2 py-1 rounded-full">
-                          ? {t(lang, 'Vérifié', 'Verified')}
+                          ? {t(lang, 'V rifi ', 'Verified')}
                         </span>
                       )}
                       <span
@@ -897,7 +897,7 @@ const ProviderProfile: React.FC = () => {
                         {isLawyer ? <Briefcase size={16} /> : <Users size={16} />}
                         <span>
                           {isLawyer
-                            ? `${provider.yearsOfExperience || 0} ${t(lang, "ans d'expérience", 'years experience')}`
+                            ? `${provider.yearsOfExperience || 0} ${t(lang, "ans d'exp rience", 'years experience')}`
                             : `${provider.yearsAsExpat || provider.yearsOfExperience || 0} ${t(lang, "ans d'expatriation", 'years as expat')}`}
                         </span>
                       </div>
@@ -957,22 +957,22 @@ const ProviderProfile: React.FC = () => {
                 <div className="bg-white rounded-xl shadow-xl p-6">
                   <div className="text-center mb-6">
                     <div className="text-2xl sm:text-3xl font-bold text-red-600 mb-2">
-                      {typeof provider.price === 'number' ? `€${provider.price}` : '—'}
+                      {typeof provider.price === 'number' ? ` ${provider.price}` : ' '}
                     </div>
                     <div className="text-gray-600">
-                      {provider.duration ? `${provider.duration} ${t(lang, 'minutes', 'minutes')}` : '—'}
+                      {provider.duration ? `${provider.duration} ${t(lang, 'minutes', 'minutes')}` : ' '}
                     </div>
                   </div>
 
                   <div className="space-y-4 mb-6">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t(lang, 'Taux de succès', 'Success rate')}</span>
+                      <span className="text-gray-600">{t(lang, 'Taux de succ s', 'Success rate')}</span>
                       <span className="font-medium text-gray-900">
-                        {typeof provider.successRate === 'number' ? `${provider.successRate}%` : '—'}
+                        {typeof provider.successRate === 'number' ? `${provider.successRate}%` : ' '}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm bg-gray-50 p-3 rounded-lg">
-                      <span className="text-gray-600 font-medium">{t(lang, 'Disponibilité', 'Availability')}</span>
+                      <span className="text-gray-600 font-medium">{t(lang, 'Disponibilit ', 'Availability')}</span>
                       <span
                         className={`font-bold text-sm px-3 py-1 rounded-full transition-all duration-500 ${
                           onlineStatus.isOnline
@@ -984,8 +984,8 @@ const ProviderProfile: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t(lang, 'Appels réalisés', 'Completed calls')}</span>
-                      <span className="font-medium">{typeof provider.totalCalls === 'number' ? provider.totalCalls : '—'}</span>
+                      <span className="text-gray-600">{t(lang, 'Appels r alis s', 'Completed calls')}</span>
+                      <span className="font-medium">{typeof provider.totalCalls === 'number' ? provider.totalCalls : ' '}</span>
                     </div>
                   </div>
 
@@ -999,7 +999,7 @@ const ProviderProfile: React.FC = () => {
                     disabled={!onlineStatus.isOnline}
                   >
                     <Phone size={24} />
-                    <span>{onlineStatus.isOnline ? t(lang, 'RÉSERVER MAINTENANT', 'BOOK NOW') : t(lang, 'NON DISPONIBLE', 'UNAVAILABLE')}</span>
+                    <span>{onlineStatus.isOnline ? t(lang, 'R SERVER MAINTENANT', 'BOOK NOW') : t(lang, 'NON DISPONIBLE', 'UNAVAILABLE')}</span>
                     {onlineStatus.isOnline && (
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 rounded-full animate-pulse bg-green-300" />
@@ -1020,7 +1020,7 @@ const ProviderProfile: React.FC = () => {
                   <div className="mt-4 text-center">
                     <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
                       <Shield size={16} />
-                      <span>{t(lang, 'Paiement sécurisé • Satisfaction garantie', 'Secure payment • Satisfaction guaranteed')}</span>
+                      <span>{t(lang, 'Paiement s curis    Satisfaction garantie', 'Secure payment   Satisfaction guaranteed')}</span>
                     </div>
                   </div>
                 </div>
@@ -1036,7 +1036,7 @@ const ProviderProfile: React.FC = () => {
             <div className="lg:col-span-2 space-y-8" id="reviews-section">
               {/* Specialties */}
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">{t(lang, 'Spécialités', 'Specialties')}</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t(lang, 'Sp cialit s', 'Specialties')}</h2>
                 {derivedSpecialties.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {derivedSpecialties.map((s, i) => (
@@ -1051,13 +1051,13 @@ const ProviderProfile: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-gray-500">{t(lang, 'Aucune spécialité renseignée.', 'No specialties provided.')}</div>
+                  <div className="text-gray-500">{t(lang, 'Aucune sp cialit  renseign e.', 'No specialties provided.')}</div>
                 )}
               </div>
 
               {/* Languages */}
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">{t(lang, 'Langues parlées', 'Languages')}</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t(lang, 'Langues parl es', 'Languages')}</h2>
                 <div className="flex flex-wrap gap-2">
                   {languagesList.map((l, i) => (
                     <span
@@ -1071,7 +1071,7 @@ const ProviderProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* Education & Certifications (lawyers only) — NO SUBTITLES */}
+              {/* Education & Certifications (lawyers only)   NO SUBTITLES */}
               {isLawyer && (educationText || certificationsArray.length > 0) && (
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -1098,11 +1098,11 @@ const ProviderProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Expérience d'expatriation (expats only) */}
+              {/* Exp rience d'expatriation (expats only) */}
               {isExpat && (
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    {t(lang, "Expérience d'expatriation", 'Expat experience')}
+                    {t(lang, "Exp rience d'expatriation", 'Expat experience')}
                   </h2>
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">
@@ -1178,11 +1178,11 @@ const ProviderProfile: React.FC = () => {
                       <span className="font-medium">{reviews.length}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{t(lang, 'Taux de succès', 'Success rate')}</span>
-                      <span className="font-medium">{typeof provider.successRate === 'number' ? `${provider.successRate}%` : '—'}</span>
+                      <span className="text-gray-600">{t(lang, 'Taux de succ s', 'Success rate')}</span>
+                      <span className="font-medium">{typeof provider.successRate === 'number' ? `${provider.successRate}%` : ' '}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{t(lang, 'Expérience', 'Experience')}</span>
+                      <span className="text-gray-600">{t(lang, 'Exp rience', 'Experience')}</span>
                       <span className="font-medium">
                         {isLawyer
                           ? `${provider.yearsOfExperience || 0} ${t(lang, 'ans', 'yrs')}`
@@ -1197,7 +1197,7 @@ const ProviderProfile: React.FC = () => {
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center space-x-2">
                       <MapPin size={16} className="text-gray-400" />
-                      <span>{t(lang, 'Basé en', 'Based in')} {provider.country}</span>
+                      <span>{t(lang, 'Bas  en', 'Based in')} {provider.country}</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <LanguagesIcon size={16} className="text-gray-400" />
@@ -1232,7 +1232,7 @@ const ProviderProfile: React.FC = () => {
                     {provider.isVerified && (
                       <div className="flex items-center space-x-2">
                         <Shield size={16} className="text-gray-400" />
-                        <span>{t(lang, 'Expert vérifié', 'Verified expert')}</span>
+                        <span>{t(lang, 'Expert v rifi ', 'Verified expert')}</span>
                       </div>
                     )}
                   </div>

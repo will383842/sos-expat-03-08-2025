@@ -29,7 +29,7 @@ import { User } from './types';
 
 declare global {
   interface Window {
-    /** d√©fini quand la page est en COOP/COEP */
+    /** dÈfini quand la page est en COOP/COEP */
     crossOriginIsolated?: boolean;
   }
 }
@@ -99,88 +99,88 @@ interface AuthContextType {
 const AUTH_ERRORS: Record<string, { severity: AuthError['severity']; userMessage: string; helpText?: string }> = {
   GOOGLE_ROLE_RESTRICTION: {
     severity: 'high',
-    userMessage: 'üö´ La connexion Google est r√©serv√©e aux clients',
-    helpText: 'üë®‚Äç‚öñÔ∏è Avocats et üåç expatri√©s : utilisez votre email et mot de passe professionnels ci-dessous'
+    userMessage: '?? La connexion Google est rÈservÈe aux clients',
+    helpText: '????? Avocats et ?? expatriÈs : utilisez votre email et mot de passe professionnels ci-dessous'
   },
   'auth/popup-closed-by-user': {
     severity: 'low',
-    userMessage: '‚ùå Connexion Google annul√©e',
-    helpText: 'üí° Gardez la fen√™tre Google ouverte pour terminer la connexion'
+    userMessage: '? Connexion Google annulÈe',
+    helpText: '?? Gardez la fenÍtre Google ouverte pour terminer la connexion'
   },
   'auth/popup-blocked': {
     severity: 'medium',
-    userMessage: 'üö´ Popup Google bloqu√©e',
-    helpText: 'üîß Autorisez les popups dans votre navigateur pour continuer'
+    userMessage: '?? Popup Google bloquÈe',
+    helpText: '?? Autorisez les popups dans votre navigateur pour continuer'
   },
   'auth/cancelled-popup-request': {
     severity: 'low',
-    userMessage: '‚èπÔ∏è Connexion Google interrompue',
-    helpText: 'üîÑ R√©essayez en cliquant sur "Continuer avec Google"'
+    userMessage: '?? Connexion Google interrompue',
+    helpText: '?? RÈessayez en cliquant sur "Continuer avec Google"'
   },
   'auth/invalid-credential': {
     severity: 'medium',
-    userMessage: 'üîê Email ou mot de passe incorrect',
-    helpText: 'üí° V√©rifiez votre email et mot de passe, ou utilisez "Mot de passe oubli√©"'
+    userMessage: '?? Email ou mot de passe incorrect',
+    helpText: '?? VÈrifiez votre email et mot de passe, ou utilisez "Mot de passe oubliÈ"'
   },
   'auth/invalid-login-credentials': {
     severity: 'medium',
-    userMessage: 'üîê Identifiants invalides',
-    helpText: 'üìß Double-v√©rifiez votre adresse email et mot de passe'
+    userMessage: '?? Identifiants invalides',
+    helpText: '?? Double-vÈrifiez votre adresse email et mot de passe'
   },
   'auth/user-not-found': {
     severity: 'medium',
-    userMessage: 'üë§ Aucun compte trouv√©',
-    helpText: 'üìù Cr√©ez un nouveau compte ou v√©rifiez l\'adresse email'
+    userMessage: '?? Aucun compte trouvÈ',
+    helpText: '?? CrÈez un nouveau compte ou vÈrifiez l\'adresse email'
   },
   'auth/wrong-password': {
     severity: 'medium',
-    userMessage: 'üîë Mot de passe incorrect',
-    helpText: 'üîÑ R√©essayez ou cliquez sur "Mot de passe oubli√©"'
+    userMessage: '?? Mot de passe incorrect',
+    helpText: '?? RÈessayez ou cliquez sur "Mot de passe oubliÈ"'
   },
   'auth/network-request-failed': {
     severity: 'high',
-    userMessage: 'üì∂ Probl√®me de connexion internet',
-    helpText: 'üåê V√©rifiez votre connexion et r√©essayez'
+    userMessage: '?? ProblËme de connexion internet',
+    helpText: '?? VÈrifiez votre connexion et rÈessayez'
   },
   'auth/timeout': {
     severity: 'medium',
-    userMessage: '‚è±Ô∏è D√©lai d\'attente d√©pass√©',
-    helpText: 'üîÑ Votre connexion semble lente, r√©essayez'
+    userMessage: '?? DÈlai d\'attente dÈpassÈ',
+    helpText: '?? Votre connexion semble lente, rÈessayez'
   },
   'auth/email-already-in-use': {
     severity: 'medium',
-    userMessage: 'üìß Email d√©j√† utilis√©',
-    helpText: 'üîë Connectez-vous ou utilisez "Mot de passe oubli√©"'
+    userMessage: '?? Email dÈj‡ utilisÈ',
+    helpText: '?? Connectez-vous ou utilisez "Mot de passe oubliÈ"'
   },
   'auth/weak-password': {
     severity: 'low',
-    userMessage: 'üîí Mot de passe trop faible',
-    helpText: 'üí™ Utilisez au moins 8 caract√®res avec majuscules, minuscules et chiffres'
+    userMessage: '?? Mot de passe trop faible',
+    helpText: '?? Utilisez au moins 8 caractËres avec majuscules, minuscules et chiffres'
   },
   'auth/invalid-email': {
     severity: 'low',
-    userMessage: 'üìß Format d\'email invalide',
-    helpText: '‚úÖ Exemple : votre.email@domaine.com'
+    userMessage: '?? Format d\'email invalide',
+    helpText: '? Exemple : votre.email@domaine.com'
   },
   'auth/too-many-requests': {
     severity: 'high',
-    userMessage: 'üõ°Ô∏è Trop de tentatives',
-    helpText: '‚è∞ Attendez 15 minutes avant de r√©essayer pour votre s√©curit√©'
+    userMessage: '??? Trop de tentatives',
+    helpText: '? Attendez 15 minutes avant de rÈessayer pour votre sÈcuritÈ'
   },
   'auth/user-disabled': {
     severity: 'critical',
-    userMessage: 'üö´ Compte temporairement suspendu',
-    helpText: 'üìû Contactez le support pour r√©activer votre compte'
+    userMessage: '?? Compte temporairement suspendu',
+    helpText: '?? Contactez le support pour rÈactiver votre compte'
   },
   'auth/operation-not-allowed': {
     severity: 'critical',
-    userMessage: '‚ö†Ô∏è Service temporairement indisponible',
-    helpText: 'üîß Maintenance en cours, r√©essayez dans quelques minutes'
+    userMessage: '?? Service temporairement indisponible',
+    helpText: '?? Maintenance en cours, rÈessayez dans quelques minutes'
   },
   'auth/requires-recent-login': {
     severity: 'medium',
-    userMessage: 'üîÑ Reconnexion requise',
-    helpText: 'üîê Reconnectez-vous pour des raisons de s√©curit√©'
+    userMessage: '?? Reconnexion requise',
+    helpText: '?? Reconnectez-vous pour des raisons de sÈcuritÈ'
   }
 };
 
@@ -250,7 +250,7 @@ const processProfilePhoto = async (photoUrl: string | undefined, uid: string, pr
           return photoUrl.replace(/s\d+-c/, size);
         }
       } catch {
-        console.warn("Photo Google non accessible, utilisation de l'avatar par d√©faut");
+        console.warn("Photo Google non accessible, utilisation de l'avatar par dÈfaut");
       }
       return '/default-avatar.png';
     }
@@ -331,8 +331,8 @@ const getLocalizedErrorMessage = (errorCode: string, deviceInfo: DeviceInfo): { 
   const errorConfig = AUTH_ERRORS[errorCode];
   if (!errorConfig) {
     return {
-      message: deviceInfo.type === 'mobile' ? '‚ùå Erreur de connexion' : 'Une erreur est survenue. Veuillez r√©essayer',
-      helpText: deviceInfo.type === 'mobile' ? 'üîÑ R√©essayez ou contactez le support' : undefined
+      message: deviceInfo.type === 'mobile' ? '? Erreur de connexion' : 'Une erreur est survenue. Veuillez rÈessayer',
+      helpText: deviceInfo.type === 'mobile' ? '?? RÈessayez ou contactez le support' : undefined
     };
   }
   return { message: errorConfig.userMessage, helpText: errorConfig.helpText };
@@ -357,7 +357,7 @@ const getErrorCode = (err: unknown): string => {
     }
   }
   
-  console.log('üîç Erreur non reconnue:', err); // Pour debug
+  console.log('?? Erreur non reconnue:', err); // Pour debug
   return '';
 };
 
@@ -368,13 +368,13 @@ const getErrorCode = (err: unknown): string => {
 const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userData: Partial<User>, deviceInfo: DeviceInfo): Promise<User> => {
   try {
     const emailLower = (firebaseUser.email || '').trim().toLowerCase();
-    console.log('üîß [Debug] D√©but createUserDocumentInFirestore', { uid: firebaseUser.uid, role: userData.role });
+    console.log('?? [Debug] DÈbut createUserDocumentInFirestore', { uid: firebaseUser.uid, role: userData.role });
     
     const userRef = doc(db, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userRef);
 
     if (userDoc.exists()) {
-      console.log('‚úÖ [Debug] Utilisateur existe d√©j√†, mise √† jour...');
+      console.log('? [Debug] Utilisateur existe dÈj‡, mise ‡ jour...');
       const existingData = userDoc.data() as Record<string, unknown>;
       await updateDoc(userRef, {
         lastLoginAt: serverTimestamp(),
@@ -392,23 +392,23 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       } as User;
     }
 
-    console.log('üîß [Debug] Nouvel utilisateur, cr√©ation...');
+    console.log('?? [Debug] Nouvel utilisateur, crÈation...');
     const userRole = userData.role;
     const provider = firebaseUser.providerData[0]?.providerId;
 
     if (provider === 'google.com' && userRole !== 'client') throw new Error('GOOGLE_ROLE_RESTRICTION');
     if (!userRole || !['client', 'lawyer', 'expat', 'admin'].includes(userRole)) {
-      throw new Error(`R√¥le utilisateur invalide: ${userRole as string}`);
+      throw new Error(`RÙle utilisateur invalide: ${userRole as string}`);
     }
 
-    console.log('üîß [Debug] Traitement photo profil...');
+    console.log('?? [Debug] Traitement photo profil...');
     const finalProfilePhoto = await processProfilePhoto(
       userData.profilePhoto || firebaseUser.photoURL || undefined,
       firebaseUser.uid,
       provider === 'google.com' ? 'google' : 'manual'
     );
 
-    console.log('üîß [Debug] G√©n√©ration des donn√©es utilisateur...');
+    console.log('?? [Debug] GÈnÈration des donnÈes utilisateur...');
     const affiliateCode = generateAffiliateCode(firebaseUser.uid, firebaseUser.email || '');
     const displayNameParts = firebaseUser.displayName?.split(' ') || [];
     const firstName = userData.firstName || displayNameParts[0] || '';
@@ -471,7 +471,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       bio: userData.bio || '',
       ...(userRole === 'lawyer' && {
         practiceCountries: userData.practiceCountries || [],
-        languages: userData.languages || ['Fran√ßais'],
+        languages: userData.languages || ['FranÁais'],
         yearsOfExperience: userData.yearsOfExperience || 0,
         specialties: userData.specialties || [],
         barNumber: userData.barNumber || '',
@@ -481,7 +481,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       }),
       ...(userRole === 'expat' && {
         residenceCountry: userData.residenceCountry || '',
-        languages: userData.languages || ['Fran√ßais'],
+        languages: userData.languages || ['FranÁais'],
         helpTypes: userData.helpTypes || [],
         yearsAsExpat: userData.yearsAsExpat || 0,
         previousCountries: userData.previousCountries || [],
@@ -489,7 +489,7 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       })
     };
 
-    console.log('üîß [Debug] Sauvegarde dans Firestore...');
+    console.log('?? [Debug] Sauvegarde dans Firestore...');
     await setDoc(userRef, {
       ...newUser,
       createdAt: serverTimestamp(),
@@ -497,14 +497,14 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       lastLoginAt: serverTimestamp()
     });
 
-    console.log('‚úÖ [Debug] Document utilisateur cr√©√© avec succ√®s');
+    console.log('? [Debug] Document utilisateur crÈÈ avec succËs');
 
     if (userRole === 'lawyer' || userRole === 'expat') {
-      console.log('üîß [Debug] Cr√©ation profil SOS...');
+      console.log('?? [Debug] CrÈation profil SOS...');
       await createSOSProfile(firebaseUser.uid, newUser, userRole);
     }
 
-    console.log('üîß [Debug] Log de l\'√©v√©nement...');
+    console.log('?? [Debug] Log de l\'ÈvÈnement...');
     await logAuthEvent('user_creation', {
       userId: firebaseUser.uid,
       userRole,
@@ -512,12 +512,12 @@ const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userDat
       profilePhotoUploaded: finalProfilePhoto !== '/default-avatar.png'
     }, deviceInfo);
 
-    console.log('‚úÖ [Debug] createUserDocumentInFirestore termin√© avec succ√®s');
+    console.log('? [Debug] createUserDocumentInFirestore terminÈ avec succËs');
     return newUser as User;
   } catch (error) {
-    console.error('‚ùå [Debug] Erreur dans createUserDocumentInFirestore:', error);
+    console.error('? [Debug] Erreur dans createUserDocumentInFirestore:', error);
     if (error instanceof Error && error.message === 'GOOGLE_ROLE_RESTRICTION') throw error;
-    throw new Error('Impossible de cr√©er le profil utilisateur');
+    throw new Error('Impossible de crÈer le profil utilisateur');
   }
 };
 
@@ -553,7 +553,7 @@ const createSOSProfile = async (uid: string, userData: Partial<User>, role: 'law
       email: userData.email,
       phone: userData.phone || '',
       phoneCountryCode: userData.phoneCountryCode || '+33',
-      languages: userData.languages || ['Fran√ßais'],
+      languages: userData.languages || ['FranÁais'],
       country,
       city: '',
       description: userData.bio || '',
@@ -586,7 +586,7 @@ const createSOSProfile = async (uid: string, userData: Partial<User>, role: 'law
 
     await setDoc(sosProfileRef, sosProfile);
   } catch (error) {
-    console.error(`Erreur cr√©ation profil SOS pour ${role}:`, error);
+    console.error(`Erreur crÈation profil SOS pour ${role}:`, error);
   }
 };
 
@@ -603,7 +603,7 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
       lastLoginAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       isActive: true
-    }).catch(e => console.warn('Erreur mise √† jour silencieuse lastLoginAt:', e));
+    }).catch(e => console.warn('Erreur mise ‡ jour silencieuse lastLoginAt:', e));
 
     return {
       id: firebaseUser.uid,
@@ -613,7 +613,7 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
       lastLoginAt: (userData.lastLoginAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date()
     } as User;
   } catch (error) {
-    console.error('Erreur r√©cup√©ration document utilisateur:', error);
+    console.error('Erreur rÈcupÈration document utilisateur:', error);
     return null;
   }
 };
@@ -626,7 +626,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth doit √™tre utilis√© dans un AuthProvider');
+  if (!context) throw new Error('useAuth doit Ítre utilisÈ dans un AuthProvider');
   return context;
 };
 
@@ -658,7 +658,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
       }
     } catch (e) {
-      console.error('Erreur mise √† jour √©tat utilisateur:', e);
+      console.error('Erreur mise ‡ jour Ètat utilisateur:', e);
       setUser(null);
     }
   }, []);
@@ -747,7 +747,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [firebaseUser?.uid, firebaseUser?.emailVerified]);
 
   // ===============================
-  // M√âTHODES D'AUTHENTIFICATION
+  // M…THODES D'AUTHENTIFICATION
   // ===============================
 
   const login = async (email: string, password: string) => {
@@ -756,7 +756,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setAuthMetrics(prev => ({ ...prev, loginAttempts: prev.loginAttempts + 1, lastAttempt: new Date() }));
 
     if (!email || !password) {
-      const errorMsg = deviceInfo.type === 'mobile' ? 'üìß Email et üîë mot de passe requis' : 'Email et mot de passe sont obligatoires';
+      const errorMsg = deviceInfo.type === 'mobile' ? '?? Email et ?? mot de passe requis' : 'Email et mot de passe sont obligatoires';
       setError(errorMsg);
       setIsLoading(false);
       setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
@@ -765,7 +765,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      const errorMsg = deviceInfo.type === 'mobile' ? 'üìß Format email invalide' : "Format d'email invalide";
+      const errorMsg = deviceInfo.type === 'mobile' ? '?? Format email invalide' : "Format d'email invalide";
       setError(errorMsg);
       setIsLoading(false);
       setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
@@ -810,7 +810,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (e) {
       const code = getErrorCode(e) || (e as Error).message || '';
       const { message, helpText } = getLocalizedErrorMessage(code, deviceInfo);
-      const finalMessage = helpText ? `${message}\n\nüí° ${helpText}` : message;
+      const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : message;
 
       setError(finalMessage);
       setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
@@ -838,12 +838,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       display: getDeviceInfo().type === 'mobile' ? 'touch' : 'popup'
       });
 
-
-      // ‚úÖ En COOP/COEP, √©viter signInWithPopup (fen√™tre ne peut pas se fermer) ‚Üí use redirect
+      // ? En COOP/COEP, Èviter signInWithPopup (fenÍtre ne peut pas se fermer) ? use redirect
       const isCrossOriginIsolated = window.crossOriginIsolated === true;
       if (isCrossOriginIsolated) {
         await signInWithRedirect(auth, provider);
-        return; // Suite g√©r√©e dans le useEffect getRedirectResult
+        return; // Suite gÈrÈe dans le useEffect getRedirectResult
       }
 
       const result = await signInWithPopup(auth, provider);
@@ -859,7 +858,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1, roleRestrictionBlocks: prev.roleRestrictionBlocks + 1 }));
 
           const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', getDeviceInfo());
-          const finalMessage = helpText ? `${message}\n\nüí° ${helpText}` : message;
+          const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : message;
           setError(finalMessage);
 
           await logAuthEvent('google_login_role_restriction', {
@@ -920,7 +919,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if ((e as Error).message === 'GOOGLE_ROLE_RESTRICTION') errorCode = 'GOOGLE_ROLE_RESTRICTION';
 
       const { message, helpText } = getLocalizedErrorMessage(errorCode, getDeviceInfo());
-      const finalMessage = helpText ? `${message}\n\nüí° ${helpText}` : message;
+      const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : message;
 
       setError(finalMessage);
       setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
@@ -943,37 +942,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
 
     if (!userData.role) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? '‚ö†Ô∏è R√¥le requis pour inscription' : "Le r√¥le utilisateur est obligatoire pour l'inscription";
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '?? RÙle requis pour inscription' : "Le rÙle utilisateur est obligatoire pour l'inscription";
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
     }
     if (!['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
-      const errorMsg = `R√¥le utilisateur invalide: ${userData.role}`;
+      const errorMsg = `RÙle utilisateur invalide: ${userData.role}`;
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
     }
     if (!userData.email || !password) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? 'üìß Email et üîë mot de passe requis' : 'Email et mot de passe sont obligatoires';
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Email et ?? mot de passe requis' : 'Email et mot de passe sont obligatoires';
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userData.email)) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? 'üìß Format email invalide' : "Format d'email invalide";
+      const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Format email invalide' : "Format d'email invalide";
       setError(errorMsg);
       setIsLoading(false);
       throw new Error(errorMsg);
     }
     if (password.length < 6) {
-  const errorMsg = getDeviceInfo().type === 'mobile' ? 'üîí Mot de passe min. 6 caract√®res' : 'Le mot de passe doit contenir au moins 6 caract√®res';
+  const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Mot de passe min. 6 caractËres' : 'Le mot de passe doit contenir au moins 6 caractËres';
   setError(errorMsg);
   setIsLoading(false);
   throw new Error(errorMsg);
 }
-// Suppression des contraintes de complexit√© - mot de passe simple accept√© ! üéâ
+// Suppression des contraintes de complexitÈ - mot de passe simple acceptÈ ! ??
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);
@@ -1017,7 +1016,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             photoURL: finalProfilePhotoURL || null
           });
         } catch (profileError) {
-          console.warn('Erreur mise √† jour profil Firebase:', profileError);
+          console.warn('Erreur mise ‡ jour profil Firebase:', profileError);
         }
       }
     } catch (e) {
@@ -1028,7 +1027,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
 
       const { message, helpText } = getLocalizedErrorMessage(getErrorCode(e), getDeviceInfo());
-      const finalMessage = helpText ? `${message}\n\nüí° ${helpText}` : (message || (e as Error).message);
+      const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : (message || (e as Error).message);
       setError(finalMessage);
       throw new Error(finalMessage);
     } finally {
@@ -1044,7 +1043,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           try {
             await updateDoc(doc(db, 'users', user.id), { isOnline: false, lastSeenAt: serverTimestamp() });
           } catch (statusError) {
-            console.warn('Erreur mise √† jour statut hors ligne:', statusError);
+            console.warn('Erreur mise ‡ jour statut hors ligne:', statusError);
           }
         }
       }
@@ -1054,12 +1053,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(null);
       setAuthMetrics({ loginAttempts: 0, lastAttempt: new Date(), successfulLogins: 0, failedLogins: 0, googleAttempts: 0, roleRestrictionBlocks: 0 });
     } catch (e) {
-      console.error('Erreur d√©connexion:', e);
+      console.error('Erreur dÈconnexion:', e);
     }
   };
 
   const sendVerificationEmail = async () => {
-    if (!firebaseUser) throw new Error('Aucun utilisateur connect√©');
+    if (!firebaseUser) throw new Error('Aucun utilisateur connectÈ');
     try {
       const userLanguage = user?.preferredLanguage || user?.lang || 'fr';
       try {
@@ -1094,7 +1093,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       return false;
     } catch (e) {
-      console.error('Erreur v√©rification email:', e);
+      console.error('Erreur vÈrification email:', e);
       return false;
     }
   };
@@ -1142,8 +1141,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // ===============================
-  // üîÅ R√âCUP√âRER LE R√âSULTAT GOOGLE EN COOP/COEP (Redirect flow)
-  // (√† placer tout en bas du composant, juste avant le return)
+  // ?? R…CUP…RER LE R…SULTAT GOOGLE EN COOP/COEP (Redirect flow)
+  // (‡ placer tout en bas du composant, juste avant le return)
   // ===============================
   const redirectHandledRef = useRef(false);
   useEffect(() => {
@@ -1154,7 +1153,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Si la page est "crossOriginIsolated", on vient d'un signInWithRedirect
         const isCrossOriginIsolated = window.crossOriginIsolated === true;
         if (!isCrossOriginIsolated) return;
-        if (redirectHandledRef.current) return; // √©vite double-traitement (StrictMode)
+        if (redirectHandledRef.current) return; // Èvite double-traitement (StrictMode)
 
         const result = await getRedirectResult(auth);
         if (!result || !result.user) return;
@@ -1168,13 +1167,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (userDoc.exists()) {
           const existingData = userDoc.data() as ExistingUserData;
 
-
-          // Blocage r√¥le pour Google si ‚â† client
+          // Blocage rÙle pour Google si ? client
           if (existingData.role && existingData.role !== 'client') {
             await firebaseSignOut(auth);
             setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1, roleRestrictionBlocks: prev.roleRestrictionBlocks + 1 }));
             const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', getDeviceInfo());
-            setError(helpText ? `${message}\n\nüí° ${helpText}` : message);
+            setError(helpText ? `${message}\n\n?? ${helpText}` : message);
 
             await logAuthEvent('google_login_role_restriction', {
               userId: googleUser.uid,
@@ -1249,3 +1247,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 };
 
 export default AuthProvider;
+
+
+

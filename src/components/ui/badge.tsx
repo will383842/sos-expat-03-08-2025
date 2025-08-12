@@ -25,3 +25,5 @@ const Badge: React.FC<BadgeProps> = ({ className, variant = 'default', ...props 
 };
 
 export { Badge };
+
+

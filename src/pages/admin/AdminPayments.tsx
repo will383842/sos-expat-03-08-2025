@@ -708,3 +708,4 @@ const AdminPayments: React.FC = () => {
 };
 
 export default AdminPayments;
+

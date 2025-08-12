@@ -19,7 +19,7 @@ interface LanguageOption {
   label: string;
 }
 
-// Interface pour les données du formulaire
+// Interface pour les donn�es du formulaire
 interface FormData {
   firstName: string;
   lastName: string;
@@ -57,7 +57,7 @@ const Contact: React.FC = () => {
     message: ''
   });
   
-  // State séparé pour les langues parlées (format array simple)
+  // State s�par� pour les langues parl�es (format array simple)
   const [spokenLanguages, setSpokenLanguages] = useState<string[]>([]);
   const [languagesDropdownOpen, setLanguagesDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,7 +68,7 @@ const Contact: React.FC = () => {
   const [showErrors, setShowErrors] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
 
-  // Préchargement et optimisations performance
+  // Pr�chargement et optimisations performance
   useEffect(() => {
     // Optimisation viewport mobile
     const viewport = document.querySelector('meta[name="viewport"]');
@@ -77,7 +77,7 @@ const Contact: React.FC = () => {
     }
   }, []);
 
-  // Fermer le dropdown au clic extérieur
+  // Fermer le dropdown au clic ext�rieur
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -92,7 +92,7 @@ const Contact: React.FC = () => {
     }
   }, [languagesDropdownOpen]);
 
-  // Scroll vers le haut lors de la soumission réussie
+  // Scroll vers le haut lors de la soumission r�ussie
   useEffect(() => {
     if (isSubmitted) {
       window.scrollTo({ 
@@ -102,71 +102,71 @@ const Contact: React.FC = () => {
     }
   }, [isSubmitted]);
 
-  // Textes i18n centralisés
+  // Textes i18n centralis�s
   const t = useMemo(() => ({
     // Header
     pageTitle: language === 'fr' ? 'Nous contacter' : 'Contact us',
     pageDescription: language === 'fr' 
-      ? 'Notre équipe est là pour vous aider. Envoyez-nous un message et nous vous répondrons rapidement.'
+      ? 'Notre �quipe est l� pour vous aider. Envoyez-nous un message et nous vous r�pondrons rapidement.'
       : 'Our team is here to help you. Send us a message and we will respond quickly.',
     
     // Form labels
-    firstName: language === 'fr' ? 'Prénom' : 'First name',
+    firstName: language === 'fr' ? 'Pr�nom' : 'First name',
     lastName: language === 'fr' ? 'Nom' : 'Last name',
     email: 'Email',
-    phoneNumber: language === 'fr' ? 'Numéro de téléphone' : 'Phone number',
-    customCode: language === 'fr' ? 'Indicatif personnalisé' : 'Custom country code',
+    phoneNumber: language === 'fr' ? 'Num�ro de t�l�phone' : 'Phone number',
+    customCode: language === 'fr' ? 'Indicatif personnalis�' : 'Custom country code',
     originCountry: language === 'fr' ? 'Pays d\'origine' : 'Country of origin',
     interventionCountry: language === 'fr' ? 'Pays d\'intervention' : 'Intervention country',
-    spokenLanguages: language === 'fr' ? 'Langues parlées' : 'Spoken languages',
-    nationalities: language === 'fr' ? 'Nationalités' : 'Nationalities',
-    category: language === 'fr' ? 'Catégorie' : 'Category',
+    spokenLanguages: language === 'fr' ? 'Langues parl�es' : 'Spoken languages',
+    nationalities: language === 'fr' ? 'Nationalit�s' : 'Nationalities',
+    category: language === 'fr' ? 'Cat�gorie' : 'Category',
     subject: language === 'fr' ? 'Sujet' : 'Subject',
     message: language === 'fr' ? 'Message' : 'Message',
     
     // Placeholders
-    firstNamePlaceholder: language === 'fr' ? 'Votre prénom...' : 'Your first name...',
+    firstNamePlaceholder: language === 'fr' ? 'Votre pr�nom...' : 'Your first name...',
     lastNamePlaceholder: language === 'fr' ? 'Votre nom...' : 'Your last name...',
     emailPlaceholder: language === 'fr' ? 'votre@email.com' : 'your@email.com',
     phonePlaceholder: '06 12 34 56 78',
     customCodePlaceholder: language === 'fr' ? 'Ex: +225' : 'Ex: +225',
     originCountryPlaceholder: language === 'fr' ? 'France' : 'France',
-    interventionCountryPlaceholder: language === 'fr' ? 'Pays où vous avez besoin d\'aide' : 'Country where you need help',
-    nationalitiesPlaceholder: language === 'fr' ? 'Française' : 'French',
-    subjectPlaceholder: language === 'fr' ? 'Résumez votre demande...' : 'Summarize your request...',
+    interventionCountryPlaceholder: language === 'fr' ? 'Pays o� vous avez besoin d\'aide' : 'Country where you need help',
+    nationalitiesPlaceholder: language === 'fr' ? 'Fran�aise' : 'French',
+    subjectPlaceholder: language === 'fr' ? 'R�sumez votre demande...' : 'Summarize your request...',
     messagePlaceholder: language === 'fr' 
-      ? 'Décrivez votre demande en détail... Plus vous serez précis, mieux nous pourrons vous aider !'
+      ? 'D�crivez votre demande en d�tail... Plus vous serez pr�cis, mieux nous pourrons vous aider !'
       : 'Describe your request in detail... The more specific you are, the better we can help you!',
     
     // Buttons
     sendMessage: language === 'fr' ? 'Envoyer le message' : 'Send message',
     sending: language === 'fr' ? 'Envoi en cours...' : 'Sending...',
     sendAnother: language === 'fr' ? 'Envoyer un autre message' : 'Send another message',
-    backHome: language === 'fr' ? 'Retour à l\'accueil' : 'Back to home',
+    backHome: language === 'fr' ? 'Retour � l\'accueil' : 'Back to home',
     
     // Success messages
-    messageSent: language === 'fr' ? 'Message envoyé !' : 'Message sent!',
+    messageSent: language === 'fr' ? 'Message envoy� !' : 'Message sent!',
     messageReceived: language === 'fr'
-      ? 'Nous avons bien reçu votre message. Notre équipe vous répondra dans les plus brefs délais.'
+      ? 'Nous avons bien re�u votre message. Notre �quipe vous r�pondra dans les plus brefs d�lais.'
       : 'We have received your message. Our team will respond to you as soon as possible.',
     
     // Contact info
     contactInfo: language === 'fr' ? 'Informations de contact' : 'Contact information',
     sosService: language === 'fr' ? 'Service S.O.S Appel' : 'S.O.S Call Service',
     available247: language === 'fr' ? 'Disponible 24h/24, 7j/7' : 'Available 24/7',
-    quickResponse: language === 'fr' ? 'Réponse rapide' : 'Quick response',
-    usually24h: language === 'fr' ? 'Généralement sous 24h' : 'Usually within 24h',
+    quickResponse: language === 'fr' ? 'R�ponse rapide' : 'Quick response',
+    usually24h: language === 'fr' ? 'G�n�ralement sous 24h' : 'Usually within 24h',
     multilingualSupport: language === 'fr' ? 'Support multilingue' : 'Multilingual support',
     multipleLanguages: language === 'fr' ? 'Plusieurs langues disponibles' : 'Multiple languages available',
     
     // Form
     formTitle: language === 'fr' ? 'Envoyez-nous un message' : 'Send us a message',
     formDescription: language === 'fr' ? 'Remplissez le formulaire ci-dessous' : 'Fill out the form below',
-    selectCategory: language === 'fr' ? 'Sélectionner une catégorie...' : 'Select a category...',
-    responseTime: language === 'fr' ? 'Temps de réponse estimé' : 'Estimated response time',
+    selectCategory: language === 'fr' ? 'S�lectionner une cat�gorie...' : 'Select a category...',
+    responseTime: language === 'fr' ? 'Temps de r�ponse estim�' : 'Estimated response time',
     maxTime: language === 'fr' ? '24h max' : '24h max',
     secureData: language === 'fr' 
-      ? 'Vos données sont sécurisées et ne seront jamais partagées' 
+      ? 'Vos donn�es sont s�curis�es et ne seront jamais partag�es' 
       : 'Your data is secure and will never be shared',
     
     // SEO Footer
@@ -174,26 +174,26 @@ const Contact: React.FC = () => {
       ? 'Service de contact disponible 24h/24 et 7j/7 pour tous vos besoins d\'assistance.'
       : '24/7 contact service available for all your assistance needs.',
     seoFeatures: language === 'fr'
-      ? 'Support multilingue • Réponse rapide • Service professionnel'
-      : 'Multilingual support • Quick response • Professional service',
+      ? 'Support multilingue � R�ponse rapide � Service professionnel'
+      : 'Multilingual support � Quick response � Professional service',
     
     // Errors
     errorSending: language === 'fr' 
-      ? 'Erreur lors de l\'envoi du message. Veuillez réessayer.'
+      ? 'Erreur lors de l\'envoi du message. Veuillez r�essayer.'
       : 'Error sending message. Please try again.',
     
     // Validation errors
     required: language === 'fr' ? 'Ce champ est obligatoire' : 'This field is required',
     invalidEmail: language === 'fr' ? 'Veuillez saisir un email valide' : 'Please enter a valid email',
-    invalidPhone: language === 'fr' ? 'Veuillez saisir un numéro de téléphone valide' : 'Please enter a valid phone number',
+    invalidPhone: language === 'fr' ? 'Veuillez saisir un num�ro de t�l�phone valide' : 'Please enter a valid phone number',
     invalidCustomCode: language === 'fr' ? 'L\'indicatif doit commencer par +' : 'Country code must start with +',
-    selectLanguages: language === 'fr' ? 'Veuillez sélectionner au moins une langue' : 'Please select at least one language',
-    acceptTermsRequired: language === 'fr' ? 'Vous devez accepter les conditions générales' : 'You must accept the terms and conditions',
+    selectLanguages: language === 'fr' ? 'Veuillez s�lectionner au moins une langue' : 'Please select at least one language',
+    acceptTermsRequired: language === 'fr' ? 'Vous devez accepter les conditions g�n�rales' : 'You must accept the terms and conditions',
     formHasErrors: language === 'fr' ? 'Veuillez corriger les erreurs ci-dessous :' : 'Please correct the errors below:',
     
     // Terms and conditions
     acceptTerms: language === 'fr' ? 'J\'accepte les' : 'I accept the',
-    termsAndConditions: language === 'fr' ? 'conditions générales' : 'terms and conditions',
+    termsAndConditions: language === 'fr' ? 'conditions g�n�rales' : 'terms and conditions',
     termsLink: language === 'fr' ? '/conditions-generales-clients' : '/terms-conditions-clients',
     
     // Other option
@@ -221,12 +221,12 @@ const Contact: React.FC = () => {
       errors.email = t.invalidEmail;
     }
 
-    // Validation du téléphone
+    // Validation du t�l�phone
     if (formData.phoneNumber && !/^[\d\s\-+()]{6,}$/.test(formData.phoneNumber)) {
       errors.phoneNumber = t.invalidPhone;
     }
 
-    // Validation de l'indicatif personnalisé
+    // Validation de l'indicatif personnalis�
     if (formData.phoneCountryCode === '+other') {
       if (!formData.customCountryCode.trim()) {
         errors.customCountryCode = t.required;
@@ -235,12 +235,12 @@ const Contact: React.FC = () => {
       }
     }
 
-    // Validation des langues parlées
+    // Validation des langues parl�es
     if (spokenLanguages.length === 0) {
       errors.spokenLanguages = t.selectLanguages;
     }
 
-    // Validation des conditions générales
+    // Validation des conditions g�n�rales
     if (!acceptTerms) {
       errors.acceptTerms = t.acceptTermsRequired;
     }
@@ -253,7 +253,7 @@ const Contact: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Effacer l'erreur du champ quand l'utilisateur commence à taper
+    // Effacer l'erreur du champ quand l'utilisateur commence � taper
     if (formErrors[name]) {
       setFormErrors(prev => {
         const newErrors = { ...prev };
@@ -265,18 +265,18 @@ const Contact: React.FC = () => {
 
   // Liste des langues disponibles
   const availableLanguages = useMemo(() => [
-    'Français', 'English', 'العربية', 'Español', 'Italiano', 'Deutsch', 
-    'Português', '中文', '日本語', '한국어', 'Русский', 'Nederlands', 
-    'Polski', 'Türkçe', 'Svenska', 'Norsk', 'Dansk', 'Suomi',
-    'Ελληνικά', 'Български', 'Čeština', 'Slovenčina', 'Magyar',
-    'Română', 'Hrvatski', 'Srpski', 'Українська', 'Lietuvių',
-    'Latviešu', 'Eesti', 'Slovenščina', 'עברית', 'हिन्दी',
-    'ไทย', 'Tiếng Việt', 'Bahasa Indonesia', 'Bahasa Malaysia',
-    'Filipino', 'فارسی', 'اردو', 'বাংলা', 'తేలుగు', 'தமிழ்',
-    'ગુજરાતી', 'ಕನ್ನಡ', 'മലയാളം', 'मराठी', 'پنجابی', 'नेपाली'
+    'Fran�ais', 'English', '???????', 'Espa�ol', 'Italiano', 'Deutsch', 
+    'Portugu�s', '??', '???', '???', '???????', 'Nederlands', 
+    'Polski', 'T�rk�e', 'Svenska', 'Norsk', 'Dansk', 'Suomi',
+    '????????', '?????????', 'Ce�tina', 'Slovencina', 'Magyar',
+    'Rom�na', 'Hrvatski', 'Srpski', '??????????', 'Lietuviu',
+    'Latvie�u', 'Eesti', 'Sloven�cina', '?????', '??????',
+    '???', 'Ti?ng Vi?t', 'Bahasa Indonesia', 'Bahasa Malaysia',
+    'Filipino', '?????', '????', '?????', '??????', '?????',
+    '???????', '?????', '??????', '?????', '??????', '??????'
   ], []);
 
-  // Fonction pour gérer les changements de langues
+  // Fonction pour g�rer les changements de langues
   const handleLanguageToggle = useCallback((language: string) => {
     setSpokenLanguages(prev => {
       if (prev.includes(language)) {
@@ -306,7 +306,7 @@ const Contact: React.FC = () => {
     // Validation du formulaire
     if (!validateForm()) {
       setShowErrors(true);
-      // Scroll vers la première erreur
+      // Scroll vers la premi�re erreur
       const firstErrorElement = document.querySelector('.error-field');
       if (firstErrorElement) {
         firstErrorElement.scrollIntoView({ 
@@ -324,7 +324,7 @@ const Contact: React.FC = () => {
       // Analytics de completion time
       const completionTime = Date.now() - formStartTime;
 
-      // Vérifier si l'utilisateur existe déjà
+      // V�rifier si l'utilisateur existe d�j�
       const usersQuery = query(
         collection(db, 'users'), 
         where('email', '==', formData.email)
@@ -349,13 +349,13 @@ const Contact: React.FC = () => {
         };
       }
 
-      // Convertir les langues sélectionnées
+      // Convertir les langues s�lectionn�es
       const spokenLanguagesString = spokenLanguages.join(', ');
       const finalPhoneCode = getPhoneCode();
 
-      // Préparer les données complètes pour Firebase
+      // Pr�parer les donn�es compl�tes pour Firebase
       const contactData = {
-        // Données du formulaire - TOUS LES CHAMPS
+        // Donn�es du formulaire - TOUS LES CHAMPS
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -371,7 +371,7 @@ const Contact: React.FC = () => {
         acceptedTerms: acceptTerms,
         acceptedTermsAt: new Date().toISOString(),
         
-        // Métadonnées système
+        // M�tadonn�es syst�me
         createdAt: serverTimestamp(),
         submittedAt: new Date().toISOString(),
         status: 'new',
@@ -381,7 +381,7 @@ const Contact: React.FC = () => {
         // Informations utilisateur
         user: userInfo,
         
-        // Analytics et métadonnées techniques
+        // Analytics et m�tadonn�es techniques
         userAgent: navigator.userAgent,
         language: language,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -398,7 +398,7 @@ const Contact: React.FC = () => {
         formVersion: '3.1',
         source: 'contact_form_web',
         
-        // Métadonnées enrichies
+        // M�tadonn�es enrichies
         metadata: {
           version: '3.1',
           source: 'contact_form',
@@ -494,37 +494,37 @@ const Contact: React.FC = () => {
   };
 
   const categories = useMemo(() => [
-    { value: 'technical', label: language === 'fr' ? 'Problème technique' : 'Technical issue', emoji: '🔧' },
-    { value: 'billing', label: language === 'fr' ? 'Facturation' : 'Billing', emoji: '💳' },
-    { value: 'account', label: language === 'fr' ? 'Compte utilisateur' : 'User account', emoji: '👤' },
-    { value: 'expert', label: language === 'fr' ? 'Question sur les experts' : 'Expert question', emoji: '🎓' },
-    { value: 'service', label: language === 'fr' ? 'Qualité de service' : 'Service quality', emoji: '⭐' },
-    { value: 'partnership', label: language === 'fr' ? 'Partenariat' : 'Partnership', emoji: '🤝' },
-    { value: 'urgent', label: language === 'fr' ? 'Urgent' : 'Urgent', emoji: '🚨' },
-    { value: 'other', label: t.other, emoji: '💬' }
+    { value: 'technical', label: language === 'fr' ? 'Probl�me technique' : 'Technical issue', emoji: '??' },
+    { value: 'billing', label: language === 'fr' ? 'Facturation' : 'Billing', emoji: '??' },
+    { value: 'account', label: language === 'fr' ? 'Compte utilisateur' : 'User account', emoji: '??' },
+    { value: 'expert', label: language === 'fr' ? 'Question sur les experts' : 'Expert question', emoji: '??' },
+    { value: 'service', label: language === 'fr' ? 'Qualit� de service' : 'Service quality', emoji: '?' },
+    { value: 'partnership', label: language === 'fr' ? 'Partenariat' : 'Partnership', emoji: '??' },
+    { value: 'urgent', label: language === 'fr' ? 'Urgent' : 'Urgent', emoji: '??' },
+    { value: 'other', label: t.other, emoji: '??' }
   ], [language, t.other]);
 
   const countryCodes = useMemo(() => [
-    { value: '+33', label: '🇫🇷 +33 (France)' },
-    { value: '+1', label: '🇺🇸 +1 (USA/Canada)' },
-    { value: '+44', label: '🇬🇧 +44 (UK)' },
-    { value: '+49', label: '🇩🇪 +49 (Germany)' },
-    { value: '+39', label: '🇮🇹 +39 (Italy)' },
-    { value: '+34', label: '🇪🇸 +34 (Spain)' },
-    { value: '+32', label: '🇧🇪 +32 (Belgium)' },
-    { value: '+41', label: '🇨🇭 +41 (Switzerland)' },
-    { value: '+31', label: '🇳🇱 +31 (Netherlands)' },
-    { value: '+352', label: '🇱🇺 +352 (Luxembourg)' },
-    { value: '+213', label: '🇩🇿 +213 (Algeria)' },
-    { value: '+212', label: '🇲🇦 +212 (Morocco)' },
-    { value: '+216', label: '🇹🇳 +216 (Tunisia)' },
-    { value: '+86', label: '🇨🇳 +86 (China)' },
-    { value: '+91', label: '🇮🇳 +91 (India)' },
-    { value: '+55', label: '🇧🇷 +55 (Brazil)' },
-    { value: '+other', label: `🌍 ${t.other}` }
+    { value: '+33', label: '???? +33 (France)' },
+    { value: '+1', label: '???? +1 (USA/Canada)' },
+    { value: '+44', label: '???? +44 (UK)' },
+    { value: '+49', label: '???? +49 (Germany)' },
+    { value: '+39', label: '???? +39 (Italy)' },
+    { value: '+34', label: '???? +34 (Spain)' },
+    { value: '+32', label: '???? +32 (Belgium)' },
+    { value: '+41', label: '???? +41 (Switzerland)' },
+    { value: '+31', label: '???? +31 (Netherlands)' },
+    { value: '+352', label: '???? +352 (Luxembourg)' },
+    { value: '+213', label: '???? +213 (Algeria)' },
+    { value: '+212', label: '???? +212 (Morocco)' },
+    { value: '+216', label: '???? +216 (Tunisia)' },
+    { value: '+86', label: '???? +86 (China)' },
+    { value: '+91', label: '???? +91 (India)' },
+    { value: '+55', label: '???? +55 (Brazil)' },
+    { value: '+other', label: `?? ${t.other}` }
   ], [t.other]);
 
-  // Données structurées pour SEO et IA - version 2025
+  // Donn�es structur�es pour SEO et IA - version 2025
   const structuredData = useMemo(() => ({
     "@context": "https://schema.org",
     "@type": ["ContactPage", "WebPage"],
@@ -561,7 +561,7 @@ const Contact: React.FC = () => {
     }
   }), [t.pageTitle, t.pageDescription, language]);
 
-  // Meta tags pour réseaux sociaux et IA
+  // Meta tags pour r�seaux sociaux et IA
   useEffect(() => {
     const updateMetaTags = () => {
       // Open Graph
@@ -585,7 +585,7 @@ const Contact: React.FC = () => {
         meta.content = content;
       };
 
-      // Open Graph pour réseaux sociaux
+      // Open Graph pour r�seaux sociaux
       updateOrCreateMeta('og:title', t.pageTitle);
       updateOrCreateMeta('og:description', t.pageDescription);
       updateOrCreateMeta('og:type', 'website');
@@ -764,7 +764,7 @@ const Contact: React.FC = () => {
               </div>
             </aside>
 
-            {/* Contact Form - Design optimisé 2025 */}
+            {/* Contact Form - Design optimis� 2025 */}
             <section className="lg:col-span-8">
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
                 <div className="text-center mb-8">
@@ -885,7 +885,7 @@ const Contact: React.FC = () => {
                     <ErrorMessage error={formErrors.email} fieldName="email" />
                   </div>
 
-                  {/* Phone Number avec indicatif personnalisé */}
+                  {/* Phone Number avec indicatif personnalis� */}
                   <div className="group">
                     <label className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                       <Phone className="w-4 h-4 mr-2 text-red-500" aria-hidden="true" />
@@ -893,7 +893,7 @@ const Contact: React.FC = () => {
                     </label>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                      {/* Sélecteur d'indicatif */}
+                      {/* S�lecteur d'indicatif */}
                       <div className="sm:col-span-2">
                         <select
                           name="phoneCountryCode"
@@ -909,7 +909,7 @@ const Contact: React.FC = () => {
                               ? 'border-red-400 bg-white shadow-lg' 
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
-                          aria-label={language === 'fr' ? 'Sélectionner l\'indicatif pays' : 'Select country code'}
+                          aria-label={language === 'fr' ? 'S�lectionner l\'indicatif pays' : 'Select country code'}
                         >
                           {countryCodes.map(code => (
                             <option key={code.value} value={code.value}>
@@ -919,7 +919,7 @@ const Contact: React.FC = () => {
                         </select>
                       </div>
 
-                      {/* Champ indicatif personnalisé si "Autre" sélectionné */}
+                      {/* Champ indicatif personnalis� si "Autre" s�lectionn� */}
                       {formData.phoneCountryCode === '+other' && (
                         <div className="sm:col-span-2">
                           <input
@@ -944,7 +944,7 @@ const Contact: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Numéro de téléphone */}
+                      {/* Num�ro de t�l�phone */}
                       <div className={formData.phoneCountryCode === '+other' ? 'sm:col-span-1' : 'sm:col-span-3'}>
                         <input
                           type="tel"
@@ -1056,8 +1056,8 @@ const Contact: React.FC = () => {
                         >
                           <span className={spokenLanguages.length > 0 ? 'text-gray-900' : 'text-gray-500'}>
                             {spokenLanguages.length > 0 
-                              ? `${spokenLanguages.length} ${language === 'fr' ? 'langue(s) sélectionnée(s)' : 'language(s) selected'}`
-                              : language === 'fr' ? 'Sélectionnez vos langues...' : 'Select your languages...'
+                              ? `${spokenLanguages.length} ${language === 'fr' ? 'langue(s) s�lectionn�e(s)' : 'language(s) selected'}`
+                              : language === 'fr' ? 'S�lectionnez vos langues...' : 'Select your languages...'
                             }
                           </span>
                           <ChevronDown 
@@ -1104,7 +1104,7 @@ const Contact: React.FC = () => {
                                   className="ml-2 text-red-600 hover:text-red-800 focus:outline-none"
                                   aria-label={`Remove ${lang}`}
                                 >
-                                  ×
+                                  �
                                 </button>
                               </span>
                             ))}
@@ -1267,7 +1267,7 @@ const Contact: React.FC = () => {
                         checked={acceptTerms}
                         onChange={(e) => {
                           setAcceptTerms(e.target.checked);
-                          // Effacer l'erreur si cochée
+                          // Effacer l'erreur si coch�e
                           if (e.target.checked && formErrors.acceptTerms) {
                             setFormErrors(prev => {
                               const newErrors = { ...prev };
@@ -1287,7 +1287,7 @@ const Contact: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-red-600 hover:text-red-800 underline font-semibold transition-colors duration-200"
-                          onClick={(e) => e.stopPropagation()} // Empêche de cocher la case lors du clic sur le lien
+                          onClick={(e) => e.stopPropagation()} // Emp�che de cocher la case lors du clic sur le lien
                         >
                           {t.termsAndConditions}
                         </a>
@@ -1354,3 +1354,6 @@ const Contact: React.FC = () => {
 };
 
 export default Contact;
+
+
+

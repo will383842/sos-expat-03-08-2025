@@ -2,7 +2,7 @@ import React from 'react';
 import { Phone, ArrowRight, Shield, Clock, Globe, Users, Rocket, Smartphone, Home, Zap, CheckCircle, Award, ShieldCheck, Star } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
-// âœ… SOSIcon du code home.tsx
+// ? SOSIcon du code home.tsx
 const SOSIcon: React.FC<{ className?: string; size?: 'sm' | 'md' | 'lg' | 'xl' }> = ({ 
   className = "", 
   size = "md" 
@@ -18,7 +18,7 @@ const SOSIcon: React.FC<{ className?: string; size?: 'sm' | 'md' | 'lg' | 'xl' }
     <div className={`relative ${className}`}>
       <div className="absolute inset-0 bg-gradient-to-br from-red-600 to-rose-600 rounded-2xl blur-md opacity-70" />
       <div className={`relative bg-gradient-to-br from-red-500 to-rose-500 rounded-2xl shadow-2xl flex items-center justify-center ${sizeClasses[size]}`}>
-        <span className="text-white font-black">ðŸ“±</span>
+        <span className="text-white font-black">??</span>
       </div>
     </div>
   );
@@ -29,13 +29,13 @@ const CTASection: React.FC = () => {
   
   return (
     <section className="py-20 sm:py-32 bg-gradient-to-br from-red-700 to-red-800 relative overflow-hidden">
-      {/* âœ… Background effects du code home.tsx */}
+      {/* ? Background effects du code home.tsx */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(239,68,68,0.3)_0%,transparent_70%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_60%,rgba(244,63,94,0.2)_0%,transparent_70%)]" />
       </div>
 
-      {/* âœ… Ã‰lÃ©ments flottants du code home.tsx */}
+      {/* ? Éléments flottants du code home.tsx */}
       <div className="absolute inset-0">
         {[...Array(12)].map((_, i) => (
           <div
@@ -61,7 +61,7 @@ const CTASection: React.FC = () => {
 
           <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black mb-4 sm:mb-6">
             <span className="text-white block">
-              {language === 'fr' ? 'PrÃªt pour' : 'Ready for'}
+              {language === 'fr' ? 'Prêt pour' : 'Ready for'}
             </span>
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-red-300 via-rose-300 to-pink-300">
               {language === 'fr' ? 'l\'excellence ?' : 'excellence?'}
@@ -70,12 +70,12 @@ const CTASection: React.FC = () => {
           
           <p className="text-lg sm:text-xl lg:text-2xl text-white/80 mb-8 sm:mb-12 leading-relaxed max-w-3xl mx-auto">
             {language === 'fr'
-              ? 'Rejoignez l\'Ã©lite des expatriÃ©s qui ont choisi la tranquillitÃ© d\'esprit.'
+              ? 'Rejoignez l\'élite des expatriés qui ont choisi la tranquillité d\'esprit.'
               : 'Join the elite of expats who have chosen peace of mind.'
             }
             <span className="block mt-2 text-base sm:text-lg text-white/60">
               {language === 'fr'
-                ? 'Votre prochaine urgence sera votre derniÃ¨re inquiÃ©tude.'
+                ? 'Votre prochaine urgence sera votre dernière inquiétude.'
                 : 'Your next emergency will be your last worry.'
               }
             </span>
@@ -103,19 +103,19 @@ const CTASection: React.FC = () => {
             </span>
             <span className="flex items-center gap-2 hover:text-white transition-colors">
               <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
-              {language === 'fr' ? '100% sÃ©curisÃ©' : '100% secure'}
+              {language === 'fr' ? '100% sécurisé' : '100% secure'}
             </span>
             <span className="flex items-center gap-2 hover:text-white transition-colors">
               <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
-              {language === 'fr' ? 'Activation instantanÃ©e' : 'Instant activation'}
+              {language === 'fr' ? 'Activation instantanée' : 'Instant activation'}
             </span>
           </div>
 
           <div className="mt-8 sm:mt-12 grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto">
             {[
-              { icon: Award, text: language === 'fr' ? 'NÂ°1 des expatriÃ©s' : '#1 for expats' },
-              { icon: ShieldCheck, text: language === 'fr' ? 'DonnÃ©es protÃ©gÃ©es' : 'Data protected' },
-              { icon: Star, text: '4.9/5 Ã©toiles' }
+              { icon: Award, text: language === 'fr' ? 'N°1 des expatriés' : '#1 for expats' },
+              { icon: ShieldCheck, text: language === 'fr' ? 'Données protégées' : 'Data protected' },
+              { icon: Star, text: '4.9/5 étoiles' }
             ].map((item, i) => (
               <div key={i} className="text-center group hover:scale-105 transition-transform">
                 <item.icon className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-red-300 group-hover:text-white transition-colors" />
@@ -126,14 +126,14 @@ const CTASection: React.FC = () => {
         </div>
       </div>
 
-      {/* âœ… Styles CSS du code home.tsx */}
+      {/* ? Styles CSS du code home.tsx */}
       <style>{`
         @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
+%, 100% { transform: translateY(0px) rotate(0deg); }
           50% { transform: translateY(-20px) rotate(1deg); }
         }
         @keyframes glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
           50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.6); }
         }
         .animate-float {
@@ -148,3 +148,6 @@ const CTASection: React.FC = () => {
 };
 
 export default CTASection;
+
+
+

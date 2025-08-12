@@ -1497,3 +1497,5 @@ const RegisterLawyer: React.FC = () => {
 };
 
 export default RegisterLawyer;
+
+

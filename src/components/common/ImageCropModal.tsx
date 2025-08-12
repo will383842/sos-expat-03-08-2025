@@ -550,3 +550,5 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
 };
 
 export default ImageCropModal;
+
+

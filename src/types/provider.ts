@@ -129,7 +129,6 @@ export function normalizeProvider(providerData: unknown): Provider {
 
   // years of experience
   const yearsOfExperience = Math.max(
-    0,
     toNum(o.yearsOfExperience, toNum(o.yearsAsExpat, 1))
   );
 
@@ -268,3 +267,5 @@ export function createDefaultProvider(providerId: string): Provider {
     isActive: true
   };
 }
+
+

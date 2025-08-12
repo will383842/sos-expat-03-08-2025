@@ -16,3 +16,4 @@
      { path: '/admin/settings', label: 'Paramètres', icon: Settings },
      { path: '/admin/legal-documents', label: 'Documents légaux', icon: BookOpen },
    ];
+

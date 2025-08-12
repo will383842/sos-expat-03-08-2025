@@ -949,3 +949,4 @@ const PwaInstallBanner: React.FC = () => {
 };
 
 export default PwaInstallBanner;
+

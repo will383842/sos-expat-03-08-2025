@@ -1,13 +1,9 @@
-import React, { useEffect, Suspense } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { useDeviceDetection } from './hooks/useDeviceDetection.ts';
 import { registerSW, measurePerformance } from './utils/performance';
 import './App.css';
-import DashboardMessages from '@/components/dashboard/DashboardMessages';
-import AdminClientMessages from "@/pages/admin/AdminClientMessages";
-
-
 
 // Interface pour la configuration des routes
 interface RouteConfig {
@@ -19,66 +15,72 @@ interface RouteConfig {
   preload?: boolean;
 }
 
-// Composants critiques (chargés immédiatement)
-import Home from './pages/Home';
+// Composant de protection des routes (gardé statique car critique)
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
-// Lazy loading pour les pages moins critiques
-const Login = React.lazy(() => import('./pages/Login'));
-const Register = React.lazy(() => import('./pages/Register'));
-const RegisterExpat = React.lazy(() => import('./pages/RegisterExpat'));
-const RegisterLawyer = React.lazy(() => import('./pages/RegisterLawyer'));
-const RegisterClient = React.lazy(() => import('./pages/RegisterClient'));
-const EmailVerification = React.lazy(() => import('./pages/EmailVerification'));
-const PasswordReset = React.lazy(() => import('./pages/PasswordReset'));
+// ========== LAZY LOADING DE TOUTES LES PAGES ==========
 
-// User pages
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const ProfileEdit = React.lazy(() => import('./pages/ProfileEdit'));
+// Page d'accueil (maintenant lazy-loaded aussi)
+const Home = lazy(() => import('./pages/Home'));
 
-// Service pages
-const SOSCall = React.lazy(() => import('./pages/SOSCall'));
-const ExpatCall = React.lazy(() => import('./pages/ExpatCall'));
-const CallCheckout = React.lazy(() => import('./pages/CallCheckout'));
-const Checkout = React.lazy(() => import('./pages/Checkout'));
-const BookingRequest = React.lazy(() => import('./pages/BookingRequest'));
-const PaymentSuccess = React.lazy(() => import('./pages/PaymentSuccess'));
-const ProviderProfile = React.lazy(() => import('./pages/ProviderProfile'));
-const Providers = React.lazy(() => import('./pages/Providers'));
-const Pricing = React.lazy(() => import('./pages/Pricing'));
+// Pages d'authentification
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const RegisterExpat = lazy(() => import('./pages/RegisterExpat'));
+const RegisterLawyer = lazy(() => import('./pages/RegisterLawyer'));
+const RegisterClient = lazy(() => import('./pages/RegisterClient'));
+const EmailVerification = lazy(() => import('./pages/EmailVerification'));
+const PasswordReset = lazy(() => import('./pages/PasswordReset'));
 
-// Admin pages
-const AdminLogin = React.lazy(() => import('./pages/admin/AdminLogin'));
-const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminUsers = React.lazy(() => import('./pages/admin/AdminUsers'));
-const AdminCalls = React.lazy(() => import('./pages/admin/AdminCalls'));
-const AdminPayments = React.lazy(() => import('./pages/admin/AdminPayments'));
-const AdminReviews = React.lazy(() => import('./pages/admin/AdminReviews'));
-const AdminReports = React.lazy(() => import('./pages/admin/AdminReports'));
-const AdminSettings = React.lazy(() => import('./pages/admin/AdminSettings'));
-const AdminBackups = React.lazy(() => import('./pages/admin/AdminBackups'));
-const AdminApprovals = React.lazy(() => import('./pages/admin/AdminApprovals'));
-const AdminCountries = React.lazy(() => import('./pages/admin/AdminCountries'));
-const AdminDocuments = React.lazy(() => import('./pages/admin/AdminDocuments'));
-const AdminPromoCodes = React.lazy(() => import('./pages/admin/AdminPromoCodes'));
-const AdminLegalDocuments = React.lazy(() => import('./pages/admin/AdminLegalDocuments'));
-const AdminNotifications = React.lazy(() => import('./pages/admin/AdminNotifications'));
+// Pages utilisateur
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ProfileEdit = lazy(() => import('./pages/ProfileEdit'));
+const DashboardMessages = lazy(() => import('@/components/dashboard/DashboardMessages'));
 
-// Info pages
-const SEO = React.lazy(() => import('./pages/SEO'));
-const ServiceStatus = React.lazy(() => import('./pages/ServiceStatus'));
-const Consumers = React.lazy(() => import('./pages/Consumers'));
-const Cookies = React.lazy(() => import('./pages/Cookies'));
-const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
-const TermsExpats = React.lazy(() => import('./pages/TermsExpats'));
-const TermsLawyers = React.lazy(() => import('./pages/TermsLawyers'));
-const TermsClients = React.lazy(() => import('./pages/TermsClients'));
-const TestimonialDetail = React.lazy(() => import('./pages/TestimonialDetail'));
-const Testimonials = React.lazy(() => import('./pages/Testimonials'));
-const HelpCenter = React.lazy(() => import('./pages/HelpCenter'));
-const FAQ = React.lazy(() => import('./pages/FAQ'));
-const Contact = React.lazy(() => import('./pages/Contact'));
-const HowItWorks = React.lazy(() => import('./pages/HowItWorks'));
+// Pages de services
+const SOSCall = lazy(() => import('./pages/SOSCall'));
+const ExpatCall = lazy(() => import('./pages/ExpatCall'));
+const CallCheckout = lazy(() => import('./pages/CallCheckout'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const BookingRequest = lazy(() => import('./pages/BookingRequest'));
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
+const ProviderProfile = lazy(() => import('./pages/ProviderProfile'));
+const Providers = lazy(() => import('./pages/Providers'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+
+// Pages admin
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminCalls = lazy(() => import('./pages/admin/AdminCalls'));
+const AdminClientMessages = lazy(() => import("@/pages/admin/AdminClientMessages"));
+const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
+const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const AdminBackups = lazy(() => import('./pages/admin/AdminBackups'));
+const AdminApprovals = lazy(() => import('./pages/admin/AdminApprovals'));
+const AdminCountries = lazy(() => import('./pages/admin/AdminCountries'));
+const AdminDocuments = lazy(() => import('./pages/admin/AdminDocuments'));
+const AdminPromoCodes = lazy(() => import('./pages/admin/AdminPromoCodes'));
+const AdminLegalDocuments = lazy(() => import('./pages/admin/AdminLegalDocuments'));
+const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'));
+
+// Pages d'information
+const SEO = lazy(() => import('./pages/SEO'));
+const ServiceStatus = lazy(() => import('./pages/ServiceStatus'));
+const Consumers = lazy(() => import('./pages/Consumers'));
+const Cookies = lazy(() => import('./pages/Cookies'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsExpats = lazy(() => import('./pages/TermsExpats'));
+const TermsLawyers = lazy(() => import('./pages/TermsLawyers'));
+const TermsClients = lazy(() => import('./pages/TermsClients'));
+const TestimonialDetail = lazy(() => import('./pages/TestimonialDetail'));
+const Testimonials = lazy(() => import('./pages/Testimonials'));
+const HelpCenter = lazy(() => import('./pages/HelpCenter'));
+const FAQ = lazy(() => import('./pages/FAQ'));
+const Contact = lazy(() => import('./pages/Contact'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 
 // Configuration des routes
 const routeConfigs: RouteConfig[] = [
@@ -137,7 +139,6 @@ const protectedUserRoutes: RouteConfig[] = [
   { path: '/booking-request', component: BookingRequest, protected: true },
   { path: '/payment-success', component: PaymentSuccess, protected: true },
   { path: '/dashboard/messages', component: DashboardMessages, protected: true },
-  
 ];
 
 // Routes admin
@@ -289,6 +290,7 @@ const App: React.FC = () => {
       <div className={`App ${isMobile ? 'mobile-layout' : 'desktop-layout'}`}>
         <DefaultHelmet pathname={location.pathname} />
         
+        {/* SUSPENSE WRAPPER POUR TOUTES LES ROUTES */}
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
             {/* Routes publiques */}
@@ -307,3 +309,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

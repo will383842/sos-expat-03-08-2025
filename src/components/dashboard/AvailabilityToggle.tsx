@@ -484,3 +484,4 @@ const AvailabilityToggle: React.FC<AvailabilityToggleProps> = ({ className = '' 
 };
 
 export default AvailabilityToggle;
+

@@ -104,16 +104,16 @@ const SUPPORTED_LANGUAGES: Language[] = [
   },
 ];
 
-// Configuration de navigation pour i18n
+// Configuration de navigation pour i18n avec emojis modernes
 const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/', labelKey: 'nav.home', icon: '🏠' },
-  { path: '/sos-appel', labelKey: 'nav.viewProfiles', icon: '👥' },
-  { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💬' },
+  { path: '/', labelKey: 'nav.home', icon: '🏡' },
+  { path: '/sos-appel', labelKey: 'nav.viewProfiles', icon: '🤝' },
+  { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💎' },
 ];
 
 const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '⚡' },
-  { path: '/pricing', labelKey: 'nav.pricing', icon: '💎' },
+  { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '🚀' },
+  { path: '/pricing', labelKey: 'nav.pricing', icon: '⚡' },
 ];
 
 const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
@@ -232,7 +232,7 @@ const HeaderAvailabilityToggle = memo(() => {
           )}
         </>
       )}
-      <span>{isOnline ? `🟢 ${t.online}` : `🔴 ${t.offline}`}</span>
+      <span>{isOnline ? `🟢 ${t.online}` : `⚫ ${t.offline}`}</span>
     </button>
   );
 });

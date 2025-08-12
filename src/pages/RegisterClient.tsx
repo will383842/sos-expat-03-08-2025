@@ -1126,3 +1126,4 @@ const RegisterClient: React.FC = () => {
 
 // Export avec React.memo pour optimiser les re-renders
 export default React.memo(RegisterClient);
+

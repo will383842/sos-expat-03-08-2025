@@ -41,7 +41,6 @@ const canonical: Record<string, LatLng> = {
 
 // alias FR/variantes -> clé canonique
 const aliases: Record<string, string> = {
-  "france": "france",
   "autriche": "austria",
   "allemagne": "germany",
   "italie": "italy",
@@ -72,7 +71,6 @@ const aliases: Record<string, string> = {
   "algerie": "algeria",
   "algérie": "algeria",
   "tunisie": "tunisia",
-  "egypte": "egypt",
   "egypte": "egypt",
   "emirats arabes unis": "united arab emirates",
   "emirats": "united arab emirates",

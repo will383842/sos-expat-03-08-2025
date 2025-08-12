@@ -413,3 +413,4 @@ const ReviewsManagement: React.FC = () => {
 };
 
 export default ReviewsManagement;
+

@@ -22,7 +22,7 @@ import Layout from '../components/layout/Layout';
 import SEOHead from '../components/layout/SEOHead';
 import HeroSection from '../components/home/HeroSection';
 import ProfileCarousel from '../components/home/ProfileCarousel';
-import { WorldMap } from '../components/map/WorldMap';
+
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -708,7 +708,7 @@ const Home: React.FC = () => {
 
       {/* Map Section - Utilise le composant existant */}
       <div className="bg-gradient-to-br from-gray-50 to-blue-50">
-        <WorldMap />
+        
       </div>
 
       {/* Témoignages */}
@@ -721,7 +721,7 @@ const Home: React.FC = () => {
       <FinalCTASection />
 
       {/* Styles globaux pour les animations */}
-      <style jsx global>{`
+      <style>{`
         @keyframes float {
           0%, 100% {
             transform: translateY(0px);
@@ -811,15 +811,6 @@ const Home: React.FC = () => {
         /* Optimisation des images */
         img {
           content-visibility: auto;
-        }
-
-        /* Préchargement des polices critiques */
-        @font-face {
-          font-family: 'Inter';
-          font-style: normal;
-          font-weight: 400 900;
-          font-display: swap;
-          src: url('/fonts/inter-var.woff2') format('woff2');
         }
 
         /* Variables CSS pour la cohérence */

@@ -21,3 +21,4 @@ const EmailVerification: React.FC = () => {
 };
 
 export default EmailVerification;
+

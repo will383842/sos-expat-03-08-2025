@@ -285,3 +285,4 @@ const HowItWorksPage: React.FC = () => {
 };
 
 export default HowItWorksPage;
+

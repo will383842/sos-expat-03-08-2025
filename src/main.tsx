@@ -7,9 +7,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AppProvider } from './contexts/AppContext';
 import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
@@ -49,13 +46,13 @@ const resources = {
           goOffline: "Se rendre indisponible"
         },
         errors: {
-          notApproved: "Votre profil n'est pas encore approuvÃ©.",
-          updateFailed: "Ã‰chec de la mise Ã  jour de votre statut.",
+          notApproved: "Votre profil n'est pas encore approuvé.",
+          updateFailed: "Échec de la mise à jour de votre statut.",
           syncFailed: "Erreur de synchronisation du statut."
         }
       },
       common: {
-        refresh: "RafraÃ®chir"
+        refresh: "Rafraîchir"
       }
     }
   }
@@ -90,3 +87,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </HelmetProvider>
   </React.StrictMode>
 );
+
+
+

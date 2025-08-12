@@ -1,4 +1,4 @@
-import { 
+﻿import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   sendEmailVerification,
@@ -482,7 +482,6 @@ export const checkUserRole = (
   const rolesArray = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
   return rolesArray.includes(user.role);
 };
-
 
 // Vérifier si l'utilisateur est vérifié par email
 export const isEmailVerified = async (): Promise<boolean> => {

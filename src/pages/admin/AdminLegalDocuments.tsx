@@ -635,3 +635,4 @@ const AdminLegalDocuments: React.FC = () => {
 };
 
 export default AdminLegalDocuments;
+

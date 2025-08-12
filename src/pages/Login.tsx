@@ -1196,3 +1196,4 @@ const Login: React.FC = () => {
 
 // Export with React.memo for performance optimization - COMPLET
 export default React.memo(Login);
+

@@ -11,20 +11,20 @@ import ModernProfileCard, { Provider } from './ModernProfileCard';
 // Fonction utilitaire pour les langues (VOTRE CODE EXACT)
 const getLanguageLabel = (language: string): string => {
   const LANGUAGE_MAP: Record<string, string> = {
-    'Fran√ßais': 'Fran√ßais',
-    'French': 'Fran√ßais',
-    'fr': 'Fran√ßais',
-    'FR': 'Fran√ßais',
+    'FranÁais': 'FranÁais',
+    'French': 'FranÁais',
+    'fr': 'FranÁais',
+    'FR': 'FranÁais',
     'Anglais': 'Anglais',
     'English': 'Anglais',
     'en': 'Anglais',
     'EN': 'Anglais',
     'Espagnol': 'Espagnol',
     'Spanish': 'Espagnol',
-    'Espa√±ol': 'Espagnol',
+    'EspaÒol': 'Espagnol',
     'es': 'Espagnol',
     'ES': 'Espagnol',
-    'Portugu√™s': 'Portugais',
+    'PortuguÍs': 'Portugais',
     'Portuguese': 'Portugais',
     'pt': 'Portugais',
     'PT': 'Portugais',
@@ -36,19 +36,19 @@ const getLanguageLabel = (language: string): string => {
     'Italian': 'Italien',
     'it': 'Italien',
     'IT': 'Italien',
-    'Nederlands': 'N√©erlandais',
-    'Dutch': 'N√©erlandais',
-    'nl': 'N√©erlandais',
-    'NL': 'N√©erlandais',
-    '–†—É—Å—Å–∫–∏–π': 'Russe',
+    'Nederlands': 'NÈerlandais',
+    'Dutch': 'NÈerlandais',
+    'nl': 'NÈerlandais',
+    'NL': 'NÈerlandais',
+    '???????': 'Russe',
     'Russian': 'Russe',
     'ru': 'Russe',
     'RU': 'Russe',
-    '‰∏≠Êñá': 'Chinois',
+    '??': 'Chinois',
     'Chinese': 'Chinois',
     'zh': 'Chinois',
     'ZH': 'Chinois',
-    'ÿßŸÑÿπÿ±ÿ®Ÿäÿ©': 'Arabe',
+    '???????': 'Arabe',
     'Arabic': 'Arabe',
     'ar': 'Arabe',
     'AR': 'Arabe'
@@ -61,24 +61,24 @@ const DEFAULT_AVATAR = '/default-avatar.png';
 
 // Debug Firebase (VOTRE FONCTION EXACTE)
 const debugFirebaseConnection = async (): Promise<{ success: boolean; totalDocs: number; error?: string }> => {
-  console.log('üîç === DEBUG FIREBASE CONNECTION ===');
+  console.log('?? === DEBUG FIREBASE CONNECTION ===');
   
   try {
     if (!db) {
-      throw new Error('Firebase non initialis√©');
+      throw new Error('Firebase non initialisÈ');
     }
     
     const collectionRef = collection(db, 'sos_profiles');
     const allDocsSnapshot = await getDocs(query(collectionRef, fsLimit(50)));
     const totalDocs = allDocsSnapshot.size;
     
-    console.log('üìä Total documents trouv√©s:', totalDocs);
+    console.log('?? Total documents trouvÈs:', totalDocs);
     
     return { success: true, totalDocs };
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-    console.error('‚ùå Debug Firebase failed:', errorMessage);
+    console.error('? Debug Firebase failed:', errorMessage);
     return { success: false, totalDocs: 0, error: errorMessage };
   }
 };
@@ -90,12 +90,12 @@ interface ProfileCarouselProps {
   pageSize?: number;
 }
 
-// === CONFIGURATION OPTIMIS√âE ===
+// === CONFIGURATION OPTIMIS…E ===
 const MAX_VISIBLE = 20;
 const ROTATE_INTERVAL_MS = 30000;
 const ROTATE_COUNT = 8;
 
-// Composant ProfileCarousel - VOTRE LOGIQUE M√âTIER EXACTE SANS TEST_PROVIDERS
+// Composant ProfileCarousel - VOTRE LOGIQUE M…TIER EXACTE SANS TEST_PROVIDERS
 const ProfileCarousel: React.FC<ProfileCarouselProps> = ({ 
   className = "",
   showStats = false,
@@ -119,7 +119,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
   // Navigation avec URL SEO (VOTRE LOGIQUE EXACTE)
   const handleProfileClick = useCallback((provider: Provider) => {
-    console.log('üîó Navigation vers le profil de:', provider.name);
+    console.log('?? Navigation vers le profil de:', provider.name);
     
     const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
     const countrySlug = provider.country
@@ -138,7 +138,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     try {
       sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
     } catch (error) {
-      console.warn('‚ö†Ô∏è Erreur sessionStorage:', error);
+      console.warn('?? Erreur sessionStorage:', error);
     }
     
     navigate(seoUrl, {
@@ -149,36 +149,36 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     });
   }, [navigate]);
 
-  // Algorithme de s√©lection intelligente pour la rotation
+  // Algorithme de sÈlection intelligente pour la rotation
   const selectVisibleProviders = useCallback((allProviders: Provider[]): Provider[] => {
     if (allProviders.length === 0) return [];
 
-    // S√©parer en ligne et hors ligne
+    // SÈparer en ligne et hors ligne
     const online = allProviders.filter(p => p.isOnline);
     const offline = allProviders.filter(p => !p.isOnline);
 
-    // M√©langer chaque groupe
+    // MÈlanger chaque groupe
     const shuffledOnline = online.sort(() => Math.random() - 0.5);
     const shuffledOffline = offline.sort(() => Math.random() - 0.5);
 
-    // Prioriser les profils en ligne, puis compl√©ter avec offline
+    // Prioriser les profils en ligne, puis complÈter avec offline
     const prioritized = [...shuffledOnline, ...shuffledOffline];
 
-    // √âviter les profils r√©cemment affich√©s si possible
+    // …viter les profils rÈcemment affichÈs si possible
     const notRecent = prioritized.filter(p => !recentlyShown.current.has(p.id));
     
     let selected = notRecent.slice(0, MAX_VISIBLE);
     
-    // Si pas assez, compl√©ter avec tous les profils
+    // Si pas assez, complÈter avec tous les profils
     if (selected.length < MAX_VISIBLE) {
       const remaining = prioritized.filter(p => !selected.includes(p));
       selected = [...selected, ...remaining].slice(0, MAX_VISIBLE);
     }
 
-    // M√©moriser les profils affich√©s
+    // MÈmoriser les profils affichÈs
     selected.forEach(p => recentlyShown.current.add(p.id));
     
-    // Nettoyer le cache de r√©cence s'il devient trop grand
+    // Nettoyer le cache de rÈcence s'il devient trop grand
     if (recentlyShown.current.size > 40) {
       const oldEntries = Array.from(recentlyShown.current).slice(0, 20);
       oldEntries.forEach(id => recentlyShown.current.delete(id));
@@ -187,24 +187,24 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return selected;
   }, []);
 
-  // Chargement des providers avec Firebase (VOTRE LOGIQUE M√âTIER EXACTE)
+  // Chargement des providers avec Firebase (VOTRE LOGIQUE M…TIER EXACTE)
   const loadInitialProviders = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log('üöÄ === D√âBUT CHARGEMENT PROVIDERS ===');
+      console.log('?? === D…BUT CHARGEMENT PROVIDERS ===');
 
       // Debug Firebase (VOTRE FONCTION EXACTE)
       const debugResult = await debugFirebaseConnection();
       
       if (!debugResult.success) {
-        throw new Error(debugResult.error || '√âchec de connexion Firebase');
+        throw new Error(debugResult.error || '…chec de connexion Firebase');
       }
 
       // Si pas de documents, ne rien afficher (PAS DE TEST_PROVIDERS)
       if (debugResult.totalDocs === 0) {
-        console.log('üìã Aucun document Firebase trouv√©');
+        console.log('?? Aucun document Firebase trouvÈ');
         setOnlineProviders([]);
         setVisibleProviders([]);
         return;
@@ -219,16 +219,16 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       );
       
       const snapshot = await getDocs(sosProfilesQuery);
-      console.log('üìä Documents avec filtres:', snapshot.size);
+      console.log('?? Documents avec filtres:', snapshot.size);
       
       if (snapshot.empty) {
-        console.log('‚ö†Ô∏è Aucun document avec filtres');
+        console.log('?? Aucun document avec filtres');
         setOnlineProviders([]);
         setVisibleProviders([]);
         return;
       }
 
-      // Transformer les donn√©es (VOTRE LOGIQUE EXACTE)
+      // Transformer les donnÈes (VOTRE LOGIQUE EXACTE)
       const transformedProviders: Provider[] = [];
       
       for (const doc of snapshot.docs) {
@@ -241,7 +241,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
           if (!country) continue;
 
-          // G√©rer l'avatar (VOTRE LOGIQUE EXACTE)
+          // GÈrer l'avatar (VOTRE LOGIQUE EXACTE)
           let avatar = data.profilePhoto || data.photoURL || data.avatar || '';
           if (avatar && avatar.startsWith('user_uploads/')) {
             try {
@@ -260,7 +260,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             type: type as 'lawyer' | 'expat',
             country,
             nationality: data.nationality || data.nationalite || undefined,
-            languages: Array.isArray(data.languages) ? data.languages : ['Fran√ßais'],
+            languages: Array.isArray(data.languages) ? data.languages : ['FranÁais'],
             specialties: Array.isArray(data.specialties) ? data.specialties : [],
             rating: typeof data.rating === 'number' && data.rating >= 0 && data.rating <= 5 ? data.rating : 4.5,
             reviewCount: typeof data.reviewCount === 'number' && data.reviewCount >= 0 ? data.reviewCount : 0,
@@ -284,19 +284,19 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           }
 
         } catch (error) {
-          console.error('‚ùå Erreur transformation document:', doc.id, error);
+          console.error('? Erreur transformation document:', doc.id, error);
         }
       }
 
-      console.log('‚úÖ Profils transform√©s:', transformedProviders.length);
+      console.log('? Profils transformÈs:', transformedProviders.length);
       setOnlineProviders(transformedProviders.slice(0, pageSize));
       
-      // S√©lection initiale intelligente pour la rotation
+      // SÈlection initiale intelligente pour la rotation
       const initialVisible = selectVisibleProviders(transformedProviders);
       setVisibleProviders(initialVisible);
 
     } catch (err) {
-      console.error('‚ùå Erreur lors du chargement:', err);
+      console.error('? Erreur lors du chargement:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(`Erreur de chargement: ${errorMessage}`);
       
@@ -312,39 +312,39 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
   const rotateVisibleProviders = useCallback(() => {
     if (onlineProviders.length === 0) return;
 
-    console.log('üîÑ Rotation des profils...');
+    console.log('?? Rotation des profils...');
     
     // Garder une partie des profils actuels, remplacer le reste
     const keepCount = Math.max(0, MAX_VISIBLE - ROTATE_COUNT);
     const toKeep = visibleProviders.slice(0, keepCount);
     
-    // S√©lectionner de nouveaux profils du pool
+    // SÈlectionner de nouveaux profils du pool
     const availableForRotation = onlineProviders.filter(p => 
       !toKeep.find(kept => kept.id === p.id) && 
       !recentlyShown.current.has(p.id)
     );
     
-    // Si pas assez de nouveaux profils, rel√¢cher la contrainte de r√©cence
+    // Si pas assez de nouveaux profils, rel‚cher la contrainte de rÈcence
     let newProviders = availableForRotation.slice(0, ROTATE_COUNT);
     if (newProviders.length < ROTATE_COUNT) {
       const fallback = onlineProviders.filter(p => !toKeep.find(kept => kept.id === p.id));
       newProviders = [...newProviders, ...fallback].slice(0, ROTATE_COUNT);
     }
     
-    // M√©langer les nouveaux profils
+    // MÈlanger les nouveaux profils
     const shuffledNew = newProviders.sort(() => Math.random() - 0.5);
     
-    // Combiner et m√©langer le r√©sultat final
+    // Combiner et mÈlanger le rÈsultat final
     const rotated = [...toKeep, ...shuffledNew].sort(() => Math.random() - 0.5);
     
     setVisibleProviders(rotated.slice(0, MAX_VISIBLE));
     setRotationIndex(prev => prev + 1);
     
-    // M√©moriser les nouveaux profils affich√©s
+    // MÈmoriser les nouveaux profils affichÈs
     shuffledNew.forEach(p => recentlyShown.current.add(p.id));
   }, [onlineProviders, visibleProviders]);
 
-  // Mise √† jour du statut en ligne en temps r√©el (VOTRE LOGIQUE EXACTE)
+  // Mise ‡ jour du statut en ligne en temps rÈel (VOTRE LOGIQUE EXACTE)
   const updateProviderOnlineStatus = useCallback((providerId: string, isOnline: boolean) => {
     setOnlineProviders(prevProviders => 
       prevProviders.map(provider => 
@@ -363,7 +363,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     );
   }, []);
 
-  // Configuration de l'√©coute en temps r√©el (VOTRE LOGIQUE EXACTE)
+  // Configuration de l'Ècoute en temps rÈel (VOTRE LOGIQUE EXACTE)
   const setupRealtimeListeners = useCallback(() => {
     if (!isUserConnected || visibleProviders.length === 0) {
       return () => {};
@@ -390,7 +390,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           });
         },
         (error) => {
-          console.error(`‚ùå Erreur listener pour ${provider.id}:`, error);
+          console.error(`? Erreur listener pour ${provider.id}:`, error);
         }
       );
 
@@ -432,7 +432,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return cleanup;
   }, [setupRealtimeListeners, visibleProviders.length]);
 
-  // Stats calcul√©es (VOTRE LOGIQUE EXACTE)
+  // Stats calculÈes (VOTRE LOGIQUE EXACTE)
   const stats = useMemo(() => ({
     total: onlineProviders.length,
     online: onlineProviders.filter(p => p.isOnline).length,
@@ -440,7 +440,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     experts: onlineProviders.filter(p => p.type === 'expat').length
   }), [onlineProviders]);
 
-  // Gestion des √©tats (VOTRE LOGIQUE EXACTE)
+  // Gestion des Ètats (VOTRE LOGIQUE EXACTE)
   if (isLoading) {
     return (
       <div className={`flex justify-center items-center py-8 ${className}`}>
@@ -458,7 +458,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           onClick={loadInitialProviders}
           className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
         >
-          R√©essayer
+          RÈessayer
         </button>
       </div>
     );
@@ -471,20 +471,20 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return (
       <div className={`text-center py-8 ${className}`}>
         <div className="max-w-md mx-auto">
-          <div className="text-6xl mb-4">üîç</div>
+          <div className="text-6xl mb-4">??</div>
           <h3 className="text-lg font-semibold text-gray-800 mb-2">
             Aucun expert disponible
           </h3>
           <p className="text-gray-600 text-sm mb-4">
-            Aucun profil n'a √©t√© trouv√© dans la base de donn√©es Firebase.
+            Aucun profil n'a ÈtÈ trouvÈ dans la base de donnÈes Firebase.
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
-            <h4 className="font-semibold text-blue-800 mb-2">V√©rifications :</h4>
+            <h4 className="font-semibold text-blue-800 mb-2">VÈrifications :</h4>
             <ul className="text-blue-700 text-sm space-y-1">
-              <li>‚Ä¢ Firebase est-il correctement configur√© ?</li>
-              <li>‚Ä¢ Y a-t-il des profils dans 'sos_profiles' ?</li>
-              <li>‚Ä¢ Les profils ont-ils isVisible: true ?</li>
-              <li>‚Ä¢ Les types sont-ils 'lawyer' ou 'expat' ?</li>
+              <li>ï Firebase est-il correctement configurÈ ?</li>
+              <li>ï Y a-t-il des profils dans 'sos_profiles' ?</li>
+              <li>ï Les profils ont-ils isVisible: true ?</li>
+              <li>ï Les types sont-ils 'lawyer' ou 'expat' ?</li>
             </ul>
           </div>
         </div>
@@ -519,7 +519,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       {onlineProviders.length > MAX_VISIBLE && (
         <div className="flex justify-center mb-4">
           <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-            Rotation automatique ‚Ä¢ {displayProviders.filter(p => p.isOnline).length}/{displayProviders.length} en ligne
+            Rotation automatique ï {displayProviders.filter(p => p.isOnline).length}/{displayProviders.length} en ligne
           </div>
         </div>
       )}
@@ -557,7 +557,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       {/* Styles pour l'animation (VOTRE CSS EXACT) */}
       <style>{`
         @keyframes infinite-scroll {
-          0% { transform: translateX(0); }
+% { transform: translateX(0); }
           100% { transform: translateX(-33.333%); }
         }
         
@@ -598,3 +598,6 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
 export default React.memo(ProfileCarousel);
 export type { Provider };
+
+
+

@@ -20,6 +20,8 @@ import {
   getRedirectResult,
   reload,
   sendEmailVerification,
+  fetchSignInMethodsForEmail, // ✅ ajouté
+  deleteUser,                 // ✅ ajouté
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
@@ -114,6 +116,18 @@ const getDeviceInfo = (): DeviceInfo => {
 
   return { type, os, browser, isOnline: navigator.onLine, connectionSpeed };
 };
+
+/* =========================================================
+   Helpers email (locaux, pas de nouveau fichier)
+   ========================================================= */
+const normalizeEmail = (s: string) =>
+  (s ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\u00A0/g, '')          // NBSP
+    .replace(/[\u2000-\u200D]/g, ''); // espaces fines / zero-width
+
+const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 type LogPayload = Record<string, unknown>;
 const logAuthEvent = async (type: string, data: LogPayload = {}): Promise<void> => {
@@ -724,32 +738,59 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     })();
   }, []);
 
+  // ✅ REGISTER corrigé
   const register = async (userData: Partial<User>, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
-    if (!userData.role || !['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
-      const msg = 'Rôle utilisateur invalide ou manquant.';
-      setError(msg);
-      setIsLoading(false);
-      throw new Error(msg);
-    }
-    if (!userData.email || !password) {
-      const msg = 'Email et mot de passe sont obligatoires';
-      setError(msg);
-      setIsLoading(false);
-      throw new Error(msg);
-    }
-    if (password.length < 6) {
-      const msg = 'Le mot de passe doit contenir au moins 6 caractères';
-      setError(msg);
-      setIsLoading(false);
-      throw new Error(msg);
-    }
-
     try {
-      const cred = await createUserWithEmailAndPassword(auth, userData.email, password);
+      // Vérifs de base
+      if (!userData.role || !['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
+        const e: any = new Error('Rôle utilisateur invalide ou manquant.');
+        e.code = 'sos/invalid-role';
+        throw e;
+      }
+      if (!userData.email || !password) {
+        const e: any = new Error('Email et mot de passe sont obligatoires');
+        e.code = 'sos/missing-credentials';
+        throw e;
+      }
+      if (password.length < 6) {
+        const e: any = new Error('Le mot de passe doit contenir au moins 6 caractères');
+        e.code = 'auth/weak-password';
+        throw e;
+      }
 
+      // Normalisation + validation email
+      const email = normalizeEmail(userData.email);
+      if (!isValidEmail(email)) {
+        const e: any = new Error('Adresse email invalide');
+        e.code = 'auth/invalid-email';
+        throw e;
+      }
+
+      // ✅ Pré-check dans Auth (source de vérité)
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      if (methods.length > 0) {
+        if (methods.includes('password')) {
+          const e: any = new Error('Cet email est déjà associé à un compte.');
+          e.code = 'auth/email-already-in-use';
+          throw e;
+        }
+        if (methods.includes('google.com')) {
+          const e: any = new Error('Cet email est lié à un compte Google.');
+          e.code = 'sos/email-linked-to-google';
+          throw e;
+        }
+        const e: any = new Error("Email lié à un autre fournisseur d'identité.");
+        e.code = 'sos/email-linked-to-other';
+        throw e;
+      }
+
+      // ✅ Création Auth
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Photo de profil finale
       let finalProfilePhotoURL = '/default-avatar.png';
       if (userData.profilePhoto?.startsWith('data:image')) {
         finalProfilePhotoURL = await processProfilePhoto(userData.profilePhoto, cred.user.uid, 'manual');
@@ -757,15 +798,23 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         finalProfilePhotoURL = userData.profilePhoto;
       }
 
-      await createUserDocumentInFirestore(cred.user, {
-        ...userData,
-        role: userData.role as User['role'],
-        profilePhoto: finalProfilePhotoURL,
-        photoURL: finalProfilePhotoURL,
-        avatar: finalProfilePhotoURL,
-        provider: 'password',
-      });
+      // ✅ Création Firestore + rollback si échec (évite comptes "fantômes")
+      try {
+        await createUserDocumentInFirestore(cred.user, {
+          ...userData,
+          email, // email normalisé
+          role: userData.role as User['role'],
+          profilePhoto: finalProfilePhotoURL,
+          photoURL: finalProfilePhotoURL,
+          avatar: finalProfilePhotoURL,
+          provider: 'password',
+        });
+      } catch (docErr) {
+        try { await deleteUser(cred.user); } catch {}
+        throw docErr;
+      }
 
+      // MAJ du profil Auth (non bloquant)
       if (userData.firstName || userData.lastName) {
         await updateProfile(cred.user, {
           displayName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
@@ -773,7 +822,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         }).catch(() => {});
       }
 
-      // Essayer d’envoyer l’email de vérification (non bloquant)
+      // Email de vérification (non bloquant)
       try {
         await sendEmailVerification(cred.user);
       } catch {
@@ -781,11 +830,36 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       }
 
       await logAuthEvent('registration_success', { userId: cred.user.uid, role: userData.role });
-    } catch (e) {
-      const msg = 'Inscription impossible. Réessayez.';
+    } catch (e: any) {
+      // Mapping d'erreurs clair (ne pas tout mapper vers "email déjà utilisé")
+      let msg = 'Inscription impossible. Réessayez.';
+      switch (e?.code) {
+        case 'auth/email-already-in-use':
+          msg = 'Cet email est déjà associé à un compte. Connectez-vous ou réinitialisez votre mot de passe.';
+          break;
+        case 'sos/email-linked-to-google':
+          msg = 'Cet email est lié à un compte Google. Utilisez « Se connecter avec Google » puis complétez votre profil.';
+          break;
+        case 'auth/invalid-email':
+          msg = 'Adresse email invalide.';
+          break;
+        case 'auth/weak-password':
+          msg = 'Le mot de passe doit contenir au moins 6 caractères.';
+          break;
+        case 'sos/invalid-role':
+        case 'sos/missing-credentials':
+          msg = e.message || msg;
+          break;
+        default:
+          // garde message générique
+          break;
+      }
       setError(msg);
-      await logAuthEvent('registration_error', { error: e instanceof Error ? e.message : String(e) });
-      throw new Error(msg);
+      await logAuthEvent('registration_error', {
+        errorCode: e?.code ?? 'unknown',
+        errorMessage: e?.message ?? String(e),
+      });
+      throw e;
     } finally {
       setIsLoading(false);
     }
@@ -881,7 +955,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     deviceInfo,
     login,
     loginWithGoogle,
-    register,
+    register, // ✅ version corrigée
     logout,
     sendVerificationEmail: sendVerificationEmailSafe,
     checkEmailVerification,

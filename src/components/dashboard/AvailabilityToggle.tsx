@@ -26,8 +26,24 @@ interface AvailabilityToggleProps {
   className?: string;
 }
 
-// Helper sûr pour récupérer un userId string sans `any`
-// Utilise `unknown` + affinage de type pour satisfaire eslint `no-explicit-any`
+/** -------- Types locaux anti-any -------- */
+interface AppUser {
+  uid?: string;
+  id?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  role?: 'lawyer' | 'expat' | 'admin' | string;
+  type?: 'lawyer' | 'expat' | string;
+  isOnline?: boolean;
+  isApproved?: boolean;
+  isVerified?: boolean;
+}
+type FireUserDoc = { isOnline?: boolean };
+type FireSosDoc  = { isOnline?: boolean; uid?: string };
+
+/** Helper sûr pour récupérer un userId string sans any */
 type MaybeId = { id?: unknown; uid?: unknown };
 const getUserId = (u: unknown): string | null => {
   if (typeof u !== 'object' || u === null) return null;
@@ -38,13 +54,14 @@ const getUserId = (u: unknown): string | null => {
 };
 
 const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => {
-  // ✅ Hooks en tête
+  // ✅ Hooks
   const { user } = useAuth();
+  const authUser = (user as unknown) as AppUser | null;
   const { t, i18n } = useTranslation();
 
-  const userId = useMemo(() => getUserId(user), [user]);
+  const userId = useMemo(() => getUserId(authUser), [authUser]);
 
-  const [isAvailable, setIsAvailable] = useState(false);
+  const [isAvailable, setIsAvailable] = useState<boolean>(!!authUser?.isOnline);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
@@ -54,21 +71,21 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
   });
   const [statusSyncError, setStatusSyncError] = useState<string | null>(null);
 
-  // 🛡️ Protection contre les boucles de sync
+  // 🛡️ Protection anti-boucles de sync
   const skipNextSyncRef = useRef(false);
   const skipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Rôles
   const isProvider = useMemo(() => {
-    return user?.role === 'lawyer' || user?.role === 'expat';
-  }, [user?.role]);
+    return authUser?.role === 'lawyer' || authUser?.role === 'expat' || authUser?.type === 'lawyer' || authUser?.type === 'expat';
+  }, [authUser?.role, authUser?.type]);
 
   const isApprovedProvider = useMemo(() => {
-    if (!isProvider || !user) return false;
-    return user.role === 'expat' || (user.role === 'lawyer' && user.isApproved === true);
-  }, [isProvider, user]);
+    if (!isProvider || !authUser) return false;
+    return authUser.role === 'expat' || (authUser.role === 'lawyer' && authUser.isApproved === true);
+  }, [isProvider, authUser]);
 
-  // Log d'activité
+  /** ---------- Logs d'activité ---------- */
   const createStatusLog = useCallback(
     async (previousStatus: boolean, newStatus: boolean) => {
       if (!userId) return;
@@ -87,66 +104,113 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
     [userId]
   );
 
-  // Mise à jour/creation du profil SOS
-  const updateSOSProfile = useCallback(
-    async (newStatus: boolean) => {
-      if (!userId || !user || !isProvider) return;
+  /** ---------- Écritures CORRIGÉES (vérité = sos_profiles) ---------- */
+  const writeSosProfile = useCallback(async (newStatus: boolean) => {
+    if (!userId || !authUser || !isProvider) return;
 
-      const sosProfileRef = doc(db, 'sos_profiles', userId);
-      const updateData = {
-        isOnline: newStatus,
-        availability: newStatus ? 'available' : 'unavailable',
-        lastStatusChange: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        isVisible: true,
-        isVisibleOnMap: true,
-      };
+    const sosRef = doc(db, 'sos_profiles', userId);
+    const updateData = {
+      isOnline: newStatus,
+      availability: newStatus ? 'available' : 'unavailable',
+      lastStatusChange: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isVisible: true,
+      isVisibleOnMap: true,
+    };
 
+    try {
+      // 1) Update direct
+      await updateDoc(sosRef, updateData);
+      return;
+    } catch (error) {
+      // 2) Existe ?
       try {
-        await updateDoc(sosProfileRef, updateData);
-      } catch (error) {
-        console.warn('updateDoc sos_profiles a échoué, tentative fallback...', error);
-        try {
-          const sosProfilesQuery = query(
-            collection(db, 'sos_profiles'),
-            where('uid', '==', userId)
-          );
-          const sosProfilesSnapshot = await getDocs(sosProfilesQuery);
+        const snap = await getDoc(sosRef);
+        if (snap.exists()) {
+          console.error('❌ Document exists but update failed:', error);
+          throw error;
+        }
 
-          if (!sosProfilesSnapshot.empty) {
+        // 3) Créer si inexistant
+        const newProfile = {
+          uid: userId,
+          type: authUser.role || authUser.type,
+          fullName:
+            authUser.fullName ||
+            `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+            'Expert',
+          email: authUser.email || '',
+          ...updateData,
+          isActive: true,
+          isApproved: (authUser.role || authUser.type) !== 'lawyer',
+          isVerified: !!authUser.isVerified,
+          rating: 5.0,
+          reviewCount: 0,
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(sosRef, newProfile, { merge: true });
+        return;
+      } catch (createError) {
+        console.warn('⚠️ Création SOS directe échouée, fallback query...', createError);
+        // 4) Fallback query par uid
+        try {
+          const qSos = query(collection(db, 'sos_profiles'), where('uid', '==', userId));
+          const found = await getDocs(qSos);
+          if (!found.empty) {
             const batch = writeBatch(db);
-            sosProfilesSnapshot.docs.forEach((d) => batch.update(d.ref, updateData));
+            found.docs.forEach((d) => batch.update(d.ref, updateData));
             await batch.commit();
-          } else {
-            // Créer si inexistant
-            const newProfileData = {
+            return;
+          }
+          // 5) Dernier recours : force create
+          await setDoc(
+            sosRef,
+            {
               uid: userId,
-              type: user.role,
+              type: authUser.role || authUser.type,
               fullName:
-                user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+                authUser.fullName ||
+                `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+                'Expert',
+              email: authUser.email || '',
               ...updateData,
               isActive: true,
-              isApproved: user.role !== 'lawyer',
-              isVerified: false,
+              isApproved: (authUser.role || authUser.type) !== 'lawyer',
+              isVerified: !!authUser.isVerified,
               rating: 5.0,
               reviewCount: 0,
               createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            };
-            await setDoc(sosProfileRef, newProfileData, { merge: true });
-          }
-        } catch (alternativeError) {
-          console.error('Erreur méthode alternative SOS:', alternativeError);
-          throw alternativeError;
+            },
+            { merge: true }
+          );
+        } catch (finalError) {
+          console.error('💥 All fallbacks failed (SOS):', finalError);
+          throw finalError;
         }
       }
-    },
-    [userId, user, isProvider]
-  );
+    }
+  }, [userId, authUser, isProvider]);
 
-  // Fonction principale de toggle
+  const writeUsersPresenceBestEffort = useCallback(async (newStatus: boolean) => {
+    if (!userId) return;
+    const userRef = doc(db, 'users', userId);
+    const payload = {
+      isOnline: newStatus,
+      availability: newStatus ? 'available' : 'unavailable',
+      lastStatusChange: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    try {
+      await updateDoc(userRef, payload);
+      console.log('✅ users presence updated');
+    } catch (e) {
+      console.warn('⚠️ Users presence update ignorée (rules/email) :', e);
+    }
+  }, [userId]);
+
+  /** ---------- Toggle principal (ordre : SOS -> users) ---------- */
   const toggleAvailability = useCallback(async () => {
-    if (!userId || !user || isLoading) return;
+    if (!userId || !authUser || isLoading) return;
 
     if (!isApprovedProvider) {
       setStatusSyncError(t('availability.errors.notApproved'));
@@ -156,14 +220,13 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
     setIsLoading(true);
     setStatusSyncError(null);
 
-    // Sauvegarde l’état précédent pour rollback
     const previous = isAvailable;
     const newStatus = !previous;
 
     try {
       await createStatusLog(previous, newStatus);
 
-      // 🛡️ Anti-boucle de sync pendant l’update
+      // Anti-boucle de sync pendant l’update
       skipNextSyncRef.current = true;
       if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
       skipTimeoutRef.current = setTimeout(() => {
@@ -173,52 +236,26 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
       // Optimistic UI
       setIsAvailable(newStatus);
 
-      const batch = writeBatch(db);
-      const userRef = doc(db, 'users', userId);
-
-      const userUpdateData = {
-        isOnline: newStatus,
-        availability: newStatus ? 'available' : 'unavailable',
-        lastStatusChange: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      } as const;
-
-      batch.update(userRef, userUpdateData);
-
-      // Sync aussi le profil SOS (source affichage public)
-      const sosProfileRef = doc(db, 'sos_profiles', userId);
-      const sosSnap = await getDoc(sosProfileRef);
-      const profileUpdate = { ...userUpdateData, isVisible: true, isVisibleOnMap: true };
-
-      if (sosSnap.exists()) {
-        batch.update(sosProfileRef, profileUpdate);
-      } else {
-        batch.set(sosProfileRef, {
-          uid: userId,
-          type: user.role,
-          fullName:
-            user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-          ...profileUpdate,
-          isActive: true,
-          isApproved: user.role !== 'lawyer',
-          isVerified: false,
-          rating: 5.0,
-          reviewCount: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+      // 1) SOS (vérité) avec retry
+      let ok = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await writeSosProfile(newStatus);
+          ok = true;
+          break;
+        } catch (e) {
+          console.error(`❌ SOS update attempt ${attempt} failed:`, e);
+          if (attempt === 3) throw e;
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
       }
+      if (!ok) throw new Error('SOS update failed after retries');
 
-      await batch.commit();
+      // 2) users (best-effort)
+      await writeUsersPresenceBestEffort(newStatus);
 
-      // Débloque la protection
-      skipNextSyncRef.current = false;
-      if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
-
-      // Notifie toute l’appli
-      const detail = { isOnline: newStatus };
-      window.dispatchEvent(new CustomEvent('availabilityChanged', { detail }));
-      window.dispatchEvent(new CustomEvent('availability:changed', { detail }));
+      // Notifie l’app
+      broadcastAvailability(newStatus);
     } catch (error) {
       console.error('Erreur toggle disponibilité:', error);
 
@@ -227,100 +264,81 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
       if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
       setIsAvailable(previous);
       setStatusSyncError(t('availability.errors.updateFailed'));
-
-      // Fallback SOS
-      if (isProvider) {
-        try {
-          await updateSOSProfile(newStatus);
-          setIsAvailable(newStatus);
-        } catch (fallbackError) {
-          console.error('Erreur fallback SOS:', fallbackError);
-        }
-      }
     } finally {
       setIsLoading(false);
     }
   }, [
     userId,
-    user,
+    authUser,
     isLoading,
     isApprovedProvider,
     isAvailable,
-    isProvider,
     t,
     createStatusLog,
-    updateSOSProfile,
+    writeSosProfile,
+    writeUsersPresenceBestEffort,
   ]);
 
-  // 🔔 Rappels
-  const handleStayOnline = useCallback(() => setShowReminderModal(false), []);
-  const handleGoOffline = useCallback(() => {
-    toggleAvailability();
-    setShowReminderModal(false);
-  }, [toggleAvailability]);
-  const handleDisableReminderToday = useCallback(() => {
-    const today = new Date().toISOString().split('T')[0];
-    localStorage.setItem('disableOnlineReminderUntil', today);
-    setShowReminderModal(false);
-  }, []);
-
-  // Charger préférences
+  /** ---------- Charger préférences ---------- */
   useEffect(() => {
     const prefs = getNotificationPreferences();
     setNotificationPrefs(prefs);
   }, []);
 
-  // Sync temps réel depuis users/{id}
+  /** ---------- ÉCOUTE TEMPS RÉEL UNIFIÉE (priorité = sos_profiles) ---------- */
   useEffect(() => {
     if (!userId) return;
-    setIsAvailable(user?.isOnline === true);
 
-    const unsubscribeUser = onSnapshot(
-      doc(db, 'users', userId),
-      (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data() as { isOnline?: boolean };
-          if (typeof data.isOnline === 'boolean' && data.isOnline !== isAvailable) {
-            if (skipNextSyncRef.current) return;
-            setIsAvailable(data.isOnline);
+    // initialise selon authUser
+    setIsAvailable(authUser?.isOnline === true);
 
-            const detail = { isOnline: data.isOnline };
-            window.dispatchEvent(new CustomEvent('availabilityChanged', { detail }));
-            window.dispatchEvent(new CustomEvent('availability:changed', { detail }));
+    const sosRef = doc(db, 'sos_profiles', userId);
+    const userRef = doc(db, 'users', userId);
+
+    let unsubUser: (() => void) | null = null;
+
+    const unsubSos = onSnapshot(
+      sosRef,
+      (snap) => {
+        if (snap.exists()) {
+          // Si SOS existe, on se base dessus et on coupe le fallback users
+          if (unsubUser) {
+            unsubUser();
+            unsubUser = null;
+          }
+          const data = snap.data() as FireSosDoc;
+          const next = data?.isOnline === true;
+          if (!skipNextSyncRef.current) setIsAvailable(next);
+        } else {
+          // Fallback users si SOS n'existe pas (une seule fois)
+          if (!unsubUser) {
+            unsubUser = onSnapshot(
+              userRef,
+              (userSnap) => {
+                if (userSnap.exists()) {
+                  const udata = userSnap.data() as FireUserDoc;
+                  const next = udata?.isOnline === true;
+                  if (!skipNextSyncRef.current) setIsAvailable(next);
+                }
+              },
+              (err) => console.error('❌ Users snapshot error:', err)
+            );
           }
         }
       },
-      (error) => {
-        console.error('Erreur écoute users:', error);
+      (err) => {
+        console.error('❌ SOS snapshot error:', err);
         setStatusSyncError(t('availability.errors.syncFailed'));
       }
     );
 
-    // Sync SOS pour prestataires
-    let unsubscribeSOS: (() => void) | null = null;
-    if (isProvider) {
-      unsubscribeSOS = onSnapshot(
-        doc(db, 'sos_profiles', userId),
-        (docSnapshot) => {
-          if (docSnapshot.exists()) {
-            const data = docSnapshot.data() as { isOnline?: boolean };
-            if (typeof data.isOnline === 'boolean' && data.isOnline !== isAvailable) {
-              if (skipNextSyncRef.current) return;
-              setIsAvailable(data.isOnline);
-            }
-          }
-        },
-        (error) => console.error('Erreur écoute sos_profiles:', error)
-      );
-    }
-
     return () => {
-      unsubscribeUser();
-      unsubscribeSOS?.();
+      unsubSos();
+      if (unsubUser) unsubUser();
     };
-  }, [userId, user?.isOnline, isProvider, isAvailable, t]);
+  }, [userId, authUser?.isOnline, t]);
 
-  // Rappel périodique quand online
+  /** ---------- Rappel périodique quand online ---------- */
   useEffect(() => {
     if (!isAvailable) return;
 
@@ -345,29 +363,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
     return () => clearInterval(interval);
   }, [isAvailable, i18n.language, notificationPrefs]);
 
-  // Écoute SOS dédiée (déjà couvert mais conservée pour robustesse)
-  useEffect(() => {
-    if (!userId || !isProvider) return;
-
-    const sosProfileRef = doc(db, 'sos_profiles', userId);
-    const unsubscribe = onSnapshot(
-      sosProfileRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data() as { isOnline?: boolean };
-          if (typeof data.isOnline === 'boolean' && data.isOnline !== isAvailable) {
-            if (skipNextSyncRef.current) return;
-            setIsAvailable(data.isOnline);
-          }
-        }
-      },
-      (error) => console.error('Erreur écoute SOS bis:', error)
-    );
-
-    return () => unsubscribe();
-  }, [userId, isProvider, isAvailable]);
-
-  // Cleanup timeout
+  /** ---------- Cleanup ---------- */
   useEffect(() => {
     return () => {
       if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
@@ -375,7 +371,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
   }, []);
 
   // Ne pas afficher si non prestataire
-  if (!user || !isProvider) return null;
+  if (!authUser || !isProvider) return null;
 
   if (statusSyncError) {
     return (
@@ -447,9 +443,16 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
 
       <ReminderModal
         isOpen={showReminderModal}
-        onClose={handleStayOnline}
-        onGoOffline={handleGoOffline}
-        onDisableReminderToday={handleDisableReminderToday}
+        onClose={() => setShowReminderModal(false)}
+        onGoOffline={() => {
+          toggleAvailability();
+          setShowReminderModal(false);
+        }}
+        onDisableReminderToday={() => {
+          const today = new Date().toISOString().split('T')[0];
+          localStorage.setItem('disableOnlineReminderUntil', today);
+          setShowReminderModal(false);
+        }}
         langCode={i18n.language || 'en'}
       />
     </>

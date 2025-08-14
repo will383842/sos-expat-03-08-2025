@@ -1,5 +1,5 @@
 // src/firebase.ts
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import {
   initializeFirestore,
@@ -32,18 +32,10 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
   throw new Error("Configuration Firebase incomplète");
 }
 
-console.log("✅ Configuration Firebase chargée :", {
-  apiKey: firebaseConfig.apiKey ? "***" : "MANQUANT",
-  projectId: firebaseConfig.projectId,
-  storageBucket: firebaseConfig.storageBucket,
-  authDomain: firebaseConfig.authDomain,
-  VITE_USE_EMULATORS: import.meta.env.VITE_USE_EMULATORS ?? "(non défini)",
-});
+// 🔁 Supporte HMR / multi-imports sans ré-initialiser
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// -------------------------------
-// Init App + Services
-// -------------------------------
-const app = initializeApp(firebaseConfig);
+// Expose les services **depuis CETTE instance uniquement**
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
@@ -57,29 +49,33 @@ export const db = initializeFirestore(app, {
 // Functions (us-central1 par défaut)
 export const functions = getFunctions(app, "us-central1");
 
-console.log("🔥 Firebase initialisé avec succès");
-
 // -------------------------------
 // Emulateurs (optionnels)
 // -------------------------------
-// Active si ET SEULEMENT SI VITE_USE_EMULATORS = "1"
-const USE_EMULATORS = import.meta.env.VITE_USE_EMULATORS === "1";
+// ✅ Accepte "1" | "true" (minimise les désalignements .env)
+const RAW = (import.meta.env.VITE_USE_EMULATORS ?? "").toString().toLowerCase();
+const USE_EMULATORS = RAW === "1" || RAW === "true";
 
+// Les connect* doivent se faire AVANT toute requête réseau
 if (USE_EMULATORS && typeof window !== "undefined") {
   try {
-    connectAuthEmulator(auth, "http://localhost:9099");
-    connectFirestoreEmulator(db, "localhost", 8080);
-    connectStorageEmulator(storage, "localhost", 9199);
-    connectFunctionsEmulator(functions, "localhost", 5001);
-    console.log("🔧 Émulateurs Firebase connectés (auth:9099, fs:8080, storage:9199, functions:5001)");
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
+    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
   } catch (e) {
     console.warn("ℹ️ Impossible de connecter un des émulateurs (peut-être déjà connectés)", e);
   }
 }
 
+// Logs de diagnostic (une seule fois au boot)
+console.log("✅ Firebase prêt :", {
+  projectId: app.options.projectId,
+  authDomain: app.options.authDomain,
+  usingEmulators: USE_EMULATORS,
+});
+
 // Petit helper debug
 export const call = <T, R = unknown>(name: string) => httpsCallable<T, R>(functions, name);
 
-
 export default app;
-

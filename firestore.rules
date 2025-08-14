@@ -53,7 +53,7 @@ service cloud.firestore {
         .hasAny(['role','isAdmin','isApproved','isBanned','uid','email','type','isVerified']);
     }
 
-    // Lecture publique d’une fiche visible (home / carrousel)
+    // Lecture publique d'une fiche visible (home / carrousel)
     function isPublicProfile() {
       return (resource.data.isVisible == true || resource.data.isVisibleOnMap == true) &&
              (resource.data.type in ['lawyer','expat']);
@@ -75,11 +75,23 @@ service cloud.firestore {
              request.resource.data.email == request.auth.token.email;
     }
 
-    // ✅ NOUVEAU : MAJ "présence uniquement" (online/offline) autorisée
+    // ✅ CORRIGÉ : MAJ "présence" élargie pour sos_profiles
     function presenceOnlyUpdate() {
       return request.resource.data.diff(resource.data).changedKeys().hasOnly(
-        ['isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','updatedAt']
+        ['isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','updatedAt','isVisible','isVisibleOnMap']
       );
+    }
+
+    // ✅ NOUVEAU : MAJ étendue pour sos_profiles (présence + champs standards)
+    function sosProfileUpdate() {
+      let allowedFields = [
+        'isOnline', 'availability', 'lastStatusChange', 'lastSeen', 'lastSeenAt', 'updatedAt',
+        'isVisible', 'isVisibleOnMap', 'profilePhoto', 'photoURL', 'avatar',
+        'fullName', 'email', 'phone', 'phoneCountryCode', 'languages', 'country',
+        'description', 'bio', 'specialties', 'helpTypes', 'yearsOfExperience',
+        'interventionCountries', 'practiceCountries'
+      ];
+      return changedKeys().hasOnly(allowedFields);
     }
 
     // =============== USERS ===============
@@ -108,22 +120,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ====================== SOS_PROFILES (ancien) ======================
+    // ====================== SOS_PROFILES (CORRIGÉ) ======================
     match /sos_profiles/{profileId} {
-      // Lecture : public
+      // Lecture : public pour les profils visibles
       allow read: if true;
 
-      // Création : seulement lawyer ou expat
-      allow create: if isAuthenticated() &&
-                      request.resource.data.type in ['lawyer', 'expat'] &&
-                      request.resource.data.uid == request.auth.uid;
+      // ✅ CORRIGÉ : Création plus permissive
+      allow create: if isAuthenticated() && (
+                      // Création par le propriétaire (uid match)
+                      (request.resource.data.uid == request.auth.uid && 
+                       request.resource.data.type in ['lawyer', 'expat']) ||
+                      // Création directe si profileId == auth.uid
+                      (profileId == request.auth.uid && 
+                       request.resource.data.type in ['lawyer', 'expat']) ||
+                      // Admin
+                      isAdmin()
+                    );
 
-      // Mise à jour : propriétaire du profil (uid), id du doc, ou admin
-      allow update: if isAuthenticated() &&
-                      ((request.resource.data.type ?? resource.data.type) in ['lawyer', 'expat']) &&
-                      (request.auth.uid == resource.data.uid ||
-                       request.auth.uid == profileId ||
-                       isAdmin());
+      // ✅ CORRIGÉ : Mise à jour très permissive pour le statut
+      allow update: if isAuthenticated() && (
+                      // Propriétaire via uid dans les données
+                      (resource.data.uid == request.auth.uid && sosProfileUpdate()) ||
+                      // Propriétaire via ID du document
+                      (profileId == request.auth.uid && sosProfileUpdate()) ||
+                      // Mise à jour de présence uniquement (plus permissif)
+                      ((resource.data.uid == request.auth.uid || profileId == request.auth.uid) && 
+                       presenceOnlyUpdate()) ||
+                      // Admin
+                      isAdmin()
+                    );
 
       allow delete: if isAdmin();
     }
@@ -145,6 +170,7 @@ service cloud.firestore {
                     || (
                          isDocOwner() && isNotBanned() && hasValidProviderFields() && (
                            onlyPhotoFieldsChanged() ||
+                           presenceOnlyUpdate() ||
                            (isEmailVerified() && hasNoSensitiveChanges())
                          )
                        );

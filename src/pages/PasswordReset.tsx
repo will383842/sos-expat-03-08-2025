@@ -1,7 +1,7 @@
 // src/pages/PasswordReset.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle, AlertCircle, Shield, Globe, Smartphone, RefreshCw } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, AlertCircle, Shield, Globe, Smartphone, RefreshCw, Sparkles, Lock, Zap, ChevronRight } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -62,12 +62,12 @@ const useTranslation = () => {
         en: 'SOS Expats password reset interface'
       },
       'reset.title': { 
-        fr: 'Réinitialiser votre mot de passe',
-        en: 'Reset your password'
+        fr: 'Oups, mot de passe oublié ? 🤔',
+        en: 'Oops, forgot your password? 🤔'
       },
       'reset.subtitle': { 
-        fr: 'Nous vous enverrons un lien de réinitialisation par email',
-        en: 'We\'ll send you a reset link via email'
+        fr: 'Pas de panique ! On va t\'envoyer un lien magique ✨',
+        en: 'No worries! We\'ll send you a magic link ✨'
       },
       'reset.back_to_login': { 
         fr: 'Retour à la connexion',
@@ -82,36 +82,44 @@ const useTranslation = () => {
         en: 'your@email.com'
       },
       'reset.email_help': { 
-        fr: 'Utilisez l\'email de votre compte',
-        en: 'Use your account email address'
+        fr: 'Utilise l\'email de ton compte (celui que tu connais par cœur ! 💝)',
+        en: 'Use your account email (the one you know by heart! 💝)'
       },
       'reset.submit_button': { 
-        fr: 'Envoyer le lien de réinitialisation',
-        en: 'Send reset link'
+        fr: 'Envoie-moi le lien ! 🎯',
+        en: 'Send me the link! 🎯'
       },
       'reset.submitting': { 
-        fr: 'Envoi en cours...',
-        en: 'Sending...'
+        fr: 'C\'est parti... 🏃‍♂️',
+        en: 'Here we go... 🏃‍♂️'
       },
       'reset.success_title': { 
-        fr: 'Email envoyé avec succès !',
-        en: 'Email sent successfully!'
+        fr: 'C\'est parti ! 🚀',
+        en: 'All set! 🚀'
       },
       'reset.success_message': { 
-        fr: 'Vérifiez votre boîte email et suivez les instructions pour réinitialiser votre mot de passe.',
-        en: 'Check your email inbox and follow the instructions to reset your password.'
+        fr: 'Si on te connaît (spoiler : on vérifie discrètement 🕵️), tu vas recevoir un super email avec un lien magique !',
+        en: 'If we know you (spoiler: we\'re checking discretely 🕵️), you\'ll receive an awesome email with a magic link!'
       },
       'reset.success_note': { 
-        fr: 'Le lien est valide pendant 24 heures. Vérifiez aussi vos spams.',
-        en: 'The link is valid for 24 hours. Also check your spam folder.'
+        fr: 'Patience, ça arrive ! Check tes spams aussi, parfois notre email fait une petite sieste là-bas 😴',
+        en: 'Be patient, it\'s coming! Check your spam too, sometimes our email takes a nap there 😴'
+      },
+      'reset.security_info': {
+        fr: '🤫 Psst... Pour ta sécurité, on fait semblant de rien même si on ne te connaît pas !',
+        en: '🤫 Psst... For your security, we play it cool even if we don\'t know you!'
+      },
+      'reset.email_sent_label': {
+        fr: '📬 On a envoyé la sauce à :',
+        en: '📬 We sent the goods to:'
       },
       'reset.resend_button': { 
-        fr: 'Renvoyer l\'email',
-        en: 'Resend email'
+        fr: 'Renvoyer (au cas où 📮)',
+        en: 'Resend (just in case 📮)'
       },
       'reset.different_email': { 
-        fr: 'Utiliser une autre adresse',
-        en: 'Use different email'
+        fr: 'Essayer un autre email 🔄',
+        en: 'Try another email 🔄'
       },
       'validation.email_required': { 
         fr: 'L\'adresse email est requise',
@@ -186,37 +194,53 @@ const useTranslation = () => {
         en: 'Why reset?'
       },
       'info.security_note': {
-        fr: 'Pour votre sécurité, nous ne stockons jamais vos mots de passe en clair.',
-        en: 'For your security, we never store your passwords in plain text.'
+        fr: 'Tes mots de passe ? On les garde secrets comme la recette du Coca ! 🔐',
+        en: 'Your passwords? We keep them as secret as the Coca-Cola recipe! 🔐'
       },
       'info.process_steps': {
-        fr: 'Processus de réinitialisation',
-        en: 'Reset process'
+        fr: 'Comment ça marche ? 🎬',
+        en: 'How does it work? 🎬'
       },
       'steps.step1': {
-        fr: '1. Saisissez votre email',
-        en: '1. Enter your email'
+        fr: 'Tu mets ton email (le bon hein ! 😉)',
+        en: 'You enter your email (the right one! 😉)'
       },
       'steps.step2': {
-        fr: '2. Vérifiez votre boîte mail',
-        en: '2. Check your inbox'
+        fr: 'Tu cours checker tes emails 📧',
+        en: 'You run to check your emails 📧'
       },
       'steps.step3': {
-        fr: '3. Cliquez sur le lien reçu',
-        en: '3. Click the received link'
+        fr: 'Tu cliques sur notre lien magique ✨',
+        en: 'You click our magic link ✨'
       },
       'steps.step4': {
-        fr: '4. Créez un nouveau mot de passe',
-        en: '4. Create a new password'
+        fr: 'Tu choisis un nouveau mot de passe (costaud cette fois ! 💪)',
+        en: 'You choose a new password (a strong one this time! 💪)'
       },
       'help.contact': {
-        fr: 'Besoin d\'aide ?',
-        en: 'Need help?'
+        fr: 'Coincé ? 🆘',
+        en: 'Stuck? 🆘'
       },
-      'help.contact_support': {
-        fr: 'Contactez notre support',
-        en: 'Contact our support'
-      }
+      'pwa.banner_title': {
+        fr: 'Accès rapide et hors ligne',
+        en: 'Quick and offline access'
+      },
+      'security.badge_text': {
+        fr: 'Fort Knox niveau sécurité 🔒',
+        en: 'Fort Knox level security 🔒'
+      },
+      'security.ninja_title': {
+        fr: 'Sécurité niveau ninja 🥷',
+        en: 'Ninja level security 🥷'
+      },
+      'help.team_message': {
+        fr: 'Bloqué ? Pas de stress, notre équipe de super-héros est là ! 🦸‍♂️',
+        en: 'Stuck? No stress, our superhero team is here! 🦸‍♂️'
+      },
+      'button.close': {
+        fr: 'Fermer',
+        en: 'Close'
+      },
     };
     
     return translations[key]?.[language] || defaultValue || key;
@@ -271,20 +295,20 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({ resetErrorBoundary }) => 
   const { t } = useTranslation();
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center px-4">
-      <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
-        <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-          <AlertCircle className="h-8 w-8 text-red-500" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center px-4">
+      <div className="bg-white/10 backdrop-blur-xl p-8 sm:p-10 rounded-3xl shadow-2xl max-w-md w-full text-center border border-white/20">
+        <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center">
+          <AlertCircle className="h-10 w-10 text-white" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-black text-white mb-3">
           {t('error.title')}
         </h2>
-        <p className="text-gray-600 mb-6 text-sm leading-relaxed">
+        <p className="text-gray-300 mb-8 text-base leading-relaxed">
           {t('error.description')}
         </p>
         <Button 
           onClick={resetErrorBoundary} 
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105"
+          className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-red-500/25"
         >
           {t('error.retry')}
         </Button>
@@ -309,6 +333,14 @@ const PasswordReset: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [lastSentEmail, setLastSentEmail] = useState<string>('');
   const [cooldownTime, setCooldownTime] = useState(0);
+  
+  // Type pour l'événement BeforeInstallPrompt
+  type BeforeInstallPromptEvent = Event & {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+  };
+  
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   const currentLang = language || 'fr';
 
@@ -323,6 +355,37 @@ const PasswordReset: React.FC = () => {
     };
   }, []);
 
+  // PWA Install Prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!installPrompt) return;
+    
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      const gtag = getGtag();
+      if (gtag) {
+        gtag('event', 'pwa_installed', {
+          page: 'password_reset'
+        });
+      }
+    }
+    
+    setInstallPrompt(null);
+  };
 
   // Online/offline status
   useEffect(() => {
@@ -627,6 +690,7 @@ const PasswordReset: React.FC = () => {
       performance.mark('password-reset-attempt-end');
       performance.measure('password-reset-attempt', { start: 'password-reset-attempt-start', end: 'password-reset-attempt-end' });
       
+      // Toujours afficher le succès (même si l'email n'existe pas)
       setIsSuccess(true);
       setLastSentEmail(formData.email);
       setCooldownTime(60); // 1 minute cooldown
@@ -644,39 +708,35 @@ const PasswordReset: React.FC = () => {
       // Narrow typing + extraction
       const err = error as { code?: string; message?: string } | Error | unknown;
       console.error('Password reset error:', err);
-      setSubmitAttempts(prev => prev + 1);
       
-      let errorMessage = t('error.description');
-      
-      // Firebase specific error handling
       const code = (err as { code?: string })?.code;
-      if (code) {
-        switch (code) {
-          case 'auth/user-not-found':
-            errorMessage = t('error.user_not_found');
-            break;
-          case 'auth/too-many-requests':
-            errorMessage = t('error.too_many_requests');
-            setCooldownTime(300); // 5 minutes cooldown
-            break;
-          case 'auth/invalid-email':
-            setFormErrors({ email: t('validation.email_invalid') });
-            setIsLoading(false);
-            return;
-          default:
-            errorMessage = t('error.description');
-        }
+      
+      // Pour la sécurité : toujours afficher le succès même si l'email n'existe pas
+      if (code === 'auth/user-not-found') {
+        // On affiche quand même le succès pour ne pas révéler que l'email n'existe pas
+        setIsSuccess(true);
+        setLastSentEmail(formData.email);
+        setCooldownTime(60);
+        
+        // Log en interne seulement
+        console.log('Email not found but showing success for security');
+        
+      } else if (code === 'auth/too-many-requests') {
+        setFormErrors({ general: t('error.too_many_requests') });
+        setCooldownTime(300); // 5 minutes cooldown
+      } else if (code === 'auth/invalid-email') {
+        setFormErrors({ email: t('validation.email_invalid') });
+      } else {
+        // Pour les autres erreurs, on affiche un message générique
+        setFormErrors({ general: t('error.description') });
       }
       
-      setFormErrors({ general: errorMessage });
-      
-      // Error analytics
+      // Error analytics (sans révéler si l'email existe)
       const gtag = getGtag();
-      if (gtag) {
+      if (gtag && code !== 'auth/user-not-found') {
         gtag('event', 'password_reset_failed', {
           error_type: code || 'unknown',
-          attempts: submitAttempts + 1,
-          email_domain: formData.email.split('@')[1]
+          attempts: submitAttempts + 1
         });
       }
     } finally {
@@ -703,10 +763,10 @@ const PasswordReset: React.FC = () => {
   // Classes CSS pour inputs (clé typée)
   const inputClass = useCallback(
     (fieldName: keyof FormErrors) =>
-      `appearance-none block w-full px-4 py-3.5 text-base border rounded-xl placeholder-gray-400 bg-white text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-gray-400 ${
+      `appearance-none block w-full px-5 py-4 text-base text-white border-2 rounded-2xl placeholder-gray-400 bg-gray-800/50 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-500/30 focus:border-red-500 hover:border-gray-500 hover:bg-gray-800/70 ${
         formErrors[fieldName]
-          ? 'border-red-300 bg-red-50 ring-2 ring-red-200'
-          : 'border-gray-300'
+          ? 'border-red-400 bg-red-900/30 ring-4 ring-red-500/20'
+          : 'border-gray-600'
       }`,
     [formErrors]
   );
@@ -731,12 +791,19 @@ const PasswordReset: React.FC = () => {
       }}
     >
       <Layout>
-        <main className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-red-100 flex flex-col justify-center py-6 px-4 sm:py-12 sm:px-6 lg:px-8">
+        <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col justify-center py-8 px-4 sm:py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+          {/* Animated background elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-full blur-3xl" />
+          </div>
+
           {/* Offline banner */}
           {!isOnline && (
-            <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-white px-4 py-3 text-center text-sm font-medium z-50 shadow-lg">
+            <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-3 text-center text-sm font-bold z-50 shadow-2xl backdrop-blur-sm">
               <div className="flex items-center justify-center space-x-2">
-                <Globe className="inline h-4 w-4" />
+                <Globe className="inline h-5 w-5 animate-pulse" />
                 <span>{t('offline.message')}</span>
               </div>
             </div>
@@ -744,26 +811,28 @@ const PasswordReset: React.FC = () => {
 
           {/* PWA Install Banner */}
           {installPrompt && (
-            <div className="fixed bottom-4 left-4 right-4 bg-red-600 text-white p-4 rounded-2xl shadow-2xl z-40 sm:max-w-md sm:mx-auto border border-red-500">
+            <div className="fixed bottom-6 left-6 right-6 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 text-white p-5 rounded-3xl shadow-2xl z-40 sm:max-w-md sm:mx-auto border border-white/20 backdrop-blur-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <Smartphone className="h-5 w-5 mr-3 flex-shrink-0" />
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mr-4">
+                    <Smartphone className="h-6 w-6 text-white" />
+                  </div>
                   <div>
-                    <p className="text-sm font-semibold">{t('pwa.install')}</p>
-                    <p className="text-xs text-red-100">Accès rapide et hors ligne</p>
+                    <p className="text-base font-black">{t('pwa.install')}</p>
+                    <p className="text-sm text-red-100">{t('pwa.banner_title')}</p>
                   </div>
                 </div>
                 <div className="flex space-x-2">
                   <button
                     onClick={handleInstallApp}
-                    className="bg-white text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 transition-colors duration-200"
+                    className="bg-white text-red-600 px-5 py-2.5 rounded-2xl text-sm font-black hover:bg-gray-100 transition-all duration-300 hover:scale-105"
                   >
                     {t('pwa.install_button')}
                   </button>
                   <button
                     onClick={() => setInstallPrompt(null)}
-                    className="text-red-100 hover:text-white p-2 rounded-lg hover:bg-red-700 transition-colors duration-200"
-                    aria-label="Fermer"
+                    className="text-red-100 hover:text-white p-2.5 rounded-2xl hover:bg-white/10 transition-all duration-300"
+                    aria-label={t('button.close')}
                   >
                     ✕
                   </button>
@@ -772,82 +841,103 @@ const PasswordReset: React.FC = () => {
             </div>
           )}
 
-          <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-lg">
             {/* Header optimisé mobile-first */}
-            <header className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
-                <RefreshCw className="w-10 h-10 text-white" />
+            <header className="text-center mb-10">
+              {/* Badge moderne */}
+              <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-5 py-2.5 border border-white/20 mb-8">
+                <Lock className="w-4 h-4 text-yellow-400" />
+                <span className="text-white font-semibold text-sm">{t('security.badge_text')}</span>
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              </div>
+
+              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-red-500 to-orange-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-red-500/25 transform hover:scale-110 transition-transform duration-300">
+                <RefreshCw className="w-12 h-12 text-white" />
               </div>
               
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight tracking-tight mb-3">
+              <h1 className="text-4xl sm:text-5xl font-black text-white leading-tight tracking-tight mb-4">
                 {t('reset.title')}
               </h1>
               
-              <p className="text-sm text-gray-600 max-w-sm mx-auto leading-relaxed mb-4">
+              <p className="text-lg text-gray-300 max-w-md mx-auto leading-relaxed mb-6">
                 {t('reset.subtitle')}
               </p>
               
               <Link
                 to="/login"
-                className="inline-flex items-center text-sm font-semibold text-red-600 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md px-3 py-2 transition-all duration-200 underline decoration-2 underline-offset-2 hover:decoration-red-700"
+                className="group inline-flex items-center text-base font-bold text-blue-400 hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/20 rounded-xl px-4 py-3 transition-all duration-300"
               >
-                <ArrowLeft size={16} className="mr-2" />
+                <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
                 {t('reset.back_to_login')}
               </Link>
             </header>
           </div>
 
-          <div className="sm:mx-auto sm:w-full sm:max-w-md">
-            <div className="bg-white py-8 px-6 shadow-2xl sm:rounded-2xl sm:px-10 border border-gray-100 relative overflow-hidden">
-              {/* Security indicator */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 via-blue-500 to-red-500" />
+          <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-lg">
+            <div className="bg-white/10 backdrop-blur-xl py-10 px-8 shadow-2xl sm:rounded-3xl border border-white/20 relative overflow-hidden">
+              {/* Gradient accent top */}
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500" />
               
-              <div className="flex items-center justify-center mb-6">
-                <Shield className="h-5 w-5 text-green-500 mr-2" aria-hidden="true" />
-                <span className="text-xs text-gray-500 font-medium">
-                  {t('security.ssl')}
-                </span>
+              {/* Security indicator */}
+              <div className="flex items-center justify-center mb-8">
+                <div className="inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-500/30">
+                  <Shield className="h-5 w-5 text-green-400" aria-hidden="true" />
+                  <span className="text-sm text-green-300 font-semibold">
+                    {t('security.ssl')}
+                  </span>
+                </div>
               </div>
 
               {/* Success State */}
               {isSuccess ? (
-                <div className="text-center space-y-6">
-                  <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle className="h-8 w-8 text-green-500" />
+                <div className="text-center space-y-8">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-500 to-emerald-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-green-500/25">
+                    <CheckCircle className="h-10 w-10 text-white" />
                   </div>
                   
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">
+                    <h2 className="text-2xl font-black text-white mb-3">
                       {t('reset.success_title')}
                     </h2>
-                    <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                    <p className="text-gray-300 text-base leading-relaxed mb-6">
                       {t('reset.success_message')}
                     </p>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-blue-800 text-sm font-medium mb-2">
-                        📧 Email envoyé à :
+                    
+                    {/* Security notice */}
+                    <div className="bg-amber-500/10 backdrop-blur-sm border border-amber-500/30 rounded-2xl p-4 mb-6">
+                      <div className="flex items-start">
+                        <AlertCircle className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0 mr-3" />
+                        <p className="text-amber-200 text-sm leading-relaxed">
+                          {t('reset.security_info')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-500/10 backdrop-blur-sm border border-blue-500/30 rounded-2xl p-5">
+                      <p className="text-blue-300 text-sm font-semibold mb-2">
+                        {t('reset.email_sent_label')}
                       </p>
-                      <p className="text-blue-900 font-semibold break-all">
+                      <p className="text-blue-200 font-black text-lg break-all">
                         {lastSentEmail}
                       </p>
                     </div>
-                    <p className="text-gray-500 text-xs mt-4">
+                    <p className="text-gray-400 text-sm mt-5">
                       {t('reset.success_note')}
                     </p>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <Button
                       onClick={handleResend}
                       disabled={cooldownTime > 0}
                       fullWidth
                       size="large"
-                      className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-black py-4 px-8 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       {cooldownTime > 0 ? (
                         <span className="flex items-center justify-center">
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Attendre {cooldownTime}s
+                          <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                          {t('button.wait')} {cooldownTime}s
                         </span>
                       ) : (
                         t('reset.resend_button')
@@ -859,7 +949,7 @@ const PasswordReset: React.FC = () => {
                       fullWidth
                       variant="outline"
                       size="large"
-                      className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105"
+                      className="border-2 border-white/30 text-white hover:bg-white/10 hover:border-white/40 font-bold py-4 px-8 rounded-2xl transition-all duration-300 hover:scale-105 backdrop-blur-sm"
                     >
                       {t('reset.different_email')}
                     </Button>
@@ -867,17 +957,17 @@ const PasswordReset: React.FC = () => {
                 </div>
               ) : (
                 /* Form State */
-                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                <form onSubmit={handleSubmit} className="space-y-8" noValidate>
                   {/* Enhanced error display */}
                   {formErrors.general && (
-                    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl" role="alert">
+                    <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/30 p-5 rounded-2xl" role="alert">
                       <div className="flex">
-                        <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                        <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                         <div className="ml-3">
-                          <h3 className="text-sm font-semibold text-red-800 mb-1">
+                          <h3 className="text-base font-black text-red-300 mb-1">
                             {t('error.title')}
                           </h3>
-                          <div className="text-sm text-red-700 leading-relaxed">
+                          <div className="text-sm text-red-200 leading-relaxed">
                             {formErrors.general}
                           </div>
                         </div>
@@ -889,13 +979,13 @@ const PasswordReset: React.FC = () => {
                   <div>
                     <label 
                       htmlFor="email" 
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-base font-bold text-white mb-3"
                     >
                       {t('reset.email_label')}
-                      <span className="text-red-500 ml-1">*</span>
+                      <span className="text-red-400 ml-1">*</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
                         <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
                       </div>
                       <input
@@ -906,18 +996,18 @@ const PasswordReset: React.FC = () => {
                         required
                         value={formData.email}
                         onChange={handleEmailChange}
-                        className={`${inputClass('email')} pl-10`}
+                        className={`${inputClass('email')} pl-12 pr-4`}
                         placeholder={t('reset.email_placeholder')}
                         disabled={isLoading}
                       />
                     </div>
                     {formErrors.email && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle size={16} className="mr-1 flex-shrink-0" />
+                      <p className="mt-3 text-sm text-red-400 flex items-center">
+                        <AlertCircle size={18} className="mr-2 flex-shrink-0" />
                         {formErrors.email}
                       </p>
                     )}
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-3 text-sm text-gray-400">
                       {t('reset.email_help')}
                     </p>
                   </div>
@@ -929,26 +1019,26 @@ const PasswordReset: React.FC = () => {
                       loading={isLoading}
                       fullWidth
                       size="large"
-                      className={`py-4 text-base font-bold rounded-xl transition-all duration-300 transform min-h-[56px] ${
+                      className={`py-5 text-lg font-black rounded-2xl transition-all duration-300 transform min-h-[64px] ${
                         isFormValid && !isLoading && isOnline && cooldownTime === 0
-                          ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-red-500/50'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-md'
+                          ? 'bg-gradient-to-r from-red-600 via-red-500 to-orange-500 hover:from-red-700 hover:via-red-600 hover:to-orange-600 text-white shadow-2xl hover:shadow-red-500/50 hover:scale-105 active:scale-[0.98] focus:ring-4 focus:ring-red-500/30'
+                          : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/10'
                       }`}
                       disabled={!isFormValid || isLoading || !isOnline || cooldownTime > 0}
                     >
                       {isLoading ? (
                         <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white mr-3" />
+                          <div className="animate-spin rounded-full h-6 w-6 border-3 border-white/30 border-t-white mr-3" />
                           {t('reset.submitting')}
                         </div>
                       ) : cooldownTime > 0 ? (
                         <div className="flex items-center justify-center">
-                          <RefreshCw size={20} className="mr-3 animate-spin" aria-hidden="true" />
-                          Attendre {cooldownTime}s
+                          <RefreshCw size={22} className="mr-3 animate-spin" aria-hidden="true" />
+                          {t('button.wait')} {cooldownTime}s
                         </div>
                       ) : (
                         <div className="flex items-center justify-center">
-                          <Mail size={20} className="mr-3" aria-hidden="true" />
+                          <Mail size={22} className="mr-3" aria-hidden="true" />
                           {t('reset.submit_button')}
                         </div>
                       )}
@@ -957,43 +1047,43 @@ const PasswordReset: React.FC = () => {
                 </form>
               )}
 
-              {/* Info Section */}
-              <div className="mt-8 space-y-6">
+              {/* Info Section avec design moderne */}
+              <div className="mt-10 space-y-6">
                 {/* Process Steps */}
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                  <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-sm rounded-2xl p-5 border border-blue-500/20">
+                  <h3 className="text-base font-black text-blue-300 mb-4 flex items-center">
+                    <Zap className="h-5 w-5 mr-2" />
                     {t('info.process_steps')}
                   </h3>
-                  <div className="space-y-2 text-xs text-blue-800">
+                  <div className="space-y-3 text-sm">
                     <div className="flex items-start">
-                      <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mr-3 mt-0.5 flex-shrink-0">1</span>
-                      <span>{t('steps.step1')}</span>
+                      <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-black mr-3 mt-0.5 flex-shrink-0">1</span>
+                      <span className="text-gray-300">{t('steps.step1')}</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mr-3 mt-0.5 flex-shrink-0">2</span>
-                      <span>{t('steps.step2')}</span>
+                      <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-black mr-3 mt-0.5 flex-shrink-0">2</span>
+                      <span className="text-gray-300">{t('steps.step2')}</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mr-3 mt-0.5 flex-shrink-0">3</span>
-                      <span>{t('steps.step3')}</span>
+                      <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-black mr-3 mt-0.5 flex-shrink-0">3</span>
+                      <span className="text-gray-300">{t('steps.step3')}</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mr-3 mt-0.5 flex-shrink-0">4</span>
-                      <span>{t('steps.step4')}</span>
+                      <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-black mr-3 mt-0.5 flex-shrink-0">4</span>
+                      <span className="text-gray-300">{t('steps.step4')}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Security Note */}
-                <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-sm rounded-2xl p-5 border border-green-500/20">
                   <div className="flex items-start">
-                    <Shield className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0 mr-3" />
+                    <Shield className="h-6 w-6 text-green-400 mt-0.5 flex-shrink-0 mr-3" />
                     <div>
-                      <h4 className="text-sm font-semibold text-green-900 mb-1">
-                        🔒 Sécurité garantie
+                      <h4 className="text-base font-black text-green-300 mb-2">
+                        {t('security.ninja_title')}
                       </h4>
-                      <p className="text-xs text-green-800 leading-relaxed">
+                      <p className="text-sm text-green-200 leading-relaxed">
                         {t('info.security_note')}
                       </p>
                     </div>
@@ -1001,39 +1091,43 @@ const PasswordReset: React.FC = () => {
                 </div>
 
                 {/* Help Section */}
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-sm rounded-2xl p-5 border border-purple-500/20">
                   <div className="flex items-start">
-                    <AlertCircle className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0 mr-3" />
+                    <Sparkles className="h-6 w-6 text-purple-400 mt-0.5 flex-shrink-0 mr-3" />
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">
+                      <h4 className="text-base font-black text-purple-300 mb-2">
                         {t('help.contact')}
                       </h4>
-                      <p className="text-xs text-gray-600 mb-2">
-                        Si vous rencontrez des difficultés, notre équipe est là pour vous aider.
+                      <p className="text-sm text-purple-200 mb-3">
+                        {t('help.team_message')}
                       </p>
                       <Link 
                         to="/contact" 
-                        className="text-xs text-red-600 hover:text-red-700 underline font-medium"
+                        className="inline-flex items-center text-sm text-purple-300 hover:text-purple-200 font-bold transition-colors group"
                       >
                         {t('help.contact_support')}
+                        <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
                       </Link>
                     </div>
                   </div>
                 </div>
 
                 {/* Trust indicators */}
-                <div className="flex items-center justify-center space-x-6 text-xs text-gray-500">
+                <div className="flex items-center justify-center space-x-8 text-sm text-gray-400">
                   <span className="flex items-center">
-                    <Shield className="h-3 w-3 mr-1" />
+                    <Shield className="h-4 w-4 mr-2 text-green-400" />
                     {t('trust.secure')}
                   </span>
-                  <span>•</span>
-                  <span>{t('trust.support_24_7')}</span>
+                  <span className="text-gray-600">•</span>
+                  <span className="flex items-center">
+                    <Zap className="h-4 w-4 mr-2 text-yellow-400" />
+                    {t('trust.support_24_7')}
+                  </span>
                 </div>
 
                 {/* Performance indicator (dev only) */}
                 {process.env.NODE_ENV === 'development' && (
-                  <div className="text-xs text-gray-400 text-center">
+                  <div className="text-xs text-gray-500 text-center">
                     ⚡ Optimized for Core Web Vitals
                   </div>
                 )}
@@ -1068,5 +1162,3 @@ const PasswordReset: React.FC = () => {
 
 // Export with React.memo for performance optimization
 export default React.memo(PasswordReset);
-
-

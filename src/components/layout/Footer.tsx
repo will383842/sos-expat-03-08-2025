@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Phone, MapPin, Facebook, Twitter, Linkedin, ArrowUp, LucideIcon } from 'lucide-react';
+import { Phone, MapPin, Facebook, Twitter, Linkedin, ArrowUp, LucideIcon, Globe } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { Link } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -156,7 +156,7 @@ const Footer: React.FC = () => {
 
   const contactInfo = useMemo<ContactInfo[]>(() => ([
     {
-      icon: MapPin,
+      icon: Globe,
       text: t('footer.contact.presence'),
       ariaLabel: t('footer.contact.locationAria')
     },
@@ -348,63 +348,75 @@ const Footer: React.FC = () => {
       {/* JSON-LD for SEO / AI */}
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-red-500/5 to-red-500/5" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-600/10 via-transparent to-transparent" />
+      {/* Subtle Background Effects */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-blue-500/5" />
+        <div className="absolute top-0 right-1/4 w-64 h-64 bg-red-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-blue-500/8 rounded-full blur-2xl animate-pulse delay-1000" />
+      </div>
 
-      {/* Scroll to top button */}
+      {/* Floating Back to Top Button */}
       {showTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-4 right-4 z-50 p-3 bg-gradient-to-r from-red-500 to-red-600 
-                    text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 
-                    focus:scale-110 transition-all duration-300 focus:outline-none 
-                    focus:ring-2 focus:ring-red-500/50
-                    touch-manipulation active:scale-95"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
+          className="fixed bottom-6 right-6 z-50 group
+                    bg-gradient-to-r from-red-500 to-red-600 
+                    text-white p-3 rounded-2xl shadow-xl 
+                    hover:shadow-red-500/25 hover:scale-110 
+                    focus:scale-110 active:scale-95
+                    transition-all duration-300 ease-out
+                    focus:outline-none focus:ring-2 focus:ring-red-500/50
+                    backdrop-blur-sm border border-red-400/20"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
           aria-label="Remonter en haut de la page"
         >
-          <ArrowUp size={20} aria-hidden />
+          <ArrowUp size={18} className="transform group-hover:translate-y-[-2px] transition-transform duration-300" aria-hidden />
         </button>
       )}
 
-      <div className="relative backdrop-blur-xl bg-white/5 border-b border-white/10 py-8 sm:py-12 md:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* GRID : mobile-first */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-12">
-            {/* Col 1: Brand + Social */}
-            <div className="sm:col-span-2 lg:col-span-1 space-y-4 sm:space-y-6">
+      {/* Main Content */}
+      <div className="relative backdrop-blur-sm bg-black/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+          
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-12">
+            
+            {/* Brand Section */}
+            <div className="lg:col-span-1 space-y-6">
               <div className="group">
-                <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+                <div className="flex items-center space-x-3 mb-4">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-red-600 rounded-xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-300" />
-                    <div className="relative bg-gradient-to-r from-red-500 to-red-600 p-2.5 rounded-xl">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-red-600 rounded-xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500" />
+                    <div className="relative bg-gradient-to-r from-red-500 to-red-600 p-2.5 rounded-xl shadow-lg">
                       <Phone className="text-white" size={18} aria-hidden />
                     </div>
                   </div>
-                  <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                    SOS Urgently
-                  </span>
+                  <div>
+                    <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                      SOS Urgently
+                    </span>
+                    <div className="h-0.5 w-12 bg-gradient-to-r from-red-500 to-red-600 mt-1" />
+                  </div>
                 </div>
 
-                <p className="text-gray-300/90 leading-relaxed text-sm sm:text-base mb-6 sm:mb-8">
+                <p className="text-gray-300 text-sm leading-relaxed mb-6">
                   {t('footer.company.description')}
                 </p>
               </div>
 
-              <div className="flex items-center space-x-3 sm:space-x-4" role="list" aria-label={t('footer.social.ariaLabel')}>
+              {/* Social Links */}
+              <div className="flex space-x-3" role="list" aria-label={t('footer.social.ariaLabel')}>
                 {socialLinks.map((social) => (
                   <a
                     key={social.name}
                     href={social.href || '#'}
-                    className="group relative p-2.5 sm:p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 
+                    className="group p-2.5 rounded-xl bg-white/5 border border-white/10 
                                hover:bg-white/10 hover:border-white/20 hover:scale-105 
                                focus:bg-white/10 focus:border-white/20 focus:scale-105 
-                               transition-all duration-300 focus:outline-none focus:ring-2 
-                               focus:ring-red-500/50
+                               transition-all duration-300 focus:outline-none 
                                touch-manipulation active:scale-95"
                     aria-label={social.ariaLabel}
                     target={social.href.startsWith('http') ? '_blank' : undefined}
@@ -412,7 +424,7 @@ const Footer: React.FC = () => {
                   >
                     <social.icon
                       size={16}
-                      className="text-gray-300 group-hover:text-white transition-colors duration-300"
+                      className="text-gray-400 group-hover:text-white transition-colors duration-300"
                       aria-hidden
                     />
                   </a>
@@ -420,24 +432,24 @@ const Footer: React.FC = () => {
               </div>
             </div>
 
-            {/* Col 2: Services */}
-            <div className="space-y-4 sm:space-y-6">
-              <h3 className="text-base sm:text-lg font-semibold text-white relative">
-                <span className="relative z-10">{footerSections.services.title}</span>
-                <div className="absolute -bottom-1 left-0 w-6 sm:w-8 h-0.5 bg-gradient-to-r from-red-500 to-red-600" />
+            {/* Services */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                {footerSections.services.title}
+                <div className="w-6 h-px bg-gradient-to-r from-red-500 to-red-600" />
               </h3>
               <nav aria-label={t('footer.services.navAria')}>
-                <ul className="space-y-2 sm:space-y-3">
+                <ul className="space-y-2">
                   {footerSections.services.links.map((link, index) => (
                     <li key={index}>
                       <Link
                         to={link.href}
-                        className="group flex items-center text-gray-300/90 hover:text-white 
-                                   focus:text-white transition-all duration-300 text-sm sm:text-base 
+                        className="group flex items-center text-gray-400 hover:text-white 
+                                   focus:text-white transition-all duration-300 text-sm 
                                    focus:outline-none py-1.5 px-2 -mx-2 rounded-lg 
                                    hover:bg-white/5 focus:bg-white/5 touch-manipulation"
                       >
-                        <span className="w-1.5 h-1.5 bg-gray-600 rounded-full mr-3 
+                        <span className="w-1 h-1 bg-gray-600 rounded-full mr-3 
                                        group-hover:bg-red-400 group-focus:bg-red-400 
                                        transition-colors duration-300" />
                         {link.label}
@@ -448,24 +460,24 @@ const Footer: React.FC = () => {
               </nav>
             </div>
 
-            {/* Col 3: Support */}
-            <div className="space-y-4 sm:space-y-6">
-              <h3 className="text-base sm:text-lg font-semibold text-white relative">
-                <span className="relative z-10">{footerSections.support.title}</span>
-                <div className="absolute -bottom-1 left-0 w-6 sm:w-8 h-0.5 bg-gradient-to-r from-red-500 to-red-600" />
+            {/* Support */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                {footerSections.support.title}
+                <div className="w-6 h-px bg-gradient-to-r from-red-500 to-red-600" />
               </h3>
               <nav aria-label={t('footer.support.navAria')}>
-                <ul className="space-y-2 sm:space-y-3">
+                <ul className="space-y-2">
                   {footerSections.support.links.map((link, index) => (
                     <li key={index}>
                       <Link
                         to={link.href}
-                        className="group flex items-center text-gray-300/90 hover:text-white 
-                                   focus:text-white transition-all duration-300 text-sm sm:text-base 
+                        className="group flex items-center text-gray-400 hover:text-white 
+                                   focus:text-white transition-all duration-300 text-sm 
                                    focus:outline-none py-1.5 px-2 -mx-2 rounded-lg 
                                    hover:bg-white/5 focus:bg-white/5 touch-manipulation"
                       >
-                        <span className="w-1.5 h-1.5 bg-gray-600 rounded-full mr-3 
+                        <span className="w-1 h-1 bg-gray-600 rounded-full mr-3 
                                        group-hover:bg-red-400 group-focus:bg-red-400 
                                        transition-colors duration-300" />
                         {link.label}
@@ -476,16 +488,16 @@ const Footer: React.FC = () => {
               </nav>
             </div>
 
-            {/* Col 4: Contact */}
-            <div className="sm:col-span-2 lg:col-span-1 space-y-4 sm:space-y-6">
-              <h3 className="text-base sm:text-lg font-semibold text-white relative">
-                <span className="relative z-10">{t('footer.contact.title')}</span>
-                <div className="absolute -bottom-1 left-0 w-6 sm:w-8 h-0.5 bg-gradient-to-r from-red-500 to-red-600" />
+            {/* Contact */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                {t('footer.contact.title')}
+                <div className="w-6 h-px bg-gradient-to-r from-red-500 to-red-600" />
               </h3>
-              <ul className="space-y-2 sm:space-y-3">
+              <ul className="space-y-3">
                 {contactInfo.map((item, index) => (
                   <li key={index} className="group">
-                    <div className="flex items-start space-x-3 p-2 sm:p-2.5 rounded-lg transition-all duration-300 
+                    <div className="flex items-start space-x-3 p-2 rounded-lg transition-all duration-300 
                                     hover:bg-white/5 focus-within:bg-white/5">
                       <div className="flex-shrink-0 p-1.5 rounded-lg bg-white/5 border border-white/10 
                                       group-hover:bg-white/10 group-hover:border-white/20 
@@ -495,15 +507,15 @@ const Footer: React.FC = () => {
                       {item.href ? (
                         <Link
                           to={item.href}
-                          className="text-gray-300/90 hover:text-white focus:text-white 
-                                     transition-colors duration-300 text-sm sm:text-base 
+                          className="text-gray-400 hover:text-white focus:text-white 
+                                     transition-colors duration-300 text-sm 
                                      focus:outline-none leading-relaxed touch-manipulation"
                           aria-label={item.ariaLabel}
                         >
                           {item.text}
                         </Link>
                       ) : (
-                        <span className="text-gray-300/90 text-sm sm:text-base leading-relaxed">
+                        <span className="text-gray-400 text-sm leading-relaxed">
                           {item.text}
                         </span>
                       )}
@@ -513,52 +525,75 @@ const Footer: React.FC = () => {
               </ul>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Bottom bar */}
-      <div className="relative backdrop-blur-xl bg-black/20 py-4 sm:py-6 md:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0">
-            <div className="text-gray-400/90 text-xs sm:text-sm text-center sm:text-left">
-              © {currentYear} SOS Urgently. {t('footer.copyright')}
+          {/* Divider */}
+          <div className="relative mb-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            </div>
+            <div className="relative flex justify-center">
+              <div className="bg-gradient-to-r from-slate-900 to-black px-4">
+                <div className="w-2 h-2 bg-gradient-to-r from-red-500 to-red-600 rounded-full animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section */}
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            
+            {/* Copyright */}
+            <div className="text-gray-400 text-sm text-center lg:text-left order-2 lg:order-1">
+              <span className="font-medium text-white">© {currentYear} SOS Urgently.</span>
+              <span className="ml-1">{t('footer.copyright')}</span>
             </div>
 
+            {/* Legal Links */}
             <nav
-              className="flex flex-wrap justify-center sm:justify-end gap-1 text-xs sm:text-sm"
+              className="order-1 lg:order-2"
               aria-label={t('footer.legal.navAria')}
             >
               {isLoading ? (
-                <div className="text-gray-400 animate-pulse flex items-center space-x-2" aria-live="polite">
-                  <div className="w-2 h-2 bg-red-400 rounded-full animate-bounce" />
-                  <span>{t('common.loading')}</span>
+                <div className="flex items-center gap-3 text-gray-400 animate-pulse" aria-live="polite">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-red-400 rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-red-400 rounded-full animate-bounce delay-100" />
+                    <div className="w-2 h-2 bg-red-400 rounded-full animate-bounce delay-200" />
+                  </div>
+                  <span className="text-sm">{t('common.loading')}</span>
                 </div>
               ) : (
-                legalLinks.map((link, index) => (
-                  <React.Fragment key={`${link.href}-${index}`}>
-                    <Link
-                      to={link.href}
-                      className="text-gray-400/90 hover:text-white focus:text-white 
-                                 transition-colors duration-300 focus:outline-none 
-                                 px-2 sm:px-3 py-2 rounded-lg hover:bg-white/5 focus:bg-white/5
-                                 touch-manipulation"
-                    >
-                      {link.label}
-                    </Link>
-                    {index < legalLinks.length - 1 && (
-                      <span className="text-gray-600 select-none" aria-hidden>•</span>
-                    )}
-                  </React.Fragment>
-                ))
+                <div className="flex flex-wrap justify-center lg:justify-end gap-1 text-sm">
+                  {legalLinks.map((link, index) => (
+                    <React.Fragment key={`${link.href}-${index}`}>
+                      <Link
+                        to={link.href}
+                        className="px-3 py-2 rounded-lg text-gray-400 hover:text-white 
+                                   focus:text-white transition-all duration-300 
+                                   hover:bg-white/5 focus:bg-white/5 focus:outline-none
+                                   touch-manipulation relative group overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-red-600/10 
+                                      opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+                        <span className="relative z-10">{link.label}</span>
+                      </Link>
+                      {index < legalLinks.length - 1 && (
+                        <span className="text-gray-600 select-none flex items-center px-1" aria-hidden>
+                          <div className="w-1 h-1 bg-gray-600 rounded-full" />
+                        </span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
               )}
             </nav>
           </div>
         </div>
+
+        {/* Bottom border */}
+        <div className="h-1 bg-gradient-to-r from-red-500/50 via-red-600/80 to-red-500/50" />
       </div>
     </footer>
   );
 };
 
 export default Footer;
-
-

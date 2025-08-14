@@ -2,9 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ============
-    // Utilitaires
-    // ============
+    // ============ UTILITAIRES ============
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -25,7 +23,7 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
     }
 
-    // Propriétaire basé sur le champ uid du document (pas l'ID du doc)
+    // Propriétaire basé sur le champ uid du document
     function isDocOwner() {
       return isAuthenticated() && resource.data.uid == request.auth.uid;
     }
@@ -49,25 +47,45 @@ service cloud.firestore {
         request.resource.data.lastName is string;
     }
 
-    // Champs sensibles qui ne doivent pas être modifiés par l’utilisateur
+    // Champs sensibles non modifiables par l'utilisateur (sauf cas spécifiques gérés plus bas)
     function hasNoSensitiveChanges() {
       return !request.resource.data.diff(resource.data).affectedKeys()
         .hasAny(['role','isAdmin','isApproved','isBanned','uid','email','type','isVerified']);
     }
 
-    // Lecture publique d’une fiche visible (pour la page d’accueil / carrousel)
+    // Lecture publique d’une fiche visible (home / carrousel)
     function isPublicProfile() {
       return (resource.data.isVisible == true || resource.data.isVisibleOnMap == true) &&
              (resource.data.type in ['lawyer','expat']);
     }
 
-    // ===============
-    // USERS
-    // ===============
+    // ---- Aides de validation de deltas ----
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).changedKeys();
+    }
+
+    // Mise à jour limitée aux champs photo (utilisée pour users et providers)
+    function onlyPhotoFieldsChanged() {
+      return changedKeys().hasOnly(['profilePhoto','photoURL','avatar','updatedAt']);
+    }
+
+    // Mise à jour d'email autorisée UNIQUEMENT si l'email Firestore == email du token Auth
+    function emailSelfSynced() {
+      return changedKeys().hasOnly(['email','emailLower','updatedAt']) &&
+             request.resource.data.email == request.auth.token.email;
+    }
+
+    // ✅ NOUVEAU : MAJ "présence uniquement" (online/offline) autorisée
+    function presenceOnlyUpdate() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(
+        ['isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','updatedAt']
+      );
+    }
+
+    // =============== USERS ===============
     match /users/{userId} {
       allow read: if (isAuthenticated() && request.auth.uid == userId) ||
                    isAdmin() ||
-                   // profils approvés de prestataires consultables (si tu veux afficher des fiches publiques depuis /users)
                    (resource.data.isApproved == true && resource.data.role in ['lawyer','expat']);
 
       allow create: if isAuthenticated() &&
@@ -77,40 +95,40 @@ service cloud.firestore {
                      request.resource.data.uid == request.auth.uid &&
                      request.resource.data.email == request.auth.token.email;
 
-      allow update: if (isAuthenticated() && request.auth.uid == userId &&
-                        isEmailVerified() && isNotBanned() && hasNoSensitiveChanges()) ||
-                     isAdmin();
+      // ✅ Ajout de presenceOnlyUpdate() (pas besoin d'email vérifié)
+      allow update: if (
+                      isAuthenticated() && request.auth.uid == userId && isNotBanned() && (
+                        onlyPhotoFieldsChanged() ||
+                        emailSelfSynced() ||
+                        presenceOnlyUpdate() ||
+                        (isEmailVerified() && hasNoSensitiveChanges())
+                      )
+                    ) || isAdmin();
 
       allow delete: if isAdmin();
     }
 
-    // ======================
-    // SOS_PROFILES (ancien)
-    // ======================
-match /sos_profiles/{profileId} {
-  // Lecture : public
-  allow read: if true;
-  
-  // Création : seulement lawyer ou expat
-  allow create: if isAuthenticated() &&
-                  request.resource.data.type in ['lawyer', 'expat'] &&
-                  request.resource.data.uid == request.auth.uid;
-  
-  // Mise à jour : seulement lawyer ou expat, en tenant compte de la valeur existante
-  allow update: if isAuthenticated() &&
-                  ((request.resource.data.type ?? resource.data.type) in ['lawyer', 'expat']) &&
-                  (request.auth.uid == resource.data.uid || 
-                   request.auth.uid == profileId ||
-                   isAdmin());
-  
-  // Suppression : admin uniquement
-  allow delete: if isAdmin();
-}
+    // ====================== SOS_PROFILES (ancien) ======================
+    match /sos_profiles/{profileId} {
+      // Lecture : public
+      allow read: if true;
 
+      // Création : seulement lawyer ou expat
+      allow create: if isAuthenticated() &&
+                      request.resource.data.type in ['lawyer', 'expat'] &&
+                      request.resource.data.uid == request.auth.uid;
 
-    // ==================
-    // PROVIDERS (actuel)
-    // ==================
+      // Mise à jour : propriétaire du profil (uid), id du doc, ou admin
+      allow update: if isAuthenticated() &&
+                      ((request.resource.data.type ?? resource.data.type) in ['lawyer', 'expat']) &&
+                      (request.auth.uid == resource.data.uid ||
+                       request.auth.uid == profileId ||
+                       isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ================== PROVIDERS (actuel) ==================
     match /providers/{providerId} {
       function hasValidProviderFields() {
         return request.resource.data.keys().hasAll(['uid','type','fullName']) &&
@@ -119,25 +137,22 @@ match /sos_profiles/{profileId} {
                request.resource.data.fullName is string;
       }
 
-      // Lecture publique si visible, ou propriétaire, ou admin
       allow read: if isPublicProfile() || isDocOwner() || isAdmin();
-
-      // Création par le propriétaire (uid) ou admin
-      allow create: if creatingOwnDoc() && isEmailVerified() && isProviderRole() && hasValidProviderFields()
+      allow create: if (creatingOwnDoc() && isEmailVerified() && isProviderRole() && hasValidProviderFields())
                     || isAdmin();
 
-      // Mise à jour : admin OU propriétaire (sans modifier les champs sensibles)
-      // => permet de passer en ligne/hors-ligne (isOnline), ou visibilité (isVisible / isVisibleOnMap), etc.
       allow update: if isAdmin()
-                    ||
-                    (isDocOwner() && isEmailVerified() && isNotBanned() && hasValidProviderFields() && hasNoSensitiveChanges());
+                    || (
+                         isDocOwner() && isNotBanned() && hasValidProviderFields() && (
+                           onlyPhotoFieldsChanged() ||
+                           (isEmailVerified() && hasNoSensitiveChanges())
+                         )
+                       );
 
       allow delete: if isAdmin();
     }
 
-    // =========
-    // CALLS
-    // =========
+    // ========= CALLS =========
     match /calls/{callId} {
       allow read: if isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
@@ -156,9 +171,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAdmin();
     }
 
-    // ============
-    // PAYMENTS
-    // ============
+    // ============ PAYMENTS ============
     match /payments/{paymentId} {
       function hasValidPaymentFields() {
         return request.resource.data.keys().hasAll(['clientId','providerId','amount','status']) &&
@@ -181,9 +194,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAdmin();
     }
 
-    // ==========
-    // REVIEWS
-    // ==========
+    // ========== REVIEWS ==========
     match /reviews/{reviewId} {
       function hasValidReviewFields() {
         return request.resource.data.keys().hasAll(['clientId','providerId','rating','comment']) &&
@@ -211,9 +222,7 @@ match /sos_profiles/{profileId} {
       allow delete: if (isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin();
     }
 
-    // ============
-    // DOCUMENTS
-    // ============
+    // ============ DOCUMENTS ============
     match /documents/{documentId} {
       allow read: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
       allow create: if isAuthenticated() && isEmailVerified() &&
@@ -223,9 +232,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
     }
 
-    // ===============
-    // NOTIFICATIONS
-    // ===============
+    // =============== NOTIFICATIONS ===============
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
       allow create: if isAdmin();
@@ -235,9 +242,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId || isAdmin();
     }
 
-    // =================
-    // CALL_SESSIONS
-    // =================
+    // ================= CALL_SESSIONS =================
     match /call_sessions/{sessionId} {
       allow read: if isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
@@ -255,9 +260,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAdmin();
     }
 
-    // ==================
-    // INVOICE_RECORDS
-    // ==================
+    // ================== INVOICE_RECORDS ==================
     match /invoice_records/{invoiceId} {
       allow read: if isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
@@ -271,9 +274,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAdmin();
     }
 
-    // ===================
-    // NOTIFICATION_LOGS
-    // ===================
+    // =================== NOTIFICATION_LOGS ===================
     match /notification_logs/{logId} {
       allow read: if isAuthenticated() &&
                     (request.auth.uid == resource.data.recipientId || isAdmin());
@@ -282,9 +283,7 @@ match /sos_profiles/{profileId} {
       allow delete: if isAdmin();
     }
 
-    // =======================
-    // Collections Admin
-    // =======================
+    // ======================= Collections Admin =======================
     match /logs/{logId} { allow read, write: if isAdmin(); }
     match /analytics/{analyticsId} { allow read, write: if isAdmin(); }
     match /app_settings/{settingId} { allow read, write: if isAdmin(); }

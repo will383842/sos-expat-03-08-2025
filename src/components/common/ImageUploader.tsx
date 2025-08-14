@@ -158,7 +158,6 @@ const useDropzone = (opts: UseDropzoneOptions) => {
 
 /* =========================
    Caméra (mobile + desktop)
-   -> Version corrigée (pas de réassignation de const, on utilise un useRef)
    ========================= */
 interface CameraCapture {
   openCamera: (facingMode?: 'user' | 'environment') => Promise<void>;
@@ -179,9 +178,7 @@ const useCameraCapture = (
         video: { facingMode: { ideal: preferred }, width: { ideal: 1280 }, height: { ideal: 1280 } },
         audio: false,
       });
-    } catch {
-      /* no-op */
-    }
+    } catch { /* no-op */ }
 
     // 2) chercher une cam dos / back, ou première dispos
     try {
@@ -196,9 +193,7 @@ const useCameraCapture = (
           audio: false,
         });
       }
-    } catch {
-      /* no-op */
-    }
+    } catch { /* no-op */ }
 
     // 3) fallback
     return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -424,22 +419,41 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
   }, []);
 
+  /**
+   * SUPPRESSION ROBUSTE D'UNE ANCIENNE IMAGE
+   * - On décode le chemin exact de l'objet à partir de l'URL Firebase:
+   *   https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<path encodé>?alt=media&token=...
+   * - Pas d'heuristique sur le fileName. On supprime l'objet exact.
+   */
   const deleteFromStorage = useCallback(async (url: string): Promise<void> => {
     try {
       if (!url) return;
-      const storage = getStorage();
-      // Heuristique très simple pour récupérer un nom de fichier
-      const match = url.match(/(?:\/o\/|\/)([^/?#]+)\?alt=media|\/([^/?#]+)$/);
-      const fileName = match?.[1] || match?.[2];
-      if (!fileName) return;
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return; // pas une URL valide -> on ignore
+      }
 
-      const refPath = `${uploadPath}/${fileName}`;
-      const refObj = storageRef(storage, refPath);
+      // on accepte les hôtes Firebase Storage usuels
+      const host = parsed.host.toLowerCase();
+      if (!/firebasestorage\.googleapis\.com$/.test(host) && !/storage\.googleapis\.com$/.test(host)) {
+        return;
+      }
+
+      const afterO = parsed.pathname.split('/o/')[1];
+      if (!afterO) return;
+      const encodedObjectPath = afterO.split('?')[0];
+      const fullObjectPath = decodeURIComponent(encodedObjectPath); // ex: "profilePhotos/uid/filename.jpg"
+      if (!fullObjectPath) return;
+
+      const storage = getStorage();
+      const refObj = storageRef(storage, fullObjectPath);
       await deleteObject(refObj);
     } catch (e) {
       if (process.env.NODE_ENV === 'development') console.warn('Delete previous image failed:', e);
     }
-  }, [uploadPath]);
+  }, []);
 
   const uploadImage = useCallback(async (file: File | Blob): Promise<string> => {
     const storage = getStorage();
@@ -824,5 +838,3 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 };
 
 export default ImageUploader;
-
-

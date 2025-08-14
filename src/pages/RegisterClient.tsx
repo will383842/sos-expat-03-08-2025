@@ -131,7 +131,12 @@ const i18nConfig = {
       required: 'obligatoire',
       loading: 'Création magique en cours...',
       progressHint: 'Encore quelques petites choses à remplir ! ⭐',
-      passwordStrength: 'Force de votre mot de passe'
+      passwordStrength: 'Force de votre mot de passe',
+      progressLabel: 'Progression',
+      loadingLanguages: 'Chargement des langues...',
+      ariaShowPassword: 'Afficher le mot de passe',
+      ariaHidePassword: 'Masquer le mot de passe',
+      footerBanner: "🌟 En vous inscrivant, vous rejoignez notre super communauté et accédez instantanément à de l'aide qualifiée !"
     },
     // Champs du formulaire
     fields: {
@@ -151,7 +156,11 @@ const i18nConfig = {
     help: {
       minPassword: '6 caractères minimum (aucune autre contrainte !)',
       emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'Comment vous appelez-vous ?'
+      firstNamePlaceholder: 'Comment vous appelez-vous ? 😊',
+      firstNameHint: 'Comment on vous appelle ? Un petit prénom sympa et on est partis ✨',
+      emailHint: 'On vous écrit uniquement pour votre compte et les mises en relation. Pas de spam 🤝',
+      passwordTip: 'Astuce : plus c’est long, mieux c’est — 6+ caractères suffisent ici 💪',
+      dataSecure: 'Vos données sont chiffrées et sécurisées'
     },
     // Messages d'erreur fun et encourageants
     errors: {
@@ -166,7 +175,8 @@ const i18nConfig = {
       termsRequired: 'Un petit clic sur les conditions pour finaliser ! ✅',
       registrationError: 'Oups ! Un petit souci technique. Réessayez dans un instant ! 🔧',
       emailAlreadyExists: 'Cette adresse est déjà prise ! Vous pouvez vous connecter à la place ? 🔄',
-      networkError: 'Problème de connexion ! Vérifiez votre wifi et on reessaie ? 📶'
+      networkError: 'Problème de connexion ! Vérifiez votre wifi et on réessaie ? 📶',
+      tooManyRequests: 'Trop de tentatives ! Prenez une pause et réessayez dans quelques minutes ! ⏰'
     },
     // Messages de succès fun
     success: {
@@ -199,7 +209,12 @@ const i18nConfig = {
       required: 'required',
       loading: 'Creating magic...',
       progressHint: 'Just a few more things to fill! ⭐',
-      passwordStrength: 'Your password strength'
+      passwordStrength: 'Your password strength',
+      progressLabel: 'Progress',
+      loadingLanguages: 'Loading languages...',
+      ariaShowPassword: 'Show password',
+      ariaHidePassword: 'Hide password',
+      footerBanner: '🌟 By registering, you join our amazing community and get instant access to qualified help!'
     },
     fields: {
       firstName: 'Your first name',
@@ -215,8 +230,12 @@ const i18nConfig = {
     },
     help: {
       minPassword: '6 characters minimum (no other requirements!)',
-      emailPlaceholder: 'your@email.com',
-      firstNamePlaceholder: 'What\'s your name?'
+      emailPlaceholder: 'you@example.com',
+      firstNamePlaceholder: "What's your name? 😊",
+      firstNameHint: 'How should we call you? A friendly first name is perfect ✨',
+      emailHint: 'We email you only for your account & connections. No spam 🤝',
+      passwordTip: 'Tip: longer is stronger — but 6+ chars is enough here 💪',
+      dataSecure: 'Your data is encrypted & secure'
     },
     errors: {
       title: 'Small fixes needed:',
@@ -230,7 +249,8 @@ const i18nConfig = {
       termsRequired: 'A quick click on the terms to finalize! ✅',
       registrationError: 'Oops! A little technical hiccup. Try again in a moment! 🔧',
       emailAlreadyExists: 'This address is already taken! Can you log in instead? 🔄',
-      networkError: 'Connection problem! Check your wifi and let\'s try again? 📶'
+      networkError: 'Connection problem! Check your wifi and let\'s try again? 📶',
+      tooManyRequests: 'Too many attempts! Take a breather and try again in a few minutes! ⏰'
     },
     success: {
       fieldValid: 'Perfect! ✨',
@@ -272,7 +292,7 @@ const CustomFieldInput = React.memo(({
       type="button"
       onClick={onAdd}
       disabled={disabled}
-      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 whitespace-nowrap"
+      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 whitespace-nowrap"
     >
       {addLabel}
     </button>
@@ -300,7 +320,7 @@ const FieldSuccess = React.memo(({ show, message }: { show: boolean; message: st
   if (!show) return null;
   
   return (
-    <div className="mt-1 flex items-center gap-1 text-sm text-green-600 bg-green-50 rounded-lg px-2 py-1">
+    <div className="mt-1 inline-flex items-center gap-1 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1">
       <CheckCircle className="h-4 w-4 flex-shrink-0" />
       <span>{message}</span>
     </div>
@@ -359,8 +379,8 @@ const RegisterClient: React.FC = () => {
   const { register, isLoading, error } = useAuth();
   const { language } = useApp();
 
-  // Configuration i18n basée sur la langue actuelle
-  const t = i18nConfig[language as keyof typeof i18nConfig] || i18nConfig.fr;
+  // Sélection i18n robuste (par défaut FR si code inconnu comme 'fr-FR')
+  const t = i18nConfig[(language as keyof typeof i18nConfig)] ?? i18nConfig.fr;
 
   // État initial du formulaire optimisé
   const initialFormData: FormData = useMemo(() => ({
@@ -410,7 +430,7 @@ const RegisterClient: React.FC = () => {
     setMeta('property', 'og:title', t.meta.title);
     setMeta('property', 'og:description', t.meta.description);
     setMeta('property', 'og:type', 'website');
-    setMeta('property', 'og:locale', language === 'en' ? 'en_US' : 'fr_FR');
+    setMeta('property', 'og:locale', (language === 'en' || language === 'en-US') ? 'en_US' : 'fr_FR');
 
     // Twitter Card
     setMeta('name', 'twitter:card', 'summary_large_image');
@@ -425,7 +445,7 @@ const RegisterClient: React.FC = () => {
       '@type': 'WebPage',
       name: t.jsonLdName,
       description: t.meta.description,
-      inLanguage: language === 'en' ? 'en-US' : 'fr-FR',
+      inLanguage: (language === 'en' || language === 'en-US') ? 'en-US' : 'fr-FR',
       url: typeof window !== 'undefined' ? window.location.href : undefined,
       isPartOf: {
         '@type': 'WebSite',
@@ -660,9 +680,7 @@ const RegisterClient: React.FC = () => {
       case 'auth/network-request-failed':
         return t.errors.networkError;
       case 'auth/too-many-requests':
-        return language === 'en' 
-          ? 'Too many attempts! Take a breather and try again in a few minutes! ⏰'
-          : 'Trop de tentatives ! Prenez une pause et réessayez dans quelques minutes ! ⏰';
+        return t.errors.tooManyRequests;
       case 'auth/weak-password':
         // Remplacer le message Firebase par le nôtre (pas de contraintes)
         return t.errors.passwordTooShort;
@@ -676,7 +694,7 @@ const RegisterClient: React.FC = () => {
         }
         return t.errors.registrationError;
     }
-  }, [t.errors, language]);
+  }, [t.errors]);
 
   // Soumission du formulaire - optimisée
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -728,41 +746,47 @@ const RegisterClient: React.FC = () => {
 
   return (
     <Layout>
-      {/* Fond pastel bleu (client) + correction d'espace sous header */}
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-blue-50">
-        {/* En-tête compact optimisé pour mobile */}
-        <header className="pt-6 sm:pt-8">
+      {/* Fond sombre à la Home + halos dégradés */}
+      <div className="relative min-h-screen bg-gray-950 overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/80 to-gray-950" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-transparent to-blue-500/10" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-sky-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        </div>
+
+        {/* En-tête */}
+        <header className="relative z-10 pt-6 sm:pt-8">
           <div className="mx-auto w-full max-w-2xl px-4">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg mb-3">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 text-white shadow-lg mb-3 border border-white/20">
                 <UserCheck className="w-8 h-8" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                 {t.ui.heroTitle}
               </h1>
 
               <div className="mt-3 flex items-center justify-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
-                  <Clock3 className="h-4 w-4 text-blue-600" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white shadow-sm backdrop-blur">
+                  <Clock3 className="h-4 w-4 text-white" />
                   {t.ui.badge247}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
-                  <Languages className="h-4 w-4 text-blue-600" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white shadow-sm backdrop-blur">
+                  <Languages className="h-4 w-4 text-white" />
                   {t.ui.badgeMulti}
                 </span>
               </div>
 
-              {/* petit séparateur bleu, fin pour "sous-titre" */}
-              <div className="mx-auto mt-5 h-1 w-40 rounded-full bg-blue-500/60" />
+              <div className="mx-auto mt-5 h-1 w-40 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 opacity-90" />
             </div>
           </div>
         </header>
 
-        {/* Contenu principal : marge top réduite pour éviter l'immense vide */}
-        <main className="mx-auto w-full max-w-2xl px-4 pb-12 pt-6 sm:pt-8">
+        {/* Contenu principal */}
+        <main className="relative z-10 mx-auto w-full max-w-2xl px-4 pb-12 pt-6 sm:pt-8">
           {/* Panneau formulaire */}
-          <div className="rounded-2xl border border-blue-100 bg-white/90 shadow-xl backdrop-blur-sm">
-            <div className="border-b border-blue-100 px-5 py-4 sm:px-8">
+          <div className="rounded-3xl border border-gray-200 bg-white shadow-2xl backdrop-blur-sm">
+            <div className="border-b border-gray-100 px-5 py-4 sm:px-8">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900">{t.ui.title}</h2>
               <p className="mt-1 text-sm text-gray-600">{t.ui.subtitle}</p>
               <p className="mt-2 text-xs text-gray-500">
@@ -777,10 +801,10 @@ const RegisterClient: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8 px-5 py-6 sm:px-8 sm:py-8" noValidate>
-              {/* Messages d'erreur globaux fun et colorés */}
+              {/* Messages d'erreur globaux */}
               {(error || fieldErrors.general || errorCount > 0) && (
                 <div
-                  className="rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-pink-50 p-4"
+                  className="rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-4"
                   role="alert"
                   aria-live="polite"
                 >
@@ -807,27 +831,23 @@ const RegisterClient: React.FC = () => {
                 </div>
               )}
 
-              {/* Indicateur de progression fun avec emojis */}
+              {/* Indicateur de progression (bleu) */}
               {!error && !fieldErrors.general && (
                 <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-800 flex items-center gap-1">
-                      🎯 Progression
-                    </span>
-                    <span className="text-sm text-blue-600 font-bold">
+                    <span className="text-sm font-medium text-blue-800 flex items-center gap-1">🎯 {t.ui.progressLabel}</span>
+                    <span className="text-sm text-blue-700 font-bold">
                       {Object.values(fieldValidation).filter(Boolean).length}/5
                     </span>
                   </div>
                   <div className="h-3 bg-blue-200 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out"
-                      style={{ 
-                        width: `${(Object.values(fieldValidation).filter(Boolean).length / 5) * 100}%` 
-                      }}
+                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
+                      style={{ width: `${(Object.values(fieldValidation).filter(Boolean).length / 5) * 100}%` }}
                     />
                   </div>
                   {canSubmit && (
-                    <div className="mt-2 flex items-center gap-1 text-sm text-green-600 bg-green-50 rounded-lg px-2 py-1">
+                    <div className="mt-2 flex items-center gap-1 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1">
                       <CheckCircle className="h-4 w-4" />
                       <span>{t.success.allFieldsValid}</span>
                     </div>
@@ -835,7 +855,7 @@ const RegisterClient: React.FC = () => {
                 </div>
               )}
 
-              {/* Section: Informations personnelles avec style fun */}
+              {/* Section: Informations personnelles */}
               <section>
                 <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900">
                   <UserCheck className="h-5 w-5 text-blue-600" />
@@ -845,7 +865,7 @@ const RegisterClient: React.FC = () => {
                 <div className="space-y-6">
                   {/* Prénom */}
                   <div>
-                    <label htmlFor="firstName" className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="firstName" className="mb-1 block text-sm font-semibold text-gray-800">
                       {t.fields.firstName} <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -859,8 +879,11 @@ const RegisterClient: React.FC = () => {
                       onBlur={() => handleFieldBlur('firstName')}
                       placeholder={t.help.firstNamePlaceholder}
                       className={getInputClassName('firstName')}
-                      aria-describedby="firstName-error firstName-success"
+                      aria-describedby="firstName-hint firstName-error firstName-success"
                     />
+                    <p id="firstName-hint" className="mt-1 text-xs text-gray-500">
+                      {t.help.firstNameHint}
+                    </p>
                     <FieldError 
                       error={fieldErrors.firstName} 
                       show={!!(fieldErrors.firstName && touched.firstName)} 
@@ -873,11 +896,11 @@ const RegisterClient: React.FC = () => {
 
                   {/* Email */}
                   <div>
-                    <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="email" className="mb-1 block text-sm font-semibold text-gray-800">
                       {t.fields.email} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-blue-500" />
                       <input
                         id="email"
                         name="email"
@@ -889,9 +912,12 @@ const RegisterClient: React.FC = () => {
                         onBlur={() => handleFieldBlur('email')}
                         placeholder={t.help.emailPlaceholder}
                         className={getInputClassName('email', true)}
-                        aria-describedby="email-error email-success"
+                        aria-describedby="email-hint email-error email-success"
                       />
                     </div>
+                    <p id="email-hint" className="mt-1 text-xs text-gray-500">
+                      {t.help.emailHint}
+                    </p>
                     <FieldError 
                       error={fieldErrors.email} 
                       show={!!(fieldErrors.email && touched.email)} 
@@ -902,13 +928,13 @@ const RegisterClient: React.FC = () => {
                     />
                   </div>
 
-                  {/* Mot de passe fun et sans contraintes */}
+                  {/* Mot de passe */}
                   <div>
-                    <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="password" className="mb-1 block text-sm font-semibold text-gray-800">
                       {t.fields.password} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <Lock className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <Lock className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-blue-500" />
                       <input
                         id="password"
                         name="password"
@@ -920,13 +946,13 @@ const RegisterClient: React.FC = () => {
                         onBlur={() => handleFieldBlur('password')}
                         placeholder={t.help.minPassword}
                         className={`${getInputClassName('password', true)} pr-11`}
-                        aria-describedby="password-error password-success password-strength"
+                        aria-describedby="password-hint password-error password-success password-strength"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-2.5 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95 transition-all"
-                        aria-label={showPassword ? (language === 'en' ? 'Hide password' : 'Masquer le mot de passe') : (language === 'en' ? 'Show password' : 'Afficher le mot de passe')}
+                        aria-label={showPassword ? t.ui.ariaHidePassword : t.ui.ariaShowPassword}
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
@@ -935,6 +961,9 @@ const RegisterClient: React.FC = () => {
                       password={formData.password} 
                       label={t.ui.passwordStrength}
                     />
+                    <p id="password-hint" className="mt-1 text-xs text-gray-500">
+                      {t.help.passwordTip}
+                    </p>
                     <FieldError 
                       error={fieldErrors.password} 
                       show={!!(fieldErrors.password && touched.password)} 
@@ -945,17 +974,15 @@ const RegisterClient: React.FC = () => {
                     />
                   </div>
 
-                  {/* Langues parlées avec MultiLanguageSelect */}
+                  {/* Langues parlées */}
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-semibold text-gray-800">
                       {t.fields.languagesSpoken} <span className="text-red-500">*</span>
                     </label>
 
                     <Suspense fallback={
                       <div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100 flex items-center px-3">
-                        <div className="text-gray-500 text-sm">
-                          {language === 'en' ? 'Loading languages...' : 'Chargement des langues...'}
-                        </div>
+                        <div className="text-gray-500 text-sm">{t.ui.loadingLanguages}</div>
                       </div>
                     }>
                       <div className={`${getInputClassName('languagesSpoken')} p-0`}>
@@ -965,6 +992,20 @@ const RegisterClient: React.FC = () => {
                         />
                       </div>
                     </Suspense>
+
+                    {/* Chips des langues sélectionnées */}
+                    {selectedLanguages.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(selectedLanguages as { value: string; label: string }[]).map((l) => (
+                          <span
+                            key={l.value}
+                            className="px-2.5 py-1 rounded-lg text-xs bg-blue-50 text-blue-800 border border-blue-200"
+                          >
+                            {l.label.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {showCustomLanguage && (
                       <CustomFieldInput
@@ -986,16 +1027,16 @@ const RegisterClient: React.FC = () => {
                       message={t.success.fieldValid}
                     />
 
-                    {/* Note de sécurité fun */}
-                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 bg-green-50 rounded-lg px-2 py-1">
-                      <ShieldCheck className="h-4 w-4 text-green-600" />
-                      <span>🔒 SSL • {language === 'en' ? 'Your data is encrypted & secure' : 'Vos données sont chiffrées et sécurisées'}</span>
+                    {/* Note de sécurité */}
+                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-700 bg-blue-50 rounded-lg px-2 py-1 border border-blue-200">
+                      <ShieldCheck className="h-4 w-4 text-blue-600" />
+                      <span>🔒 SSL • {t.help.dataSecure}</span>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Conditions générales avec style fun */}
+              {/* Conditions générales */}
               <div className="rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50 px-4 py-3">
                 <div className="flex items-start gap-3">
                   <input
@@ -1012,13 +1053,13 @@ const RegisterClient: React.FC = () => {
                     }`}
                   />
                   <div className="flex-1">
-                    <label htmlFor="acceptClientTerms" className="text-sm text-gray-700">
+                    <label htmlFor="acceptClientTerms" className="text-sm text-gray-800">
                       {t.ui.acceptTerms}{' '}
                       <Link
                         to={t.termsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-blue-600 underline decoration-2 underline-offset-2 hover:text-blue-700 transition-colors"
+                        className="font-semibold text-blue-700 underline decoration-2 underline-offset-2 hover:text-blue-800 transition-colors"
                       >
                         {t.ui.termsLink}
                       </Link>{' '}
@@ -1036,7 +1077,7 @@ const RegisterClient: React.FC = () => {
                 </div>
               </div>
 
-              {/* Bouton de soumission fun et coloré */}
+              {/* Bouton de soumission (bleu) */}
               <div>
                 <Button
                   type="submit"
@@ -1046,7 +1087,7 @@ const RegisterClient: React.FC = () => {
                   disabled={!canSubmit}
                   className={`min-h-[52px] rounded-xl font-bold text-white shadow-lg transition-all duration-300 active:scale-[0.98] transform ${
                     canSubmit
-                      ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 shadow-blue-500/30 hover:from-blue-700 hover:via-purple-700 hover:to-blue-800 hover:shadow-blue-600/40 hover:scale-[1.02]'
+                      ? 'bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-700 shadow-blue-500/30 hover:brightness-110 hover:shadow-blue-600/40 hover:scale-[1.02]'
                       : 'bg-gray-400 cursor-not-allowed shadow-gray-400/20'
                   }`}
                 >
@@ -1060,7 +1101,7 @@ const RegisterClient: React.FC = () => {
                   )}
                 </Button>
 
-                {/* Indicateur de progression détaillé avec emojis */}
+                {/* Indicateur de progression détaillé */}
                 {!canSubmit && !isLoading && (
                   <div className="mt-4 space-y-3">
                     <p className="text-center text-xs text-gray-500 font-medium">{t.ui.progressHint}</p>
@@ -1112,11 +1153,19 @@ const RegisterClient: React.FC = () => {
             </form>
           </div>
 
-          {/* Footer informatif fun */}
-          <div className="mt-6 text-center text-xs text-gray-500 bg-white/50 rounded-lg px-4 py-2">
-            {language === 'en'
-              ? '🌟 By registering, you join our amazing community and get instant access to qualified help!'
-              : "🌟 En vous inscrivant, vous rejoignez notre super communauté et accédez instantanément à de l'aide qualifiée !"}
+          {/* Footer informatif — capsule premium */}
+          <div className="mt-8">
+            <div className="relative mx-auto max-w-xl">
+              <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-700 opacity-60 blur-sm" />
+              <div className="relative flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-md border border-white/15 shadow-lg hover:shadow-blue-500/20 transition-shadow">
+                <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-500 text-white text-sm shadow">
+                  ✨
+                </div>
+                <p className="text-[13px] sm:text-sm text-white/95">
+                  {t.ui.footerBanner}
+                </p>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -1126,4 +1175,3 @@ const RegisterClient: React.FC = () => {
 
 // Export avec React.memo pour optimiser les re-renders
 export default React.memo(RegisterClient);
-

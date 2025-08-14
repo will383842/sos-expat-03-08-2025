@@ -1,50 +1,56 @@
-import NotificationSettings from '../notifications/notificationsDashboardProviders/NotificationSettings';
-import React, { useState, useEffect } from 'react';
+// src/pages/Dashboard.tsx
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  User, 
-  Settings, 
-  Phone, 
-  FileText, 
-  Bell, 
-  Shield, 
-  LogOut, 
-  Edit, 
+import {
+  User,
+  Settings,
+  Phone,
+  FileText,
+  Bell,
+  Shield,
+  LogOut,
+  Edit,
   CreditCard,
   Calendar,
-  Globe,
   Mail,
   MessageSquare,
   Check,
   AlertTriangle,
-  MapPin,
   Clock,
-  ExternalLink,
-  Star
+  Star,
+  Bookmark
 } from 'lucide-react';
+
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import AvailabilityToggle from '../components/dashboard/AvailabilityToggle';
+import NotificationSettings from '../notifications/notificationsDashboardProviders/NotificationSettings';
+import UserInvoices from '../components/dashboard/UserInvoices';
+import DashboardMessages from '../components/dashboard/DashboardMessages';
+import ImageUploader from '../components/common/ImageUploader';
+import MultiLanguageSelect from '../components/forms-data/MultiLanguageSelect';
+
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { updateUserProfile, logAuditEvent } from '../utils/firestore';
-import ImageUploader from '../components/common/ImageUploader';
+
 import {
   collection,
   query,
-  where,
   orderBy,
   limit,
-  startAfter,
   getDocs,
   onSnapshot,
-  doc
+  doc,
+  updateDoc,
+  serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import UserInvoices from '../components/dashboard/UserInvoices';
-import DashboardMessages from '../components/dashboard/DashboardMessages';
+import { db, auth } from '../config/firebase';
+import { updateEmail as fbUpdateEmail, updateProfile as fbUpdateProfile } from 'firebase/auth';
 
-// Types pour les données du dashboard
+// ===============================
+// Types
+// ===============================
 interface Call {
   id: string;
   clientId: string;
@@ -73,7 +79,7 @@ interface Invoice {
   downloadUrl: string;
 }
 
-interface Notification {
+interface NotificationItem {
   id: string;
   title: string;
   message: string;
@@ -85,263 +91,316 @@ interface ProfileData {
   email: string;
   phone: string;
   phoneCountryCode: string;
+  whatsappNumber?: string;
+  whatsappCountryCode?: string;
   currentCountry: string;
+  currentPresenceCountry?: string;
+  residenceCountry?: string;
   profilePhoto: string;
   isOnline: boolean;
+
+  // commun
+  preferredLanguage?: 'fr' | 'en';
+  languages?: string[];
+  bio?: string;
+
+  // lawyer
+  yearsOfExperience?: number;
+  specialties?: string[];
+  practiceCountries?: string[];
+  graduationYear?: number;
+  educations?: string[];
+  barNumber?: string;
+
+  // expat
+  helpTypes?: string[];
+  yearsAsExpat?: number;
+  interventionCountries?: string[];
 }
 
-interface LanguageOption {
-  value: string;
-  label: string;
-}
+type TabType =
+  | 'profile'
+  | 'settings'
+  | 'calls'
+  | 'invoices'
+  | 'reviews'
+  | 'notifications'
+  | 'messages'
+  | 'favorites';
 
-type TabType = 'profile' | 'calls' | 'messages' | 'reviews' | 'notifications' | 'invoices' | 'settings';
 type CallStatus = 'completed' | 'pending' | 'in_progress' | 'failed';
 
+// ===============================
+// Sous-composants UI
+// ===============================
+const Field: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: 'text' | 'email' | 'number';
+}> = ({ label, value, onChange, placeholder, type = 'text' }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+    />
+  </div>
+);
+
+const ChipInput: React.FC<{
+  value: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+  className?: string;
+}> = ({ value, onChange, placeholder, className }) => {
+  const [input, setInput] = useState<string>('');
+  const add = () => {
+    const v = input.trim();
+    if (!v) return;
+    if (value.includes(v)) {
+      setInput('');
+      return;
+    }
+    onChange([...value, v]);
+    setInput('');
+  };
+  const remove = (i: number) => {
+    const next = [...value];
+    next.splice(i, 1);
+    onChange(next);
+  };
+  return (
+    <div className={className ?? ''}>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {value.map((v, i) => (
+          <span
+            key={`${v}-${i}`}
+            className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-100"
+          >
+            {v}
+            <button
+              type="button"
+              className="hover:text-blue-900"
+              onClick={() => remove(i)}
+              aria-label={`Supprimer ${v}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+        <Button type="button" onClick={add} size="small">
+          Ajouter
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div>
+    <p className="text-sm font-medium text-gray-500">{label}</p>
+    <p className="mt-1 text-sm text-gray-900">{value || '—'}</p>
+  </div>
+);
+
+const PillsRow: React.FC<{ label: string; items: string[]; color: 'blue' | 'green' | 'red' }> = ({
+  label,
+  items,
+  color
+}) => {
+  const colorMap: Record<'blue' | 'green' | 'red', string> = {
+    blue: 'bg-blue-100 text-blue-800',
+    green: 'bg-green-100 text-green-800',
+    red: 'bg-red-100 text-red-800'
+  };
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray-500 mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {(items || []).length > 0 ? (
+          items.map((it, i) => (
+            <span key={`${it}-${i}`} className={`px-2 py-1 ${colorMap[color]} text-xs rounded-full`}>
+              {it}
+            </span>
+          ))
+        ) : (
+          <span className="text-sm text-gray-900">—</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Alert: React.FC<{ type: 'success' | 'error'; message: string }> = ({ type, message }) => {
+  const cfg =
+    type === 'success'
+      ? {
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          text: 'text-green-800',
+          icon: <Check className="h-5 w-5 text-green-400 mr-2" />
+        }
+      : {
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          text: 'text-red-800',
+          icon: <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+        };
+  return (
+    <div className={`mb-2 ${cfg.bg} ${cfg.border} ${cfg.text} rounded-md p-4`}>
+      <div className="flex items-start">
+        {cfg.icon}
+        <span>{message}</span>
+      </div>
+    </div>
+  );
+};
+
+// ===============================
+// Composant principal
+// ===============================
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const { language, enhancedSettings, updateEnhancedSettings } = useApp();
-  
-  // États du composant
+  const { user, firebaseUser, logout, refreshUser } = useAuth();
+  const { language } = useApp();
+
+  // UI & feedback
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
+
+  // data
   const [currentStatus, setCurrentStatus] = useState<boolean>(user?.isOnline ?? false);
-  const [profileData, setProfileData] = useState<ProfileData>({
-    email: '',
-    phone: '',
-    phoneCountryCode: '+33',
-    currentCountry: '',
-    profilePhoto: '',
-    isOnline: true
-  });
-  const [showCustomLanguage, setShowCustomLanguage] = useState<boolean>(false);
-  const [customLanguage, setCustomLanguage] = useState<string>('');
   const [calls, setCalls] = useState<Call[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [invoices] = useState<Invoice[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [favorites, setFavorites] = useState<
+    Array<{ id: string; type: 'lawyer' | 'expat'; name: string; country?: string; photo?: string }>
+  >([]);
 
-  // Effet pour rediriger si non connecté
+  // Profil (édition) pré-rempli
+  const baseProfile: ProfileData = useMemo(
+    () => ({
+      email: user?.email || '',
+      phone: (user as { phone?: string })?.phone || '',
+      phoneCountryCode: (user as { phoneCountryCode?: string })?.phoneCountryCode || '+33',
+      whatsappNumber: (user as { whatsappNumber?: string })?.whatsappNumber || '',
+      whatsappCountryCode: (user as { whatsappCountryCode?: string })?.whatsappCountryCode || '+33',
+      currentCountry: (user as { currentCountry?: string })?.currentCountry || '',
+      currentPresenceCountry: (user as { currentPresenceCountry?: string })?.currentPresenceCountry || '',
+      residenceCountry: (user as { residenceCountry?: string })?.residenceCountry || '',
+      profilePhoto: user?.profilePhoto || user?.photoURL || '',
+      isOnline: user?.isOnline ?? true,
+      preferredLanguage: (user as { preferredLanguage?: 'fr' | 'en' })?.preferredLanguage || 'fr',
+      languages: (user as { languages?: string[] })?.languages || [],
+      bio: (user as { bio?: string })?.bio || '',
+      yearsOfExperience: (user as { yearsOfExperience?: number })?.yearsOfExperience ?? 0,
+      specialties: (user as { specialties?: string[] })?.specialties || [],
+      practiceCountries: (user as { practiceCountries?: string[] })?.practiceCountries || [],
+      graduationYear: (user as { graduationYear?: number })?.graduationYear || new Date().getFullYear() - 5,
+      educations: (user as { educations?: string[] })?.educations || [],
+      barNumber: (user as { barNumber?: string })?.barNumber || '',
+      helpTypes: (user as { helpTypes?: string[] })?.helpTypes || [],
+      yearsAsExpat: (user as { yearsAsExpat?: number })?.yearsAsExpat ?? 0,
+      interventionCountries: (user as { interventionCountries?: string[] })?.interventionCountries || []
+    }),
+    [user]
+  );
+  const [profileData, setProfileData] = useState<ProfileData>(baseProfile);
+
+  // Langues (sélecteur identique aux formulaires)
+  const [selectedLanguages, setSelectedLanguages] = useState<Array<{ value: string; label: string }>>(
+    (baseProfile.languages || []).map((l) => ({ value: l, label: l }))
+  );
+
+  // Redirect si pas loggé
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    // Initialiser les données du profil depuis l'utilisateur
-    setProfileData({
-      email: user.email || '',
-      phone: user.phone || '',
-      phoneCountryCode: user.phoneCountryCode || '+33',
-      currentCountry: user.currentCountry || '',
-      profilePhoto: user.profilePhoto || '',
-      isOnline: user.isOnline || true
-    });
-
-    // Charger les données utilisateur
-    loadUserData();
+    if (!user) navigate('/login');
   }, [user, navigate]);
 
-  // Effet pour écouter les changements de statut en temps réel
+  // Status en temps réel
   useEffect(() => {
     if (!user) return;
-
-    const unsubscribe = onSnapshot(
+    const unsub = onSnapshot(
       doc(db, 'users', user.id),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          setCurrentStatus(data?.isOnline === true);
-        }
+      (s) => {
+        if (s.exists()) setCurrentStatus(((s.data() as { isOnline?: boolean })?.isOnline) === true);
       },
-      (error) => {
-        console.error('Erreur de synchronisation isOnline dans le dashboard :', error);
-      }
+      () => {}
     );
-
-    return () => unsubscribe();
+    return () => unsub();
   }, [user]);
 
-  // Fonction de déconnexion
-  const handleLogout = async (): Promise<void> => {
-    try {
-      await logout();
-      // La navigation vers login sera gérée par l'AuthContext
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion :', error);
-      setErrorMessage(language === 'fr' ? 'Erreur lors de la déconnexion' : 'Error during logout');
-    }
-  };
-
-  // Fonction pour annuler l'édition
-  const handleCancelEdit = (): void => {
-    if (!user) return;
-    setProfileData({
-      email: user.email || '',
-      phone: user.phone || '',
-      phoneCountryCode: user.phoneCountryCode || '+33',
-      currentCountry: user.currentCountry || '',
-      profilePhoto: user.profilePhoto || '',
-      isOnline: user.isOnline || true
-    });
-    setIsEditing(false);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  };
-
-  // Fonction pour commencer l'édition
-  const handleEditProfile = (): void => {
-    setIsEditing(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  };
-
-  // Fonction pour charger les données utilisateur
-  const loadUserData = async (): Promise<void> => {
-    if (!user) return;
-
-    // Dans une vraie app, ces données seraient chargées depuis Firestore
-    // Pour l'instant, on utilise des données fictives
-    
-    // Remettre les données du formulaire aux données utilisateur
-    setProfileData({
-      email: user?.email || '',
-      phone: user?.phone || '',
-      phoneCountryCode: user?.phoneCountryCode || '+33',
-      currentCountry: user?.currentCountry || '',
-      profilePhoto: user?.profilePhoto || '',
-      isOnline: user?.isOnline || true
-    });
-    setIsEditing(false);
-  };
-
-  // Fonction pour sauvegarder le profil
-  const handleSaveProfile = async (): Promise<void> => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-    
-    try {
-      // Mettre à jour le profil utilisateur dans Firestore
-      await updateUserProfile(user.id, {
-        email: profileData.email,
-        phone: profileData.phone,
-        phoneCountryCode: profileData.phoneCountryCode,
-        currentCountry: profileData.currentCountry,
-        profilePhoto: profileData.profilePhoto,
-        isOnline: profileData.isOnline,
-        updatedAt: new Date()
-      });
-      
-      // Logger l'action
-      await logAuditEvent(user.id, 'profile_updated', {
-        updatedFields: JSON.stringify({
-          email: profileData.email,
-          phone: profileData.phone,
-          phoneCountryCode: profileData.phoneCountryCode,
-          currentCountry: profileData.currentCountry,
-          profilePhoto: profileData.profilePhoto,
-          isOnline: profileData.isOnline
-        })
-      });
-      
-      setSuccessMessage(language === 'fr' ? 'Profil mis à jour avec succès' : 'Profile updated successfully');
-      setIsEditing(false);
-      
-      // Effacer le message de succès après 3 secondes
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      setErrorMessage(language === 'fr' ? 'Erreur lors de la mise à jour du profil' : 'Error updating profile');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fonction pour sauvegarder les paramètres
-  const handleSaveSettings = async (): Promise<void> => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-    
-    try {
-      // Mettre à jour les paramètres dans Firestore
-      await updateUserProfile(user.id, {
-        enhancedSettings: enhancedSettings,
-        updatedAt: new Date()
-      });
-      
-      // Logger l'action
-      await logAuditEvent(user.id, 'settings_updated', {
-        settings: JSON.stringify(enhancedSettings)
-      });
-      
-      setSuccessMessage(language === 'fr' ? 'Paramètres mis à jour avec succès' : 'Settings updated successfully');
-      
-      // Effacer le message de succès après 3 secondes
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      setErrorMessage(language === 'fr' ? 'Erreur lors de la mise à jour des paramètres' : 'Error updating settings');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fonction pour mettre à jour les paramètres de langue
-  const updateLanguageSettings = (key: keyof typeof enhancedSettings.language, value: string): void => {
-    updateEnhancedSettings({
-      language: {
-        ...enhancedSettings.language,
-        [key]: value
+  // Favoris
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const q = query(collection(db, 'users', user.id, 'favorites'), orderBy('createdAt', 'desc'), limit(20));
+        const snap = await getDocs(q);
+        const items: Array<{ id: string; type: 'lawyer' | 'expat'; name: string; country?: string; photo?: string }> = [];
+        snap.forEach((d) => {
+          const data = d.data() as Record<string, unknown>;
+          items.push({
+            id: d.id,
+            type: (data.type as 'lawyer' | 'expat') || 'lawyer',
+            name: String(data.name || ''),
+            country: (data.country as string) || '',
+            photo: (data.photo as string) || ''
+          });
+        });
+        setFavorites(items);
+      } catch {
+        /* silent */
       }
-    });
-  };
+    })();
+  }, [user?.id]);
 
-  // Fonction pour ajouter une langue secondaire personnalisée
-  const handleAddSecondaryLanguage = (): void => {
-    if (customLanguage && customLanguage.trim() !== '') {
-      updateLanguageSettings('secondary', customLanguage);
-      setCustomLanguage('');
-      setShowCustomLanguage(false);
-    }
-  };
+  // Historique notifications (optionnel – placeholder)
+  useEffect(() => {
+    setNotifications([]);
+  }, []);
 
-  // Fonction pour formater les dates
-  const formatDate = (date: Date): string => {
-    return new Intl.DateTimeFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
+  // Appels (placeholder lisible – garde tes fetch si tu en as)
+  useEffect(() => {
+    setCalls([]);
+  }, []);
+
+  // Helpers
+  const formatDate = (date: Date): string =>
+    new Intl.DateTimeFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
-  };
 
-  // Fonction pour formater la durée
-  const formatDuration = (minutes: number): string => {
-    return `${minutes} min`;
-  };
+  const formatDuration = (minutes: number): string => `${minutes} min`;
+  const formatPrice = (price: number): string => `${price.toFixed(2)} €`;
 
-  // Fonction pour formater le prix
-  const formatPrice = (price: number): string => {
-    return `${price.toFixed(2)} €`;
-  };
-
-  // Fonction pour obtenir le badge de statut
   const getStatusBadge = (status: CallStatus): JSX.Element => {
-    const statusConfig = {
+    const statusConfig: Record<CallStatus, { className: string; text: string }> = {
       completed: {
         className: 'px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium',
         text: language === 'fr' ? 'Terminé' : 'Completed'
@@ -359,228 +418,260 @@ const Dashboard: React.FC = () => {
         text: language === 'fr' ? 'Échoué' : 'Failed'
       }
     };
-
-    const config = statusConfig[status] || {
-      className: 'px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium',
-      text: status
-    };
-
-    return (
-      <span className={config.className}>
-        {config.text}
-      </span>
-    );
+    const config = statusConfig[status];
+    return <span className={config.className}>{config.text}</span>;
   };
 
-  // Fonction helper pour rendre les champs de type array de façon sécurisée
-  const renderArrayField = (
-    items: string[] | undefined,
-    colorClass: string,
-    fallbackText: string
-  ): JSX.Element => {
-    if (items && items.length > 0) {
-      return (
-        <>
-          {items.map((item: string, index: number) => (
-            <span
-              key={index}
-              className={`px-2 py-1 ${colorClass} text-xs rounded-full`}
-            >
-              {item}
-            </span>
-          ))}
-        </>
+  // Palette alignée Home
+  const gradientHeader =
+    'bg-gradient-to-r from-red-500 via-orange-500 to-purple-600 text-white shadow-sm';
+  const softCard =
+    'bg-white/90 backdrop-blur border border-gray-200 rounded-xl shadow-sm';
+
+  // ===============================
+  // PHOTO : persistance immédiate (users + sos_profiles + Auth)
+  // ===============================
+  const handleInstantPhotoPersist = useCallback(
+    async (url: string) => {
+      if (!user) return;
+      try {
+        // users/{uid}
+        await updateDoc(doc(db, 'users', user.id), {
+          profilePhoto: url,
+          photoURL: url,
+          avatar: url,
+          updatedAt: serverTimestamp()
+        });
+
+        // sos_profiles/{uid} si prestataire
+        if (user.role === 'lawyer' || user.role === 'expat') {
+          await updateDoc(doc(db, 'sos_profiles', user.id), {
+            profilePhoto: url,
+            photoURL: url,
+            avatar: url,
+            updatedAt: serverTimestamp()
+          }).catch(() => {});
+        }
+
+        // Auth photoURL
+        if (auth.currentUser) {
+          await fbUpdateProfile(auth.currentUser, { photoURL: url }).catch(() => {});
+        }
+
+        // MAJ UI immédiate
+        setProfileData((prev) => ({ ...prev, profilePhoto: url }));
+
+        await logAuditEvent(user.id, 'profile_photo_updated', { newUrl: url });
+        await refreshUser?.(); // propage vers sidebar / profil
+
+        setSuccessMessage(language === 'fr' ? 'Photo mise à jour ✅' : 'Photo updated ✅');
+        setTimeout(() => setSuccessMessage(null), 2000);
+      } catch (e) {
+        setErrorMessage(
+          language === 'fr' ? 'Erreur lors de la mise à jour de la photo' : 'Error updating photo'
+        );
+        setTimeout(() => setErrorMessage(null), 2500);
+      }
+    },
+    [user, refreshUser, language]
+  );
+
+  // ===============================
+  // Sauvegarde des paramètres
+  // ===============================
+  const saveSettings = async (): Promise<void> => {
+    if (!user) return;
+
+    setIsLoading(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    try {
+      // langues depuis le MultiLanguageSelect
+      const languagesFromSelect = selectedLanguages.map((o) => o.value);
+
+      const payload: Record<string, unknown> = {
+        email: profileData.email.trim().toLowerCase(),
+        phone: profileData.phone || '',
+        phoneCountryCode: profileData.phoneCountryCode || '+33',
+        whatsappNumber: profileData.whatsappNumber || '',
+        whatsappCountryCode: profileData.whatsappCountryCode || '+33',
+        currentCountry: profileData.currentCountry || '',
+        currentPresenceCountry: profileData.currentPresenceCountry || '',
+        residenceCountry: profileData.residenceCountry || '',
+        preferredLanguage: profileData.preferredLanguage || 'fr',
+        languages: languagesFromSelect,
+        bio: profileData.bio || '',
+        profilePhoto: profileData.profilePhoto || '',
+        photoURL: profileData.profilePhoto || '',
+        avatar: profileData.profilePhoto || '',
+        updatedAt: new Date()
+      };
+
+      if (user.role === 'lawyer') {
+        Object.assign(payload, {
+          practiceCountries: profileData.practiceCountries || [],
+          yearsOfExperience:
+            typeof profileData.yearsOfExperience === 'number' ? profileData.yearsOfExperience : 0,
+          specialties: profileData.specialties || [],
+          graduationYear:
+            typeof profileData.graduationYear === 'number'
+              ? profileData.graduationYear
+              : new Date().getFullYear() - 5,
+          educations: profileData.educations || [],
+          barNumber: profileData.barNumber || ''
+        });
+      } else if (user.role === 'expat') {
+        Object.assign(payload, {
+          helpTypes: profileData.helpTypes || [],
+          yearsAsExpat:
+            typeof profileData.yearsAsExpat === 'number' ? profileData.yearsAsExpat : 0,
+          interventionCountries: profileData.interventionCountries || []
+        });
+      }
+
+      // Si changement d'email => met à jour l'identifiant Auth
+      const emailChanged =
+        user.email.trim().toLowerCase() !== profileData.email.trim().toLowerCase();
+      if (emailChanged && firebaseUser) {
+        try {
+          await fbUpdateEmail(firebaseUser, profileData.email.trim().toLowerCase());
+        } catch {
+          throw new Error(
+            language === 'fr'
+              ? "Impossible de changer l’email (reconnexion récente requise). Déconnectez-vous puis reconnectez-vous et réessayez."
+              : 'Cannot change email (recent login required). Please sign out/in and try again.'
+          );
+        }
+      }
+
+      // update Firestore user
+      await updateUserProfile(user.id, payload);
+
+      // sync SOS profile
+      if (user.role === 'lawyer' || user.role === 'expat') {
+        await updateDoc(doc(db, 'sos_profiles', user.id), {
+          profilePhoto: payload.profilePhoto,
+          photoURL: payload.photoURL,
+          avatar: payload.avatar,
+          email: payload.email,
+          phone: payload.phone,
+          phoneCountryCode: payload.phoneCountryCode,
+          languages: payload.languages,
+          country:
+            user.role === 'lawyer'
+              ? profileData.currentCountry || ''
+              : profileData.residenceCountry || profileData.currentCountry || '',
+          description: payload.bio,
+          specialties:
+            user.role === 'lawyer'
+              ? (payload as { specialties?: string[] }).specialties || []
+              : (payload as { helpTypes?: string[] }).helpTypes || [],
+          yearsOfExperience:
+            user.role === 'lawyer'
+              ? (payload as { yearsOfExperience?: number }).yearsOfExperience || 0
+              : (payload as { yearsAsExpat?: number }).yearsAsExpat || 0,
+          interventionCountries:
+            user.role === 'lawyer'
+              ? (payload as { practiceCountries?: string[] }).practiceCountries || []
+              : (payload as { interventionCountries?: string[] }).interventionCountries || [],
+          updatedAt: serverTimestamp()
+        }).catch(() => {});
+      }
+
+      await logAuditEvent(user.id, 'settings_updated', {
+        settings: JSON.stringify(payload)
+      });
+      await refreshUser?.();
+
+      setSuccessMessage(language === 'fr' ? 'Paramètres mis à jour ✔️' : 'Settings updated ✔️');
+      setTimeout(() => setSuccessMessage(null), 2500);
+    } catch (error) {
+      setErrorMessage(
+        language === 'fr' ? 'Erreur lors de la mise à jour des paramètres' : 'Error updating settings'
       );
+    } finally {
+      setIsLoading(false);
     }
-    return (
-      <span className="text-sm text-gray-900">
-        {fallbackText}
-      </span>
-    );
   };
 
-  // Redirection si pas d'utilisateur
-  if (!user) {
-    return null; // Sera redirigé dans useEffect
-  }
+  if (!user) return null;
 
-  // Options de langue pour le dropdown
-  const languageOptions: LanguageOption[] = [
-    { value: 'fr', label: 'Français' },
-    { value: 'en', label: 'English' },
-    { value: 'es', label: 'Español' },
-    { value: 'de', label: 'Deutsch' },
-    { value: 'it', label: 'Italiano' },
-    { value: 'pt', label: 'Português' },
-    { value: 'ru', label: 'Русский' },
-    { value: 'zh', label: '中文' },
-    { value: 'ja', label: '日本語' },
-    { value: 'ko', label: '한국어' },
-    { value: 'ar', label: 'العربية' },
-    { value: 'hi', label: 'हिन्दी' },
-    { value: 'nl', label: 'Nederlands' },
-    { value: 'sv', label: 'Svenska' },
-    { value: 'no', label: 'Norsk' },
-    { value: 'da', label: 'Dansk' },
-    { value: 'fi', label: 'Suomi' },
-    { value: 'pl', label: 'Polski' },
-    { value: 'cs', label: 'Čeština' },
-    { value: 'hu', label: 'Magyar' },
-    { value: 'el', label: 'Ελληνικά' },
-    { value: 'tr', label: 'Türkçe' },
-    { value: 'he', label: 'עברית' },
-    { value: 'th', label: 'ไทย' },
-    { value: 'vi', label: 'Tiếng Việt' },
-    { value: 'id', label: 'Bahasa Indonesia' },
-    { value: 'ms', label: 'Bahasa Melayu' },
-    { value: 'tl', label: 'Tagalog' },
-    { value: 'sw', label: 'Kiswahili' },
-    { value: 'other', label: 'Autre' }
-  ];
-
+  // ===============================
+  // Rendu
+  // ===============================
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-b from-red-50 via-purple-50 to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Sidebar */}
+            {/* SIDEBAR GAUCHE */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
+              <div className={`${softCard} overflow-hidden`}>
+                <div className={`p-6 ${gradientHeader}`}>
                   <div className="flex items-center space-x-4">
                     {user.profilePhoto ? (
-                      <img 
-                        src={user.profilePhoto} 
-                        alt={user.firstName} 
-                        className="w-16 h-16 rounded-full object-cover"
+                      <img
+                        src={`${user.profilePhoto}?v=${(user.updatedAt as Date | undefined)?.valueOf?.() || Date.now()}`}
+                        alt={user.firstName}
+                        className="w-16 h-16 rounded-full object-cover ring-2 ring-white/80"
                       />
                     ) : (
-                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                        <User className="h-8 w-8 text-red-600" />
+                      <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                        <User className="h-8 w-8 text-white" />
                       </div>
                     )}
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">
+                      <h2 className="text-xl font-semibold leading-tight">
                         {user.firstName} {user.lastName}
                       </h2>
-                      <p className="text-gray-500">{user.email}</p>
-                      <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        user.role === 'lawyer' 
-                          ? 'bg-blue-100 text-blue-800' 
+                      <p className="text-white/90 text-sm flex items-center gap-1">
+                        <Mail className="w-4 h-4" />
+                        {user.email}
+                      </p>
+                      <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20">
+                        {user.role === 'lawyer'
+                          ? language === 'fr'
+                            ? 'Avocat'
+                            : 'Lawyer'
                           : user.role === 'expat'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {user.role === 'lawyer' 
-                          ? (language === 'fr' ? 'Avocat' : 'Lawyer')
-                          : user.role === 'expat'
-                            ? (language === 'fr' ? 'Expatrié' : 'Expat')
-                            : (language === 'fr' ? 'Client' : 'Client')
-                        }
+                          ? language === 'fr'
+                            ? 'Expatrié'
+                            : 'Expat'
+                          : language === 'fr'
+                          ? 'Client'
+                          : 'Client'}
                       </span>
                     </div>
                   </div>
                 </div>
-                
+
                 <nav className="p-4">
                   <ul className="space-y-2">
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('profile')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'profile'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <User className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Mon profil' : 'My profile'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('settings')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'settings'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <Settings className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Paramètres' : 'Settings'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('calls')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'calls'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <Phone className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Mes appels' : 'My calls'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('invoices')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'invoices'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <FileText className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Mes factures' : 'My invoices'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('reviews')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'reviews'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <Star className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Mes avis' : 'My reviews'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('notifications')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'notifications'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <Bell className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Notifications' : 'Notifications'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => setActiveTab('messages')}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                          activeTab === 'messages'
-                            ? 'bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <MessageSquare className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Mes messages' : 'My messages'}
-                      </button>
-                    </li>
+                    {[
+                      { key: 'profile', icon: <User className="mr-3 h-5 w-5" />, fr: 'Mon profil', en: 'My profile' },
+                      { key: 'settings', icon: <Settings className="mr-3 h-5 w-5" />, fr: 'Paramètres', en: 'Settings' },
+                      { key: 'calls', icon: <Phone className="mr-3 h-5 w-5" />, fr: 'Mes appels', en: 'My calls' },
+                      { key: 'invoices', icon: <FileText className="mr-3 h-5 w-5" />, fr: 'Mes factures', en: 'My invoices' },
+                      { key: 'reviews', icon: <Star className="mr-3 h-5 w-5" />, fr: 'Mes avis', en: 'My reviews' },
+                      { key: 'notifications', icon: <Bell className="mr-3 h-5 w-5" />, fr: 'Notifications', en: 'Notifications' },
+                      { key: 'messages', icon: <MessageSquare className="mr-3 h-5 w-5" />, fr: 'Mes messages', en: 'My messages' },
+                      { key: 'favorites', icon: <Bookmark className="mr-3 h-5 w-5" />, fr: 'Mes favoris', en: 'My favorites' }
+                    ].map((item) => (
+                      <li key={item.key}>
+                        <button
+                          onClick={() => setActiveTab(item.key as TabType)}
+                          className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                            activeTab === (item.key as TabType)
+                              ? 'bg-red-50 text-red-700'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {item.icon}
+                          {language === 'fr' ? item.fr : item.en}
+                        </button>
+                      </li>
+                    ))}
 
                     {user.role === 'admin' && (
                       <li>
@@ -596,7 +687,7 @@ const Dashboard: React.FC = () => {
 
                     <li>
                       <button
-                        onClick={handleLogout}
+                        onClick={logout}
                         className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50"
                       >
                         <LogOut className="mr-3 h-5 w-5" />
@@ -605,17 +696,17 @@ const Dashboard: React.FC = () => {
                     </li>
                   </ul>
                 </nav>
-                
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+
+                <div className="p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
                     {language === 'fr' ? 'Statut de disponibilité' : 'Availability status'}
                   </h3>
                   {user && (user.role === 'lawyer' || user.role === 'expat') ? (
                     <AvailabilityToggle className="justify-center" />
                   ) : (
                     <p className="text-gray-500 text-center">
-                      {language === 'fr' 
-                        ? 'Statut disponible uniquement pour les prestataires' 
+                      {language === 'fr'
+                        ? 'Statut disponible uniquement pour les prestataires'
                         : 'Status available only for providers'}
                     </p>
                   )}
@@ -623,236 +714,97 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Contenu Principal */}
-            <div className="lg:col-span-3">
-              {/* Onglet Profil */}
+            {/* CONTENU PRINCIPAL */}
+            <div className="lg:col-span-3 space-y-8">
+              {/* PROFIL — lecture seule */}
               {activeTab === 'profile' && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader} flex justify-between items-center`}>
+                    <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mon profil' : 'My profile'}
                     </h2>
-                    {user.role === 'client' ? (
-                      isEditing ? (
-                        <div className="flex space-x-2">
-                          <Button
-                            onClick={handleCancelEdit}
-                            variant="outline"
-                            size="small"
-                          >
-                            {language === 'fr' ? 'Annuler' : 'Cancel'}
-                          </Button>
-                          <Button
-                            onClick={handleSaveProfile}
-                            loading={isLoading}
-                            size="small"
-                          >
-                            {language === 'fr' ? 'Enregistrer' : 'Save'}
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          onClick={handleEditProfile}
-                          variant="outline"
-                          size="small"
-                        >
-                          <Edit size={16} className="mr-2" />
-                          {language === 'fr' ? 'Modifier' : 'Edit'}
-                        </Button>
-                      )
-                    ) : (
-                      <Button
-                        onClick={() => navigate('/contact')}
-                        variant="outline"
-                        size="small"
-                      >
-                        <ExternalLink size={16} className="mr-2" />
-                        {language === 'fr' ? 'Contacter le support' : 'Contact support'}
-                      </Button>
-                    )}
+                    <Button
+                      onClick={() => setActiveTab('settings')}
+                      variant="outline"
+                      size="small"
+                      className="bg-white text-gray-800 hover:bg-gray-50"
+                    >
+                      <Edit size={16} className="mr-2" />
+                      {language === 'fr' ? 'Modifier' : 'Edit'}
+                    </Button>
                   </div>
-                  <div className="p-6">
-                    {successMessage && (
-                      <div className="mb-6 bg-green-50 border border-green-200 text-green-800 rounded-md p-4">
-                        <div className="flex">
-                          <Check className="h-5 w-5 text-green-400 mr-2" />
-                          <span>{successMessage}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {errorMessage && (
-                      <div className="mb-6 bg-red-50 border border-red-200 text-red-800 rounded-md p-4">
-                        <div className="flex">
-                          <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
-                          <span>{errorMessage}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {user.role !== 'client' && (
-                      <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 rounded-md p-4">
-                        <div className="flex">
-                          <AlertTriangle className="h-5 w-5 text-blue-400 mr-2" />
-                          <div>
-                            <p className="font-medium">
-                              {language === 'fr' 
-                                ? 'Modification des informations personnelles' 
-                                : 'Personal information modification'}
-                            </p>
-                            <p className="mt-1">
-                              {language === 'fr'
-                                ? 'Pour modifier vos informations personnelles, veuillez contacter notre équipe support.'
-                                : 'To modify your personal information, please contact our support team.'}
-                            </p>
-                            <Button
-                              onClick={() => navigate('/contact')}
-                              className="mt-2"
-                              size="small"
-                            >
-                              {language === 'fr' ? 'Contacter le support' : 'Contact support'}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
+                  <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <h3 className="text-lg font-medium text-gray-900 mb-4">
                           {language === 'fr' ? 'Informations personnelles' : 'Personal information'}
                         </h3>
                         <div className="space-y-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">
-                              {language === 'fr' ? 'Nom complet' : 'Full name'}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-900">
-                              {user.firstName} {user.lastName}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">
-                              Email
-                            </p>
-                            {isEditing && user.role === 'client' ? (
-                              <input
-                                type="email"
-                                value={profileData.email}
-                                onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                              />
-                            ) : (
-                              <p className="mt-1 text-sm text-gray-900">
-                                {user.email}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">
-                              {language === 'fr' ? 'Téléphone' : 'Phone'}
-                            </p>
-                            {isEditing && user.role === 'client' ? (
-                              <div className="mt-1 flex space-x-2">
-                                <select
-                                  value={profileData.phoneCountryCode}
-                                  onChange={(e) => setProfileData(prev => ({ ...prev, phoneCountryCode: e.target.value }))}
-                                  className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                                >
-                                  <option value="+33">🇫🇷 +33</option>
-                                  <option value="+1">🇺🇸 +1</option>
-                                  <option value="+44">🇬🇧 +44</option>
-                                  <option value="+49">🇩🇪 +49</option>
-                                  <option value="+34">🇪🇸 +34</option>
-                                  <option value="+39">🇮🇹 +39</option>
-                                  <option value="+66">🇹🇭 +66</option>
-                                  <option value="+61">🇦🇺 +61</option>
-                                </select>
-                                <input
-                                  type="tel"
-                                  value={profileData.phone}
-                                  onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                                  placeholder="612345678"
-                                />
-                              </div>
-                            ) : (
-                              <p className="mt-1 text-sm text-gray-900">
-                                {user.phone ? `${user.phoneCountryCode} ${user.phone}` : (language === 'fr' ? 'Non renseigné' : 'Not provided')}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">
-                              {language === 'fr' ? 'Pays de résidence' : 'Country of residence'}
-                            </p>
-                            {isEditing && user.role === 'client' ? (
-                              <input
-                                type="text"
-                                value={profileData.currentCountry}
-                                onChange={(e) => setProfileData(prev => ({ ...prev, currentCountry: e.target.value }))}
-                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                                placeholder="Ex: Canada, Thaïlande..."
-                              />
-                            ) : (
-                              <p className="mt-1 text-sm text-gray-900">
-                                {user.currentCountry || (language === 'fr' ? 'Non renseigné' : 'Not provided')}
-                              </p>
-                            )}
-                          </div>
+                          <InfoRow
+                            label={language === 'fr' ? 'Nom complet' : 'Full name'}
+                            value={`${user.firstName} ${user.lastName}`}
+                          />
+                          <InfoRow label="Email" value={user.email} />
+                          {(user as { phone?: string }).phone && (
+                            <InfoRow
+                              label={language === 'fr' ? 'Téléphone' : 'Phone'}
+                              value={`${(user as { phoneCountryCode?: string }).phoneCountryCode || '+33'} ${(user as { phone?: string }).phone}`}
+                            />
+                          )}
                           {user.role !== 'client' && (
                             <div>
                               <p className="text-sm font-medium text-gray-500">
                                 {language === 'fr' ? 'Statut' : 'Status'}
                               </p>
                               <div className="mt-1 flex items-center">
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                  currentStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                }`}>
-                                  <span className={`w-2 h-2 mr-2 rounded-full ${
-                                    currentStatus ? 'bg-green-600' : 'bg-red-600'
-                                  }`}></span>
-                                  {currentStatus 
-                                    ? (language === 'fr' ? 'En ligne' : 'Online')
-                                    : (language === 'fr' ? 'Hors ligne' : 'Offline')
-                                  }
-                                </span>
-                                <span className="ml-2 text-sm text-gray-500">
-                                  {language === 'fr' 
-                                    ? '(Modifiable dans la barre latérale)'
-                                    : '(Editable in sidebar)'
-                                  }
+                                <span
+                                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    currentStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-2 h-2 mr-2 rounded-full ${
+                                      currentStatus ? 'bg-green-600' : 'bg-red-600'
+                                    }`}
+                                  />
+                                  {currentStatus
+                                    ? language === 'fr'
+                                      ? 'En ligne'
+                                      : 'Online'
+                                    : language === 'fr'
+                                    ? 'Hors ligne'
+                                    : 'Offline'}
                                 </span>
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
-                      
+
                       <div>
                         <h3 className="text-lg font-medium text-gray-900 mb-4">
-                          {language === 'fr' ? 'Photo de profil' : 'Profile photo'}
+                          {language === 'fr' ? 'Photo & bio' : 'Photo & bio'}
                         </h3>
-                        {isEditing && user.role === 'client' ? (
-                          <ImageUploader
-                            onImageUploaded={(url: string) => setProfileData(prev => ({ ...prev, profilePhoto: url }))}
-                            currentImage={profileData.profilePhoto}
-                          />
-                        ) : (
-                          <div className="flex justify-center">
-                            {user.profilePhoto ? (
-                              <img 
-                                src={user.profilePhoto} 
-                                alt={user.firstName} 
-                                className="w-32 h-32 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-32 h-32 bg-red-100 rounded-full flex items-center justify-center">
-                                <User className="h-16 w-16 text-red-600" />
-                              </div>
-                            )}
+                        <div className="flex items-start gap-6">
+                          {user.profilePhoto ? (
+                            <img
+                              src={`${user.profilePhoto}?v=${(user.updatedAt as Date | undefined)?.valueOf?.() || Date.now()}`}
+                              alt={user.firstName}
+                              className="w-32 h-32 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-32 h-32 bg-red-100 rounded-full flex items-center justify-center">
+                              <User className="h-16 w-16 text-red-600" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                              {(user as { bio?: string }).bio ||
+                                (language === 'fr' ? 'Aucune description.' : 'No description.')}
+                            </p>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
 
@@ -861,107 +813,60 @@ const Dashboard: React.FC = () => {
                         <h3 className="text-lg font-medium text-gray-900 mb-4">
                           {language === 'fr' ? 'Informations professionnelles' : 'Professional information'}
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {user.role === 'lawyer' && (
                             <>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Numéro au barreau' : 'Bar number'}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-900">
-                                  {user.barNumber || (language === 'fr' ? 'Non renseigné' : 'Not provided')}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Années d\'expérience' : 'Years of experience'}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-900">
-                                  {user.yearsOfExperience || 0} {language === 'fr' ? 'ans' : 'years'}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Spécialités' : 'Specialties'}
-                                </p>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {renderArrayField(
-                                    user.specialties, 
-                                    'bg-blue-100 text-blue-800',
-                                    language === 'fr' ? 'Non renseigné' : 'Not provided'
-                                  )}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Pays d\'intervention' : 'Countries of practice'}
-                                </p>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {renderArrayField(
-                                    user.practiceCountries, 
-                                    'bg-blue-100 text-blue-800',
-                                    language === 'fr' ? 'Non renseigné' : 'Not provided'
-                                  )}
-                                </div>
-                              </div>
+                              <InfoRow
+                                label={language === 'fr' ? "Années d'expérience" : 'Years of experience'}
+                                value={`${(user as { yearsOfExperience?: number }).yearsOfExperience ?? 0} ${
+                                  language === 'fr' ? 'ans' : 'years'
+                                }`}
+                              />
+                              <PillsRow
+                                label={language === 'fr' ? 'Spécialités' : 'Specialties'}
+                                items={(user as { specialties?: string[] }).specialties || []}
+                                color="blue"
+                              />
+                              <PillsRow
+                                label={language === 'fr' ? "Pays d'intervention" : 'Countries of practice'}
+                                items={(user as { practiceCountries?: string[] }).practiceCountries || []}
+                                color="blue"
+                              />
+                              <InfoRow
+                                label={language === 'fr' ? 'Année de diplôme' : 'Graduation year'}
+                                value={`${(user as { graduationYear?: number }).graduationYear || ''}`}
+                              />
                             </>
                           )}
                           {user.role === 'expat' && (
                             <>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Pays de résidence' : 'Country of residence'}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-900">
-                                  {user.residenceCountry || (language === 'fr' ? 'Non renseigné' : 'Not provided')}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Années d\'expatriation' : 'Years as expat'}
-                                </p>
-                                <p className="mt-1 text-sm text-gray-900">
-                                  {user.yearsAsExpat || 0} {language === 'fr' ? 'ans' : 'years'}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Types d\'aide' : 'Help types'}
-                                </p>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {renderArrayField(
-                                    user.helpTypes, 
-                                    'bg-green-100 text-green-800',
-                                    language === 'fr' ? 'Non renseigné' : 'Not provided'
-                                  )}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">
-                                  {language === 'fr' ? 'Pays d\'intervention' : 'Countries of intervention'}
-                                </p>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {renderArrayField(
-                                    user.interventionCountries, 
-                                    'bg-green-100 text-green-800',
-                                    language === 'fr' ? 'Non renseigné' : 'Not provided'
-                                  )}
-                                </div>
-                              </div>
+                              <InfoRow
+                                label={language === 'fr' ? 'Pays de résidence' : 'Country of residence'}
+                                value={(user as { residenceCountry?: string }).residenceCountry || ''}
+                              />
+                              <InfoRow
+                                label={language === 'fr' ? "Années d'expatriation" : 'Years as expat'}
+                                value={`${(user as { yearsAsExpat?: number }).yearsAsExpat ?? 0} ${
+                                  language === 'fr' ? 'ans' : 'years'
+                                }`}
+                              />
+                              <PillsRow
+                                label={language === 'fr' ? "Types d'aide" : 'Help types'}
+                                items={(user as { helpTypes?: string[] }).helpTypes || []}
+                                color="green"
+                              />
+                              <PillsRow
+                                label={language === 'fr' ? "Pays d'intervention" : 'Countries of intervention'}
+                                items={(user as { interventionCountries?: string[] }).interventionCountries || []}
+                                color="green"
+                              />
                             </>
                           )}
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">
-                              {language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {renderArrayField(
-                                user.languages, 
-                                'bg-red-100 text-red-800',
-                                language === 'fr' ? 'Non renseigné' : 'Not provided'
-                              )}
-                            </div>
-                          </div>
+                          <PillsRow
+                            label={language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
+                            items={(user as { languages?: string[] }).languages || []}
+                            color="red"
+                          />
                         </div>
                       </div>
                     )}
@@ -969,149 +874,307 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Onglet Paramètres */}
+              {/* PARAMÈTRES — édition complète */}
               {activeTab === 'settings' && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                    <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Paramètres' : 'Settings'}
                     </h2>
                   </div>
-                  <div className="p-6">
-                    {successMessage && (
-                      <div className="mb-6 bg-green-50 border border-green-200 text-green-800 rounded-md p-4">
-                        <div className="flex">
-                          <Check className="h-5 w-5 text-green-400 mr-2" />
-                          <span>{successMessage}</span>
-                        </div>
+
+                  <div className="p-6 space-y-6">
+                    {successMessage && <Alert type="success" message={successMessage} />}
+                    {errorMessage && <Alert type="error" message={errorMessage} />}
+
+                    {/* Photo de profil : mise à jour immédiate */}
+                    <section>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {language === 'fr' ? 'Photo de profil' : 'Profile photo'}
+                      </h3>
+                      <div className="flex items-center gap-6">
+                        {profileData.profilePhoto ? (
+                          <img
+                            src={`${profileData.profilePhoto}?v=${Date.now()}`}
+                            alt="preview"
+                            className="w-24 h-24 rounded-full object-cover border"
+                          />
+                        ) : (
+                          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center">
+                            <User className="h-10 w-10 text-red-600" />
+                          </div>
+                        )}
+                        <ImageUploader
+                          currentImage={profileData.profilePhoto}
+                          uploadPath={`profilePhotos/${user.id}`}
+                          locale={language === 'fr' ? 'fr' : 'en'}
+                          onImageUploaded={handleInstantPhotoPersist}
+                        />
                       </div>
-                    )}
-                    
-                    {errorMessage && (
-                      <div className="mb-6 bg-red-50 border border-red-200 text-red-800 rounded-md p-4">
-                        <div className="flex">
-                          <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
-                          <span>{errorMessage}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="space-y-8">
-                      {/* Paramètres de langue */}
+                      <p className="text-xs text-gray-500 mt-2">
+                        {language === 'fr'
+                          ? 'La nouvelle photo remplace immédiatement l’ancienne dans tout le dashboard.'
+                          : 'The new photo replaces the old one immediately across the dashboard.'}
+                      </p>
+                    </section>
+
+                    {/* Commun à tous les rôles */}
+                    <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Field
+                        label="Email"
+                        value={profileData.email}
+                        onChange={(v) => setProfileData((p) => ({ ...p, email: v }))}
+                        type="email"
+                      />
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                          <Globe className="mr-2 h-5 w-5 text-gray-500" />
-                          {language === 'fr' ? 'Paramètres de langue' : 'Language settings'}
-                        </h3>
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">
-                              {language === 'fr' ? 'Langue principale' : 'Primary language'}
-                            </p>
-                            <div className="text-sm text-gray-900">
-                              {user.preferredLanguage === 'fr' ? 'Français' : 'English'}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {language === 'fr' 
-                                ? 'La langue principale ne peut pas être modifiée' 
-                                : 'Primary language cannot be changed'}
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">
-                              {language === 'fr' ? 'Langue secondaire' : 'Secondary language'}
-                            </p>
-                            <div className="flex items-center space-x-2">
-                              <select
-                                value={enhancedSettings.language.secondary}
-                                onChange={(e) => {
-                                  if (e.target.value === 'other') {
-                                    setShowCustomLanguage(true);
-                                  } else {
-                                    updateLanguageSettings('secondary', e.target.value);
-                                  }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                              >
-                                <option value="none">{language === 'fr' ? 'Aucune' : 'None'}</option>
-                                {languageOptions.map((option: LanguageOption) => (
-                                  <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                                <option value="other">{language === 'fr' ? 'Autre' : 'Other'}</option>
-                              </select>
-                            </div>
-                            
-                            {showCustomLanguage && (
-                              <div className="mt-2 flex items-center space-x-2">
-                                <input
-                                  type="text"
-                                  value={customLanguage}
-                                  onChange={(e) => setCustomLanguage(e.target.value)}
-                                  placeholder={language === 'fr' ? "Précisez la langue" : "Specify language"}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                                />
-                                <Button
-                                  onClick={handleAddSecondaryLanguage}
-                                  size="small"
-                                >
-                                  {language === 'fr' ? 'Ajouter' : 'Add'}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">
-                              {language === 'fr' ? 'Langue de communication préférée' : 'Preferred communication language'}
-                            </p>
-                            <select
-                              value={enhancedSettings.language.preferredCommunication}
-                              onChange={(e) => updateLanguageSettings('preferredCommunication', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >
-                              <option value="fr">Français</option>
-                              <option value="en">English</option>
-                              {enhancedSettings.language.secondary !== 'none' && 
-                               enhancedSettings.language.secondary !== 'fr' && 
-                               enhancedSettings.language.secondary !== 'en' && (
-                                <option value={enhancedSettings.language.secondary}>
-                                  {languageOptions.find((l: LanguageOption) => l.value === enhancedSettings.language.secondary)?.label || enhancedSettings.language.secondary}
-                                </option>
-                              )}
-                            </select>
-                          </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {language === 'fr' ? 'Téléphone' : 'Phone'}
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={profileData.phoneCountryCode}
+                            onChange={(e) =>
+                              setProfileData((p) => ({ ...p, phoneCountryCode: e.target.value }))
+                            }
+                            className="w-28 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                          >
+                            <option value="+33">🇫🇷 +33</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+44">🇬🇧 +44</option>
+                            <option value="+49">🇩🇪 +49</option>
+                            <option value="+34">🇪🇸 +34</option>
+                            <option value="+39">🇮🇹 +39</option>
+                          </select>
+                          <input
+                            value={profileData.phone}
+                            onChange={(e) => setProfileData((p) => ({ ...p, phone: e.target.value }))}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="612345678"
+                          />
                         </div>
                       </div>
-                      
-                      {/* Bouton de sauvegarde */}
-                      <div className="pt-4 border-t border-gray-200">
-                        <Button
-                          onClick={handleSaveSettings}
-                          loading={isLoading}
-                          fullWidth
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          {language === 'fr' ? 'Enregistrer les paramètres' : 'Save settings'}
-                        </Button>
+
+                      <Field
+                        label={language === 'fr' ? 'Pays de résidence' : 'Country of residence'}
+                        value={profileData.residenceCountry || profileData.currentCountry}
+                        onChange={(v) =>
+                          setProfileData((p) => ({
+                            ...p,
+                            residenceCountry: v,
+                            currentCountry: p.currentCountry || v
+                          }))
+                        }
+                      />
+
+                      <Field
+                        label={
+                          language === 'fr'
+                            ? 'Pays où vous êtes actuellement'
+                            : 'Current presence country'
+                        }
+                        value={profileData.currentPresenceCountry || ''}
+                        onChange={(v) =>
+                          setProfileData((p) => ({
+                            ...p,
+                            currentPresenceCountry: v
+                          }))
+                        }
+                      />
+
+                      {/* WhatsApp */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          WhatsApp
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={profileData.whatsappCountryCode || '+33'}
+                            onChange={(e) =>
+                              setProfileData((p) => ({ ...p, whatsappCountryCode: e.target.value }))
+                            }
+                            className="w-28 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                          >
+                            <option value="+33">🇫🇷 +33</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+44">🇬🇧 +44</option>
+                            <option value="+49">🇩🇪 +49</option>
+                            <option value="+34">🇪🇸 +34</option>
+                            <option value="+39">🇮🇹 +39</option>
+                          </select>
+                          <input
+                            value={profileData.whatsappNumber || ''}
+                            onChange={(e) =>
+                              setProfileData((p) => ({ ...p, whatsappNumber: e.target.value }))
+                            }
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="612345678"
+                          />
+                        </div>
                       </div>
+
+                      {/* Langues — même sélecteur que l’inscription */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
+                        </label>
+                        <MultiLanguageSelect
+                          value={selectedLanguages}
+                          onChange={(opts) => {
+                            const normalized = (opts || []).map((o) => ({ value: o.value, label: o.label }));
+                            setSelectedLanguages(normalized);
+                            setProfileData((p) => ({ ...p, languages: normalized.map((o) => o.value) }));
+                          }}
+                          providerLanguages={[]}
+                          highlightShared
+                          locale={language === 'fr' ? 'fr' : 'en'}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {language === 'fr' ? 'Description / Bio' : 'Description / Bio'}
+                        </label>
+                        <textarea
+                          value={profileData.bio || ''}
+                          onChange={(e) => setProfileData((p) => ({ ...p, bio: e.target.value }))}
+                          rows={5}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder={
+                            language === 'fr' ? 'Votre bio professionnelle…' : 'Your professional bio…'
+                          }
+                        />
+                      </div>
+                    </section>
+
+                    {/* Rôle : Lawyer */}
+                    {user.role === 'lawyer' && (
+                      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Field
+                          label={language === 'fr' ? "Années d'expérience" : 'Years of experience'}
+                          type="number"
+                          value={String(profileData.yearsOfExperience ?? 0)}
+                          onChange={(v) =>
+                            setProfileData((p) => ({ ...p, yearsOfExperience: Number(v || 0) }))
+                          }
+                        />
+                        <Field
+                          label={language === 'fr' ? 'Année de diplôme' : 'Graduation year'}
+                          type="number"
+                          value={String(
+                            profileData.graduationYear || new Date().getFullYear() - 5
+                          )}
+                          onChange={(v) =>
+                            setProfileData((p) => ({
+                              ...p,
+                              graduationYear: Number(v || new Date().getFullYear() - 5)
+                            }))
+                          }
+                        />
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {language === 'fr' ? 'Spécialités' : 'Specialties'}
+                          </label>
+                          <ChipInput
+                            value={profileData.specialties || []}
+                            onChange={(next) => setProfileData((p) => ({ ...p, specialties: next }))}
+                            placeholder={language === 'fr' ? 'Ajoutez une spécialité' : 'Add a specialty'}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {language === 'fr' ? "Pays d'intervention" : 'Countries of practice'}
+                          </label>
+                          <ChipInput
+                            value={profileData.practiceCountries || []}
+                            onChange={(next) =>
+                              setProfileData((p) => ({ ...p, practiceCountries: next }))
+                            }
+                            placeholder={language === 'fr' ? 'Ajoutez un pays' : 'Add a country'}
+                          />
+                        </div>
+                        <Field
+                          label={
+                            language === 'fr' ? 'Numéro au barreau (optionnel)' : 'Bar number (optional)'
+                          }
+                          value={profileData.barNumber || ''}
+                          onChange={(v) => setProfileData((p) => ({ ...p, barNumber: v }))}
+                        />
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {language === 'fr' ? 'Formations' : 'Educations'}
+                          </label>
+                          <ChipInput
+                            value={profileData.educations || []}
+                            onChange={(next) => setProfileData((p) => ({ ...p, educations: next }))}
+                            placeholder={language === 'fr' ? 'Ajoutez une formation' : 'Add an education'}
+                          />
+                        </div>
+                      </section>
+                    )}
+
+                    {/* Rôle : Expat */}
+                    {user.role === 'expat' && (
+                      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Field
+                          label={language === 'fr' ? "Années d'expatriation" : 'Years as expat'}
+                          type="number"
+                          value={String(profileData.yearsAsExpat ?? 0)}
+                          onChange={(v) =>
+                            setProfileData((p) => ({ ...p, yearsAsExpat: Number(v || 0) }))
+                          }
+                        />
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {language === 'fr' ? "Types d'aide" : 'Help types'}
+                          </label>
+                          <ChipInput
+                            value={profileData.helpTypes || []}
+                            onChange={(next) => setProfileData((p) => ({ ...p, helpTypes: next }))}
+                            placeholder={language === 'fr' ? 'Ajoutez un type' : 'Add a type'}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {language === 'fr' ? "Pays d'intervention" : 'Countries of intervention'}
+                          </label>
+                          <ChipInput
+                            value={profileData.interventionCountries || []}
+                            onChange={(next) =>
+                              setProfileData((p) => ({ ...p, interventionCountries: next }))
+                            }
+                            placeholder={language === 'fr' ? 'Ajoutez un pays' : 'Add a country'}
+                          />
+                        </div>
+                      </section>
+                    )}
+
+                    {/* Sauvegarde */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <Button
+                        onClick={saveSettings}
+                        loading={isLoading}
+                        fullWidth
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        {language === 'fr' ? 'Enregistrer les paramètres' : 'Save settings'}
+                      </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Onglet Appels */}
+              {/* APPELS */}
               {activeTab === 'calls' && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                    <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes appels' : 'My calls'}
                     </h2>
                   </div>
                   <div className="p-6">
                     {calls.length > 0 ? (
                       <div className="space-y-4">
-                        {calls.map((call: Call) => (
+                        {calls.map((call) => (
                           <div key={call.id} className="border border-gray-200 rounded-lg p-4">
                             <div className="flex justify-between items-start">
                               <div>
@@ -1133,23 +1196,21 @@ const Dashboard: React.FC = () => {
                                 </div>
                                 <div className="mt-2">
                                   <p className="text-sm text-gray-700">
-                                    {user.role === 'client' 
+                                    {user.role === 'client'
                                       ? `${language === 'fr' ? 'Prestataire' : 'Provider'}: ${call.providerName}`
-                                      : `${language === 'fr' ? 'Client' : 'Client'}: ${call.clientName}`
-                                    }
+                                      : `${language === 'fr' ? 'Client' : 'Client'}: ${call.clientName}`}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex flex-col items-end space-y-2">
                                 {getStatusBadge(call.status)}
-                                {call.status === 'completed' && user.role === 'client' && !call.clientRating && (
-                                  <Button
-                                    size="small"
-                                    variant="outline"
-                                  >
-                                    {language === 'fr' ? 'Laisser un avis' : 'Leave a review'}
-                                  </Button>
-                                )}
+                                {call.status === 'completed' &&
+                                  user.role === 'client' &&
+                                  !call.clientRating && (
+                                    <Button size="small" variant="outline">
+                                      {language === 'fr' ? 'Laisser un avis' : 'Leave a review'}
+                                    </Button>
+                                  )}
                               </div>
                             </div>
                           </div>
@@ -1157,20 +1218,20 @@ const Dashboard: React.FC = () => {
                       </div>
                     ) : (
                       <p className="text-gray-500 text-center py-8">
-                        {language === 'fr' 
-                          ? 'Vous n\'avez pas encore effectué d\'appels.' 
-                          : 'You haven\'t made any calls yet.'}
+                        {language === 'fr'
+                          ? "Vous n'avez pas encore effectué d'appels."
+                          : "You haven't made any calls yet."}
                       </p>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Onglet Messages */}
+              {/* MESSAGES */}
               {activeTab === 'messages' && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                    <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes messages' : 'My messages'}
                     </h2>
                   </div>
@@ -1180,39 +1241,34 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Onglet Factures */}
-              {activeTab === 'invoices' && (
-                <UserInvoices />
-              )}
+              {/* FACTURES */}
+              {activeTab === 'invoices' && <UserInvoices />}
 
-              {/* Onglet Avis */}
+              {/* AVIS */}
               {activeTab === 'reviews' && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                    <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes avis' : 'My reviews'}
                     </h2>
                   </div>
                   <div className="p-6">
                     <p className="text-gray-500 text-center py-8">
-                      {language === 'fr' 
-                        ? 'Aucun avis pour le moment.' 
-                        : 'No reviews yet.'}
+                      {language === 'fr' ? 'Aucun avis pour le moment.' : 'No reviews yet.'}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Onglet Notifications */}
+              {/* NOTIFICATIONS */}
               {activeTab === 'notifications' && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                    <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Notifications' : 'Notifications'}
                     </h2>
                   </div>
                   <div className="p-6">
-                    {/* Paramètres de notification pour les prestataires */}
                     {(user?.role === 'lawyer' || user?.role === 'expat') && (
                       <div className="mb-8">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -1221,35 +1277,79 @@ const Dashboard: React.FC = () => {
                         <NotificationSettings />
                       </div>
                     )}
-                    
-                    {/* Historique des notifications */}
+
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         {language === 'fr' ? 'Historique des notifications' : 'Notification history'}
                       </h3>
                       {notifications.length > 0 ? (
                         <div className="space-y-4">
-                          {notifications.map((notification: Notification) => (
-                            <div 
-                              key={notification.id} 
-                              className={`p-4 rounded-lg border ${notification.isRead ? 'bg-white border-gray-200' : 'bg-blue-50 border-blue-200'}`}
+                          {notifications.map((n) => (
+                            <div
+                              key={n.id}
+                              className={`p-4 rounded-lg border ${
+                                n.isRead ? 'bg-white border-gray-200' : 'bg-blue-50 border-blue-200'
+                              }`}
                             >
                               <div className="flex justify-between">
-                                <h4 className="font-medium text-gray-900">{notification.title}</h4>
-                                <span className="text-sm text-gray-500">{formatDate(notification.createdAt)}</span>
+                                <h4 className="font-medium text-gray-900">{n.title}</h4>
+                                <span className="text-sm text-gray-500">{formatDate(n.createdAt)}</span>
                               </div>
-                              <p className="mt-1 text-gray-600">{notification.message}</p>
+                              <p className="mt-1 text-gray-600">{n.message}</p>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <p className="text-gray-500 text-center py-8">
-                          {language === 'fr' 
-                            ? 'Vous n\'avez pas de notifications.' 
-                            : 'You don\'t have any notifications.'}
+                          {language === 'fr'
+                            ? "Vous n'avez pas de notifications."
+                            : "You don't have any notifications."}
                         </p>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* FAVORIS */}
+              {activeTab === 'favorites' && (
+                <div className={`${softCard} overflow-hidden`}>
+                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                    <h2 className="text-xl font-semibold">
+                      {language === 'fr' ? 'Mes favoris' : 'My favorites'}
+                    </h2>
+                  </div>
+                  <div className="p-6">
+                    {favorites.length > 0 ? (
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {favorites.map((f) => (
+                          <li key={f.id} className="border rounded-lg p-4 flex items-center gap-3">
+                            <img
+                              src={(f.photo || '/default-avatar.png') + `?v=${Date.now()}`}
+                              alt={f.name}
+                              className="w-12 h-12 rounded-full object-cover border"
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{f.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {f.type === 'lawyer'
+                                  ? language === 'fr'
+                                    ? 'Avocat'
+                                    : 'Lawyer'
+                                  : language === 'fr'
+                                  ? 'Expatrié'
+                                  : 'Expat'}
+                                {f.country ? ` • ${f.country}` : ''}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500 text-center py-12">
+                        {language === 'fr' ? 'Aucun favori pour le moment.' : 'No favorites yet.'}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1262,4 +1362,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-

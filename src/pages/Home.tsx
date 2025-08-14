@@ -1,50 +1,23 @@
-import React, { useState, useEffect, memo } from 'react';
-import { 
-  ArrowRight, Play, Shield, Globe, Users, Zap, DollarSign, 
-  Check, Star, Quote, ChevronRight, Phone, Heart, Award,
-  TrendingUp, Clock, MapPin, Sparkles, ChevronLeft
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowRight, Play, Shield, Globe, Users, Zap, DollarSign,
+  Check, Star, Phone, Award, Clock, MapPin,
+  Sparkles, ChevronLeft, ChevronRight as ChevronRightIcon, Briefcase, User
 } from 'lucide-react';
+import Layout from '../components/layout/Layout';
+import ModernProfileCard from '../components/home/ModernProfileCard';
+import ProfilesCarousel from '../components/home/ProfileCarousel';
 
-// Note: Dans un vrai projet, vous importeriez le header depuis '../components/layout/header'
-// Pour cette démo, le header sera inclus directement ou importé selon votre structure
-
-// Types pour TypeScript
-interface Testimonial {
-  id: string;
-  name: string;
-  role: string;
-  location: string;
-  avatar: string;
-  rating: number;
-  comment: string;
-  date: string;
-  verified: boolean;
-  helpful: number;
-}
-
+/* ================================
+   Types
+   ================================ */
 interface Stat {
   value: string;
   label: string;
   icon: React.ReactNode;
   color: string;
 }
-
-interface Profile {
-  id: string;
-  name: string;
-  role: string;
-  specialty: string;
-  location: string;
-  avatar: string;
-  rating: number;
-  reviewCount: number;
-  responseTime: string;
-  languages: string[];
-  verified: boolean;
-  online: boolean;
-  price: string;
-}
-
 interface PricingPlan {
   name: string;
   price: string;
@@ -56,126 +29,399 @@ interface PricingPlan {
   color: string;
 }
 
-// Données des témoignages
-const TESTIMONIALS: Testimonial[] = [
+/* ================================
+   Global typing for analytics (no any)
+   ================================ */
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
+/* ================================
+   PWA install hook (pour le badge du Hero)
+   ================================ */
+type BIPEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice?: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+const usePWAInstall = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState<BIPEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BIPEvent);
+    };
+    const onAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+      if (typeof window !== 'undefined') {
+        window.gtag?.('event', 'pwa_installed', { event_category: 'engagement' });
+      }
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, []);
+
+  const install = useCallback(async () => {
+    if (!deferredPrompt) return { started: false as const };
+    try {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice && typeof window !== 'undefined') {
+        window.gtag?.('event', 'pwa_install_prompt', {
+          event_category: 'engagement',
+          outcome: choice.outcome,
+          platform: choice.platform,
+        });
+      }
+      return { started: true as const };
+    } catch {
+      return { started: false as const };
+    }
+  }, [deferredPrompt]);
+
+  return { install, isInstalled, canInstall: !!deferredPrompt };
+};
+
+/* ================================
+   Bouton PWA + hint sympa
+   ================================ */
+function PWAInstallIconWithHint({
+  canInstall,
+  onInstall
+}: {
+  canInstall: boolean;
+  onInstall: () => void;
+}) {
+  const [showHint, setShowHint] = useState(false);
+  const [hintText, setHintText] = useState('');
+  const hideTimer = useRef<number | null>(null);
+
+  const computeHint = () => {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isIOS =
+      /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints ?? 0) > 1);
+    const isAndroid = /Android/i.test(ua);
+    const isDesktop = !isIOS && !isAndroid;
+
+    const prefix = 'Votre navigateur ne permet pas l’installation automatique. ';
+    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari → « Partager » → « Sur l’écran d’accueil ». 😊';
+    if (isAndroid) return prefix + 'Sur Android : Chrome → menu ⋮ → « Installer l’application ». 😊';
+    if (isDesktop) return prefix + 'Sur ordinateur : Chrome/Edge → icône « Installer » dans la barre d’adresse.';
+    return prefix + 'Essayez avec Chrome/Edge (ordinateur) ou Safari/Chrome (mobile).';
+  };
+
+  const reveal = (text?: string) => {
+    if (hideTimer.current) { window.clearTimeout(hideTimer.current); hideTimer.current = null; }
+    setHintText(text ?? computeHint());
+    setShowHint(true);
+  };
+  const scheduleHide = (delay = 1600) => {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setShowHint(false), delay) as unknown as number;
+  };
+
+  const onClick = () => {
+    if (canInstall) onInstall();
+    else { reveal(); scheduleHide(2800); }
+  };
+
+  return (
+    <div className="relative select-none">
+      <button
+        type="button"
+        onClick={onClick}
+        onMouseEnter={() => { reveal('L’application qui fait du bien !'); }}
+        onMouseLeave={() => scheduleHide()}
+        onTouchStart={() => { reveal('L’application qui fait du bien !'); scheduleHide(1400); }}
+        className="ml-1 w-14 h-14 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl overflow-hidden border border-white/20 hover:border-white/40 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/40 touch-manipulation"
+        title="Installer l'application"
+        aria-label="Installer l'application"
+      >
+        <img
+          src="/icons/icon-512x512-maskable.png"
+          alt="Icône appli SOS Expat"
+          className={`${canInstall ? 'animate-bounce' : 'animate-pulse'} w-full h-full object-cover`}
+        />
+      </button>
+
+      <div
+        className={`absolute left-1/2 -translate-x-1/2 mt-3 w-[260px] sm:w-[320px] text-sm rounded-2xl shadow-2xl border transition-all duration-200 ${
+          showHint ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1 pointer-events-none'
+        } bg-white/95 backdrop-blur-xl border-gray-200 text-gray-900`}
+        role="status"
+      >
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/95 rotate-45 border-l border-t border-gray-200" />
+        <div className="px-4 py-3">
+          <div className="font-extrabold text-gray-900">L’application qui fait du bien !</div>
+          {hintText && <div className="mt-1 leading-relaxed text-gray-700">{hintText}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================
+   Données « Avis » (FR) + avatars humains + FALLBACK
+   ================================ */
+type TypeEchange = 'avocat' | 'expatrié';
+interface Review {
+  id: string;
+  name: string;
+  city: string;
+  avatar: string;
+  fallback: string;
+  comment: string;
+  typeEchange: TypeEchange;
+}
+
+const faceParams = '?auto=format&fit=crop&w=600&h=600&q=80&crop=faces&ixlib=rb-4.0.3';
+
+const REVIEWS: Review[] = [
   {
-    id: '1',
-    name: 'Marie Dubois',
-    role: 'Expatriée',
-    location: 'Tokyo, Japon',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b107?w=150&h=150&fit=crop&crop=face',
-    rating: 5,
-    comment: 'SOS Expats m\'a sauvé la vie lors de mon déménagement au Japon. L\'avocat spécialisé en droit du travail international que j\'ai trouvé via la plateforme m\'a aidé à négocier mon contrat et mes conditions. Service exceptionnel, réactif 24/7 !',
-    date: '2024-12-15',
-    verified: true,
-    helpful: 47
+    id: 'fr-man',
+    name: 'Thomas Laurent',
+    city: 'Lille, France',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e' + faceParams,
+    fallback: 'https://i.pravatar.cc/600?img=12',
+    typeEchange: 'avocat',
+    comment:
+      'J’avais peur d’appeler un avocat, mais il a été super cool et super efficace. Il était en vacances dans le pays voisin et m’a trouvé la solution en moins de 15 minutes en s’appuyant sur la législation locale au Brésil.'
   },
   {
-    id: '2',
-    name: 'Alexandre Martin',
-    role: 'Entrepreneur',
-    location: 'Singapour',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-    rating: 5,
-    comment: 'Incroyable ! J\'ai créé ma société à Singapour en moins de 2 semaines grâce à l\'expertise des consultants recommandés. La plateforme est intuitive, les professionnels sont vérifiés et ultra-compétents. Je recommande vivement !',
-    date: '2024-12-10',
-    verified: true,
-    helpful: 32
+    id: 'us-woman',
+    name: 'Emily Johnson',
+    city: 'Austin, États-Unis',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1' + faceParams,
+    fallback: 'https://i.pravatar.cc/600?img=47',
+    typeEchange: 'expatrié',
+    comment:
+      'Nouvelle à Lyon, je paniquais pour la préfecture. Une expatriée m’a rappelée en quelques minutes, tout expliqué en français et en anglais. Je me suis sentie accompagnée du début à la fin.'
   },
   {
-    id: '3',
-    name: 'Sophie Chen',
-    role: 'Directrice Marketing',
-    location: 'New York, USA',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-    rating: 5,
-    comment: 'Une urgence médicale à 3h du matin, et en 10 minutes j\'avais un avocat spécialisé en assurance santé internationale au téléphone. Problème résolu en 24h. Cette plateforme change vraiment la vie des expatriés !',
-    date: '2024-12-08',
-    verified: true,
-    helpful: 63
+    id: 'cn-man',
+    name: 'Li Wei',
+    city: 'Shanghai, Chine',
+    avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12' + faceParams,
+    fallback: 'https://i.pravatar.cc/600?img=32',
+    typeEchange: 'avocat',
+    comment:
+      'Problème d’assurance santé internationale réglé dans la journée. L’avocat bilingue a clarifié chaque point au téléphone, documents à l’appui. Rapide, précis, impeccable.'
+  },
+  {
+    id: 'th-woman',
+    name: 'Nok Suphansa',
+    city: 'Bangkok, Thaïlande',
+    avatar: 'https://images.unsplash.com/photo-1554151228-14d9def656e4' + faceParams,
+    fallback: 'https://i.pravatar.cc/600?img=65',
+    typeEchange: 'expatrié',
+    comment:
+      'Hospitalisation imprévue pendant un voyage : une expatriée m’a guidée pour les démarches et a servi d’interprète. Rassurant, humain et très efficace.'
+  },
+  {
+    id: 'ru-man',
+    name: 'Ivan Petrov',
+    city: 'Saint-Pétersbourg, Russie',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d' + faceParams,
+    fallback: 'https://i.pravatar.cc/600?img=10',
+    typeEchange: 'avocat',
+    comment:
+      'Achat immobilier à Lisbonne : l’avocat m’a rappelé, vérifié les clauses et orienté vers la bonne étude notariale. Clair, rapide, sans surprise.'
+  },
+  {
+    id: 'sn-woman',
+    name: 'Awa Diop',
+    city: 'Dakar, Sénégal',
+    avatar: 'https://images.unsplash.com/photo-1544005316-00a74bdc7f77' + faceParams,
+    fallback: 'https://i.pravatar.cc/600?img=68',
+    typeEchange: 'expatrié',
+    comment:
+      'Mon dossier de visa pour le Canada traînait. Une expatriée à Montréal m’a donné les bons justificatifs et les délais réels. J’ai gagné des semaines.'
   }
 ];
 
-// Données des profils d'experts
-const EXPERT_PROFILES: Profile[] = [
-  {
-    id: '1',
-    name: 'Maître Sarah Dubois',
-    role: 'Avocate',
-    specialty: 'Droit du Travail International',
-    location: 'Dubai, UAE',
-    avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
-    rating: 4.9,
-    reviewCount: 127,
-    responseTime: '< 5 min',
-    languages: ['Français', 'Anglais', 'Arabe'],
-    verified: true,
-    online: true,
-    price: 'à partir de 89€/h'
-  },
-  {
-    id: '2',
-    name: 'Alexandre Martin',
-    role: 'Consultant Fiscal',
-    specialty: 'Fiscalité Internationale',
-    location: 'Singapour',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-    rating: 4.8,
-    reviewCount: 93,
-    responseTime: '< 10 min',
-    languages: ['Français', 'Anglais', 'Mandarin'],
-    verified: true,
-    online: true,
-    price: 'à partir de 120€/h'
-  },
-  {
-    id: '3',
-    name: 'Dr. Marie Chen',
-    role: 'Consultante RH',
-    specialty: 'Expatriation & Mobilité',
-    location: 'New York, USA',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b107?w=150&h=150&fit=crop&crop=face',
-    rating: 5.0,
-    reviewCount: 156,
-    responseTime: '< 3 min',
-    languages: ['Français', 'Anglais'],
-    verified: true,
-    online: false,
-    price: 'à partir de 95€/h'
-  },
-  {
-    id: '4',
-    name: 'Jean-Pierre Rousseau',
-    role: 'Notaire',
-    specialty: 'Immobilier International',
-    location: 'Londres, UK',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    rating: 4.7,
-    reviewCount: 84,
-    responseTime: '< 15 min',
-    languages: ['Français', 'Anglais'],
-    verified: true,
-    online: true,
-    price: 'à partir de 150€/h'
-  },
-  {
-    id: '5',
-    name: 'Sophie Laurent',
-    role: 'Experte Assurance',
-    specialty: 'Assurance Santé Internationale',
-    location: 'Tokyo, Japon',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-    rating: 4.9,
-    reviewCount: 112,
-    responseTime: '< 7 min',
-    languages: ['Français', 'Anglais', 'Japonais'],
-    verified: true,
-    online: true,
-    price: 'à partir de 75€/h'
-  }
-];
+/* ================================
+   Slider d’avis — mobile first, swipe, auto
+   (param "theme" pour clair/sombre)
+   ================================ */
+function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
+  const [current, setCurrent] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchStartX = useRef<number | null>(null);
 
-// Plans de pricing
+  const isDark = theme === 'dark';
+
+  useEffect(() => {
+    if (paused) return;
+    const id = window.setInterval(() => {
+      setCurrent((p) => (p + 1) % REVIEWS.length);
+    }, 4500);
+    return () => window.clearInterval(id);
+  }, [paused]);
+
+  const goTo = (i: number) => setCurrent((i + REVIEWS.length) % REVIEWS.length);
+  const prev = () => goTo(current - 1);
+  const next = () => goTo(current + 1);
+
+  const onTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd: React.TouchEventHandler<HTMLDivElement> = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 50) (dx > 0 ? prev() : next());
+    touchStartX.current = null;
+  };
+
+  const labelType = (t: TypeEchange) =>
+    t === 'avocat' ? 'Appel téléphonique avec un avocat' : 'Appel téléphonique avec un expatrié';
+
+  // handler de fallback d’image
+  const onImgError = (e: React.SyntheticEvent<HTMLImageElement>, fallback: string) => {
+    const img = e.currentTarget;
+    if (img.src !== fallback) {
+      img.src = fallback;
+    }
+  };
+
+  return (
+    <div
+      className="relative max-w-[980px] mx-auto select-none"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* viewport */}
+      <div className="overflow-hidden rounded-[28px]">
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${current * 100}%)` }}
+        >
+          {REVIEWS.map((r, idx) => (
+            <div key={r.id} className="w-full shrink-0 px-2 sm:px-4">
+              <Link
+                to="/testimonials"
+                className={
+                  isDark
+                    ? 'block rounded-[28px] border border-white/15 bg-gradient-to-br from-white/8 to-white/5 backdrop-blur-xl p-6 sm:p-10 md:p-12 hover:border-white/25 hover:shadow-2xl transition-all duration-300'
+                    : 'block rounded-[28px] border border-gray-200 bg-white p-6 sm:p-10 md:p-12 hover:shadow-2xl transition-all duration-300'
+                }
+                aria-label={`Voir les avis - ${r.name}`}
+              >
+                {/* bandeau type échange */}
+                <div
+                  className={
+                    isDark
+                      ? 'mb-5 sm:mb-6 inline-flex items-center gap-2 bg-white/15 border border-white/25 text-white rounded-full px-3.5 py-2 text-xs sm:text-sm font-semibold backdrop-blur'
+                      : 'mb-5 sm:mb-6 inline-flex items-center gap-2 bg-gray-100 border border-gray-200 text-gray-700 rounded-full px-3.5 py-2 text-xs sm:text-sm font-semibold'
+                  }
+                >
+                  {r.typeEchange === 'avocat' ? <Briefcase size={14} /> : <User size={14} />}
+                  {labelType(r.typeEchange)}
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-start items-center gap-5 sm:gap-7 md:gap-8 text-center md:text-left">
+                  {/* Avatar + infos */}
+                  <div className="flex flex-col items-center md:items-start">
+                    <div className={`relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full p-[3px] ${isDark ? 'bg-gradient-to-br from-white/40 to-white/10' : 'bg-gradient-to-br from-gray-200 to-gray-100'} shadow`}>
+                      <img
+                        src={r.avatar}
+                        alt={`Portrait de ${r.name}`}
+                        className="w-full h-full rounded-full object-cover"
+                        loading={idx === current ? 'eager' : 'lazy'}
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => onImgError(e, r.fallback)}
+                      />
+                    </div>
+                    <div className="mt-3">
+                      <div className={`font-extrabold ${isDark ? 'text-white' : 'text-gray-900'} text-lg sm:text-xl leading-tight`}>{r.name}</div>
+                      <div className={`mt-0.5 inline-flex items-center gap-1 ${isDark ? 'text-gray-300/90' : 'text-gray-500'} text-xs sm:text-sm`}>
+                        <MapPin size={16} />
+                        <span>{r.city}</span>
+                      </div>
+                      <div className="mt-2 inline-flex gap-1" aria-label="Note 5 sur 5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} size={18} className="text-yellow-400 fill-yellow-400" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Texte */}
+                  <blockquote className={`${isDark ? 'text-white/95' : 'text-gray-700'} text-base sm:text-lg md:text-xl leading-7 sm:leading-8 md:leading-9 max-w-[58ch]`}>
+                    “{r.comment}”
+                  </blockquote>
+                </div>
+              </Link>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* flèches */}
+      <button
+        onClick={prev}
+        className={
+          isDark
+            ? 'absolute left-1 sm:left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-4 w-10 h-10 sm:w-12 sm:h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 flex items-center justify-center text-white active:scale-95'
+            : 'absolute left-1 sm:left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-4 w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 hover:bg-gray-200 rounded-full border border-gray-200 transition-all duration-300 flex items-center justify-center text-gray-700 active:scale-95'
+        }
+        aria-label="Précédent"
+      >
+        <ChevronLeft className="w-5 h-5 sm:w-6 h-6" />
+      </button>
+      <button
+        onClick={next}
+        className={
+          isDark
+            ? 'absolute right-1 sm:right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-4 w-10 h-10 sm:w-12 sm:h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 flex items-center justify-center text-white active:scale-95'
+            : 'absolute right-1 sm:right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-4 w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 hover:bg-gray-200 rounded-full border border-gray-200 transition-all duration-300 flex items-center justify-center text-gray-700 active:scale-95'
+        }
+        aria-label="Suivant"
+      >
+        <ChevronRightIcon className="w-5 h-5 sm:w-6 h-6" />
+      </button>
+
+      {/* points */}
+      <div className="flex items-center justify-center gap-2 mt-6">
+        {REVIEWS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => goTo(i)}
+            className={`h-2 rounded-full transition-all duration-300 ${current === i ? 'w-8 bg-gradient-to-r from-red-500 to-orange-500' : isDark ? 'w-2 bg-white/40 hover:bg-white/60' : 'w-2 bg-gray-300 hover:bg-gray-400'}`}
+            aria-label={`Aller à l’avis ${i + 1}`}
+          />
+        ))}
+      </div>
+
+      {/* CTA */}
+      <div className="text-center mt-7 sm:mt-8">
+        <Link
+          to="/testimonials"
+          className={`inline-flex items-center gap-2 ${isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-700'} font-semibold transition-colors`}
+        >
+          <span>Voir tous les avis</span>
+          <ChevronRightIcon className="w-5 h-5" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ================================
+   Plans de pricing (inchangé)
+   ================================ */
 const PRICING_PLANS: PricingPlan[] = [
   {
     name: 'Gratuit',
@@ -242,702 +488,727 @@ const PRICING_PLANS: PricingPlan[] = [
   }
 ];
 
-// Composant principal de la page d'accueil
+/* ================================
+   Page
+   ================================ */
 const OptimizedHomePage: React.FC = () => {
-  const [currentTestimonial, setCurrentTestimonial] = useState(0);
-  const [currentProfile, setCurrentProfile] = useState(0);
+  const { install, canInstall } = usePWAInstall();
 
-  // Auto-rotation des témoignages
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % TESTIMONIALS.length);
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Auto-rotation des profils
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentProfile((prev) => (prev + 1) % EXPERT_PROFILES.length);
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Stats impressionnantes
   const stats: Stat[] = [
-    {
-      value: '15K+',
-      label: 'Expatriés aidés',
-      icon: <Users className="w-8 h-8" />,
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      value: '2K+',
-      label: 'Experts vérifiés',
-      icon: <Shield className="w-8 h-8" />,
-      color: 'from-green-500 to-emerald-500'
-    },
-    {
-      value: '50+',
-      label: 'Pays couverts',
-      icon: <Globe className="w-8 h-8" />,
-      color: 'from-purple-500 to-pink-500'
-    },
-    {
-      value: '24/7',
-      label: 'Support urgent',
-      icon: <Clock className="w-8 h-8" />,
-      color: 'from-orange-500 to-red-500'
-    }
+    { value: '15K+', label: 'Expatriés aidés',    icon: <Users className="w-8 h-8" />, color: 'from-blue-500 to-cyan-500' },
+    { value: '2K+',  label: 'Experts vérifiés',    icon: <Shield className="w-8 h-8" />, color: 'from-green-500 to-emerald-500' },
+    { value: '50+',  label: 'Pays couverts',       icon: <Globe className="w-8 h-8" />,  color: 'from-purple-500 to-pink-500' },
+    { value: '24/7', label: 'Support urgent',      icon: <Clock className="w-8 h-8" />,  color: 'from-orange-500 to-red-500' }
   ];
 
   const features = [
-    {
-      icon: <Zap className="w-8 h-8" />,
-      title: "Connexion Instantanée",
-      description: "Trouvez un expert en moins de 5 minutes, 24h/24 et 7j/7",
-      color: "from-yellow-500 to-orange-500"
-    },
-    {
-      icon: <Shield className="w-8 h-8" />,
-      title: "Experts Vérifiés",
-      description: "Tous nos professionnels sont certifiés et évalués par la communauté",
-      color: "from-green-500 to-teal-500"
-    },
-    {
-      icon: <Globe className="w-8 h-8" />,
-      title: "Couverture Mondiale",
-      description: "Plus de 50 pays couverts avec des experts locaux",
-      color: "from-blue-500 to-purple-500"
-    },
-    {
-      icon: <DollarSign className="w-8 h-8" />,
-      title: "Tarifs Transparents",
-      description: "Pas de frais cachés, consultations dès 29€",
-      color: "from-pink-500 to-red-500"
-    }
+    { icon: <Zap className="w-8 h-8" />,        title: 'Connexion instantanée', description: 'Téléphonez à un expert en moins de 5 minutes, 24h/24 et 7j/7', color: 'from-yellow-500 to-orange-500' },
+    { icon: <Shield className="w-8 h-8" />,     title: 'Experts vérifiés',      description: 'Tous nos professionnels sont certifiés et évalués par la communauté', color: 'from-green-500 to-teal-500' },
+    { icon: <Globe className="w-8 h-8" />,      title: 'Couverture mondiale',   description: 'Plus de 50 pays couverts avec des experts locaux', color: 'from-blue-500 to-purple-500' },
+    { icon: <DollarSign className="w-8 h-8" />, title: 'Tarifs transparents',   description: 'Pas de frais cachés, consultations dès 29€', color: 'from-pink-500 to-red-500' }
   ];
 
+  const onInstallClick = useCallback(() => { install(); }, [install]);
+
   return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Header - Dans votre projet, remplacez par: <ModernHeader2025 /> */}
-      <div className="h-20 bg-gray-900 flex items-center justify-center border-b border-white/10">
-        <div className="text-white font-bold text-xl">
-          📍 Emplacement du Header - Importez votre composant ModernHeader2025 ici
-        </div>
-      </div>
+    <Layout>
+      <div className="min-h-screen bg-gray-950">
+        {/* ================= HERO ================= */}
+        <section className="relative pt-20 pb-32 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
+          <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-blue-500/10" />
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+          </div>
 
-      {/* Hero Section */}
-      <section className="relative pt-20 pb-32 overflow-hidden">
-        {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
-        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-blue-500/10" />
-        
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-        </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-6">
+            <div className="text-center mb-20">
+              {/* Badge “Nouveau” + PWA */}
+              <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full pl-6 pr-2 py-3 border border-white/20 mb-8 touch-manipulation">
+                <Sparkles className="w-5 h-5 text-yellow-400" />
+                <span className="text-white font-medium">
+                  Nouveau — téléchargez l’appli <strong>SOS Expat d’Ulixai</strong> !
+                </span>
+                <PWAInstallIconWithHint canInstall={canInstall} onInstall={onInstallClick} />
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 mb-8">
-              <Sparkles className="w-5 h-5 text-yellow-400" />
-              <span className="text-white font-medium">Nouveau : Support IA 24/7</span>
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight">
+                <span className="bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
+                  SOS pour
+                </span>
+                <br />
+                <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
+                  Expatriés & Voyageurs
+                </span>
+              </h1>
+
+              <h2 className="text-2xl md:text-3xl text-white font-semibold max-w-4xl mx-auto mb-3 leading-relaxed">
+                Besoin d’aide, d’une solution, d’un coup de main immédiat ?
+              </h2>
+              <h3 className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed">
+                Téléphonez à un expert local en moins de 5 minutes, partout dans le monde.
+              </h3>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+                <a
+                  href="/sos-appel"
+                  className="group relative overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-orange-500 hover:from-red-700 hover:via-red-600 hover:to-orange-600 text-white px-12 py-6 rounded-3xl font-black text-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-red-500/50 flex items-center space-x-4 border-2 border-red-400/50 touch-manipulation"
+                >
+                  <Phone className="w-8 h-8 group-hover:animate-pulse" />
+                  <span>URGENCE 24/7</span>
+                  <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/30 via-orange-500/30 to-red-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </a>
+
+                <a
+                  href="/sos-appel"
+                  className="group flex items-center space-x-3 px-10 py-6 rounded-3xl bg-white/10 hover:bg-white/20 text-white border-2 border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-105 backdrop-blur-sm font-bold text-lg touch-manipulation"
+                >
+                  <Play className="w-6 h-6" />
+                  <span>Voir les experts</span>
+                </a>
+              </div>
             </div>
 
-            <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight">
-              <span className="bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
-                SOS pour
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
-                Expatriés
-              </span>
-            </h1>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {stats.map((stat, index) => (
+                <div
+                  key={index}
+                  className="group text-center p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-105 touch-manipulation"
+                >
+                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r ${stat.color} mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                    <div className="text-white">{stat.icon}</div>
+                  </div>
+                  <div className="text-4xl font-black text-white mb-2">{stat.value}</div>
+                  <div className="text-gray-400 font-medium">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-            <p className="text-2xl text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed">
-              <strong className="text-white">Assistance juridique et administrative instantanée</strong> pour expatriés. 
-              Trouvez un expert local en moins de 5 minutes, partout dans le monde.
+        {/* ================= EXPERTS (fond clair) ================= */}
+        <section className="py-28 bg-gradient-to-b from-white via-rose-50 to-white relative overflow-hidden touch-manipulation">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-red-400/10 to-orange-400/10 rounded-full blur-2xl" />
+            <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-gradient-to-r from-blue-400/10 to-purple-400/10 rounded-full blur-2xl" />
+          </div>
+
+          <div className="relative z-10 max-w-7xl mx-auto px-6">
+            <div className="text-center mb-14">
+              <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-100 to-orange-100 backdrop-blur-sm rounded-full px-6 py-3 border border-red-200 mb-6">
+                <Shield className="w-5 h-5 text-red-600" />
+                <span className="text-red-700 font-bold">Avocats et Expatriés • Disponibles 24/7</span>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              </div>
+
+              <h2 className="text-5xl font-black text-gray-900 mb-4">
+                Nos <span className="bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">experts</span> à votre service
+              </h2>
+              <p className="text-lg text-gray-700 max-w-3xl mx-auto">
+                En moins de 5 minutes, un expert au téléphone pour résoudre tous vos besoins, où que vous soyez dans le monde et quelle que soit votre langue.
+              </p>
+            </div>
+
+            <ProfilesCarousel CardComponent={ModernProfileCard} />
+          </div>
+        </section>
+
+        {/* ================= Tarifs (DÉPLACÉ AVANT "Pourquoi choisir") ================= */}
+        <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900 relative overflow-hidden" aria-labelledby="pricing-title">
+          {/* 
+            ========= NOTE D'INTÉGRATION (section Tarifs) =========
+            - Exemples de situations RASSEMBLÉS dans un seul bloc commun sous les 2 cartes (pas de distinction).
+            - Pour éditer les bénéfices/labels : modifiez `lawyerBenefits`, `expatBenefits`.
+            - Pour les exemples : éditez les tableaux puis `combinedExamples` (fusion et déduplication).
+          */}
+
+          {/* Évite un avertissement si PRICING_PLANS référencé ailleurs */}
+          {void PRICING_PLANS.length}
+
+          {(() => {
+            const DEFAULT_USD_RATE = 1.08 as const;
+
+            const formatCurrency = (value: number, currency: 'EUR' | 'USD'): string => {
+              return new Intl.NumberFormat(currency === 'EUR' ? 'fr-FR' : 'en-US', {
+                style: 'currency',
+                currency,
+                maximumFractionDigits: 0
+              }).format(value);
+            };
+
+            interface OfferCardProps {
+              badge: string;
+              title: string;
+              minutes: number;
+              euroPrice: number;
+              usdOverride?: number;
+              description: string;
+              features: string[];
+              usdRate?: number;
+              accentGradient: string;
+              icon: React.ReactNode;
+              lightColor: string;
+              borderColor: string;
+            }
+
+            const PriceBlock: React.FC<{ euro: number; usdRate?: number; usdOverride?: number; minutes: number }> = ({ euro, usdRate, usdOverride, minutes }) => {
+              const effectiveRate: number = typeof usdRate === 'number' ? usdRate : DEFAULT_USD_RATE;
+              const usdValue = typeof usdOverride === 'number' ? usdOverride : Math.round(euro * effectiveRate);
+
+              return (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durée">
+                  <div className="flex items-end gap-3">
+                    <span className="text-5xl font-black text-gray-900 leading-none">{formatCurrency(euro, 'EUR')}</span>
+                    <span className="text-2xl font-extrabold text-gray-700 leading-none">({formatCurrency(usdValue, 'USD')})</span>
+                  </div>
+                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white font-semibold">
+                    <Clock className="w-4 h-4" />
+                    <span>{minutes} minutes</span>
+                  </div>
+                </div>
+              );
+            };
+
+            const OfferCard: React.FC<OfferCardProps> = ({
+              badge,
+              title,
+              minutes,
+              euroPrice,
+              usdOverride,
+              description,
+              features,
+              usdRate,
+              accentGradient,
+              icon,
+              lightColor,
+              borderColor
+            }) => {
+              return (
+                <article
+                  className={`group relative h-full flex flex-col p-8 rounded-3xl border ${borderColor} ${lightColor} transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] focus-within:scale-[1.02] overflow-hidden`}
+                  aria-label={`${title} – ${minutes} minutes`}
+                >
+                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentGradient} opacity-0 group-hover:opacity-[0.06] transition-opacity duration-300`} />
+                  <div className="relative z-10 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="inline-flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-white/80 rounded-full px-4 py-2 text-gray-900 text-sm font-semibold">
+                        {icon}
+                        {badge}
+                      </div>
+                      <div className="text-sm text-gray-600">Appel en ~5 min</div>
+                    </div>
+
+                    <h3 className="text-2xl font-extrabold text-gray-900 mb-2">{title}</h3>
+                    <p className="text-gray-700 mb-6 leading-relaxed">{description}</p>
+
+                    <PriceBlock euro={euroPrice} usdRate={usdRate} usdOverride={usdOverride} minutes={minutes} />
+
+                    <ul className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3" role="list" aria-label="Bénéfices inclus">
+                      {features.map((f, i) => (
+                        <li key={i} role="listitem" className="flex items-start gap-3">
+                          <span className={`mt-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r ${accentGradient}`}>
+                            <Check className="w-3 h-3 text-white" />
+                          </span>
+                          <span className="text-gray-800">{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-8 md:mt-auto">
+                      <Link
+                        to="/sos-appel"
+                        className={`inline-flex items-center justify-center w-full px-6 py-4 rounded-2xl font-bold text-lg text-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white ${`bg-gradient-to-r ${accentGradient}`} hover:scale-105`}
+                        aria-label={`Réserver ma consultation – ${title}`}
+                      >
+                        Réserver ma consultation
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              );
+            };
+
+            // Bénéfices concis
+            const expatBenefits: string[] = [
+              'Retours d’expérience concrets',
+              'Conseils logement, banque, santé, transport',
+              'Infos à jour sur démarches et délais',
+              'Astuces culturelles & pièges à éviter',
+              'Réseau local (contacts utiles)',
+              'Accompagnement bienveillant'
+            ];
+            const lawyerBenefits: string[] = [
+              'Analyse rapide de votre situation',
+              'Conseils juridiques personnalisés',
+              'Confidentialité & sécurité garanties',
+              'Réponse en < 5 minutes',
+              'Expertise pays concerné',
+              'Orientation vers les bonnes procédures'
+            ];
+
+            // Exemples (fusionnés en un seul bloc commun, + ajouts)
+            const expatExamples: string[] = [
+              'Installation : logement, forfait mobile, banque',
+              'Scolarité & assurances locales',
+              'Préfecture / immigration : RDV & dossiers'
+            ];
+            const lawyerExamples: string[] = [
+              'Contrat de travail : clauses à vérifier',
+              'Conflit locatif / commercial — premiers réflexes',
+              'Accident / hospitalisation : droits & démarches'
+            ];
+            const additionalExamples: string[] = [
+              'Problèmes justice / police (droits & démarches)',
+              'Trouver un job (CV local, entretiens, contrats)',
+              'Rencontrer d’autres expatriés (réseau & entraide)'
+            ];
+
+            const combinedExamples: string[] = Array.from(
+              new Set([...expatExamples, ...lawyerExamples, ...additionalExamples])
+            );
+
+            return (
+              <>
+                <div className="absolute inset-0">
+                  <div className="absolute top-0 left-1/3 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-full blur-3xl" />
+                </div>
+
+                <div className="relative z-10 max-w-7xl mx-auto px-6">
+                  <div className="text-center mb-16">
+                    <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-6">
+                      <DollarSign className="w-5 h-5 text-green-400" />
+                      <span className="text-green-300 font-bold">Transparence totale • Pas de frais cachés</span>
+                      <Check className="w-5 h-5 text-green-400" />
+                    </div>
+
+                    <h2 id="pricing-title" className="text-5xl font-black text-white mb-4">
+                      Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
+                    </h2>
+                    <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+                      Choisissez à qui vous voulez parler… <strong>un avocat</strong> ? <strong>Un expatrié</strong> ?
+                    </p>
+                  </div>
+
+                  {/* Ordre demandé : Expatrié AVANT Avocat */}
+                  <div className="grid gap-8 md:grid-cols-2 items-stretch">
+                    <OfferCard
+                      badge="Offre Expatrié"
+                      title="1 échange avec un expatrié expérimenté"
+                      minutes={30}
+                      euroPrice={19}
+                      usdOverride={25}
+                      description="Conseils pratiques, concrets et locaux."
+                      features={expatBenefits}
+                      accentGradient="from-blue-600 to-indigo-600"
+                      icon={<User className="w-4 h-4" />}
+                      lightColor="bg-blue-50"
+                      borderColor="border-blue-200"
+                    />
+                    <OfferCard
+                      badge="Offre Avocat"
+                      title="1 consultation avec un avocat qualifié"
+                      minutes={20}
+                      euroPrice={49}
+                      usdOverride={55}
+                      description="Réponse claire et actionnable sur votre cas."
+                      features={lawyerBenefits}
+                      accentGradient="from-red-600 to-red-700"
+                      icon={<Briefcase className="w-4 h-4" />}
+                      lightColor="bg-red-50"
+                      borderColor="border-red-200"
+                    />
+                  </div>
+
+                  {/* Bloc EXEMPLES commun */}
+                  <div
+                    className="mt-10 rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm p-6 md:p-8"
+                    role="region"
+                    aria-labelledby="examples-title"
+                  >
+                    <div className="flex flex-col items-center gap-3 mb-6">
+                      <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-r from-green-500 to-blue-500">
+                        <Sparkles className="text-white w-5 h-5" />
+                      </div>
+                      <h3 id="examples-title" className="text-xl md:text-2xl font-extrabold text-white">
+                        Exemples de situations
+                      </h3>
+                      <p className="text-gray-300 text-sm md:text-base">
+                        Un expert, quelle que soit votre situation.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                      {combinedExamples.map((ex, i) => (
+                        <div
+                          key={i}
+                          className="group flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-green-500 to-blue-500">
+                            <Check className="w-3.5 h-3.5 text-white" />
+                          </span>
+                          <span className="text-white/90">{ex}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Garanties / points-clés */}
+                  <div className="mt-14 text-center">
+                    <div className="inline-flex items-center space-x-6 bg-white/5 backdrop-blur-sm rounded-2xl px-8 py-4 border border-white/10">
+                      <div className="flex items-center space-x-2 text-green-400">
+                        <Shield className="w-5 h-5" />
+                        <span className="font-medium">Confidentialité & sécurité</span>
+                      </div>
+                      <div className="w-px h-6 bg-white/20" />
+                      <div className="flex items-center space-x-2 text-blue-400">
+                        <Globe className="w-5 h-5" />
+                        <span className="font-medium">Experts dans 150+ pays</span>
+                      </div>
+                      <div className="w-px h-6 bg-white/20" />
+                      <div className="flex items-center space-x-2 text-purple-400">
+                        <Zap className="w-5 h-5" />
+                        <span className="font-medium">Réservation instantanée — appel en 5 minutes</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </section>
+
+        {/* ================= Pourquoi choisir (MODIFIÉ) ================= */}
+        <section className="py-32 bg-gradient-to-b from-white to-gray-50" aria-labelledby="why-title">
+          {/*
+            ──────────────────────────────────────────────────────────────
+            NOTE D’ÉDITION (section “Pourquoi choisir SOS Expat”)
+            - Pour modifier textes/icônes : mettez à jour le tableau `advantages`
+              (title, tagline, caption, icon, gradient).
+            - Icônes utilisées : Zap, Clock, Globe (déjà importées).
+            ──────────────────────────────────────────────────────────────
+          */}
+          {void features.length}
+
+          {(() => {
+            interface AdvantageItem {
+              id: string;
+              title: string;
+              tagline: string;
+              caption: string;
+              icon: React.ReactNode;
+              gradient: string;
+            }
+
+            const advantages: AdvantageItem[] = [
+              {
+                id: 'speed-worldwide',
+                title: 'Un expert en 5 minutes',
+                tagline: 'Le seul service au monde, où que vous soyez.',
+                caption: 'Partout • 24/7 • < 5 min',
+                icon: <Zap className="w-6 h-6" />,
+                gradient: 'from-red-500 to-orange-500'
+              },
+              {
+                id: 'coffee-fast',
+                title: 'Avant que votre café refroidisse',
+                tagline: 'Avocat ou expatrié, on vous connecte tout de suite.',
+                caption: 'Priorité à l’urgence',
+                icon: <Clock className="w-6 h-6" />,
+                gradient: 'from-yellow-500 to-red-500'
+              },
+              {
+                id: 'multi',
+                title: 'Multilingue. Multidevise. Multicountry.',
+                tagline: 'On s’adapte à vous — et c’est ultra-rapide.',
+                caption: 'Langues • Devises • Pays',
+                icon: <Globe className="w-6 h-6" />,
+                gradient: 'from-blue-500 to-purple-500'
+              }
+            ];
+
+            const AdvantageCard: React.FC<{ item: AdvantageItem }> = ({ item }) => {
+              return (
+                <article
+                  className="group relative rounded-3xl border border-gray-200 bg-white p-8 sm:p-10 shadow-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] focus-within:scale-[1.02] text-center"
+                  aria-labelledby={`adv-title-${item.id}`}
+                  tabIndex={0}
+                >
+                  <div
+                    className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-[0.06] transition-opacity duration-300 rounded-3xl`}
+                    aria-hidden="true"
+                  />
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="relative mb-6">
+                      <div className={`mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r ${item.gradient} text-white shadow-md`} aria-hidden="true">
+                        {item.icon}
+                      </div>
+                    </div>
+
+                    <h3
+                      id={`adv-title-${item.id}`}
+                      className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-snug"
+                    >
+                      {item.title}
+                    </h3>
+
+                    <p className="mt-3 text-gray-600 max-w-[36ch]">
+                      {item.tagline}
+                    </p>
+
+                    <div className="mt-6 flex items-center justify-center">
+                      <span className={`inline-flex rounded-full p-[1px] bg-gradient-to-r ${item.gradient}`}>
+                        <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-gray-600">
+                          <span className={`inline-block w-2.5 h-2.5 rounded-full bg-gradient-to-r ${item.gradient}`} />
+                          {item.caption}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              );
+            };
+
+            return (
+              <div className="max-w-7xl mx-auto px-6">
+                <div className="text-center mb-12 sm:mb-16">
+                  <h2 id="why-title" className="text-5xl font-black text-gray-900 mb-6">
+                    Pourquoi choisir <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">SOS Expats</span> ?
+                  </h2>
+                  <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
+                    Pensée pour la vitesse, la clarté et l’accompagnement réel — sur mobile d’abord.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                  {advantages.map((adv) => (
+                    <AdvantageCard key={adv.id} item={adv} />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+
+        {/* ================= Rejoignez SOS Expat (DÉPLACÉ AVANT AVIS) — FOND SOMBRE ================= */}
+        <section className="py-28 bg-gradient-to-b from-gray-900 to-gray-950 relative overflow-hidden" aria-labelledby="join-title">
+          {/*
+            ──────────────────────────────────────────────────────────────
+            SECTION “Rejoignez SOS Expat”
+            - Modifier contenus : `joinTitle`, `joinSubtitle`, puis `lawyerCard` / `expatCard`.
+            - Modifier liens CTA : changez `ctaHref`.
+            - Couleur : teinte de fond sombre. Cartes blanches fixes, teinte plus foncée au hover.
+            ──────────────────────────────────────────────────────────────
+          */}
+          {(() => {
+            interface JoinCardProps {
+              label: string;
+              title: string;
+              benefits: string[];
+              ctaLabel: string;
+              ctaHref: string;
+              icon: React.ReactNode;
+              gradient: string;
+            }
+
+            const JoinCard: React.FC<JoinCardProps> = ({
+              label,
+              title,
+              benefits,
+              ctaLabel,
+              ctaHref,
+              icon,
+              gradient
+            }) => {
+              return (
+                <article
+                  className="group relative h-full flex flex-col rounded-3xl border border-gray-200 bg-white p-8 sm:p-10 shadow-sm transition-all duration-300 hover:shadow-2xl"
+                >
+                  {/* Teinte fixe + plus foncée au hover */}
+                  <div className={`pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br ${gradient} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity duration-300`} />
+                  <div className="relative z-10 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 border text-gray-700 border-gray-200">
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-white bg-gradient-to-r ${gradient}`}>
+                          {icon}
+                        </span>
+                        <span className="text-sm font-semibold">{label}</span>
+                      </div>
+                    </div>
+
+                    <h3 className="mt-6 text-2xl sm:text-3xl font-black text-gray-900">{title}</h3>
+
+                    <ul className="mt-6 space-y-3" role="list" aria-label="Avantages">
+                      {benefits.map((b, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className={`mt-1 inline-flex items-center justify-center w-5 h-5 rounded-full text-white bg-gradient-to-r ${gradient}`}>
+                            <Check className="w-3 h-3" />
+                          </span>
+                          <span className="text-gray-700">{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-8 md:mt-auto">
+                      <a
+                        href={ctaHref}
+                        className={`group/cta inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 font-bold text-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white bg-gradient-to-r ${gradient} hover:scale-105 hover:text-white`}
+                        aria-label={ctaLabel}
+                      >
+                        {ctaLabel}
+                        <ArrowRight className="w-5 h-5" />
+                      </a>
+                      <p className="mt-3 text-sm text-gray-500">
+                        Astuce : téléchargez l’appli <strong>SOS Expat d’Ulixai</strong> pour passer en ligne/hors ligne quand vous le souhaitez.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              );
+            };
+
+            const joinTitle = 'Faites partie du réseau SOS Expat';
+            const joinSubtitle =
+              'Avocats ou expatriés : rejoignez-nous et transformez vos compétences en opportunités réelles.';
+
+            const lawyerCard: JoinCardProps = {
+              label: 'Avocat',
+              title: 'Développez votre activité à l’international',
+              benefits: [
+                'Augmentez votre chiffre d’affaires avec des consultations de 20 minutes',
+                'Paiement rapide : versement sous 24 h',
+                'Mettez-vous en ligne/hors ligne quand vous voulez',
+                'Visibilité mondiale, clients connectés en < 5 minutes',
+                'Toutes langues, euros et dollars',
+                'Répondez aux expats, voyageurs et vacanciers'
+              ],
+              ctaLabel: 'Je suis avocat',
+              ctaHref: 'http://localhost:5173/register/lawyer',
+              icon: <Briefcase className="w-3.5 h-3.5" />,
+              gradient: 'from-red-600 to-orange-600'
+            };
+
+            const expatCard: JoinCardProps = {
+              label: 'Expatrié',
+              title: 'Partagez votre expérience où que vous soyez dans le monde',
+              benefits: [
+                'Mettez-vous en ligne ou hors ligne à tout moment (contrôle total)',
+                'Quand vous recevez des appels, vous gagnez — paiement sous 24 h',
+                '30 minutes par appel : des revenus à chaque échange',
+                'Plus vous êtes en ligne, plus vos revenus explosent',
+                'Clients partout dans le monde, toutes langues',
+                'Euros et dollars acceptés',
+                'Je veux aider : expats, voyageurs, vacanciers',
+                'Inscrivez-vous et décrivez votre expérience & vos connaissances locales'
+              ],
+              ctaLabel: 'Je suis expatrié',
+              ctaHref: 'http://localhost:5173/register/expat',
+              icon: <User className="w-3.5 h-3.5" />,
+              gradient: 'from-blue-600 to-indigo-600'
+            };
+
+            return (
+              <div className="relative z-10 max-w-7xl mx-auto px-6">
+                <div className="text-center mb-12 sm:mb-16">
+                  <h2 id="join-title" className="text-4xl sm:text-5xl font-black text-white mb-4">
+                    {joinTitle}
+                  </h2>
+                  <p className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto">
+                    {joinSubtitle}
+                  </p>
+                </div>
+
+                {/* Même hauteur des deux cartes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-stretch">
+                  <JoinCard {...expatCard} />
+                  <JoinCard {...lawyerCard} />
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+
+        {/* ================= AVIS (slider auto) — FOND CLAIR (inversé) ================= */}
+        <section className="py-28 sm:py-32 bg-gradient-to-b from-white to-gray-50 relative overflow-hidden">
+          <div className="absolute inset-0">
+            <div className="absolute -top-10 left-1/4 w-80 h-80 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
+            <div className="absolute -bottom-10 right-1/4 w-96 h-96 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-full blur-3xl" />
+          </div>
+
+          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-10 sm:mb-14">
+              {/* Badge rectangle : même fond que les cartes "Rejoignez" (fond blanc + bordure), plus visible */}
+              <span className="inline-flex rounded-full p-[1px] bg-gradient-to-r from-yellow-400 to-orange-400 shadow-md mb-5 sm:mb-6">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white px-5 sm:px-6 py-2.5 sm:py-3 border border-yellow-200/70 text-yellow-700">
+                  <Star className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="font-semibold">4,9/5 • +2 500 avis</span>
+                  <Award className="w-4 h-4 sm:w-5 sm:h-5" />
+                </span>
+              </span>
+
+              <h2 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
+                Ce que disent nos <span className="bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">utilisateurs</span>
+              </h2>
+              <p className="mt-3 sm:mt-4 text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
+                Témoignages réels, situations variées — pour que chacun puisse s’identifier.
+              </p>
+            </div>
+
+            <ReviewsSlider theme="light" />
+          </div>
+        </section>
+
+        {/* ================= CTA final — PRÊT À ÊTRE AIDÉ (optimisé) ================= */}
+        <section className="py-32 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20" />
+          <div className="relative z-10 max-w-5xl mx-auto text-center px-6">
+            <h2 className="text-5xl md:text-6xl font-black text-white mb-6 md:mb-8">
+              Prêt à être aidé ?
+            </h2>
+            <p className="text-xl md:text-2xl text-white/95 mb-10 md:mb-12 leading-relaxed">
+              Rejoignez plus de <strong>15&nbsp;000 expatriés</strong> qui font confiance à SOS Expats pour leurs démarches à l'étranger.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+            {/* Petits points de réassurance */}
+            <div className="mb-10 flex flex-wrap items-center justify-center gap-3 text-white/90">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
+                <Shield className="w-4 h-4" /> Sécurisé
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
+                <Clock className="w-4 h-4" /> <span>Moins de 5&nbsp;minutes</span>
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
+                <Globe className="w-4 h-4" /> Mondial
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+              <a
+                href="/register"
+                className="group relative overflow-hidden bg-white text-red-600 hover:text-red-700 px-12 py-6 rounded-3xl font-black text-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl flex items-center gap-4 touch-manipulation"
+              >
+                <span>Commencer gratuitement</span>
+                <ArrowRight className="w-6 h-6 group-hover:translate-x-1.5 transition-transform duration-300" />
+                <span className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-black/5" />
+              </a>
+
               <a
                 href="/sos-appel"
-                className="group relative overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-orange-500 hover:from-red-700 hover:via-red-600 hover:to-orange-600 text-white px-12 py-6 rounded-3xl font-black text-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-red-500/50 flex items-center space-x-4 border-2 border-red-400/50"
+                className="group relative overflow-hidden border-2 border-white bg-transparent text-white px-12 py-6 rounded-3xl font-bold text-xl transition-all duration-300 hover:scale-105 hover:bg-white/10 flex items-center gap-4 touch-manipulation"
               >
-                <Phone className="w-8 h-8 group-hover:animate-pulse" />
-                <span>URGENCE 24/7</span>
-                <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/30 via-orange-500/30 to-red-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </a>
-
-              <a
-                href="/experts"
-                className="group flex items-center space-x-3 px-10 py-6 rounded-3xl bg-white/10 hover:bg-white/20 text-white border-2 border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-105 backdrop-blur-sm font-bold text-lg"
-              >
-                <Play className="w-6 h-6" />
-                <span>Voir les experts</span>
+                <Phone className="w-6 h-6" />
+                <span>Urgence maintenant</span>
+                <span className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-white/30" />
               </a>
             </div>
           </div>
-
-          {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
-              <div
-                key={index}
-                className="group text-center p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-105"
-              >
-                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r ${stat.color} mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                  <div className="text-white">
-                    {stat.icon}
-                  </div>
-                </div>
-                <div className="text-4xl font-black text-white mb-2">{stat.value}</div>
-                <div className="text-gray-400 font-medium">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl font-black text-white mb-6">
-              Pourquoi choisir <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">SOS Expats</span> ?
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              La première plateforme mondiale d'assistance pour expatriés, conçue par des expatriés pour des expatriés.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <div
-                key={index}
-                className="group relative p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-105 overflow-hidden"
-              >
-                <div className="relative z-10">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r ${feature.color} mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                    <div className="text-white">
-                      {feature.icon}
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-4">{feature.title}</h3>
-                  <p className="text-gray-400 leading-relaxed">{feature.description}</p>
-                </div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Profile Carousel Section */}
-      <section className="py-32 bg-gradient-to-b from-gray-950 via-red-950/20 to-gray-950 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500/20 to-orange-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-red-500/30 mb-8">
-              <Shield className="w-5 h-5 text-red-400" />
-              <span className="text-red-300 font-bold">Experts vérifiés • Disponibles 24/7</span>
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            </div>
-
-            <h2 className="text-5xl font-black text-white mb-6">
-              Nos <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">experts</span> à votre service
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Plus de 2 000 professionnels vérifiés dans 50+ pays, prêts à vous aider immédiatement
-            </p>
-          </div>
-
-          {/* Profile Carousel */}
-          <div className="relative max-w-6xl mx-auto">
-            <div className="overflow-hidden rounded-3xl">
-              <div 
-                className="flex transition-transform duration-500 ease-in-out"
-                style={{ transform: `translateX(-${currentProfile * 100}%)` }}
-              >
-                {EXPERT_PROFILES.map((profile) => (
-                  <div key={profile.id} className="w-full flex-shrink-0 px-4">
-                    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 p-8 relative overflow-hidden">
-                      <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8">
-                        {/* Avatar et Status */}
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={profile.avatar}
-                            alt={profile.name}
-                            className="w-32 h-32 rounded-3xl object-cover ring-4 ring-white/30"
-                          />
-                          
-                          {/* Status Online */}
-                          {profile.online && (
-                            <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-xl text-xs font-bold flex items-center space-x-1 shadow-lg">
-                              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                              <span>En ligne</span>
-                            </div>
-                          )}
-
-                          {/* Verified Badge */}
-                          {profile.verified && (
-                            <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                              <Check className="w-4 h-4 text-white" />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Informations */}
-                        <div className="flex-1 text-center md:text-left">
-                          <div className="mb-4">
-                            <h3 className="text-2xl font-bold text-white mb-2">{profile.name}</h3>
-                            <div className="flex items-center justify-center md:justify-start space-x-2 text-red-400 font-medium mb-2">
-                              <span>{profile.role}</span>
-                              <span>•</span>
-                              <span>{profile.specialty}</span>
-                            </div>
-                            <div className="flex items-center justify-center md:justify-start space-x-2 text-gray-400 text-sm">
-                              <MapPin className="w-4 h-4" />
-                              <span>{profile.location}</span>
-                            </div>
-                          </div>
-
-                          {/* Rating et Reviews */}
-                          <div className="flex items-center justify-center md:justify-start space-x-4 mb-4">
-                            <div className="flex items-center space-x-1">
-                              {[...Array(5)].map((_, i) => (
-                                <Star 
-                                  key={i} 
-                                  className={`w-4 h-4 ${i < Math.floor(profile.rating) ? 'text-yellow-400 fill-current' : 'text-gray-600'}`} 
-                                />
-                              ))}
-                              <span className="text-white font-bold ml-2">{profile.rating}</span>
-                            </div>
-                            <div className="text-gray-400 text-sm">
-                              ({profile.reviewCount} avis)
-                            </div>
-                          </div>
-
-                          {/* Langues */}
-                          <div className="flex items-center justify-center md:justify-start space-x-2 mb-4">
-                            {profile.languages.map((lang, index) => (
-                              <span 
-                                key={index}
-                                className="bg-white/10 text-gray-300 px-2 py-1 rounded-lg text-xs font-medium"
-                              >
-                                {lang}
-                              </span>
-                            ))}
-                          </div>
-
-                          {/* Temps de réponse et Prix */}
-                          <div className="flex items-center justify-center md:justify-start space-x-6 text-sm">
-                            <div className="flex items-center space-x-2 text-green-400">
-                              <Clock className="w-4 h-4" />
-                              <span className="font-medium">{profile.responseTime}</span>
-                            </div>
-                            <div className="text-white font-bold">
-                              {profile.price}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex-shrink-0 flex flex-col space-y-3">
-                          <button className="group bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white px-6 py-3 rounded-2xl font-bold transition-all duration-300 hover:scale-105 shadow-lg">
-                            Contacter maintenant
-                          </button>
-                          <button className="group bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 px-6 py-3 rounded-2xl font-medium transition-all duration-300 hover:scale-105">
-                            Voir le profil
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Background Gradient */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-orange-500/5" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Navigation Dots */}
-            <div className="flex items-center justify-center space-x-3 mt-8">
-              {EXPERT_PROFILES.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentProfile(index)}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                    currentProfile === index
-                      ? 'bg-gradient-to-r from-red-500 to-orange-500 scale-125'
-                      : 'bg-white/30 hover:bg-white/50'
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Navigation Arrows */}
-            <button
-              onClick={() => setCurrentProfile((prev) => (prev - 1 + EXPERT_PROFILES.length) % EXPERT_PROFILES.length)}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => setCurrentProfile((prev) => (prev + 1) % EXPERT_PROFILES.length)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* CTA pour voir tous les experts */}
-          <div className="text-center mt-12">
-            <a
-              href="/experts"
-              className="group inline-flex items-center space-x-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-105 shadow-xl"
-            >
-              <Users className="w-6 h-6" />
-              <span>Voir tous nos experts</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/3 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-8">
-              <DollarSign className="w-5 h-5 text-green-400" />
-              <span className="text-green-300 font-bold">Transparence totale • Pas de frais cachés</span>
-              <Check className="w-5 h-5 text-green-400" />
-            </div>
-
-            <h2 className="text-5xl font-black text-white mb-6">
-              Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Choisissez le plan qui correspond à votre situation d'expatrié. Changez ou annulez à tout moment.
-            </p>
-          </div>
-
-          {/* Pricing Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {PRICING_PLANS.map((plan, index) => (
-              <div
-                key={index}
-                className={`group relative p-8 rounded-3xl border transition-all duration-300 hover:scale-105 overflow-hidden ${
-                  plan.popular
-                    ? 'bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/50 shadow-2xl shadow-red-500/25 scale-110'
-                    : 'bg-white/5 backdrop-blur-sm border-white/10 hover:border-white/20'
-                }`}
-              >
-                {/* Popular Badge */}
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
-                      ⭐ Populaire
-                    </div>
-                  </div>
-                )}
-
-                <div className="relative z-10">
-                  {/* Header */}
-                  <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
-                    <div className="mb-4">
-                      <span className="text-4xl font-black text-white">{plan.price}</span>
-                      {plan.period && <span className="text-gray-400 ml-2">{plan.period}</span>}
-                    </div>
-                    <p className="text-gray-400">{plan.description}</p>
-                  </div>
-
-                  {/* Features */}
-                  <div className="space-y-4 mb-8">
-                    {plan.features.map((feature, featureIndex) => (
-                      <div key={featureIndex} className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full bg-gradient-to-r ${plan.color} flex items-center justify-center flex-shrink-0`}>
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                        <span className="text-gray-300 text-sm">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* CTA Button */}
-                  <button
-                    className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-105 ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg'
-                        : `bg-gradient-to-r ${plan.color} hover:shadow-lg text-white`
-                    }`}
-                  >
-                    {plan.cta}
-                  </button>
-                </div>
-
-                {/* Background Gradient */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${plan.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-              </div>
-            ))}
-          </div>
-
-          {/* Additional Info */}
-          <div className="mt-16 text-center">
-            <div className="inline-flex items-center space-x-6 bg-white/5 backdrop-blur-sm rounded-2xl px-8 py-4 border border-white/10">
-              <div className="flex items-center space-x-2 text-green-400">
-                <Shield className="w-5 h-5" />
-                <span className="font-medium">Garantie 30 jours</span>
-              </div>
-              <div className="w-px h-6 bg-white/20" />
-              <div className="flex items-center space-x-2 text-blue-400">
-                <Globe className="w-5 h-5" />
-                <span className="font-medium">Support mondial</span>
-              </div>
-              <div className="w-px h-6 bg-white/20" />
-              <div className="flex items-center space-x-2 text-purple-400">
-                <Zap className="w-5 h-5" />
-                <span className="font-medium">Activation instantanée</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-32 bg-gradient-to-b from-gray-900 to-gray-950 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-yellow-500/30 mb-8">
-              <Star className="w-5 h-5 text-yellow-400 fill-current" />
-              <span className="text-yellow-300 font-bold">4.9/5 • +2,500 avis</span>
-              <Award className="w-5 h-5 text-yellow-400" />
-            </div>
-
-            <h2 className="text-5xl font-black text-white mb-6">
-              Ce que disent nos <span className="bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">utilisateurs</span>
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-8">
-              Découvrez les témoignages authentiques de notre communauté d'expatriés satisfaits
-            </p>
-
-            {/* Lien vers la page testimonials */}
-            <a
-              href="http://localhost:5177/testimonials"
-              className="group inline-flex items-center space-x-2 text-blue-400 hover:text-blue-300 font-bold transition-colors duration-300"
-            >
-              <span>Voir tous les avis</span>
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-            </a>
-          </div>
-
-          {/* Testimonials Carousel */}
-          <div className="relative max-w-5xl mx-auto">
-            <div className="overflow-hidden rounded-3xl">
-              <div 
-                className="flex transition-transform duration-500 ease-in-out"
-                style={{ transform: `translateX(-${currentTestimonial * 100}%)` }}
-              >
-                {TESTIMONIALS.map((testimonial) => (
-                  <div key={testimonial.id} className="w-full flex-shrink-0 px-4">
-                    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 p-8 md:p-12 relative overflow-hidden">
-                      {/* Quote Icon */}
-                      <div className="absolute top-8 right-8 opacity-20">
-                        <Quote className="w-16 h-16 text-white" />
-                      </div>
-
-                      {/* Content */}
-                      <div className="relative z-10">
-                        {/* Rating */}
-                        <div className="flex items-center space-x-1 mb-6">
-                          {[...Array(testimonial.rating)].map((_, i) => (
-                            <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
-                          ))}
-                        </div>
-
-                        {/* Comment */}
-                        <blockquote className="text-xl md:text-2xl text-white leading-relaxed mb-8 font-medium">
-                          "{testimonial.comment}"
-                        </blockquote>
-
-                        {/* Author Info */}
-                        <div className="flex items-center space-x-4">
-                          <div className="relative">
-                            <img
-                              src={testimonial.avatar}
-                              alt={testimonial.name}
-                              className="w-16 h-16 rounded-2xl object-cover ring-2 ring-white/30"
-                            />
-                            {testimonial.verified && (
-                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center border-2 border-gray-900">
-                                <Check className="w-3 h-3 text-white" />
-                              </div>
-                            )}
-                          </div>
-
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <div className="font-bold text-white text-lg">{testimonial.name}</div>
-                              {testimonial.verified && (
-                                <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-lg text-xs font-bold">
-                                  Vérifié
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-gray-400 font-medium">{testimonial.role}</div>
-                            <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>{testimonial.location}</span>
-                            </div>
-                          </div>
-
-                          <div className="ml-auto text-right">
-                            <div className="flex items-center space-x-1 text-gray-400 text-sm">
-                              <Heart className="w-4 h-4" />
-                              <span>{testimonial.helpful} utiles</span>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {new Date(testimonial.date).toLocaleDateString('fr-FR', {
-                                day: 'numeric',
-                                month: 'long',
-                                year: 'numeric'
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Background Gradient */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Navigation Dots */}
-            <div className="flex items-center justify-center space-x-3 mt-8">
-              {TESTIMONIALS.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentTestimonial(index)}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                    currentTestimonial === index
-                      ? 'bg-gradient-to-r from-red-500 to-orange-500 scale-125'
-                      : 'bg-white/30 hover:bg-white/50'
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Navigation Arrows */}
-            <button
-              onClick={() => setCurrentTestimonial((prev) => (prev - 1 + TESTIMONIALS.length) % TESTIMONIALS.length)}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => setCurrentTestimonial((prev) => (prev + 1) % TESTIMONIALS.length)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 hover:scale-110 flex items-center justify-center text-white"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Trust Indicators */}
-          <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { 
-                icon: <TrendingUp className="w-8 h-8" />, 
-                title: "98% de satisfaction", 
-                subtitle: "Taux de résolution" 
-              },
-              { 
-                icon: <Clock className="w-8 h-8" />, 
-                title: "< 5 minutes", 
-                subtitle: "Temps de connexion moyen" 
-              },
-              { 
-                icon: <Shield className="w-8 h-8" />, 
-                title: "100% sécurisé", 
-                subtitle: "Données cryptées" 
-              }
-            ].map((indicator, index) => (
-              <div key={index} className="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 mb-4">
-                  <div className="text-white">{indicator.icon}</div>
-                </div>
-                <div className="text-2xl font-bold text-white mb-2">{indicator.title}</div>
-                <div className="text-gray-400">{indicator.subtitle}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-32 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20" />
-        
-        <div className="relative z-10 max-w-4xl mx-auto text-center px-6">
-          <h2 className="text-5xl md:text-6xl font-black text-white mb-8">
-            Prêt à être aidé ?
-          </h2>
-          <p className="text-2xl text-white/90 mb-12 leading-relaxed">
-            Rejoignez plus de <strong>15 000 expatriés</strong> qui font confiance à SOS Expats pour leurs démarches à l'étranger.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <a
-              href="/register"
-              className="group bg-white hover:bg-gray-100 text-red-600 px-12 py-6 rounded-3xl font-black text-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl flex items-center space-x-4"
-            >
-              <span>Commencer gratuitement</span>
-              <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
-            </a>
-
-            <a
-              href="/sos-appel"
-              className="group bg-transparent border-2 border-white hover:bg-white hover:text-red-600 text-white px-12 py-6 rounded-3xl font-bold text-xl transition-all duration-300 hover:scale-105 flex items-center space-x-4"
-            >
-              <Phone className="w-6 h-6" />
-              <span>Urgence maintenant</span>
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer - À décommenter quand disponible */}
-      {/* <Footer /> */}
-    </div>
+        </section>
+      </div>
+    </Layout>
   );
 };
 

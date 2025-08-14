@@ -1,55 +1,65 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  ReactNode,
+  useContext,
+} from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  User as FirebaseUser,
+  updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  updateProfile,
-  reload
+  reload,
+  sendEmailVerification,
+  User as FirebaseUser,
 } from 'firebase/auth';
 import {
   doc,
   setDoc,
   getDoc,
-  serverTimestamp,
-  collection,
   updateDoc,
   addDoc,
-  onSnapshot
+  collection,
+  serverTimestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { FirebaseError } from 'firebase/app';
 import { auth, db, storage } from '../config/firebase';
-import { User } from './types';
+import type { User } from './types';
+import type { AuthContextType } from './AuthContextBase';
+import { AuthContext as BaseAuthContext } from './AuthContextBase';
 
-declare global {
-  interface Window {
-    /** défini quand la page est en COOP/COEP */
-    crossOriginIsolated?: boolean;
-  }
+/* =========================================================
+   Typages utilitaires
+   ========================================================= */
+type ConnectionSpeed = 'slow' | 'medium' | 'fast';
+type DeviceType = 'mobile' | 'tablet' | 'desktop';
+
+type NetworkEffectiveType = 'slow-2g' | '2g' | '3g' | '4g';
+interface NetworkInformation {
+  effectiveType?: NetworkEffectiveType;
+}
+interface NavigatorWithConnection extends Navigator {
+  connection?: NetworkInformation;
+  mozConnection?: NetworkInformation;
+  webkitConnection?: NetworkInformation;
 }
 
-interface ExistingUserData {
-  role?: string;
-  photoURL?: string;
-  profilePhoto?: string;
-  avatar?: string;
-}
-// ===============================
-// TYPES ET INTERFACES
-// ===============================
-
-interface AuthError {
-  code: string;
-  message: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  userMessage: string;
-  helpText?: string;
+interface DeviceInfo {
+  type: DeviceType;
+  os: string;
+  browser: string;
+  isOnline: boolean;
+  connectionSpeed: ConnectionSpeed;
 }
 
 interface AuthMetrics {
@@ -61,838 +71,572 @@ interface AuthMetrics {
   roleRestrictionBlocks: number;
 }
 
-interface DeviceInfo {
-  type: 'mobile' | 'tablet' | 'desktop';
-  os: string;
-  browser: string;
-  isOnline: boolean;
-  connectionSpeed: 'slow' | 'medium' | 'fast';
-}
-
-interface AuthContextType {
-  user: User | null;
-  firebaseUser: FirebaseUser | null;
-  isUserLoggedIn: () => boolean;
-  isLoading: boolean;
-  authInitialized: boolean;
-  error: string | null;
-  authMetrics: AuthMetrics;
-  deviceInfo: DeviceInfo;
-
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  register: (userData: Partial<User>, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-
-  sendVerificationEmail: () => Promise<void>;
-  checkEmailVerification: () => Promise<boolean>;
-
-  clearError: () => void;
-  refreshUser: () => Promise<void>;
-  getLastLoginInfo: () => { date: Date | null; device: string | null };
-}
-
-// ===============================
-// CONFIGURATION DES ERREURS UX
-// ===============================
-
-const AUTH_ERRORS: Record<string, { severity: AuthError['severity']; userMessage: string; helpText?: string }> = {
-  GOOGLE_ROLE_RESTRICTION: {
-    severity: 'high',
-    userMessage: '?? La connexion Google est réservée aux clients',
-    helpText: '????? Avocats et ?? expatriés : utilisez votre email et mot de passe professionnels ci-dessous'
-  },
-  'auth/popup-closed-by-user': {
-    severity: 'low',
-    userMessage: '? Connexion Google annulée',
-    helpText: '?? Gardez la fenêtre Google ouverte pour terminer la connexion'
-  },
-  'auth/popup-blocked': {
-    severity: 'medium',
-    userMessage: '?? Popup Google bloquée',
-    helpText: '?? Autorisez les popups dans votre navigateur pour continuer'
-  },
-  'auth/cancelled-popup-request': {
-    severity: 'low',
-    userMessage: '?? Connexion Google interrompue',
-    helpText: '?? Réessayez en cliquant sur "Continuer avec Google"'
-  },
-  'auth/invalid-credential': {
-    severity: 'medium',
-    userMessage: '?? Email ou mot de passe incorrect',
-    helpText: '?? Vérifiez votre email et mot de passe, ou utilisez "Mot de passe oublié"'
-  },
-  'auth/invalid-login-credentials': {
-    severity: 'medium',
-    userMessage: '?? Identifiants invalides',
-    helpText: '?? Double-vérifiez votre adresse email et mot de passe'
-  },
-  'auth/user-not-found': {
-    severity: 'medium',
-    userMessage: '?? Aucun compte trouvé',
-    helpText: '?? Créez un nouveau compte ou vérifiez l\'adresse email'
-  },
-  'auth/wrong-password': {
-    severity: 'medium',
-    userMessage: '?? Mot de passe incorrect',
-    helpText: '?? Réessayez ou cliquez sur "Mot de passe oublié"'
-  },
-  'auth/network-request-failed': {
-    severity: 'high',
-    userMessage: '?? Problème de connexion internet',
-    helpText: '?? Vérifiez votre connexion et réessayez'
-  },
-  'auth/timeout': {
-    severity: 'medium',
-    userMessage: '?? Délai d\'attente dépassé',
-    helpText: '?? Votre connexion semble lente, réessayez'
-  },
-  'auth/email-already-in-use': {
-    severity: 'medium',
-    userMessage: '?? Email déjà utilisé',
-    helpText: '?? Connectez-vous ou utilisez "Mot de passe oublié"'
-  },
-  'auth/weak-password': {
-    severity: 'low',
-    userMessage: '?? Mot de passe trop faible',
-    helpText: '?? Utilisez au moins 8 caractères avec majuscules, minuscules et chiffres'
-  },
-  'auth/invalid-email': {
-    severity: 'low',
-    userMessage: '?? Format d\'email invalide',
-    helpText: '? Exemple : votre.email@domaine.com'
-  },
-  'auth/too-many-requests': {
-    severity: 'high',
-    userMessage: '??? Trop de tentatives',
-    helpText: '? Attendez 15 minutes avant de réessayer pour votre sécurité'
-  },
-  'auth/user-disabled': {
-    severity: 'critical',
-    userMessage: '?? Compte temporairement suspendu',
-    helpText: '?? Contactez le support pour réactiver votre compte'
-  },
-  'auth/operation-not-allowed': {
-    severity: 'critical',
-    userMessage: '?? Service temporairement indisponible',
-    helpText: '?? Maintenance en cours, réessayez dans quelques minutes'
-  },
-  'auth/requires-recent-login': {
-    severity: 'medium',
-    userMessage: '?? Reconnexion requise',
-    helpText: '?? Reconnectez-vous pour des raisons de sécurité'
-  }
-};
-
-// ===============================
-// UTILITAIRES
-// ===============================
-
+/* =========================================================
+   Helpers dâ€™environnement / device
+   ========================================================= */
 const getDeviceInfo = (): DeviceInfo => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return { type: 'desktop', os: 'unknown', browser: 'unknown', isOnline: true, connectionSpeed: 'fast' };
+    return {
+      type: 'desktop',
+      os: 'unknown',
+      browser: 'unknown',
+      isOnline: true,
+      connectionSpeed: 'fast',
+    };
   }
 
-  const userAgent = navigator.userAgent;
-  const connection =
-    (navigator as unknown as { connection?: { effectiveType?: string }; mozConnection?: { effectiveType?: string }; webkitConnection?: { effectiveType?: string } }).connection ||
-    (navigator as unknown as { mozConnection?: { effectiveType?: string } }).mozConnection ||
-    (navigator as unknown as { webkitConnection?: { effectiveType?: string } }).webkitConnection;
+  const ua = navigator.userAgent;
+  const nav = navigator as NavigatorWithConnection;
+  const conn =
+    nav.connection || nav.mozConnection || nav.webkitConnection;
 
-  let deviceType: DeviceInfo['type'] = 'desktop';
-  if (/Android|iPhone|iPod/i.test(userAgent)) deviceType = 'mobile';
-  else if (/iPad|Android.*tablet/i.test(userAgent)) deviceType = 'tablet';
+  const type: DeviceType =
+    /Android|iPhone|iPod/i.test(ua) ? 'mobile' :
+    /iPad|Android.*tablet/i.test(ua) ? 'tablet' : 'desktop';
 
   let os = 'unknown';
-  if (/Android/i.test(userAgent)) os = 'android';
-  else if (/iPhone|iPad|iPod/i.test(userAgent)) os = 'ios';
-  else if (/Windows/i.test(userAgent)) os = 'windows';
-  else if (/Macintosh|Mac OS X/i.test(userAgent)) os = 'mac';
-  else if (/Linux/i.test(userAgent)) os = 'linux';
+  if (/Android/i.test(ua)) os = 'android';
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'ios';
+  else if (/Windows/i.test(ua)) os = 'windows';
+  else if (/Macintosh|Mac OS X/i.test(ua)) os = 'mac';
+  else if (/Linux/i.test(ua)) os = 'linux';
 
   let browser = 'unknown';
-  if (/Chrome/i.test(userAgent)) browser = 'chrome';
-  else if (/Firefox/i.test(userAgent)) browser = 'firefox';
-  else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent)) browser = 'safari';
-  else if (/Edge/i.test(userAgent)) browser = 'edge';
+  if (/Edg\//i.test(ua)) browser = 'edge';
+  else if (/Chrome\//i.test(ua)) browser = 'chrome';
+  else if (/Firefox\//i.test(ua)) browser = 'firefox';
+  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'safari';
 
-  let connectionSpeed: DeviceInfo['connectionSpeed'] = 'fast';
-  if (connection?.effectiveType) {
-    const effectiveType = connection.effectiveType;
-    if (effectiveType === 'slow-2g' || effectiveType === '2g') connectionSpeed = 'slow';
-    else if (effectiveType === '3g') connectionSpeed = 'medium';
+  let connectionSpeed: ConnectionSpeed = 'fast';
+  const eff = conn?.effectiveType;
+  if (eff === 'slow-2g' || eff === '2g') connectionSpeed = 'slow';
+  else if (eff === '3g') connectionSpeed = 'medium';
+
+  return { type, os, browser, isOnline: navigator.onLine, connectionSpeed };
+};
+
+type LogPayload = Record<string, unknown>;
+const logAuthEvent = async (type: string, data: LogPayload = {}): Promise<void> => {
+  try {
+    await addDoc(collection(db, 'logs'), {
+      type,
+      category: 'authentication',
+      ...data,
+      timestamp: serverTimestamp(),
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 120) : '',
+      viewport: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : '',
+      screenSize: typeof window !== 'undefined' ? `${window.screen?.width}x${window.screen?.height}` : '',
+      device: getDeviceInfo(),
+    });
+  } catch (e) {
+    console.warn('[Auth] logAuthEvent error', e);
   }
-
-  return { type: deviceType, os, browser, isOnline: navigator.onLine, connectionSpeed };
 };
 
-const generateAffiliateCode = (uid: string, email: string): string => {
-  const shortUid = uid.substring(0, 6).toUpperCase();
-  const emailPrefix = email.split('@')[0].substring(0, 3).toUpperCase();
-  const timestamp = Date.now().toString().slice(-3);
-  return `ULIX-${emailPrefix}${shortUid}${timestamp}`;
-};
-
-const processProfilePhoto = async (photoUrl: string | undefined, uid: string, provider: 'google' | 'manual'): Promise<string> => {
+/* =========================================================
+   Utils photo de profil
+   ========================================================= */
+const processProfilePhoto = async (
+  photoUrl: string | undefined,
+  uid: string,
+  provider: 'google' | 'manual'
+): Promise<string> => {
   try {
     if (!photoUrl) return '/default-avatar.png';
 
     if (provider === 'google' && photoUrl.includes('googleusercontent.com')) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        const response = await fetch(photoUrl, { method: 'HEAD', signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const deviceInfo = getDeviceInfo();
-          const size = deviceInfo.type === 'mobile' ? 's150-c' : 's300-c';
+        const to = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(photoUrl, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(to);
+        if (res.ok) {
+          const size = getDeviceInfo().type === 'mobile' ? 's150-c' : 's300-c';
           return photoUrl.replace(/s\d+-c/, size);
         }
       } catch {
-        console.warn("Photo Google non accessible, utilisation de l'avatar par défaut");
+        // fallback
       }
       return '/default-avatar.png';
     }
 
     if (photoUrl.startsWith('data:image')) {
-      try {
-        if (typeof window === 'undefined' || typeof document === 'undefined') return '/default-avatar.png';
+      if (typeof document === 'undefined') return '/default-avatar.png';
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return '/default-avatar.png';
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return '/default-avatar.png';
+      const img = new Image();
+      return await new Promise<string>((resolve) => {
+        img.onload = async () => {
+          try {
+            const maxSize = getDeviceInfo().type === 'mobile' ? 200 : 400;
+            const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = Math.max(1, Math.round(img.width * ratio));
+            canvas.height = Math.max(1, Math.round(img.height * ratio));
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.8);
 
-        const img = new Image();
-
-        return new Promise((resolve) => {
-          img.onload = async () => {
-            try {
-              const maxSize = getDeviceInfo().type === 'mobile' ? 200 : 400;
-              const ratio = Math.min(maxSize / img.width, maxSize / img.height);
-              canvas.width = img.width * ratio;
-              canvas.height = img.height * ratio;
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              const compressedData = canvas.toDataURL('image/jpeg', 0.8);
-
-              const storageRef = ref(storage, `profilePhotos/${uid}/${Date.now()}.jpg`);
-              const uploadResult = await uploadString(storageRef, compressedData, 'data_url');
-              const downloadUrl = await getDownloadURL(uploadResult.ref);
-              resolve(downloadUrl);
-            } catch (uploadError) {
-              console.error('Erreur upload photo:', uploadError);
-              resolve('/default-avatar.png');
-            }
-          };
-          img.onerror = () => resolve('/default-avatar.png');
-          img.src = photoUrl;
-        });
-      } catch (error) {
-        console.error('Erreur compression photo:', error);
-        return '/default-avatar.png';
-      }
+            const storageRef = ref(storage, `profilePhotos/${uid}/${Date.now()}.jpg`);
+            const upload = await uploadString(storageRef, compressed, 'data_url');
+            const url = await getDownloadURL(upload.ref);
+            resolve(url);
+          } catch {
+            resolve('/default-avatar.png');
+          }
+        };
+        img.onerror = () => resolve('/default-avatar.png');
+        img.src = photoUrl;
+      });
     }
 
     if (photoUrl.startsWith('http')) return photoUrl;
-
     return '/default-avatar.png';
-  } catch (error) {
-    console.error('Erreur traitement photo:', error);
+  } catch {
     return '/default-avatar.png';
   }
 };
 
-type LogPayload = Record<string, unknown>;
+/* =========================================================
+   CrÃ©ation / lecture du user Firestore
+   ========================================================= */
+const generateAffiliateCode = (uid: string, email = ''): string => {
+  const shortUid = uid.slice(0, 6).toUpperCase();
+  const prefix = email.split('@')[0]?.slice(0, 3).toUpperCase() || 'USR';
+  const tail = Date.now().toString().slice(-3);
+  return `ULIX-${prefix}${shortUid}${tail}`;
+};
 
-const logAuthEvent = async (type: string, data: LogPayload = {}, deviceInfo: DeviceInfo) => {
+const createSOSProfile = async (
+  uid: string,
+  userData: Partial<User>,
+  role: 'lawyer' | 'expat'
+): Promise<void> => {
   try {
-    const logData: Record<string, unknown> = {
-      type,
-      category: 'authentication',
-      ...data,
-      deviceType: deviceInfo.type,
-      os: deviceInfo.os,
-      browser: deviceInfo.browser,
-      isOnline: deviceInfo.isOnline,
-      connectionSpeed: deviceInfo.connectionSpeed,
-      timestamp: serverTimestamp(),
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) : '',
-      screenSize: typeof window !== 'undefined' ? `${window.screen?.width || 0}x${window.screen?.height || 0}` : '',
-      viewport: typeof window !== 'undefined' ? `${window.innerWidth || 0}x${window.innerHeight || 0}` : ''
-    };
+    const sosRef = doc(db, 'sos_profiles', uid);
+    const country =
+      userData.currentCountry || (userData as { residenceCountry?: string }).residenceCountry || '';
+    const languages = (userData.languages as string[] | undefined) || ['FranÃ§ais'];
 
-    await addDoc(collection(db, 'logs'), logData);
-  } catch (error) {
-    console.warn('Erreur logging auth:', error);
-  }
-};
-
-const getLocalizedErrorMessage = (errorCode: string, deviceInfo: DeviceInfo): { message: string; helpText?: string } => {
-  const errorConfig = AUTH_ERRORS[errorCode];
-  if (!errorConfig) {
-    return {
-      message: deviceInfo.type === 'mobile' ? '? Erreur de connexion' : 'Une erreur est survenue. Veuillez réessayer',
-      helpText: deviceInfo.type === 'mobile' ? '?? Réessayez ou contactez le support' : undefined
-    };
-  }
-  return { message: errorConfig.userMessage, helpText: errorConfig.helpText };
-};
-
-const getErrorCode = (err: unknown): string => {
-  if (err && typeof err === 'object') {
-    const error = err as any;
-    
-    // Firebase Error direct
-    if (typeof error.code === 'string') return error.code;
-    
-    // Firebase Error dans l'objet
-    if (error.error && typeof error.error.code === 'string') return error.error.code;
-    
-    // Message d'erreur Firebase
-    if (typeof error.message === 'string') {
-      if (error.message.includes('weak-password')) return 'auth/weak-password';
-      if (error.message.includes('email-already-in-use')) return 'auth/email-already-in-use';
-      if (error.message.includes('invalid-email')) return 'auth/invalid-email';
-      if (error.message.includes('too-many-requests')) return 'auth/too-many-requests';
-    }
-  }
-  
-  console.log('?? Erreur non reconnue:', err); // Pour debug
-  return '';
-};
-
-// ===============================
-// FONCTIONS PRINCIPALES
-// ===============================
-
-const createUserDocumentInFirestore = async (firebaseUser: FirebaseUser, userData: Partial<User>, deviceInfo: DeviceInfo): Promise<User> => {
-  try {
-    const emailLower = (firebaseUser.email || '').trim().toLowerCase();
-    console.log('?? [Debug] Début createUserDocumentInFirestore', { uid: firebaseUser.uid, role: userData.role });
-    
-    const userRef = doc(db, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (userDoc.exists()) {
-      console.log('? [Debug] Utilisateur existe déjà, mise à jour...');
-      const existingData = userDoc.data() as Record<string, unknown>;
-      await updateDoc(userRef, {
-        lastLoginAt: serverTimestamp(),
+    await setDoc(
+      sosRef,
+      {
+        uid,
+        type: role,
+        fullName: userData.fullName,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        email: userData.email,
+        phone: userData.phone || '',
+        phoneCountryCode: userData.phoneCountryCode || '+33',
+        languages,
+        country,
+        description: userData.bio || '',
+        profilePhoto: userData.profilePhoto,
+        photoURL: userData.profilePhoto,
+        avatar: userData.profilePhoto,
+        isActive: false,
+        isApproved: role !== 'lawyer',
+        isVerified: false,
+        isVisible: true,
+        isVisibleOnMap: true,
+        isOnline: false,
+        rating: 5.0,
+        reviewCount: 0,
+        responseTime: '< 5 minutes',
+        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        isActive: true,
-        lastDeviceInfo: { type: deviceInfo.type, os: deviceInfo.os, browser: deviceInfo.browser }
-      });
-
-      return {
-        id: firebaseUser.uid,
-        ...existingData,
-        createdAt: (existingData.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date(),
-        updatedAt: new Date(),
-        lastLoginAt: new Date()
-      } as User;
-    }
-
-    console.log('?? [Debug] Nouvel utilisateur, création...');
-    const userRole = userData.role;
-    const provider = firebaseUser.providerData[0]?.providerId;
-
-    if (provider === 'google.com' && userRole !== 'client') throw new Error('GOOGLE_ROLE_RESTRICTION');
-    if (!userRole || !['client', 'lawyer', 'expat', 'admin'].includes(userRole)) {
-      throw new Error(`Rôle utilisateur invalide: ${userRole as string}`);
-    }
-
-    console.log('?? [Debug] Traitement photo profil...');
-    const finalProfilePhoto = await processProfilePhoto(
-      userData.profilePhoto || firebaseUser.photoURL || undefined,
-      firebaseUser.uid,
-      provider === 'google.com' ? 'google' : 'manual'
-    );
-
-    console.log('?? [Debug] Génération des données utilisateur...');
-    const affiliateCode = generateAffiliateCode(firebaseUser.uid, firebaseUser.email || '');
-    const displayNameParts = firebaseUser.displayName?.split(' ') || [];
-    const firstName = userData.firstName || displayNameParts[0] || '';
-    const lastName = userData.lastName || displayNameParts.slice(1).join(' ') || '';
-    const fullDisplayName = `${firstName} ${lastName}`.trim();
-
-    const newUser: Partial<User> & {
-      id: string;
-      uid: string;
-      email: string;
-      role: 'client' | 'lawyer' | 'expat' | 'admin';
-    } = {
-      id: firebaseUser.uid,
-      uid: firebaseUser.uid,
-      email: emailLower,
-      emailLower: emailLower,
-      firstName,
-      lastName,
-      displayName: fullDisplayName,
-      fullName: fullDisplayName,
-      profilePhoto: finalProfilePhoto,
-      photoURL: finalProfilePhoto,
-      avatar: finalProfilePhoto,
-      role: userRole as 'client' | 'lawyer' | 'expat' | 'admin',
-      isApproved: userRole === 'client' || provider === 'google.com',
-      isActive: true,
-      isVerified: firebaseUser.emailVerified,
-      isVerifiedEmail: firebaseUser.emailVerified,
-      phone: userData.phone || '',
-      phoneCountryCode: userData.phoneCountryCode || '+33',
-      currentCountry: userData.currentCountry || '',
-      currentPresenceCountry: userData.currentPresenceCountry || '',
-      country: userData.currentCountry || '',
-      preferredLanguage: userData.preferredLanguage || 'fr',
-      lang: userData.preferredLanguage || 'fr',
-      rating: 5.0,
-      reviewCount: 0,
-      totalCalls: 0,
-      totalEarnings: 0,
-      averageRating: 0,
-      points: 0,
-      isOnline: userRole === 'client',
-      isSOS: userRole === 'lawyer' || userRole === 'expat',
-      hourlyRate: userData.hourlyRate || (userRole === 'lawyer' ? 49 : 19),
-      responseTime: userData.responseTime || '< 5 minutes',
-      provider: provider || 'password',
-      affiliateCode,
-      ...(userData.referralBy && { referralBy: userData.referralBy }),
-      registrationIP: '',
-      deviceInfo: {
-        type: deviceInfo.type,
-        os: deviceInfo.os,
-        browser: deviceInfo.browser,
-        registrationDevice: `${deviceInfo.type}-${deviceInfo.os}`
       },
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 200) : '',
+      { merge: true }
+    );
+  } catch (e) {
+    console.error('Erreur crÃ©ation profil SOS:', e);
+  }
+};
+
+const createUserDocumentInFirestore = async (
+  firebaseUser: FirebaseUser,
+  userData: Partial<User>
+): Promise<User> => {
+  const emailLower = (firebaseUser.email || '').trim().toLowerCase();
+  const userRef = doc(db, 'users', firebaseUser.uid);
+  const docSnap = await getDoc(userRef);
+
+  // Mise Ã  jour si existe
+  if (docSnap.exists()) {
+    const existing = docSnap.data() as Partial<User>;
+    await updateDoc(userRef, {
+      lastLoginAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isActive: true,
+    });
+    return {
+      id: firebaseUser.uid,
+      ...existing,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastLoginAt: new Date(),
-      bio: userData.bio || '',
-      ...(userRole === 'lawyer' && {
-        practiceCountries: userData.practiceCountries || [],
-        languages: userData.languages || ['Français'],
-        yearsOfExperience: userData.yearsOfExperience || 0,
-        specialties: userData.specialties || [],
-        barNumber: userData.barNumber || '',
-        lawSchool: userData.lawSchool || '',
-        graduationYear: userData.graduationYear || new Date().getFullYear(),
-        certifications: userData.certifications || []
-      }),
-      ...(userRole === 'expat' && {
-        residenceCountry: userData.residenceCountry || '',
-        languages: userData.languages || ['Français'],
-        helpTypes: userData.helpTypes || [],
-        yearsAsExpat: userData.yearsAsExpat || 0,
-        previousCountries: userData.previousCountries || [],
-        motivation: userData.motivation || ''
-      })
-    };
-
-    console.log('?? [Debug] Sauvegarde dans Firestore...');
-    await setDoc(userRef, {
-      ...newUser,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp()
-    });
-
-    console.log('? [Debug] Document utilisateur créé avec succès');
-
-    if (userRole === 'lawyer' || userRole === 'expat') {
-      console.log('?? [Debug] Création profil SOS...');
-      await createSOSProfile(firebaseUser.uid, newUser, userRole);
-    }
-
-    console.log('?? [Debug] Log de l\'événement...');
-    await logAuthEvent('user_creation', {
-      userId: firebaseUser.uid,
-      userRole,
-      provider: provider || 'unknown',
-      profilePhotoUploaded: finalProfilePhoto !== '/default-avatar.png'
-    }, deviceInfo);
-
-    console.log('? [Debug] createUserDocumentInFirestore terminé avec succès');
-    return newUser as User;
-  } catch (error) {
-    console.error('? [Debug] Erreur dans createUserDocumentInFirestore:', error);
-    if (error instanceof Error && error.message === 'GOOGLE_ROLE_RESTRICTION') throw error;
-    throw new Error('Impossible de créer le profil utilisateur');
+    } as User;
   }
-};
 
-const createSOSProfile = async (uid: string, userData: Partial<User>, role: 'lawyer' | 'expat') => {
-  try {
-    const sosProfileRef = doc(db, 'sos_profiles', uid);
-
-    const mainLanguage =
-      (Array.isArray(userData.languages) && userData.languages.length > 0
-        ? String(userData.languages[0])
-        : 'francais')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '-');
-
-    const country = userData.currentCountry || (userData as { residenceCountry?: string }).residenceCountry || '';
-    const countrySlug = country
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '-');
-
-    const sosProfile: Record<string, unknown> = {
-      uid,
-      type: role,
-      fullName: userData.fullName,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      slug: `${(userData.firstName || '').toLowerCase()}-${(userData.lastName || '').toLowerCase()}`,
-      mainLanguage,
-      countrySlug,
-      email: userData.email,
-      phone: userData.phone || '',
-      phoneCountryCode: userData.phoneCountryCode || '+33',
-      languages: userData.languages || ['Français'],
-      country,
-      city: '',
-      description: userData.bio || '',
-      profilePhoto: userData.profilePhoto,
-      photoURL: userData.profilePhoto,
-      avatar: userData.profilePhoto,
-      isActive: false,
-      isApproved: role !== 'lawyer',
-      isVerified: false,
-      isVisible: true,
-      isOnline: false,
-      rating: 5.0,
-      reviewCount: 0,
-      specialties: role === 'lawyer' ? (userData.specialties || []) : (userData as { helpTypes?: unknown[] }).helpTypes || [],
-      yearsOfExperience: role === 'lawyer' ? (userData.yearsOfExperience || 0) : (userData as { yearsAsExpat?: number }).yearsAsExpat || 0,
-      price: role === 'lawyer' ? 49 : 19,
-      duration: role === 'lawyer' ? 20 : 30,
-      documents: [],
-      motivation: (userData as { motivation?: string }).motivation || '',
-      education: (userData as { education?: string }).education || '',
-      lawSchool: (userData as { lawSchool?: string }).lawSchool || '',
-      graduationYear: (userData as { graduationYear?: number }).graduationYear || new Date().getFullYear() - 5,
-      certifications: userData.certifications || [],
-      responseTime: '< 5 minutes',
-      successRate: role === 'lawyer' ? 95 : 90,
-      interventionCountries: [country],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-
-    await setDoc(sosProfileRef, sosProfile);
-  } catch (error) {
-    console.error(`Erreur création profil SOS pour ${role}:`, error);
+  // CrÃ©ation
+  const providerId = firebaseUser.providerData[0]?.providerId;
+  const role = userData.role as User['role'];
+  if (!role || !['client', 'lawyer', 'expat', 'admin'].includes(role)) {
+    throw new Error(`RÃ´le utilisateur invalide: ${String(role)}`);
   }
+  if (providerId === 'google.com' && role !== 'client') {
+    throw new Error('GOOGLE_ROLE_RESTRICTION');
+  }
+
+  const profilePhoto = await processProfilePhoto(
+    userData.profilePhoto || firebaseUser.photoURL || undefined,
+    firebaseUser.uid,
+    providerId === 'google.com' ? 'google' : 'manual'
+  );
+
+  const displayNameParts = firebaseUser.displayName?.split(' ') || [];
+  const firstName = userData.firstName || displayNameParts[0] || '';
+  const lastName = userData.lastName || displayNameParts.slice(1).join(' ') || '';
+  const fullName = `${firstName} ${lastName}`.trim();
+  const affiliateCode = generateAffiliateCode(firebaseUser.uid, firebaseUser.email ?? '');
+
+  const newUser: Partial<User> & {
+    id: string;
+    uid: string;
+    email: string;
+    role: User['role'];
+  } = {
+    id: firebaseUser.uid,
+    uid: firebaseUser.uid,
+    email: emailLower,
+    emailLower,
+    firstName,
+    lastName,
+    displayName: fullName,
+    fullName,
+    profilePhoto,
+    photoURL: profilePhoto,
+    avatar: profilePhoto,
+    role,
+    isApproved: role === 'client' || providerId === 'google.com',
+    isActive: true,
+    isVerified: firebaseUser.emailVerified,
+    isVerifiedEmail: firebaseUser.emailVerified,
+    preferredLanguage: userData.preferredLanguage || 'fr',
+    lang: userData.preferredLanguage || 'fr',
+    isOnline: role === 'client',
+    isSOS: role === 'lawyer' || role === 'expat',
+    rating: 5.0,
+    reviewCount: 0,
+    totalCalls: 0,
+    points: 0,
+    provider: providerId || 'password',
+    affiliateCode,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastLoginAt: new Date(),
+  };
+
+  await setDoc(userRef, {
+    ...newUser,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastLoginAt: serverTimestamp(),
+  });
+
+  if (role === 'lawyer' || role === 'expat') {
+    await createSOSProfile(firebaseUser.uid, newUser, role);
+  }
+
+  await logAuthEvent('user_creation', {
+    userId: firebaseUser.uid,
+    userRole: role,
+    provider: providerId || 'password',
+  });
+
+  return newUser as User;
 };
 
 const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+  const refUser = doc(db, 'users', firebaseUser.uid);
+  const snap = await getDoc(refUser);
+  if (!snap.exists()) return null;
+  const data = snap.data() as Partial<User>;
+
+  // Mise Ã  jour lÃ©gÃ¨re (non bloquant)
+  updateDoc(refUser, {
+    lastLoginAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    isActive: true,
+  }).catch(() => {});
+
+  return {
+    id: firebaseUser.uid,
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastLoginAt: new Date(),
+  } as User;
+};
+
+/* =========================================================
+   Mise Ã  jour prÃ©sence (sos_profiles = source de vÃ©ritÃ©)
+   ========================================================= */
+const writeSosPresence = async (
+  userId: string,
+  role: User['role'] | undefined,
+  isOnline: boolean
+): Promise<void> => {
+  const sosRef = doc(db, 'sos_profiles', userId);
+  const payload = {
+    isOnline,
+    availability: isOnline ? 'available' : 'unavailable',
+    lastStatusChange: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    isVisible: true,
+    isVisibleOnMap: true,
+  };
+
   try {
-    const userRef = doc(db, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (!userDoc.exists()) return null;
-
-    const userData = userDoc.data() as Record<string, unknown>;
-
-    updateDoc(userRef, {
-      lastLoginAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      isActive: true
-    }).catch(e => console.warn('Erreur mise à jour silencieuse lastLoginAt:', e));
-
-    return {
-      id: firebaseUser.uid,
-      ...userData,
-      createdAt: (userData.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date(),
-      updatedAt: (userData.updatedAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date(),
-      lastLoginAt: (userData.lastLoginAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date()
-    } as User;
-  } catch (error) {
-    console.error('Erreur récupération document utilisateur:', error);
-    return null;
+    await updateDoc(sosRef, payload);
+  } catch {
+    // fallback: crÃ©er si absent
+    await setDoc(
+      sosRef,
+      {
+        uid: userId,
+        type: role || 'expat',
+        fullName: '',
+        rating: 5,
+        reviewCount: 0,
+        isActive: true,
+        isApproved: role !== 'lawyer',
+        isVerified: false,
+        createdAt: serverTimestamp(),
+        ...payload,
+      },
+      { merge: true }
+    );
   }
 };
 
-// ===============================
-// CONTEXTE D'AUTHENTIFICATION
-// ===============================
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-// eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth doit être utilisé dans un AuthProvider');
-  return context;
+const writeUsersPresenceBestEffort = async (
+  userId: string,
+  isOnline: boolean
+): Promise<void> => {
+  try {
+    await updateDoc(doc(db, 'users', userId), {
+      isOnline,
+      availability: isOnline ? 'available' : 'unavailable',
+      lastStatusChange: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (e) {
+    console.warn('[Presence] update users ignorÃ© (rÃ¨gles):', e);
+  }
 };
 
-interface AuthProviderProps { children: ReactNode; }
+/* =========================================================
+   Provider
+   ========================================================= */
+interface Props {
+  children: ReactNode;
+}
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<Props> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
-  const [isLoading, setIsLoading] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authInitialized, setAuthInitialized] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [deviceInfo] = useState<DeviceInfo>(() => getDeviceInfo());
   const [authMetrics, setAuthMetrics] = useState<AuthMetrics>({
     loginAttempts: 0,
     lastAttempt: new Date(),
     successfulLogins: 0,
     failedLogins: 0,
     googleAttempts: 0,
-    roleRestrictionBlocks: 0
+    roleRestrictionBlocks: 0,
   });
 
-  const updateUserState = useCallback(async (currentFirebaseUser: FirebaseUser) => {
+  const deviceInfo = useMemo(getDeviceInfo, []);
+
+  // Synchronise le state local avec Firestore users/{uid}
+  const updateUserState = useCallback(async (fbUser: FirebaseUser) => {
     try {
-      const userData = await getUserDocument(currentFirebaseUser);
-      if (userData) {
-        setUser({ ...userData, isVerifiedEmail: currentFirebaseUser.emailVerified });
-        setAuthMetrics(prev => ({ ...prev, successfulLogins: prev.successfulLogins + 1, lastAttempt: new Date() }));
+      const u = await getUserDocument(fbUser);
+      if (u) {
+        setUser({ ...u, isVerifiedEmail: fbUser.emailVerified });
+        setAuthMetrics((m) => ({
+          ...m,
+          successfulLogins: m.successfulLogins + 1,
+          lastAttempt: new Date(),
+        }));
       } else {
         setUser(null);
       }
     } catch (e) {
-      console.error('Erreur mise à jour état utilisateur:', e);
+      console.error('[Auth] updateUserState error:', e);
       setUser(null);
     }
   }, []);
 
+  // onAuthStateChanged
   useEffect(() => {
-    let unsubscribeAuth: (() => void) | null = null;
-    let isMounted = true;
-
-    const initializeAuth = async () => {
+    const unsub = onAuthStateChanged(auth, async (current) => {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        unsubscribeAuth = onAuthStateChanged(auth, async (currentFirebaseUser) => {
-          if (!isMounted) return;
-          try {
-            if (currentFirebaseUser) {
-              setFirebaseUser(currentFirebaseUser);
-              await updateUserState(currentFirebaseUser);
-            } else {
-              setFirebaseUser(null);
-              setUser(null);
-            }
-          } catch {
-            if (isMounted) {
-              setError('Erreur lors du chargement du profil');
-              setUser(null);
-            }
-          } finally {
-            if (isMounted) {
-              setIsLoading(false);
-              if (!authInitialized) setAuthInitialized(true);
-            }
-          }
-        });
-      } catch {
-        if (isMounted) {
-          setIsLoading(false);
-          setAuthInitialized(true);
+        if (current) {
+          setFirebaseUser(current);
+          await updateUserState(current);
+        } else {
+          setFirebaseUser(null);
+          setUser(null);
         }
+      } finally {
+        setIsLoading(false);
+        setAuthInitialized(true);
       }
-    };
+    });
+    return () => unsub();
+  }, [updateUserState]);
 
-    initializeAuth();
-    return () => {
-      isMounted = false;
-      if (unsubscribeAuth) unsubscribeAuth();
-    };
-  }, [authInitialized, updateUserState]);
-
+  // Snapshot temps rÃ©el sur users/{uid}
   useEffect(() => {
     if (!firebaseUser?.uid) return;
-
-    let isMounted = true;
-    const unsubscribe = onSnapshot(
+    const unsub = onSnapshot(
       doc(db, 'users', firebaseUser.uid),
-      (docSnap) => {
-        if (!isMounted) return;
-        if (docSnap.exists()) {
-          const userData = docSnap.data() as Record<string, unknown>;
-          setUser((prevUser: User | null) => {
-            if (!isMounted) return prevUser;
-            const newUser: User = {
-              ...(prevUser || ({} as User)),
-              ...(userData as Partial<User>),
-              uid: firebaseUser.uid,
-              isVerifiedEmail: firebaseUser.emailVerified,
-              createdAt: (userData.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() || prevUser?.createdAt || new Date(),
-              updatedAt: (userData.updatedAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date(),
-              lastLoginAt: (userData.lastLoginAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date()
-            };
-            if (prevUser && prevUser.id === newUser.id && prevUser.updatedAt?.getTime() === newUser.updatedAt?.getTime()) {
-              return prevUser;
-            }
-            return newUser;
-          });
-        }
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as Partial<User>;
+        setUser((prev) => {
+          const merged: User = {
+            ...(prev ?? ({} as User)),
+            ...(data as Partial<User>),
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            isVerifiedEmail: firebaseUser.emailVerified,
+          } as User;
+          return merged;
+        });
       },
-      (e) => {
-        console.error('Erreur listener document utilisateur:', e);
-      }
+      (e) => console.error('[Auth] users snapshot error', e)
     );
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
+    return () => unsub();
   }, [firebaseUser?.uid, firebaseUser?.emailVerified]);
 
-  // ===============================
-  // MÉTHODES D'AUTHENTIFICATION
-  // ===============================
+  // Ã‰coute lâ€™Ã©vÃ©nement global "availabilityChanged" pour garder le contexte en phase
+  type AvailabilityChangedDetail = { isOnline: boolean };
+  type AvailabilityEventName = 'availabilityChanged' | 'availability:changed';
+  const availabilityHandler = useCallback((e: Event) => {
+    const ce = e as CustomEvent<AvailabilityChangedDetail>;
+    if (typeof ce.detail?.isOnline === 'boolean') {
+      setUser((prev) => (prev ? { ...prev, isOnline: ce.detail.isOnline } as User : prev));
+    }
+  }, []);
+  useEffect(() => {
+    const names: AvailabilityEventName[] = ['availabilityChanged', 'availability:changed'];
+    names.forEach((n) => window.addEventListener(n, availabilityHandler as EventListener));
+    return () => {
+      names.forEach((n) => window.removeEventListener(n, availabilityHandler as EventListener));
+    };
+  }, [availabilityHandler]);
 
-  const login = async (email: string, password: string) => {
+  /* ============================
+     MÃ©thodes dâ€™auth
+     ============================ */
+  const isUserLoggedIn = useCallback(() => !!user || !!firebaseUser, [user, firebaseUser]);
+
+  const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
-    setAuthMetrics(prev => ({ ...prev, loginAttempts: prev.loginAttempts + 1, lastAttempt: new Date() }));
+    setAuthMetrics((m) => ({ ...m, loginAttempts: m.loginAttempts + 1, lastAttempt: new Date() }));
 
     if (!email || !password) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '?? Email et ?? mot de passe requis' : 'Email et mot de passe sont obligatoires';
-      setError(errorMsg);
+      const msg = 'Email et mot de passe sont obligatoires';
+      setError(msg);
       setIsLoading(false);
-      setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
-      throw new Error(errorMsg);
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      const errorMsg = deviceInfo.type === 'mobile' ? '?? Format email invalide' : "Format d'email invalide";
-      setError(errorMsg);
-      setIsLoading(false);
-      setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
-      throw new Error(errorMsg);
+      setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
+      throw new Error(msg);
     }
 
     try {
-      const loginTimeout = deviceInfo.connectionSpeed === 'slow' ? 15000 : 10000;
+      const timeout = deviceInfo.connectionSpeed === 'slow' ? 15000 : 10000;
       const loginPromise = signInWithEmailAndPassword(auth, email, password);
-      const userCredential = await Promise.race([
+      const cred = await Promise.race([
         loginPromise,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('auth/timeout')), loginTimeout))
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('auth/timeout')), timeout)),
       ]);
-
-      const userRef = doc(db, 'users', userCredential.user.uid);
-      const userDoc = await getDoc(userRef);
-
-      if (!userDoc.exists()) {
-        const userData = {
-          role: 'client' as const,
-          email: userCredential.user.email || '',
-          displayName: userCredential.user.displayName || '',
-          firstName: userCredential.user.displayName?.split(' ')[0] || '',
-          lastName: userCredential.user.displayName?.split(' ').slice(1).join(' ') || '',
-          profilePhoto: userCredential.user.photoURL || '/default-avatar.png',
-          photoURL: userCredential.user.photoURL || '/default-avatar.png',
-          avatar: userCredential.user.photoURL || '/default-avatar.png',
-          isActive: true,
-          isApproved: true,
-          provider: 'password',
-          deviceInfo: {
-            type: deviceInfo.type,
-            os: deviceInfo.os,
-            browser: deviceInfo.browser,
-            loginDevice: `${deviceInfo.type}-${deviceInfo.os}`
-          }
-        };
-        await setDoc(userRef, { ...userData, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), lastLoginAt: serverTimestamp() });
-      }
-
-      await logAuthEvent('successful_login', { userId: userCredential.user.uid, provider: 'email', connectionSpeed: deviceInfo.connectionSpeed }, deviceInfo);
+      await logAuthEvent('successful_login', { userId: cred.user.uid, provider: 'email' });
     } catch (e) {
-      const code = getErrorCode(e) || (e as Error).message || '';
-      const { message, helpText } = getLocalizedErrorMessage(code, deviceInfo);
-      const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : message;
-
-      setError(finalMessage);
-      setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
-
-      await logAuthEvent('login_failed', { errorCode: code, provider: 'email', attempts: authMetrics.loginAttempts + 1 }, deviceInfo);
-      throw new Error(finalMessage);
+      const msg =
+        e instanceof Error && e.message === 'auth/timeout'
+          ? 'Connexion trop lente, rÃ©essayez.'
+          : 'Email ou mot de passe invalide.';
+      setError(msg);
+      setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
+      await logAuthEvent('login_failed', { error: e instanceof Error ? e.message : String(e) });
+      throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isUserLoggedIn = useCallback(() => !!user || !!firebaseUser, [user, firebaseUser]);
-
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<void> => {
     setIsLoading(true);
     setError(null);
-    setAuthMetrics(prev => ({ ...prev, loginAttempts: prev.loginAttempts + 1, googleAttempts: prev.googleAttempts + 1, lastAttempt: new Date() }));
-
+    setAuthMetrics((m) => ({
+      ...m,
+      loginAttempts: m.loginAttempts + 1,
+      googleAttempts: m.googleAttempts + 1,
+      lastAttempt: new Date(),
+    }));
     try {
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
-      provider.setCustomParameters({
-      prompt: 'select_account',
-      display: getDeviceInfo().type === 'mobile' ? 'touch' : 'popup'
-      });
+      provider.setCustomParameters({ prompt: 'select_account' });
 
-      // ? En COOP/COEP, éviter signInWithPopup (fenêtre ne peut pas se fermer) ? use redirect
-      const isCrossOriginIsolated = window.crossOriginIsolated === true;
-      if (isCrossOriginIsolated) {
+      if (window.crossOriginIsolated === true) {
         await signInWithRedirect(auth, provider);
-        return; // Suite gérée dans le useEffect getRedirectResult
+        return;
       }
-
       const result = await signInWithPopup(auth, provider);
       const googleUser = result.user;
 
+      // Sâ€™il existe dÃ©jÃ 
       const userRef = doc(db, 'users', googleUser.uid);
-      const userDoc = await getDoc(userRef);
-
-      if (userDoc.exists()) {
-        const existingData = userDoc.data() as { role?: string; photoURL?: string };
-        if (existingData.role !== 'client') {
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const existing = snap.data() as Partial<User>;
+        if (existing.role && existing.role !== 'client') {
           await firebaseSignOut(auth);
-          setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1, roleRestrictionBlocks: prev.roleRestrictionBlocks + 1 }));
-
-          const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', getDeviceInfo());
-          const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : message;
-          setError(finalMessage);
-
-          await logAuthEvent('google_login_role_restriction', {
-            userId: googleUser.uid,
-            userEmail: googleUser.email,
-            blockedRole: existingData.role,
-            deviceType: getDeviceInfo().type
-          }, getDeviceInfo());
-
+          setAuthMetrics((m) => ({
+            ...m,
+            failedLogins: m.failedLogins + 1,
+            roleRestrictionBlocks: m.roleRestrictionBlocks + 1,
+          }));
+          const msg = 'La connexion Google est rÃ©servÃ©e aux clients.';
+          setError(msg);
+          await logAuthEvent('google_login_role_restriction', { userId: googleUser.uid, role: existing.role });
           throw new Error('GOOGLE_ROLE_RESTRICTION');
         }
-
         await updateDoc(userRef, {
           lastLoginAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           isActive: true,
-          lastDeviceInfo: {
-            type: getDeviceInfo().type,
-            os: getDeviceInfo().os,
-            browser: getDeviceInfo().browser,
-            loginTimestamp: new Date().toISOString()
-          },
-          ...(googleUser.photoURL && googleUser.photoURL !== existingData.photoURL && {
-            photoURL: googleUser.photoURL,
-            profilePhoto: googleUser.photoURL,
-            avatar: googleUser.photoURL
-          })
+          ...(googleUser.photoURL &&
+            googleUser.photoURL !== existing.photoURL && {
+              photoURL: googleUser.photoURL,
+              profilePhoto: googleUser.photoURL,
+              avatar: googleUser.photoURL,
+            }),
         });
       } else {
-        const newUserData: Partial<User> = {
+        // CrÃ©ation user client
+        await createUserDocumentInFirestore(googleUser, {
           role: 'client',
           email: googleUser.email || '',
-          firstName: googleUser.displayName?.split(' ')[0] || '',
-          lastName: googleUser.displayName?.split(' ').slice(1).join(' ') || '',
           profilePhoto: googleUser.photoURL || '',
           photoURL: googleUser.photoURL || '',
           avatar: googleUser.photoURL || '',
@@ -901,183 +645,186 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           isActive: true,
           provider: 'google.com',
           isVerified: googleUser.emailVerified,
-          isVerifiedEmail: googleUser.emailVerified
-        };
-
-        await createUserDocumentInFirestore(googleUser, newUserData, getDeviceInfo());
+          isVerifiedEmail: googleUser.emailVerified,
+        });
       }
 
-      await logAuthEvent('successful_google_login', {
-        userId: googleUser.uid,
-        userEmail: googleUser.email,
-        isNewUser: !userDoc.exists(),
-        deviceType: getDeviceInfo().type,
-        connectionSpeed: getDeviceInfo().connectionSpeed
-      }, getDeviceInfo());
+      await logAuthEvent('successful_google_login', { userId: googleUser.uid, userEmail: googleUser.email });
     } catch (e) {
-      let errorCode = getErrorCode(e);
-      if ((e as Error).message === 'GOOGLE_ROLE_RESTRICTION') errorCode = 'GOOGLE_ROLE_RESTRICTION';
-
-      const { message, helpText } = getLocalizedErrorMessage(errorCode, getDeviceInfo());
-      const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : message;
-
-      setError(finalMessage);
-      setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1 }));
-
-      await logAuthEvent('google_login_failed', {
-        errorCode,
-        errorMessage: (e as Error).message,
-        deviceType: getDeviceInfo().type,
-        attempts: authMetrics.googleAttempts + 1
-      }, getDeviceInfo());
-
-      throw new Error(finalMessage);
+      if (!(e instanceof Error && e.message === 'GOOGLE_ROLE_RESTRICTION')) {
+        const msg = 'Connexion Google annulÃ©e ou impossible.';
+        setError(msg);
+        setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
+        await logAuthEvent('google_login_failed', { error: e instanceof Error ? e.message : String(e) });
+        throw new Error(msg);
+      } else {
+        throw e;
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (userData: Partial<User>, password: string) => {
+  // RÃ©cupÃ©ration redirect Google en contexte crossOriginIsolated
+  const redirectHandledRef = useRef<boolean>(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (window.crossOriginIsolated !== true) return;
+        if (redirectHandledRef.current) return;
+        const result = await getRedirectResult(auth);
+        if (!result?.user) return;
+        redirectHandledRef.current = true;
+        const googleUser = result.user;
+
+        const userRef = doc(db, 'users', googleUser.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          const existing = userDoc.data() as Partial<User>;
+          if (existing.role && existing.role !== 'client') {
+            await firebaseSignOut(auth);
+            setAuthMetrics((m) => ({
+              ...m,
+              failedLogins: m.failedLogins + 1,
+              roleRestrictionBlocks: m.roleRestrictionBlocks + 1,
+            }));
+            const msg = 'La connexion Google est rÃ©servÃ©e aux clients.';
+            setError(msg);
+            await logAuthEvent('google_login_role_restriction', { userId: googleUser.uid, role: existing.role });
+            return;
+          }
+          await updateDoc(userRef, {
+            lastLoginAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            isActive: true,
+          });
+        } else {
+          await createUserDocumentInFirestore(googleUser, {
+            role: 'client',
+            email: googleUser.email || '',
+            profilePhoto: googleUser.photoURL || '',
+            photoURL: googleUser.photoURL || '',
+            avatar: googleUser.photoURL || '',
+            preferredLanguage: 'fr',
+            isApproved: true,
+            isActive: true,
+            provider: 'google.com',
+            isVerified: googleUser.emailVerified,
+            isVerifiedEmail: googleUser.emailVerified,
+          });
+        }
+
+        await logAuthEvent('successful_google_login', { userId: googleUser.uid, userEmail: googleUser.email });
+      } catch (e) {
+        console.warn('[Auth] getRedirectResult error', e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  const register = async (userData: Partial<User>, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
-    if (!userData.role) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Rôle requis pour inscription' : "Le rôle utilisateur est obligatoire pour l'inscription";
-      setError(errorMsg);
+    if (!userData.role || !['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
+      const msg = 'RÃ´le utilisateur invalide ou manquant.';
+      setError(msg);
       setIsLoading(false);
-      throw new Error(errorMsg);
-    }
-    if (!['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
-      const errorMsg = `Rôle utilisateur invalide: ${userData.role}`;
-      setError(errorMsg);
-      setIsLoading(false);
-      throw new Error(errorMsg);
+      throw new Error(msg);
     }
     if (!userData.email || !password) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Email et ?? mot de passe requis' : 'Email et mot de passe sont obligatoires';
-      setError(errorMsg);
+      const msg = 'Email et mot de passe sont obligatoires';
+      setError(msg);
       setIsLoading(false);
-      throw new Error(errorMsg);
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(userData.email)) {
-      const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Format email invalide' : "Format d'email invalide";
-      setError(errorMsg);
-      setIsLoading(false);
-      throw new Error(errorMsg);
+      throw new Error(msg);
     }
     if (password.length < 6) {
-  const errorMsg = getDeviceInfo().type === 'mobile' ? '?? Mot de passe min. 6 caractères' : 'Le mot de passe doit contenir au moins 6 caractères';
-  setError(errorMsg);
-  setIsLoading(false);
-  throw new Error(errorMsg);
-}
-// Suppression des contraintes de complexité - mot de passe simple accepté ! ??
+      const msg = 'Le mot de passe doit contenir au moins 6 caractÃ¨res';
+      setError(msg);
+      setIsLoading(false);
+      throw new Error(msg);
+    }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);
+      const cred = await createUserWithEmailAndPassword(auth, userData.email, password);
 
-      let finalProfilePhotoURL = '';
-      if (userData.profilePhoto && userData.profilePhoto.startsWith('data:image')) {
-        finalProfilePhotoURL = await processProfilePhoto(userData.profilePhoto, userCredential.user.uid, 'manual');
-      } else if (userData.profilePhoto && userData.profilePhoto.startsWith('http')) {
+      let finalProfilePhotoURL = '/default-avatar.png';
+      if (userData.profilePhoto?.startsWith('data:image')) {
+        finalProfilePhotoURL = await processProfilePhoto(userData.profilePhoto, cred.user.uid, 'manual');
+      } else if (userData.profilePhoto?.startsWith('http')) {
         finalProfilePhotoURL = userData.profilePhoto;
-      } else {
-        finalProfilePhotoURL = '/default-avatar.png';
       }
 
-      await createUserDocumentInFirestore(
-        userCredential.user,
-        {
-          ...userData,
-          role: userData.role as 'client' | 'lawyer' | 'expat' | 'admin',
-          profilePhoto: finalProfilePhotoURL,
-          photoURL: finalProfilePhotoURL,
-          avatar: finalProfilePhotoURL,
-          provider: 'password'
-        },
-        getDeviceInfo()
-      );
-
-      try {
-        const userLanguage = userData.preferredLanguage || 'fr';
-        const authUtils = await import('../utils/auth').catch(() => null);
-        if (authUtils?.sendVerificationEmail) {
-          await authUtils.sendVerificationEmail(userLanguage);
-        }
-      } catch {
-        // non bloquant
-      }
+      await createUserDocumentInFirestore(cred.user, {
+        ...userData,
+        role: userData.role as User['role'],
+        profilePhoto: finalProfilePhotoURL,
+        photoURL: finalProfilePhotoURL,
+        avatar: finalProfilePhotoURL,
+        provider: 'password',
+      });
 
       if (userData.firstName || userData.lastName) {
-        try {
-          await updateProfile(userCredential.user, {
-            displayName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-            photoURL: finalProfilePhotoURL || null
-          });
-        } catch (profileError) {
-          console.warn('Erreur mise à jour profil Firebase:', profileError);
-        }
+        await updateProfile(cred.user, {
+          displayName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+          photoURL: finalProfilePhotoURL || null,
+        }).catch(() => {});
       }
-    } catch (e) {
-      await logAuthEvent(
-        'registration_error',
-        { errorCode: getErrorCode(e), errorMessage: (e as Error).message, userEmail: userData.email, userRole: userData.role, deviceType: getDeviceInfo().type },
-        getDeviceInfo()
-      );
 
-      const { message, helpText } = getLocalizedErrorMessage(getErrorCode(e), getDeviceInfo());
-      const finalMessage = helpText ? `${message}\n\n?? ${helpText}` : (message || (e as Error).message);
-      setError(finalMessage);
-      throw new Error(finalMessage);
+      // Essayer dâ€™envoyer lâ€™email de vÃ©rification (non bloquant)
+      try {
+        await sendEmailVerification(cred.user);
+      } catch {
+        // ignore
+      }
+
+      await logAuthEvent('registration_success', { userId: cred.user.uid, role: userData.role });
+    } catch (e) {
+      const msg = 'Inscription impossible. RÃ©essayez.';
+      setError(msg);
+      await logAuthEvent('registration_error', { error: e instanceof Error ? e.message : String(e) });
+      throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
-      if (user?.id) {
-        await logAuthEvent('logout', { userId: user.id, sessionDuration: Date.now() - (user.lastLoginAt?.getTime() || Date.now()), userRole: user.role }, getDeviceInfo());
-        if (user.role === 'lawyer' || user.role === 'expat') {
-          try {
-            await updateDoc(doc(db, 'users', user.id), { isOnline: false, lastSeenAt: serverTimestamp() });
-          } catch (statusError) {
-            console.warn('Erreur mise à jour statut hors ligne:', statusError);
-          }
-        }
+      const uid = user?.id || user?.uid;
+      const role = user?.role;
+      if (uid && (role === 'lawyer' || role === 'expat')) {
+        // important : forcer offline sur les deux collections
+        await Promise.allSettled([writeSosPresence(uid, role, false), writeUsersPresenceBestEffort(uid, false)]);
       }
+      await logAuthEvent('logout', { userId: uid });
       await firebaseSignOut(auth);
       setUser(null);
       setFirebaseUser(null);
       setError(null);
-      setAuthMetrics({ loginAttempts: 0, lastAttempt: new Date(), successfulLogins: 0, failedLogins: 0, googleAttempts: 0, roleRestrictionBlocks: 0 });
+      setAuthMetrics({
+        loginAttempts: 0,
+        lastAttempt: new Date(),
+        successfulLogins: 0,
+        failedLogins: 0,
+        googleAttempts: 0,
+        roleRestrictionBlocks: 0,
+      });
     } catch (e) {
-      console.error('Erreur déconnexion:', e);
+      console.error('[Auth] logout error:', e);
     }
   };
 
-  const sendVerificationEmail = async () => {
-    if (!firebaseUser) throw new Error('Aucun utilisateur connecté');
+  const sendVerificationEmailSafe = async (): Promise<void> => {
+    if (!firebaseUser) throw new Error('Aucun utilisateur connectÃ©');
     try {
-      const userLanguage = user?.preferredLanguage || user?.lang || 'fr';
-      try {
-        const authUtils = await import('../utils/auth');
-        if (authUtils.sendVerificationEmail) {
-          await authUtils.sendVerificationEmail(userLanguage);
-        } else {
-          const { sendEmailVerification } = await import('firebase/auth');
-          await sendEmailVerification(firebaseUser);
-        }
-      } catch {
-        const { sendEmailVerification } = await import('firebase/auth');
-        await sendEmailVerification(firebaseUser);
-      }
-      await logAuthEvent('verification_email_sent', { userId: firebaseUser.uid, language: userLanguage }, getDeviceInfo());
+      await sendEmailVerification(firebaseUser);
+      await logAuthEvent('verification_email_sent', { userId: firebaseUser.uid });
     } catch (e) {
-      const { message } = getLocalizedErrorMessage(getErrorCode(e), getDeviceInfo());
-      setError(message);
-      throw new Error(message);
+      setError("Impossible dâ€™envoyer lâ€™email de vÃ©rification.");
+      throw e;
     }
   };
 
@@ -1085,40 +832,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!firebaseUser) return false;
     try {
       await reload(firebaseUser);
-      const reloadedUser = auth.currentUser;
-      if (reloadedUser?.emailVerified) {
-        await updateDoc(doc(db, 'users', reloadedUser.uid), { emailVerified: true, isVerifiedEmail: true, updatedAt: serverTimestamp() });
-        await reloadedUser.getIdToken(true);
+      const refreshed = auth.currentUser;
+      if (refreshed?.emailVerified) {
+        await updateDoc(doc(db, 'users', refreshed.uid), {
+          emailVerified: true,
+          isVerifiedEmail: true,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+        await refreshed.getIdToken(true);
         return true;
       }
       return false;
-    } catch (e) {
-      console.error('Erreur vérification email:', e);
+    } catch {
       return false;
     }
   };
 
-  const clearError = () => setError(null);
+  const clearError = (): void => setError(null);
 
-  const refreshUser = async () => {
+  const refreshUser = async (): Promise<void> => {
     if (!firebaseUser) return;
     try {
       setIsLoading(true);
       await reload(firebaseUser);
       await updateUserState(firebaseUser);
     } catch (e) {
-      console.error('Erreur refresh utilisateur:', e);
+      console.error('[Auth] refreshUser error:', e);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getLastLoginInfo = useCallback(() => {
+  const getLastLoginInfo = useCallback((): { date: Date | null; device: string | null } => {
     if (!user) return { date: null, device: null };
-    const deviceType = (user as { deviceInfo?: { type?: string; os?: string } }).deviceInfo?.type || 'unknown';
-    const os = (user as { deviceInfo?: { type?: string; os?: string } }).deviceInfo?.os || 'unknown';
-    return { date: user.lastLoginAt || null, device: deviceType !== 'unknown' ? `${deviceType} (${os})` : null };
-  }, [user]);
+    const deviceType = deviceInfo.type;
+    const os = deviceInfo.os;
+    return { date: user.lastLoginAt || null, device: `${deviceType} (${os})` };
+  }, [user, deviceInfo]);
 
   const value: AuthContextType = {
     user,
@@ -1128,125 +878,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authInitialized,
     error,
     authMetrics,
-    deviceInfo: getDeviceInfo(),
+    deviceInfo,
     login,
     loginWithGoogle,
     register,
     logout,
-    sendVerificationEmail,
+    sendVerificationEmail: sendVerificationEmailSafe,
     checkEmailVerification,
     clearError,
     refreshUser,
-    getLastLoginInfo
+    getLastLoginInfo,
   };
 
-  // ===============================
-  // ?? RÉCUPÉRER LE RÉSULTAT GOOGLE EN COOP/COEP (Redirect flow)
-  // (à placer tout en bas du composant, juste avant le return)
-  // ===============================
-  const redirectHandledRef = useRef(false);
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        // Si la page est "crossOriginIsolated", on vient d'un signInWithRedirect
-        const isCrossOriginIsolated = window.crossOriginIsolated === true;
-        if (!isCrossOriginIsolated) return;
-        if (redirectHandledRef.current) return; // évite double-traitement (StrictMode)
-
-        const result = await getRedirectResult(auth);
-        if (!result || !result.user) return;
-
-        redirectHandledRef.current = true;
-        const googleUser = result.user;
-
-        const userRef = doc(db, 'users', googleUser.uid);
-        const userDoc = await getDoc(userRef);
-
-        if (userDoc.exists()) {
-          const existingData = userDoc.data() as ExistingUserData;
-
-          // Blocage rôle pour Google si ? client
-          if (existingData.role && existingData.role !== 'client') {
-            await firebaseSignOut(auth);
-            setAuthMetrics(prev => ({ ...prev, failedLogins: prev.failedLogins + 1, roleRestrictionBlocks: prev.roleRestrictionBlocks + 1 }));
-            const { message, helpText } = getLocalizedErrorMessage('GOOGLE_ROLE_RESTRICTION', getDeviceInfo());
-            setError(helpText ? `${message}\n\n?? ${helpText}` : message);
-
-            await logAuthEvent('google_login_role_restriction', {
-              userId: googleUser.uid,
-              userEmail: googleUser.email,
-              blockedRole: existingData.role
-            }, getDeviceInfo());
-            return;
-          }
-
-          await updateDoc(userRef, {
-            lastLoginAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            isActive: true,
-            lastDeviceInfo: {
-              type: getDeviceInfo().type,
-              os: getDeviceInfo().os,
-              browser: getDeviceInfo().browser,
-              loginTimestamp: new Date().toISOString()
-            },
-            ...(googleUser.photoURL && googleUser.photoURL !== existingData.photoURL && {
-              photoURL: googleUser.photoURL,
-              profilePhoto: googleUser.photoURL,
-              avatar: googleUser.photoURL
-            })
-          });
-        } else {
-          const newUserData: Partial<User> = {
-            role: 'client',
-            email: googleUser.email || '',
-            firstName: googleUser.displayName?.split(' ')[0] || '',
-            lastName: googleUser.displayName?.split(' ').slice(1).join(' ') || '',
-            profilePhoto: googleUser.photoURL || '',
-            photoURL: googleUser.photoURL || '',
-            avatar: googleUser.photoURL || '',
-            preferredLanguage: 'fr',
-            isApproved: true,
-            isActive: true,
-            provider: 'google.com',
-            isVerified: googleUser.emailVerified,
-            isVerifiedEmail: googleUser.emailVerified
-          };
-          try {
-      await createUserDocumentInFirestore(googleUser, newUserData, getDeviceInfo());
-    } catch (err) {
-      try {
-        const { deleteUser } = await import('firebase/auth');
-        await deleteUser(userCredential.user);
-      } catch {}
-      throw err;
-    }
-        }
-
-        await logAuthEvent('successful_google_login', {
-          userId: googleUser.uid,
-          userEmail: googleUser.email,
-          isNewUser: !userDoc.exists(),
-          deviceType: getDeviceInfo().type,
-          connectionSpeed: getDeviceInfo().connectionSpeed
-        }, getDeviceInfo());
-      } catch (e) {
-        console.warn('[Auth] getRedirectResult error', e);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-    
-  }, []);
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <BaseAuthContext.Provider value={value}>{children}</BaseAuthContext.Provider>;
 };
 
 export default AuthProvider;
 
-
-
+/* =========================================================
+   Compat : re-export dâ€™un hook useAuth ici aussi
+   (pour les imports existants: import { useAuth } from '../contexts/AuthContext')
+   ========================================================= */
+export const useAuth = () => {
+  const ctx = useContext(BaseAuthContext);
+  if (!ctx) throw new Error('useAuth doit Ãªtre utilisÃ© dans un AuthProvider');
+  return ctx;
+};

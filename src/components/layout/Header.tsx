@@ -1,59 +1,27 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Settings, Phone, Shield, ChevronDown, Globe, User, UserPlus, Wifi, WifiOff } from 'lucide-react';
+import {
+  Menu, X, Phone, Shield, ChevronDown, Globe, User, UserPlus,
+  Settings, LogOut, Wifi, WifiOff
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
-import { doc, updateDoc } from 'firebase/firestore';
+import {
+  doc, updateDoc, setDoc, onSnapshot,
+  getDoc, getDocs, query, where, writeBatch,
+  serverTimestamp, collection
+} from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
-// Types pour les analytics Google
+/** ================================
+ *  Types & Global
+ *  ================================ */
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
   }
 }
 
-// Composants de drapeaux optimisés
-const FrenchFlag = memo(() => (
-  <div 
-    className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20"
-    role="img"
-    aria-label="Drapeau français"
-  >
-    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm flex">
-      <div className="w-1/3 h-full bg-blue-600" />
-      <div className="w-1/3 h-full bg-white" />
-      <div className="w-1/3 h-full bg-red-600" />
-    </div>
-    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
-  </div>
-));
-
-const BritishFlag = memo(() => (
-  <div 
-    className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20"
-    role="img"
-    aria-label="Drapeau britannique"
-  >
-    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm relative bg-blue-800">
-      <div className="absolute inset-0">
-        <div className="absolute w-full h-0.5 bg-white transform rotate-45 origin-center top-1/2 left-0" style={{ transformOrigin: 'center' }} />
-        <div className="absolute w-full h-0.5 bg-white transform -rotate-45 origin-center top-1/2 left-0" style={{ transformOrigin: 'center' }} />
-      </div>
-      <div className="absolute inset-0">
-        <div className="absolute w-full h-px bg-red-600 transform rotate-45 origin-center" style={{ top: 'calc(50% - 1px)', transformOrigin: 'center' }} />
-        <div className="absolute w-full h-px bg-red-600 transform -rotate-45 origin-center" style={{ top: 'calc(50% + 1px)', transformOrigin: 'center' }} />
-      </div>
-      <div className="absolute top-0 left-1/2 w-0.5 h-full bg-white transform -translate-x-1/2" />
-      <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white transform -translate-y-1/2" />
-      <div className="absolute top-0 left-1/2 w-px h-full bg-red-600 transform -translate-x-1/2" />
-      <div className="absolute left-0 top-1/2 w-full h-px bg-red-600 transform -translate-y-1/2" />
-    </div>
-    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
-  </div>
-));
-
-// Types
 interface Language {
   code: 'fr' | 'en';
   name: string;
@@ -64,10 +32,11 @@ interface Language {
 interface NavigationItem {
   path: string;
   labelKey: string;
-  icon: string;
+  mobileIcon?: string;  // emoji (mobile)
+  desktopIcon?: string; // emoji (desktop)
 }
 
-interface User {
+interface AppUser {
   uid?: string;
   id?: string;
   email?: string;
@@ -80,236 +49,415 @@ interface User {
   isOnline?: boolean;
 }
 
-// Configuration des langues
+/** ================================
+ *  Flags
+ *  ================================ */
+const FrenchFlag = memo(() => (
+  <div className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20" role="img" aria-label="Drapeau français">
+    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm flex">
+      <div className="w-1/3 h-full bg-blue-600" />
+      <div className="w-1/3 h-full bg-white" />
+      <div className="w-1/3 h-full bg-red-600" />
+    </div>
+    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
+  </div>
+));
+FrenchFlag.displayName = 'FrenchFlag';
+
+const BritishFlag = memo(() => (
+  <div className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20" role="img" aria-label="Drapeau britannique">
+    <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm relative bg-blue-800">
+      <div className="absolute inset-0">
+        <div className="absolute w-full h-0.5 bg-white rotate-45 top-1/2 left-0 -translate-y-1/2" />
+        <div className="absolute w-full h-0.5 bg-white -rotate-45 top-1/2 left-0 -translate-y-1/2" />
+      </div>
+      <div className="absolute inset-0">
+        <div className="absolute w-full h-px bg-red-600 rotate-45" style={{ top: 'calc(50% - 1px)' }} />
+        <div className="absolute w-full h-px bg-red-600 -rotate-45" style={{ top: 'calc(50% + 1px)' }} />
+      </div>
+      <div className="absolute top-0 left-1/2 w-0.5 h-full bg-white -translate-x-1/2" />
+      <div className="absolute left-0 top-1/2 w-full h-0.5 bg-white -translate-y-1/2" />
+      <div className="absolute top-0 left-1/2 w-px h-full bg-red-600 -translate-x-1/2" />
+      <div className="absolute left-0 top-1/2 w-full h-px bg-red-600 -translate-y-1/2" />
+    </div>
+    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none" />
+  </div>
+));
+BritishFlag.displayName = 'BritishFlag';
+
+/** ================================
+ *  i18n Config
+ *  ================================ */
 const SUPPORTED_LANGUAGES: Language[] = [
-  { 
-    code: 'fr', 
-    name: 'French', 
-    nativeName: 'Français',
-    flag: <FrenchFlag />
-  },
-  { 
-    code: 'en', 
-    name: 'English', 
-    nativeName: 'English',
-    flag: <BritishFlag />
-  },
+  { code: 'fr', name: 'French', nativeName: 'Français', flag: <FrenchFlag /> },
+  { code: 'en', name: 'English', nativeName: 'English', flag: <BritishFlag /> },
 ];
 
-// Configuration de navigation
 const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/', labelKey: 'nav.home', icon: '🏠' },
-  { path: '/sos-appel', labelKey: 'nav.sosCall', icon: '🚨' },
-  { path: '/experts', labelKey: 'nav.experts', icon: '👥' },
+  { path: '/', labelKey: 'nav.home',         mobileIcon: '🏠', desktopIcon: '🏠' },
+  { path: '/sos-appel', labelKey: 'nav.viewProfiles', mobileIcon: '👥', desktopIcon: '👥' },
+  { path: '/testimonials', labelKey: 'nav.testimonials', mobileIcon: '💬', desktopIcon: '💬' },
 ];
 
 const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/how-it-works', labelKey: 'nav.howItWorks', icon: '⚡' },
-  { path: '/pricing', labelKey: 'nav.pricing', icon: '💎' },
-  { path: '/testimonials', labelKey: 'nav.testimonials', icon: '💬' },
+  { path: '/how-it-works', labelKey: 'nav.howItWorks', mobileIcon: '⚡', desktopIcon: '⚡' },
+  { path: '/pricing',      labelKey: 'nav.pricing',     mobileIcon: '💎', desktopIcon: '💎' },
 ];
 
 const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
 
-// Hook pour le scroll
+/** ================================
+ *  Hooks
+ *  ================================ */
 const useScrolled = () => {
   const [scrolled, setScrolled] = useState(false);
-
   useEffect(() => {
     let ticking = false;
-    
     const handleScroll = () => {
       if (!ticking) {
         requestAnimationFrame(() => {
-          setScrolled(window.scrollY > 20);
+          setScrolled(window.scrollY > 120);
           ticking = false;
         });
         ticking = true;
       }
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
   return scrolled;
 };
 
-// Composant statut en ligne
-const HeaderAvailabilityToggle = memo(() => {
+/** ================================
+ *  Availability logic (source de vérité = sos_profiles)
+ *  ================================ */
+const useAvailabilityToggle = () => {
   const { user } = useAuth();
-  const { language } = useApp();
-  const [isOnline, setIsOnline] = useState(user?.isOnline ?? false);
+  const [isOnline, setIsOnline] = useState<boolean>(!!user?.isOnline);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const isProvider = user?.role === 'lawyer' || user?.role === 'expat' || user?.type === 'lawyer' || user?.type === 'expat';
+  const isProvider =
+    user?.role === 'lawyer' ||
+    user?.role === 'expat'  ||
+    user?.type === 'lawyer' ||
+    user?.type === 'expat';
 
+  // --- Helpers d'écriture ---
+  const writeSosProfile = useCallback(async (newStatus: boolean) => {
+    if (!user || !isProvider) return;
+
+    const userId = (user as any).uid || (user as any).id;
+    const sosRef = doc(db, 'sos_profiles', userId);
+    const updateData = {
+      isOnline: newStatus,
+      availability: newStatus ? 'available' : 'unavailable',
+      lastStatusChange: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isVisible: true,
+      isVisibleOnMap: true,
+    };
+
+    // 1) Update direct (doc id = uid)
+    try {
+      await updateDoc(sosRef, updateData);
+      return;
+    } catch {
+      // continue
+    }
+
+    // 2) S'il n'existe pas, crée/merge par {uid}
+    try {
+      const snap = await getDoc(sosRef);
+      if (!snap.exists()) {
+        const newProfileData = {
+          uid: userId,
+          type: (user as any).role || (user as any).type,
+          fullName:
+            (user as any).fullName ||
+            `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
+            'Expert',
+          ...updateData,
+          isActive: true,
+          isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
+          isVerified: !!(user as any).isVerified,
+          rating: 5.0,
+          reviewCount: 0,
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(sosRef, newProfileData, { merge: true });
+        return;
+      }
+    } catch {
+      // continue vers fallback query
+    }
+
+    // 3) Fallback : anciens docs avec id ≠ uid → update tous les docs où uid == userId
+    const q = query(collection(db, 'sos_profiles'), where('uid', '==', userId));
+    const found = await getDocs(q);
+    if (!found.empty) {
+      const batch = writeBatch(db);
+      found.docs.forEach((d) => batch.update(d.ref, updateData));
+      await batch.commit();
+      return;
+    }
+
+    // 4) Dernier recours : créer doc {uid}
+    await setDoc(sosRef, {
+      uid: userId,
+      type: (user as any).role || (user as any).type,
+      fullName:
+        (user as any).fullName ||
+        `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
+        'Expert',
+      ...updateData,
+      isActive: true,
+      isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
+      isVerified: !!(user as any).isVerified,
+      rating: 5.0,
+      reviewCount: 0,
+      createdAt: serverTimestamp(),
+    }, { merge: true });
+  }, [user, isProvider]);
+
+  const writeUsersPresenceBestEffort = useCallback(async (newStatus: boolean) => {
+    if (!user) return;
+    const userId = (user as any).uid || (user as any).id;
+    const userRef = doc(db, 'users', userId);
+    const payload = {
+      isOnline: newStatus,
+      availability: newStatus ? 'available' : 'unavailable',
+      lastStatusChange: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    try {
+      await updateDoc(userRef, payload);
+    } catch (e) {
+      // Ne bloque pas si rules refusent (ex: email non vérifié)
+      console.warn('Users presence update ignorée (règles/email) :', e);
+    }
+  }, [user]);
+
+  // --- Ecoute temps réel : sos_profiles = source de vérité pour l'UI ---
   useEffect(() => {
-    setIsOnline(user?.isOnline ?? false);
+    if (!user || !isProvider) return;
+    const userId = (user as any).uid || (user as any).id;
+    const sosRef = doc(db, 'sos_profiles', userId);
+
+    const un = onSnapshot(
+      sosRef,
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        const next = data?.isOnline === true;
+        setIsOnline(next);
+      },
+      (err) => console.error('Erreur snapshot sos_profiles:', err)
+    );
+
+    return () => un();
+  }, [user, isProvider]);
+
+  // Garde en phase avec un éventuel changement externe du user
+  useEffect(() => {
+    if (user?.isOnline !== undefined) setIsOnline(!!user.isOnline);
   }, [user?.isOnline]);
 
-  const toggleOnlineStatus = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!user?.uid && !user?.id || isUpdating) return;
-    
-    setIsUpdating(true);
+  const toggle = useCallback(async () => {
+    if ((!user || (!(user as any).uid && !(user as any).id)) || isUpdating) return;
+
     const newStatus = !isOnline;
+    setIsUpdating(true);
 
     try {
-      const userId = user.uid || user.id;
-      
-      await updateDoc(doc(db, 'users', userId), {
-        isOnline: newStatus,
-        lastSeen: new Date(),
-      });
-
-      await updateDoc(doc(db, 'sos_profiles', userId), {
-        isOnline: newStatus,
-        lastSeen: new Date(),
-      });
+      // 1) Écrire d’abord dans sos_profiles (vérité)
+      await writeSosProfile(newStatus);
+      // 2) Puis essayer users (best-effort)
+      await writeUsersPresenceBestEffort(newStatus);
 
       setIsOnline(newStatus);
 
-      if (typeof window !== 'undefined' && window.gtag) {
-        window.gtag('event', 'online_status_change', {
-          event_category: 'engagement',
-          event_label: newStatus ? 'online' : 'offline',
-        });
-      }
-    } catch (error) {
-      console.error('Erreur lors du changement de statut :', error);
+      // Broadcast (on émet les DEUX événements pour compatibilité)
+      window.dispatchEvent(new CustomEvent('availability:changed', { detail: { isOnline: newStatus } }));
+      window.dispatchEvent(new CustomEvent('availabilityChanged',   { detail: { isOnline: newStatus } }));
+
+      // Analytics
+      window.gtag?.('event', 'online_status_change', {
+        event_category: 'engagement',
+        event_label: newStatus ? 'online' : 'offline',
+      });
+    } catch (e) {
+      console.error('Erreur online/offline :', e);
     } finally {
       setIsUpdating(false);
     }
-  };
+  }, [isOnline, isUpdating, user, writeSosProfile, writeUsersPresenceBestEffort]);
+
+  return { isOnline, isUpdating, isProvider, toggle };
+};
+
+/** ================================
+ *  PWA Install Hook
+ *  ================================ */
+type BIPEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice?: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+const usePWAInstall = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState<BIPEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BIPEvent);
+    };
+    const onAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+      window.gtag?.('event', 'pwa_installed', { event_category: 'engagement' });
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, []);
+
+  const install = useCallback(async () => {
+    if (!deferredPrompt) return { started: false as const };
+    try {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice) {
+        window.gtag?.('event', 'pwa_install_prompt', {
+          event_category: 'engagement',
+          outcome: choice.outcome,
+          platform: choice.platform,
+        });
+      }
+      return { started: true as const };
+    } catch {
+      return { started: false as const };
+    }
+  }, [deferredPrompt]);
+
+  return { install, isInstalled };
+};
+
+/** ================================
+ *  Desktop Availability Toggle
+ *  ================================ */
+const HeaderAvailabilityToggle = memo(() => {
+  const { language } = useApp();
+  const { isOnline, isUpdating, isProvider, toggle } = useAvailabilityToggle();
 
   if (!isProvider) return null;
-
-  const t = {
-    online: language === 'fr' ? 'En ligne' : 'Online',
-    offline: language === 'fr' ? 'Hors ligne' : 'Offline',
-  };
+  const t = { online: language === 'fr' ? 'En ligne' : 'Online', offline: language === 'fr' ? 'Hors ligne' : 'Offline' };
 
   return (
     <button
-      onClick={toggleOnlineStatus}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
       disabled={isUpdating}
       type="button"
       className={`group flex items-center px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] touch-manipulation ${
-        isOnline 
-          ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg' 
-          : 'bg-gray-500 hover:bg-gray-600 text-white shadow-lg'
+        isOnline ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg'
+                 : 'bg-gray-500 hover:bg-gray-600 text-white shadow-lg'
       } ${isUpdating ? 'opacity-75 cursor-not-allowed' : ''}`}
-      style={{ 
-        border: '2px solid white',
-        boxSizing: 'border-box'
-      }}
+      style={{ border: '2px solid white', boxSizing: 'border-box' }}
       aria-label={`Changer le statut vers ${isOnline ? t.offline : t.online}`}
     >
       {isUpdating ? (
         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+      ) : isOnline ? (
+        <Wifi className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
       ) : (
-        <>
-          {isOnline ? (
-            <Wifi className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-          ) : (
-            <WifiOff className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-          )}
-        </>
+        <WifiOff className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
       )}
       <span>{isOnline ? `🟢 ${t.online}` : `🔴 ${t.offline}`}</span>
     </button>
   );
 });
+HeaderAvailabilityToggle.displayName = 'HeaderAvailabilityToggle';
 
-const UserAvatar = memo<{ user: User | null; size?: 'sm' | 'md' }>(({ user, size = 'md' }) => {
+/** ================================
+ *  User Avatar (bigger)
+ *  ================================ */
+const UserAvatar = memo<{ user: AppUser | null; size?: 'sm' | 'md' }>(({ user, size = 'md' }) => {
   const [imageError, setImageError] = useState(false);
-  const sizeClasses = size === 'sm' ? 'w-8 h-8' : 'w-9 h-9';
+  const sizeClasses = size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
 
   const photoUrl = user?.profilePhoto || user?.photoURL;
   const displayName = user?.firstName || user?.displayName || user?.email || 'User';
-
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-  }, []);
+  const onError = useCallback(() => setImageError(true), []);
 
   if (!photoUrl || imageError) {
     return (
-      <div 
-        className={`${sizeClasses} rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
+      <div
+        className={`${sizeClasses} rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-base ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
         aria-label={`Avatar de ${displayName}`}
       >
         {displayName.charAt(0).toUpperCase()}
       </div>
     );
   }
-
   return (
     <div className="relative">
       <img
         src={photoUrl}
         alt={`Avatar de ${displayName}`}
         className={`${sizeClasses} rounded-full object-cover ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
-        onError={handleImageError}
+        onError={onError}
         loading="lazy"
       />
-      <div 
-        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white"
-        aria-label="En ligne"
-      />
+      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-white" aria-label="En ligne" />
     </div>
   );
 });
+UserAvatar.displayName = 'UserAvatar';
 
-// Dropdown langue
-const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
+/** ================================
+ *  Language Dropdown (mobile light/dark)
+ *  ================================ */
+const LanguageDropdown = memo<{ isMobile?: boolean; variant?: 'light' | 'dark' }>(({ isMobile = false, variant = 'dark' }) => {
   const { language, setLanguage } = useApp();
-  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
-  const languageMenuRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const currentLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === language) || SUPPORTED_LANGUAGES[0];
+  const currentLanguage = SUPPORTED_LANGUAGES.find((l) => l.code === language) || SUPPORTED_LANGUAGES[0];
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
-        setIsLanguageMenuOpen(false);
-      }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleLanguageChange = useCallback((langCode: 'fr' | 'en') => {
     setLanguage(langCode);
-    setIsLanguageMenuOpen(false);
-    
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', 'language_change', {
-        event_category: 'engagement',
-        event_label: langCode,
-      });
-    }
+    setOpen(false);
+    window.gtag?.('event', 'language_change', { event_category: 'engagement', event_label: langCode });
   }, [setLanguage]);
 
   if (isMobile) {
+    const isLight = variant === 'light';
     return (
       <div className="mb-6">
-        <div className="flex items-center text-sm font-semibold text-white/90 mb-3">
-          <Globe className="w-4 h-4 mr-2" />
+        <div className={`flex items-center text-sm font-semibold mb-3 ${isLight ? 'text-gray-800' : 'text-white/90'}`}>
+          <Globe className={`w-4 h-4 mr-2 ${isLight ? 'text-gray-700' : 'text-white'}`} />
           {language === 'fr' ? 'Langue' : 'Language'}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {SUPPORTED_LANGUAGES.map(lang => (
+          {SUPPORTED_LANGUAGES.map((lang) => (
             <button
               key={lang.code}
               onClick={() => handleLanguageChange(lang.code)}
-              className={`group relative overflow-hidden px-6 py-4 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 ${
-                language === lang.code 
-                  ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white shadow-xl scale-105' 
-                  : 'bg-white/20 backdrop-blur-xl text-white hover:bg-white/30 border border-white/20'
+              className={`group relative overflow-hidden px-6 py-4 rounded-2xl transition-all duration-300 focus:outline-none ${
+                language === lang.code
+                  ? (isLight ? 'bg-red-600 text-white shadow' : 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white shadow-xl scale-105')
+                  : (isLight ? 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-50' : 'bg-white/20 backdrop-blur-xl text-white hover:bg-white/30 border border-white/20')
               }`}
               aria-label={`Changer la langue vers ${lang.nativeName}`}
               aria-pressed={language === lang.code}
@@ -328,21 +476,18 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
   }
 
   return (
-    <div className="relative" ref={languageMenuRef}>
+    <div className="relative" ref={ref}>
       <button
-        onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
-        className="group flex items-center space-x-2 text-white text-sm font-medium hover:text-yellow-200 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-3 min-h-[44px] min-w-[44px] justify-center touch-manipulation"
-        aria-expanded={isLanguageMenuOpen}
+        onClick={() => setOpen(!open)}
+        className="group flex items-center space-x-2 text-white hover:text-yellow-200 transition-all duration-300 hover:scale-105 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] justify-center"
+        aria-expanded={open}
         aria-haspopup="true"
         aria-label="Sélectionner la langue"
       >
-        <div className="group-hover:scale-110 transition-transform duration-300">
-          {currentLanguage.flag}
-        </div>
-        <ChevronDown className={`w-4 h-4 transition-all duration-300 ${isLanguageMenuOpen ? 'rotate-180 text-yellow-300' : ''}`} />
+        <div className="group-hover:scale-110 transition-transform duration-300">{currentLanguage.flag}</div>
+        <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${open ? 'rotate-180 text-yellow-300' : ''}`} />
       </button>
-      
-      {isLanguageMenuOpen && (
+      {open && (
         <div className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 animate-in slide-in-from-top-2 duration-300">
           {SUPPORTED_LANGUAGES.map((lang) => (
             <button
@@ -353,13 +498,9 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
               }`}
               aria-pressed={language === lang.code}
             >
-              <div className="mr-3 group-hover:scale-110 transition-transform duration-300">
-                {lang.flag}
-              </div>
+              <div className="mr-3 group-hover:scale-110 transition-transform duration-300">{lang.flag}</div>
               <span>{lang.nativeName}</span>
-              {language === lang.code && (
-                <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-label="Langue actuelle" />
-              )}
+              {language === lang.code && <div className="ml-auto w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-label="Langue actuelle" />}
             </button>
           ))}
         </div>
@@ -367,22 +508,71 @@ const LanguageDropdown = memo<{ isMobile?: boolean }>(({ isMobile = false }) => 
     </div>
   );
 });
+LanguageDropdown.displayName = 'LanguageDropdown';
 
-// Menu utilisateur
-const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
+/** ================================
+ *  PWA Area (desktop)
+ *  ================================ */
+const PWAInstallArea = memo(({ scrolled }: { scrolled: boolean }) => {
+  const { language } = useApp();
+  const { install, isInstalled } = usePWAInstall();
+  const [showSlogan, setShowSlogan] = useState(false);
+
+  useEffect(() => {
+    setShowSlogan(true);
+    const cycle = setInterval(() => setShowSlogan((p) => !p), 4000);
+    return () => clearInterval(cycle);
+  }, []);
+
+  const onClick = async () => { await install(); };
+
+  return (
+    <div className="flex items-center select-none">
+      <button
+        type="button"
+        onClick={onClick}
+        className="relative w-[72px] h-[72px] rounded-2xl overflow-hidden bg-transparent focus:outline-none focus:ring-0 shrink-0 touch-manipulation"
+        aria-label={language === 'fr' ? "Installer l'application" : 'Install the app'}
+        title={language === 'fr' ? "Installer l'application" : 'Install the app'}
+      >
+        <img src="/icons/icon-512x512-maskable.png" alt="SOS Expat App Icon" className="w-full h-full object-cover" />
+      </button>
+
+      <div className="ml-3">
+        <div className="flex flex-col leading-tight text-center">
+          <span className={`font-extrabold text-xl ${scrolled ? 'text-white' : 'text-gray-900'}`}>SOS Expat</span>
+          <span className="text-sm font-semibold">
+            <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+              {language === 'fr' ? 'd’Ulixai' : 'by Ulixai'}
+            </span>
+          </span>
+        </div>
+
+        <div className="hidden lg:block h-5 overflow-hidden">
+          <div className={`text-xs ${scrolled ? 'text-gray-300' : 'text-gray-600'} transition-opacity duration-700 ease-in-out ${showSlogan ? 'opacity-100' : 'opacity-0'}`}>
+            {language === 'fr' ? "L'appli qui fait du bien !" : 'The feel-good app!'}{isInstalled ? ' 🎉' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+PWAInstallArea.displayName = 'PWAInstallArea';
+
+/** ================================
+ *  User Menu (uses navigate on logout)
+ *  ================================ */
+const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = false, scrolled = false }) => {
   const { user, logout } = useAuth();
   const { language } = useApp();
-  const navigate = useNavigate();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate(); // ← redirect after logout
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -390,16 +580,23 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
   const handleLogout = useCallback(async () => {
     try {
       await logout();
-      setIsUserMenuOpen(false);
-      navigate('/');
-      
-      if (typeof window !== 'undefined' && window.gtag) {
-        window.gtag('event', 'logout', {
-          event_category: 'engagement',
-        });
+      setOpen(false);
+      // analytics
+      window.gtag?.('event', 'logout', { event_category: 'engagement' });
+      // navigate home
+      try {
+        navigate('/', { replace: true });
+      } catch {
+        window.location.assign('/');
       }
     } catch (error) {
       console.error('Logout error:', error);
+      // ensure user lands home even on error
+      try {
+        navigate('/', { replace: true });
+      } catch {
+        window.location.assign('/');
+      }
     }
   }, [logout, navigate]);
 
@@ -412,91 +609,79 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
   };
 
   if (!user) {
+    const loginBtnDesktop = scrolled
+      ? 'group relative p-3 rounded-full hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center'
+      : 'group relative p-3 rounded-full hover:bg-gray-100 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500/20 min-h-[44px] min-w-[44px] flex items-center justify-center border border-gray-200';
+    const loginIconDesktop = scrolled ? 'w-5 h-5 text-white group-hover:text-yellow-200' : 'w-5 h-5 text-red-600';
+
+    const registerBtnDesktop = scrolled
+      ? 'group relative p-3 rounded-full bg-white hover:bg-gray-50 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 min-h-[44px] min-w-[44px] flex items-center justify-center'
+      : 'group relative p-3 rounded-full bg-red-600 hover:bg-red-700 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[44px] min-w-[44px] flex items-center justify-center';
+    const registerIconDesktop = scrolled ? 'w-5 h-5 text-red-600' : 'w-5 h-5 text-white';
+
     const authLinks = (
       <>
-        <Link 
-          to="/login" 
-          className={isMobile 
-            ? "group flex items-center justify-center w-full bg-white/15 backdrop-blur-xl text-white px-6 py-4 rounded-2xl hover:bg-white/25 hover:scale-105 transition-all duration-300 font-semibold border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
-            : "group relative p-3 rounded-full hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-          }
+        <Link
+          to="/login"
+          className={isMobile ? 'group flex items-center justify-center w-full bg-white text-red-600 px-6 py-4 rounded-2xl border border-gray-300 hover:bg-gray-50 hover:scale-[1.01] transition-all duration-300 font-semibold min-h-[48px] touch-manipulation' : loginBtnDesktop}
           aria-label={t.login}
         >
-          {isMobile ? (
-            <>
-              <User className="w-5 h-5 mr-3" />
-              <span>{t.login}</span>
-            </>
-          ) : (
-            <User className="w-5 h-5 text-white group-hover:text-yellow-200 transition-colors duration-300" />
-          )}
+          {isMobile ? (<><User className="w-5 h-5 mr-3" /><span>{t.login}</span></>) : (<User className={loginIconDesktop} />)}
         </Link>
-        <Link 
-          to="/register" 
-          className={isMobile
-            ? "group flex items-center justify-center w-full bg-gradient-to-r from-white via-gray-50 to-white text-red-600 px-6 py-4 rounded-2xl hover:scale-105 transition-all duration-300 font-bold shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[48px] touch-manipulation"
-            : "group relative p-3 rounded-full bg-white hover:bg-gray-50 hover:scale-110 transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-          }
+        <Link
+          to="/register"
+          className={isMobile ? 'group flex items-center justify-center w-full bg-red-600 text-white px-6 py-4 rounded-2xl hover:bg-red-700 hover:scale-[1.01] transition-all duration-300 font-bold shadow min-h-[48px] touch-manipulation' : registerBtnDesktop}
           aria-label={t.signup}
         >
-          {isMobile ? (
-            <>
-              <UserPlus className="w-5 h-5 mr-3" />
-              <span>{t.signup}</span>
-            </>
-          ) : (
-            <UserPlus className="w-5 h-5 text-red-600 group-hover:text-red-700 transition-colors duration-300" />
-          )}
+          {isMobile ? (<><UserPlus className="w-5 h-5 mr-3" /><span>{t.signup}</span></>) : (<UserPlus className={registerIconDesktop} />)}
         </Link>
       </>
     );
-
-    return isMobile ? (
-      <div className="space-y-4">{authLinks}</div>  
-    ) : (
-      <div className="flex items-center space-x-4">{authLinks}</div>
-    );
+    return isMobile ? <div className="space-y-4">{authLinks}</div> : <div className="flex items-center space-x-4">{authLinks}</div>;
   }
 
+  
   if (isMobile) {
+    const mobileContainer = scrolled
+      ? 'flex items-center space-x-4 p-4 bg-white/20 backdrop-blur-sm rounded-xl'
+      : 'flex items-center space-x-4 p-4 bg-gray-100 border border-gray-200 rounded-xl';
+
+    const nameClass = scrolled ? 'font-semibold text-white' : 'font-semibold text-gray-900';
+    const roleClass = scrolled ? 'text-xs text-white/70 capitalize' : 'text-xs text-gray-500 capitalize';
+
+    const adminLinkClass = scrolled
+      ? 'flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50'
+      : 'flex items-center w-full bg-white border border-gray-300 text-gray-800 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-500/20';
+
+    const dashboardLinkClass = scrolled
+      ? 'flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-4 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation'
+      : 'flex items-center w-full bg-gray-100 text-gray-800 px-4 py-4 rounded-xl hover:bg-gray-200 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-500/20 min-h-[48px] touch-manipulation';
+
+    const logoutBtnClass =
+      'flex items-center w-full bg-red-600 text-white px-4 py-4 rounded-xl hover:bg-red-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 min-h-[48px] touch-manipulation';
+
     return (
       <div className="space-y-4">
-        <div className="flex items-center space-x-4 p-4 bg-white/20 backdrop-blur-sm rounded-xl">
-          <UserAvatar user={user} />
+        <div className={mobileContainer}>
+          <UserAvatar user={user as AppUser} />
           <div>
-            <div className="font-semibold text-white">
-              {user.firstName || user.displayName || user.email}
-            </div>
-            <div className="text-xs text-white/70 capitalize">
-              {user.role || 'Utilisateur'}
-            </div>
+            <div className={nameClass}>{user.firstName || (user as any).displayName || user.email}</div>
+            <div className={roleClass}>{user.role || 'Utilisateur'}</div>
           </div>
         </div>
 
         <div className="space-y-3">
           {user.role === 'admin' && (
-            <Link 
-              to="/admin/dashboard" 
-              className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50"
-              aria-label={t.adminConsole}
-            >
+            <Link to="/admin/dashboard" className={adminLinkClass} aria-label={t.adminConsole}>
               <Shield className="w-5 h-5 mr-3" />
               <span className="font-medium">{t.adminConsole}</span>
             </Link>
           )}
-          <Link 
-            to="/dashboard" 
-            className="flex items-center w-full bg-white/20 backdrop-blur-sm text-white px-4 py-4 rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] touch-manipulation"
-            aria-label={t.dashboard}
-          >
+          <Link to="/dashboard" className={dashboardLinkClass} aria-label={t.dashboard}>
             <Settings className="w-5 h-5 mr-3" />
             <span className="font-medium">{t.dashboard}</span>
           </Link>
-          <button 
-            onClick={handleLogout} 
-            className="flex items-center w-full bg-red-500/80 text-white px-4 py-4 rounded-xl hover:bg-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 min-h-[48px] touch-manipulation"
-            aria-label={t.logout}
-          >
+          <button onClick={handleLogout} className={logoutBtnClass} aria-label={t.logout}>
             <LogOut className="w-5 h-5 mr-3" />
             <span className="font-medium">{t.logout}</span>
           </button>
@@ -505,56 +690,46 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
     );
   }
 
+
   return (
-    <div className="relative" ref={userMenuRef}>
-      <button 
-        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
         className="group flex items-center space-x-3 text-white transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 min-h-[44px] touch-manipulation"
-        aria-expanded={isUserMenuOpen}
+        aria-expanded={open}
         aria-haspopup="true"
         aria-label="Menu utilisateur"
       >
-        <UserAvatar user={user} />
-        <span className="text-sm font-medium hidden md:inline">{user.firstName || user.displayName || 'User'}</span>
-        <ChevronDown className={`w-4 h-4 transition-all duration-300 ${isUserMenuOpen ? 'rotate-180 text-yellow-300' : ''}`} />
+        <UserAvatar user={user as AppUser} />
+        <span className="text-sm font-medium hidden md:inline">{user.firstName || (user as any).displayName || 'User'}</span>
+        <ChevronDown className={`w-4 h-4 transition-all duration-300 ${open ? 'rotate-180 text-yellow-300' : ''}`} />
       </button>
-      
-      {isUserMenuOpen && (
+
+      {open && (
         <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 animate-in slide-in-from-top-2 duration-300">
           <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-red-50 to-orange-50 rounded-t-2xl">
             <div className="flex items-center space-x-3">
-              <UserAvatar user={user} />
+              <UserAvatar user={user as AppUser} />
               <div>
-                <div className="font-semibold text-gray-900">{user.firstName || user.displayName || user.email}</div>
+                <div className="font-semibold text-gray-900">{user.firstName || (user as any).displayName || user.email}</div>
                 <div className="text-xs text-gray-500 capitalize">{user.role || 'Utilisateur'}</div>
               </div>
             </div>
           </div>
-          
+
           <div className="py-1">
             {user.role === 'admin' && (
-              <Link 
-                to="/admin/dashboard" 
-                className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" 
-                onClick={() => setIsUserMenuOpen(false)}
-              >
+              <Link to="/admin/dashboard" className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" onClick={() => setOpen(false)}>
                 <Shield className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
                 {t.adminConsole}
               </Link>
             )}
-            <Link 
-              to="/dashboard" 
-              className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" 
-              onClick={() => setIsUserMenuOpen(false)}
-            >
+            <Link to="/dashboard" className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" onClick={() => setOpen(false)}>
               <Settings className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
               {t.dashboard}
             </Link>
             <hr className="my-1 border-gray-100" />
-            <button 
-              onClick={handleLogout} 
-              className="group flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50"
-            >
+            <button onClick={handleLogout} className="group flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50">
               <LogOut className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
               {t.logout}
             </button>
@@ -564,8 +739,11 @@ const UserMenu = memo<{ isMobile?: boolean }>(({ isMobile = false }) => {
     </div>
   );
 });
+UserMenu.displayName = 'UserMenu';
 
-// Composant principal Header
+/** ================================
+ *  Header
+ *  ================================ */
 const Header: React.FC = () => {
   const location = useLocation();
   const { isLoading } = useAuth();
@@ -575,328 +753,268 @@ const Header: React.FC = () => {
 
   const isActive = useCallback((path: string) => location.pathname === path, [location.pathname]);
 
-  useEffect(() => {
-    setIsMenuOpen(false);
-  }, [location.pathname]);
+  useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
 
   const getNavigationLabel = useCallback((labelKey: string): string => {
-    const translations: Record<string, Record<string, string>> = {
-      'nav.home': { fr: 'Accueil', en: 'Home' },
-      'nav.sosCall': { fr: 'SOS Appel', en: 'SOS Call' },
-      'nav.experts': { fr: 'Experts', en: 'Experts' },
-      'nav.howItWorks': { fr: 'Comment ça marche', en: 'How it Works' },
-      'nav.pricing': { fr: 'Tarifs', en: 'Pricing' },
-      'nav.testimonials': { fr: 'Témoignages', en: 'Testimonials' },
+    const translations: Record<string, Record<'fr' | 'en', string>> = {
+      'nav.home':         { fr: 'Accueil',          en: 'Home' },
+      'nav.viewProfiles': { fr: 'Profils aidants',  en: 'Helper profiles' },
+      'nav.testimonials': { fr: 'Avis',             en: 'Reviews' },
+      'nav.howItWorks':   { fr: 'Comment ça marche', en: 'How it Works' },
+      'nav.pricing':      { fr: 'Tarifs',           en: 'Pricing' },
     };
-    
     return translations[labelKey]?.[language] || labelKey;
   }, [language]);
 
-  const t = {
-    sosCall: language === 'fr' ? 'SOS Appel' : 'SOS Call',
-    tagline: language === 'fr' ? 'pour expatriés & voyageurs' : 'for expats & travelers',
-    mobileTagline: language === 'fr' ? 'expatriés' : 'expats',
-  };
+  const t = { sosCall: language === 'fr' ? 'SOS Appel' : 'SOS Call' };
+
+  const { isOnline, isUpdating, isProvider, toggle } = useAvailabilityToggle();
 
   return (
     <>
-      <header 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled 
-            ? 'bg-red-600/95 backdrop-blur-xl shadow-xl' 
-            : 'bg-gradient-to-r from-red-600 to-red-500'
-        }`}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-700 ease-in-out ${
+          scrolled ? 'bg-gray-900/95 backdrop-blur-xl shadow-xl' : 'bg-white border-b border-gray-200'
+        } md:select-none`}
         role="banner"
       >
-        {/* Desktop Header */}
+        {/* Desktop */}
         <div className="hidden lg:block">
-          <div className="w-full px-4">
+          <div className="w-full px-6">
             <div className="flex items-center justify-between h-20">
-              {/* Logo */}
-              <div className="flex-shrink-0">
-                <Link 
-                  to="/" 
-                  className="group flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                  aria-label="SOS Expats - Accueil"
-                >
-                  <div className="transform group-hover:scale-105 transition-all duration-300">
-                    <h1 className="font-bold text-xl text-white m-0">SOS Expats</h1>
-                    <p className="text-xs text-white/80 font-medium m-0">
-                      {t.tagline}
-                    </p>
-                  </div>
-                </Link>
-              </div>
+              {/* Left: PWA area */}
+              <PWAInstallArea scrolled={scrolled} />
 
-              {/* Navigation complète avec bouton SOS au centre */}
+              {/* Center Navigation with SOS */}
               <div className="flex-1 flex items-center justify-center">
-                {/* Navigation gauche */}
-                <div className="flex items-center space-x-8">
-                  {LEFT_NAVIGATION_ITEMS.map((item) => (
-                    <Link 
-                      key={item.path} 
-                      to={item.path} 
-                      className={`group flex flex-col items-center text-lg font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 min-w-max ${
-                        isActive(item.path) 
-                          ? 'text-white' 
-                          : 'text-white/90 hover:text-white'
-                      }`}
+                <nav className="flex items-center space-x-6">
+                  {LEFT_NAVIGATION_ITEMS.slice(0, 2).map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center gap-2.5 px-4 py-3 rounded-lg transition-all duration-300 hover:scale-105 ${
+                        scrolled ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+                      } ${isActive(item.path) ? (scrolled ? 'bg-white/20' : 'bg-gray-100') : ''}`}
                       aria-current={isActive(item.path) ? 'page' : undefined}
                     >
-                      <span 
-                        className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
-                        role="img"
-                        aria-hidden="true"
-                      >
-                        {item.icon}
+                      {item.desktopIcon && <span className={`text-xl ${scrolled ? 'text-gray-200' : 'text-gray-700'}`} aria-hidden="true">{item.desktopIcon}</span>}
+                      <span className={`font-semibold ${scrolled ? 'text-gray-200' : 'text-gray-700'} text-lg tracking-wide`}>
+                        {getNavigationLabel(item.labelKey)}
                       </span>
-                      <span className="text-sm leading-tight text-center whitespace-nowrap">{getNavigationLabel(item.labelKey)}</span>
-                      {isActive(item.path) && (
-                        <div className="mt-1 w-1.5 h-1.5 bg-white rounded-full animate-pulse" aria-hidden="true" />
-                      )}
                     </Link>
                   ))}
-                </div>
 
-                {/* Bouton SOS - Principal CTA centré */}
-                <div className="mx-12">
-                  <Link 
-                    to="/sos-appel" 
-                    className="group relative overflow-hidden bg-white hover:bg-gray-50 text-red-600 px-8 py-2.5 rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-xl flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-white/50 border-2 border-white whitespace-nowrap"
-                    aria-label={t.sosCall}
-                  >
-                    <div className="relative z-10 flex items-center space-x-2">
-                      <Phone className="w-5 h-5 group-hover:rotate-6 transition-transform duration-300" />
-                      <span>{t.sosCall}</span>
-                    </div>
-                  </Link>
-                </div>
+                  {/* Central SOS CTA */}
+                  <div className="mx-6">
+                    <Link
+                      to="/sos-appel"
+                      className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-7 py-3 rounded-2xl font-bold transition-all duration-200 hover:scale-105 flex items-center space-x-2 shadow-lg border-2 border-white/20"
+                      aria-label={t.sosCall}
+                    >
+                      <Phone className="w-5 h-5 text-white" />
+                      <span className="tracking-wide">{t.sosCall.toUpperCase()}</span>
+                    </Link>
+                  </div>
 
-                {/* Navigation droite */}
-                <div className="flex items-center space-x-8">
-                  {RIGHT_NAVIGATION_ITEMS.map((item) => (
-                    <Link 
-                      key={item.path} 
-                      to={item.path} 
-                      className={`group flex flex-col items-center text-lg font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 min-w-max ${
-                        isActive(item.path) 
-                          ? 'text-white' 
-                          : 'text-white/90 hover:text-white'
-                      }`}
+                  {RIGHT_NAVIGATION_ITEMS.concat(LEFT_NAVIGATION_ITEMS.slice(2)).map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center gap-2.5 px-4 py-3 rounded-lg transition-all duration-300 hover:scale-105 ${
+                        scrolled ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+                      } ${isActive(item.path) ? (scrolled ? 'bg-white/20' : 'bg-gray-100') : ''}`}
                       aria-current={isActive(item.path) ? 'page' : undefined}
                     >
-                      <span 
-                        className="text-xl mb-1 group-hover:scale-110 transition-transform duration-300"
-                        role="img"
-                        aria-hidden="true"
-                      >
-                        {item.icon}
+                      {item.desktopIcon && <span className={`text-xl ${scrolled ? 'text-gray-200' : 'text-gray-700'}`} aria-hidden="true">{item.desktopIcon}</span>}
+                      <span className={`font-semibold ${scrolled ? 'text-gray-200' : 'text-gray-700'} text-lg tracking-wide`}>
+                        {getNavigationLabel(item.labelKey)}
                       </span>
-                      <span className="text-sm leading-tight text-center whitespace-nowrap">{getNavigationLabel(item.labelKey)}</span>
-                      {isActive(item.path) && (
-                        <div className="mt-1 w-1.5 h-1.5 bg-white rounded-full animate-pulse" aria-hidden="true" />
-                      )}
                     </Link>
                   ))}
-                </div>
+                </nav>
               </div>
 
-              {/* Actions Desktop */}
-              <div className="flex-shrink-0 flex items-center space-x-4">
+              {/* Actions */}
+              <div className="flex items-center space-x-4">
                 <HeaderAvailabilityToggle />
-                
                 <LanguageDropdown />
-
                 {isLoading ? (
-                  <div 
-                    className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"
-                    role="status"
-                    aria-label="Chargement"
-                  />
+                  <div className={`w-8 h-8 border-2 rounded-full animate-spin ${scrolled ? 'border-white/30 border-t-white' : 'border-gray-300 border-t-gray-600'}`} role="status" aria-label="Chargement" />
                 ) : (
-                  <UserMenu />
+                  <UserMenu scrolled={scrolled} />
                 )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Mobile Header */}
+        {/* Mobile */}
         <div className="lg:hidden">
           <div className="px-4 py-3 flex items-center justify-between">
-            <Link 
-              to="/" 
-              className="flex items-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1"
-              aria-label="SOS Expats - Accueil"
-            >
-              <div className="flex flex-col">
-                <h1 className="font-bold text-lg text-white m-0">SOS Expats</h1>
-                <p className="text-xs text-white/80 m-0">{t.mobileTagline}</p>
-              </div>
-            </Link>
+            {/* LEFT: PWA icon only */}
+            <PWAIconButton />
 
-            <div className="flex items-center space-x-3">
-              <Link 
-                to="/sos-appel" 
-                className="group bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-lg font-bold transition-all duration-300 hover:scale-105 text-sm flex items-center space-x-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 border border-white"
+            {/* CENTER: SOS + status indicator */}
+            <div className="flex items-center gap-3">
+              <Link
+                to="/sos-appel"
+                className="bg-gradient-to-r from-red-600 to-red-700 text-white px-7 py-2.5 rounded-2xl font-bold text-base flex items-center space-x-2 border border-white/20 touch-manipulation"
                 aria-label={t.sosCall}
               >
-                <Phone className="w-4 h-4 group-hover:rotate-6 transition-transform duration-300" />
+                <Phone className="w-4 h-4 text-white" />
                 <span>SOS</span>
               </Link>
-              <HeaderAvailabilityToggle />
-              <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className="p-3 rounded-lg text-white hover:bg-white/20 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-                aria-expanded={isMenuOpen}
-                aria-label="Menu de navigation"
-              >
-                {isMenuOpen ? 
-                  <X className="w-6 h-6" aria-hidden="true" /> : 
-                  <Menu className="w-6 h-6" aria-hidden="true" />
-                }
-              </button>
+
+              {isProvider && (
+                <button
+                  onClick={() => !isUpdating && toggle()}
+                  className={`relative w-7 h-7 rounded-full border-2 flex items-center justify-center touch-manipulation ${
+                    scrolled ? 'border-white/40' : 'border-gray-400/50'
+                  }`}
+                  aria-label={isOnline ? (language === 'fr' ? 'Se mettre hors ligne' : 'Go offline') : (language === 'fr' ? 'Se mettre en ligne' : 'Go online')}
+                >
+                  {isUpdating ? (
+                    <div className={`w-4 h-4 border-2 rounded-full animate-spin ${scrolled ? 'border-white/50 border-t-white' : 'border-gray-500/50 border-t-gray-600'}`} />
+                  ) : (
+                    <span className={`block w-4 h-4 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+                  )}
+                </button>
+              )}
             </div>
+
+            {/* RIGHT: hamburger */}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`p-2 rounded-lg transition-colors duration-200 touch-manipulation ${scrolled ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-600'}`}
+              aria-expanded={isMenuOpen}
+              aria-label="Menu de navigation"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
 
-          {/* Menu Mobile */}
           {isMenuOpen && (
-            <div className="bg-red-700 px-6 py-6 shadow-lg border-t border-red-500" role="navigation" aria-label="Navigation mobile">
-              <nav className="flex flex-col space-y-4">
-                {ALL_NAVIGATION_ITEMS.map((item) => (
-                  <Link 
-                    key={item.path} 
-                    to={item.path} 
-                    className={`text-lg font-semibold transition-colors px-4 py-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[48px] flex items-center touch-manipulation ${
-                      isActive(item.path) 
-                        ? 'text-white bg-white/20 font-bold' 
-                        : 'text-white/90 hover:text-white hover:bg-white/10'
-                    }`} 
-                    onClick={() => setIsMenuOpen(false)}
-                    aria-current={isActive(item.path) ? 'page' : undefined}
-                  >
-                    <span className="mr-3 text-xl" role="img" aria-hidden="true">{item.icon}</span>
-                    {getNavigationLabel(item.labelKey)}
-                  </Link>
-                ))}
-                
-                <div className="pt-6 border-t border-red-500 space-y-6">
-                  <LanguageDropdown isMobile />
-                  <UserMenu isMobile />
+            <div className={`border-t transition-colors duration-700 ease-in-out ${scrolled ? 'bg-gray-900 border-white/10' : 'bg-white border-gray-200'}`} role="navigation" aria-label="Navigation mobile">
+              <div className="px-4 py-4 space-y-4">
+                <nav className="space-y-2">
+                  {ALL_NAVIGATION_ITEMS.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 touch-manipulation ${
+                        scrolled ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
+                      } ${location.pathname === item.path ? (scrolled ? 'bg-white/10' : 'bg-gray-100') : ''}`}
+                      onClick={() => setIsMenuOpen(false)}
+                      aria-current={location.pathname === item.path ? 'page' : undefined}
+                    >
+                      {item.mobileIcon && <span className="text-xl">{item.mobileIcon}</span>}
+                      <span className="font-semibold text-base">{getNavigationLabel(item.labelKey)}</span>
+                    </Link>
+                  ))}
+                </nav>
+
+                <div className={`pt-4 border-t ${scrolled ? 'border-white/10' : 'border-gray-200'}`}>
+                  <LanguageDropdown isMobile variant={scrolled ? 'dark' : 'light'} />
                 </div>
-              </nav>
+
+                <div className={`pt-4 border-t ${scrolled ? 'border-white/10' : 'border-gray-200'}`}>
+                  <UserMenu isMobile scrolled={scrolled} />
+                </div>
+              </div>
             </div>
           )}
         </div>
       </header>
 
-      {/* Spacer pour compenser le header fixe */}
+      {/* Spacer */}
       <div className="h-20" aria-hidden="true" />
 
-      {/* Structured Data pour SEO */}
+      {/* Structured Data */}
       {typeof window !== 'undefined' && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "SOS Expats",
-              "description": language === 'fr' 
-                ? "Service d'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés."
-                : "Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.",
-              "url": window.location.origin,
-              "logo": `${window.location.origin}/logo.png`,
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "telephone": "+33-XXX-XXX-XXX",
-                "contactType": "customer service",
-                "availableLanguage": ["French", "English"],
-                "areaServed": "Worldwide"
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: 'SOS Expat d’Ulixai',
+              description: language === 'fr' ? "Service d'assistance pour expatriés et voyageurs" : 'Assistance service for expats and travelers',
+              url: window.location.origin,
+              logo: `${window.location.origin}/icons/icon-512x512-maskable.png`,
+              contactPoint: {
+                '@type': 'ContactPoint',
+                telephone: '+33-XXX-XXX-XXX',
+                contactType: 'customer service',
+                availableLanguage: ['French', 'English'],
               },
-              "sameAs": [
-                "https://facebook.com/sosexpats",
-                "https://twitter.com/sosexpats",
-                "https://linkedin.com/company/sosexpats"
+              sameAs: [
+                'https://facebook.com/sosexpats',
+                'https://twitter.com/sosexpats',
+                'https://linkedin.com/company/sosexpats',
               ],
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": "4.9",
-                "reviewCount": "10000",
-                "bestRating": "5",
-                "worstRating": "1"
-              },
-              "offers": {
-                "@type": "Offer",
-                "name": language === 'fr' ? "Consultation d'urgence" : "Emergency consultation",
-                "price": "29",
-                "priceCurrency": "EUR",
-                "availability": "https://schema.org/InStock",
-                "priceValidUntil": "2025-12-31"
-              }
-            })
+            }),
           }}
         />
       )}
 
-      {/* Préchargement des ressources critiques */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      
-      {/* Meta tags dynamiques pour les réseaux sociaux */}
-      {typeof window !== 'undefined' && (() => {
-        const updateMetaTag = (property: string, content: string) => {
-          let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('property', property);
-            document.head.appendChild(meta);
-          }
-          meta.content = content;
-        };
+      {/* OpenGraph/Twitter */}
+      {typeof window !== 'undefined' &&
+        (() => {
+          const updateMetaTag = (property: string, content: string) => {
+            let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+            if (!meta) { meta = document.createElement('meta'); meta.setAttribute('property', property); document.head.appendChild(meta); }
+            meta.content = content;
+          };
+          const updateTwitterMeta = (name: string, content: string) => {
+            let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
+            if (!meta) { meta = document.createElement('meta'); meta.setAttribute('name', name); document.head.appendChild(meta); }
+            meta.content = content;
+          };
+          const currentPage = location.pathname;
+          const baseTitle = 'SOS Expat d’Ulixai';
+          const baseDescription = language === 'fr'
+            ? "Service d'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés."
+            : 'Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.';
+          const currentNavItem = ALL_NAVIGATION_ITEMS.find((i) => i.path === currentPage);
+          const pageTitle = currentNavItem ? getNavigationLabel(currentNavItem.labelKey) : getNavigationLabel('nav.home');
 
-        const currentPage = location.pathname;
-        const baseTitle = 'SOS Expats';
-        const baseDescription = language === 'fr' 
-          ? 'Service d\'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés.'
-          : 'Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.';
+          updateMetaTag('og:title', `${baseTitle} - ${pageTitle}`);
+          updateMetaTag('og:description', baseDescription);
+          updateMetaTag('og:url', window.location.href);
+          updateMetaTag('og:type', 'website');
+          updateMetaTag('og:locale', language === 'fr' ? 'fr_FR' : 'en_US');
 
-        const currentNavItem = ALL_NAVIGATION_ITEMS.find(item => item.path === currentPage);
-        const pageTitle = currentNavItem ? getNavigationLabel(currentNavItem.labelKey) : getNavigationLabel('nav.home');
+          updateTwitterMeta('twitter:card', 'summary_large_image');
+          updateTwitterMeta('twitter:title', `${baseTitle} - ${pageTitle}`);
+          updateTwitterMeta('twitter:description', baseDescription);
 
-        updateMetaTag('og:title', `${baseTitle} - ${pageTitle}`);
-        updateMetaTag('og:description', baseDescription);
-        updateMetaTag('og:url', window.location.href);
-        updateMetaTag('og:type', 'website');
-        updateMetaTag('og:locale', language === 'fr' ? 'fr_FR' : 'en_US');
-        
-        const updateTwitterMeta = (name: string, content: string) => {
-          let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('name', name);
-            document.head.appendChild(meta);
-          }
-          meta.content = content;
-        };
-
-        updateTwitterMeta('twitter:card', 'summary_large_image');
-        updateTwitterMeta('twitter:title', `${baseTitle} - ${pageTitle}`);
-        updateTwitterMeta('twitter:description', baseDescription);
-
-        return null;
-      })()}
+          return null;
+        })()}
     </>
   );
 };
 
-// Display names pour le debugging
 Header.displayName = 'Header';
-FrenchFlag.displayName = 'FrenchFlag';
-BritishFlag.displayName = 'BritishFlag';
-UserAvatar.displayName = 'UserAvatar';
-LanguageDropdown.displayName = 'LanguageDropdown';
-UserMenu.displayName = 'UserMenu';
-HeaderAvailabilityToggle.displayName = 'HeaderAvailabilityToggle';
-
 export default memo(Header);
+
+/** ================================
+ *  PWA icon button (mobile)
+ *  ================================ */
+function PWAIconButton() {
+  const { install } = usePWAInstall();
+  const { language } = useApp();
+
+  const handleClick = async () => { await install(); };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="w-16 h-16 rounded-2xl overflow-hidden bg-transparent focus:outline-none focus:ring-0 touch-manipulation"
+      aria-label={language === 'fr' ? "Installer l'application" : 'Install the app'}
+      title={language === 'fr' ? "Installer l'application" : 'Install the app'}
+    >
+      <img src="/icons/icon-512x512-maskable.png" alt="SOS Expat App Icon" className="w-full h-full object-cover" />
+    </button>
+  );
+}

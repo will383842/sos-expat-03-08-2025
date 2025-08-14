@@ -103,9 +103,10 @@ const routeConfigs: RouteConfig[] = [
   { path: '/faq', component: FAQ },
   { path: '/centre-aide', component: HelpCenter },
   
-  // Routes témoignages (avec aliases FR/EN)
+  // ✅ ROUTES TÉMOIGNAGES CORRIGÉES AVEC URL SEO PARFAITE
   { path: '/testimonials', component: Testimonials, alias: '/temoignages' },
-  { path: '/testimonial/:type/:country/:language/:id', component: TestimonialDetail, alias: '/temoignage/:type/:country/:language/:id' },
+  { path: '/testimonials/:serviceType/:country/:year/:language/:id', component: TestimonialDetail },
+  { path: '/temoignages/:serviceType/:country/:year/:language/:id', component: TestimonialDetail },
   
   // Routes conditions (avec aliases FR/EN)
   { path: '/terms-clients', component: TermsClients, alias: '/cgu-clients' },
@@ -197,6 +198,16 @@ const DefaultHelmet: React.FC<{ pathname: string }> = ({ pathname }) => {
       '/tarifs': {
         title: 'Tarifs - Consultation Juridique',
         description: 'Découvrez nos tarifs de consultation',
+        lang: 'fr'
+      },
+      '/testimonials': {
+        title: 'Témoignages Clients - Consultation Juridique Expatriés',
+        description: 'Découvrez les témoignages de nos clients expatriés et avocats partout dans le monde',
+        lang: 'fr'
+      },
+      '/temoignages': {
+        title: 'Témoignages Clients - Consultation Juridique Expatriés',
+        description: 'Découvrez les témoignages de nos clients expatriés et avocats partout dans le monde',
         lang: 'fr'
       },
       // Ajouter d'autres pages selon besoin
@@ -309,4 +320,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

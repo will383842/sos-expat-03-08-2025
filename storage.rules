@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Autoriser uniquement des images, et ≤ 15 Mo
+    function isImage() {
+      return request.resource != null
+        && request.resource.contentType.matches('image/.*');
+    }
+    function isNotTooBig() {
+      return request.resource != null
+        && request.resource.size < 15 * 1024 * 1024;
+    }
+
+    // Dossier des photos de profil: profilePhotos/<uid>/...
+    match /profilePhotos/{userId}/{allPaths=**} {
+      allow read: if true; // lecture via URL signée
+      allow write: if isSignedIn()
+                   && request.auth.uid == userId
+                   && isImage()
+                   && isNotTooBig();
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Dossier temporaire pour l’inscription
+    match /temp_profiles/{allPaths=**} {
+      allow read, write: if isSignedIn() && isImage() && isNotTooBig();
+      allow delete: if isSignedIn();
+    }
+
+    // Par défaut : refus
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

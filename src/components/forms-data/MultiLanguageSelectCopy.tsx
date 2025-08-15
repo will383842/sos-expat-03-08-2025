@@ -9,7 +9,7 @@ import {
   getDetectedBrowserLanguage, 
   searchLanguages as searchLanguagesMultilingual,
   getSortedLanguages 
-} from '../../data/Languages-spoken';
+} from '../../data/Languages-spoken copy';
 
 interface LanguageOption {
   value: string;
@@ -28,7 +28,7 @@ interface MultiLanguageSelectProps {
   disabled?: boolean;
 }
 
-const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({ 
+const MultiLanguageSelectCopy: React.FC<MultiLanguageSelectProps> = React.memo(({ 
   value, 
   onChange,
   providerLanguages = [],
@@ -271,9 +271,9 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
   // Message "aucune option"
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     if (currentLocale === 'fr') {
-      return inputValue ? `Aucune langue trouvée pour "${inputValue}"` : "Aucune langue disponible";
+      return inputValue ? `Aucune langue trouvée pour \"${inputValue}\"` : "Aucune langue disponible";
     } else {
-      return inputValue ? `No language found for "${inputValue}"` : "No languages available";
+      return inputValue ? `No language found for \"${inputValue}\"` : "No languages available";
     }
   }, [currentLocale]);
 
@@ -304,6 +304,6 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
   );
 });
 
-MultiLanguageSelect.displayName = 'MultiLanguageSelect';
+MultiLanguageSelectCopy.displayName = 'MultiLanguageSelectCopy';
 
-export default MultiLanguageSelect;
+export default MultiLanguageSelectCopy;

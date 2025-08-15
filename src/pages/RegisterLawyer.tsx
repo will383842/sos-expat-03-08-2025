@@ -1333,6 +1333,8 @@ const RegisterLawyer: React.FC = () => {
                               setTouched((p) => ({ ...p, languages: true }));
                               if (v.length > 0) setFieldErrors((prev) => ({ ...prev, languages: '' }));
                             }}
+                            locale={lang}
+                            placeholder={lang === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
                           />
                         </div>
                       </Suspense>
@@ -1497,5 +1499,3 @@ const RegisterLawyer: React.FC = () => {
 };
 
 export default RegisterLawyer;
-
-

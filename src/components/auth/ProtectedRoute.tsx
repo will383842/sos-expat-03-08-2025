@@ -9,7 +9,7 @@ import { checkUserRole, isUserBanned } from '../../utils/auth';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string | string[];
-  fallbackPath?: string; // Si non fourni, auto en fonction de la langue
+  fallbackPath?: string; // Peut être surchargé par l'appelant
   showError?: boolean;
 }
 
@@ -19,34 +19,31 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
   fallbackPath,
-  showError = false
+  showError = false,
 }) => {
-  const { t, i18n } = useTranslation();
-  const { user, isLoading, authInitialized, error: authError } = useAuth();
+  const { t } = useTranslation();
   const location = useLocation();
+  const { user, isLoading, authInitialized, error: authError } = useAuth();
 
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [error, setError] = useState<string | null>(null);
 
-  // Langue courante (SSR-safe)
-  const lang = useMemo(() => {
-    if (typeof window === 'undefined') return 'en';
-    return i18n.language || navigator.language.split('-')[0] || 'en';
-  }, [i18n.language]);
-
-  // Chemin de fallback localisé
-  const localizedFallbackPath = useMemo(() => {
+  // ⚠️ Fallback robuste : admin → /admin/login, sinon → /login
+  const computedFallbackPath = useMemo(() => {
     if (fallbackPath) return fallbackPath;
-    return `/${lang}/admin/login`;
-  }, [fallbackPath, lang]);
 
-  // Détermine si on peut vérifier l'auth
+    const isAdminRoute =
+      (Array.isArray(allowedRoles) ? allowedRoles.includes('admin') : allowedRoles === 'admin') ||
+      location.pathname.startsWith('/admin');
+
+    return isAdminRoute ? '/admin/login' : '/login';
+  }, [fallbackPath, allowedRoles, location.pathname]);
+
   const shouldCheckAuth = useMemo(
     () => authInitialized && !isLoading && !authError,
     [authInitialized, isLoading, authError]
   );
 
-  // Vérifie si utilisateur est autorisé
   const checkAuthorization = useCallback(async () => {
     if (!user) {
       setAuthState('unauthorized');
@@ -57,10 +54,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     setError(null);
 
     try {
-      // Timeout anti-latence
+      // Timeout anti-latence sur le check de ban
       const banned = await Promise.race([
         isUserBanned(user.id),
-        new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000)),
       ]);
 
       if (banned) {
@@ -75,13 +72,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         setAuthState('authorized');
       }
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Authorization check failed:', err);
       setError(err instanceof Error ? err.message : 'Authorization failed');
       setAuthState('error');
     }
   }, [user, allowedRoles]);
 
-  // Déclenche la vérification
   useEffect(() => {
     if (shouldCheckAuth) {
       checkAuthorization();
@@ -93,12 +90,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }, [shouldCheckAuth, checkAuthorization, authError, t]);
 
-  // Conserve tout le chemin + query + hash pour redirect après login
-  const fullPath = useMemo(() => {
-    return location.pathname + location.search + location.hash;
-  }, [location]);
+  const fullPath = useMemo(
+    () => location.pathname + location.search + location.hash,
+    [location]
+  );
 
-  // Rendu selon état
   const renderContent = () => {
     switch (authState) {
       case 'loading':
@@ -107,9 +103,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <div className="min-h-screen flex flex-col items-center justify-center p-4">
             <LoadingSpinner size="large" color="blue" />
             <p className="mt-4 text-sm text-gray-600 text-center">
-              {authState === 'loading'
-                ? t('auth.initializing')
-                : t('auth.verifyingAccess')}
+              {authState === 'loading' ? t('auth.initializing') : t('auth.verifyingAccess')}
             </p>
           </div>
         );
@@ -133,7 +127,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
         return (
           <Navigate
-            to={`${localizedFallbackPath}?redirect=${encodeURIComponent(fullPath)}&error=auth_error`}
+            to={`${computedFallbackPath}?redirect=${encodeURIComponent(fullPath)}&error=auth_error`}
             replace
           />
         );
@@ -151,7 +145,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       case 'unauthorized':
         return (
           <Navigate
-            to={`${localizedFallbackPath}?redirect=${encodeURIComponent(fullPath)}`}
+            to={`${computedFallbackPath}?redirect=${encodeURIComponent(fullPath)}`}
             replace
           />
         );
@@ -162,7 +156,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       default:
         return (
           <Navigate
-            to={`${localizedFallbackPath}?redirect=${encodeURIComponent(fullPath)}&error=unknown`}
+            to={`${computedFallbackPath}?redirect=${encodeURIComponent(fullPath)}&error=unknown`}
             replace
           />
         );
@@ -173,5 +167,3 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 };
 
 export default ProtectedRoute;
-
-

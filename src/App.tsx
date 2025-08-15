@@ -1,43 +1,44 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
-import { useDeviceDetection } from './hooks/useDeviceDetection.ts';
+import { useDeviceDetection } from './hooks/useDeviceDetection';
 import { registerSW, measurePerformance } from './utils/performance';
 import './App.css';
 
 // Interface pour la configuration des routes
 interface RouteConfig {
   path: string;
-  component: React.LazyExoticComponent<React.ComponentType<Record<string, unknown>>> | React.ComponentType<Record<string, unknown>>;
+  component:
+    | React.LazyExoticComponent<React.ComponentType<Record<string, unknown>>>
+    | React.ComponentType<Record<string, unknown>>;
   protected?: boolean;
   role?: string;
   alias?: string;
   preload?: boolean;
 }
 
-// Composant de protection des routes (gardé statique car critique)
+// Composant de protection des routes
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
-// ========== LAZY LOADING DE TOUTES LES PAGES ==========
+// ========== LAZY LOADING DES PAGES ==========
 
-// Page d'accueil (maintenant lazy-loaded aussi)
+// Accueil
 const Home = lazy(() => import('./pages/Home'));
 
-// Pages d'authentification
+// Auth
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const RegisterExpat = lazy(() => import('./pages/RegisterExpat'));
 const RegisterLawyer = lazy(() => import('./pages/RegisterLawyer'));
 const RegisterClient = lazy(() => import('./pages/RegisterClient'));
-const EmailVerification = lazy(() => import('./pages/EmailVerification'));
-const PasswordReset = lazy(() => import('./pages/PasswordReset'));
+const PasswordReset = lazy(() => import('./pages/PasswordReset')); // ⬅ garde si tu l’utilises
 
-// Pages utilisateur
+// Utilisateur
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProfileEdit = lazy(() => import('./pages/ProfileEdit'));
 const DashboardMessages = lazy(() => import('@/components/dashboard/DashboardMessages'));
 
-// Pages de services
+// Services
 const SOSCall = lazy(() => import('./pages/SOSCall'));
 const ExpatCall = lazy(() => import('./pages/ExpatCall'));
 const CallCheckout = lazy(() => import('./pages/CallCheckout'));
@@ -48,12 +49,12 @@ const ProviderProfile = lazy(() => import('./pages/ProviderProfile'));
 const Providers = lazy(() => import('./pages/Providers'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 
-// Pages admin
+// Admin
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminCalls = lazy(() => import('./pages/admin/AdminCalls'));
-const AdminClientMessages = lazy(() => import("@/pages/admin/AdminClientMessages"));
+const AdminClientMessages = lazy(() => import('@/pages/admin/AdminClientMessages'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
 const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
@@ -66,7 +67,7 @@ const AdminPromoCodes = lazy(() => import('./pages/admin/AdminPromoCodes'));
 const AdminLegalDocuments = lazy(() => import('./pages/admin/AdminLegalDocuments'));
 const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'));
 
-// Pages d'information
+// Pages d’info
 const SEO = lazy(() => import('./pages/SEO'));
 const ServiceStatus = lazy(() => import('./pages/ServiceStatus'));
 const Consumers = lazy(() => import('./pages/Consumers'));
@@ -82,9 +83,8 @@ const FAQ = lazy(() => import('./pages/FAQ'));
 const Contact = lazy(() => import('./pages/Contact'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 
-// Configuration des routes
+// ===== Config des routes publiques (sans EmailVerification) =====
 const routeConfigs: RouteConfig[] = [
-  // Routes publiques
   { path: '/', component: Home, preload: true },
   { path: '/login', component: Login, preload: true },
   { path: '/register', component: Register, preload: true },
@@ -92,23 +92,22 @@ const routeConfigs: RouteConfig[] = [
   { path: '/register/lawyer', component: RegisterLawyer },
   { path: '/register/expat', component: RegisterExpat },
   { path: '/password-reset', component: PasswordReset },
-  { path: '/email-verification', component: EmailVerification },
-  
-  // Routes tarifaires (avec aliases FR/EN)
+
+  // Tarifs (alias FR/EN)
   { path: '/tarifs', component: Pricing, alias: '/pricing', preload: true },
-  
-  // Routes de contact et aide
+
+  // Contact & aide
   { path: '/contact', component: Contact },
   { path: '/how-it-works', component: HowItWorks },
   { path: '/faq', component: FAQ },
   { path: '/centre-aide', component: HelpCenter },
-  
-  // ✅ ROUTES TÉMOIGNAGES CORRIGÉES AVEC URL SEO PARFAITE
+
+  // Témoignages
   { path: '/testimonials', component: Testimonials, alias: '/temoignages' },
   { path: '/testimonials/:serviceType/:country/:year/:language/:id', component: TestimonialDetail },
   { path: '/temoignages/:serviceType/:country/:year/:language/:id', component: TestimonialDetail },
-  
-  // Routes conditions (avec aliases FR/EN)
+
+  // Légal / info (alias FR/EN)
   { path: '/terms-clients', component: TermsClients, alias: '/cgu-clients' },
   { path: '/terms-lawyers', component: TermsLawyers, alias: '/cgu-avocats' },
   { path: '/terms-expats', component: TermsExpats, alias: '/cgu-expatries' },
@@ -117,19 +116,19 @@ const routeConfigs: RouteConfig[] = [
   { path: '/consumers', component: Consumers, alias: '/consommateurs' },
   { path: '/statut-service', component: ServiceStatus },
   { path: '/seo', component: SEO, alias: '/referencement' },
-  
-  // Routes services d'appel
+
+  // Services d’appel
   { path: '/sos-appel', component: SOSCall },
   { path: '/appel-expatrie', component: ExpatCall },
-  
-  // Routes fournisseurs publiques
+
+  // Fournisseurs publics
   { path: '/providers', component: Providers },
   { path: '/provider/:id', component: ProviderProfile },
   { path: '/avocat/:country/:language/:nameId', component: ProviderProfile },
   { path: '/expatrie/:country/:language/:nameId', component: ProviderProfile },
 ];
 
-// Routes protégées utilisateur
+// ===== Routes protégées utilisateur =====
 const protectedUserRoutes: RouteConfig[] = [
   { path: '/dashboard', component: Dashboard, protected: true },
   { path: '/profile/edit', component: ProfileEdit, protected: true },
@@ -142,7 +141,7 @@ const protectedUserRoutes: RouteConfig[] = [
   { path: '/dashboard/messages', component: DashboardMessages, protected: true },
 ];
 
-// Routes admin
+// ===== Routes admin =====
 const adminRoutes: RouteConfig[] = [
   { path: '/admin/login', component: AdminLogin },
   { path: '/admin/dashboard', component: AdminDashboard, protected: true, role: 'admin' },
@@ -162,10 +161,9 @@ const adminRoutes: RouteConfig[] = [
   { path: '/admin/notifications', component: AdminNotifications, protected: true, role: 'admin' },
 ];
 
-// Composant de chargement adaptatif avec accessibilité
+// Spinner de chargement
 const LoadingSpinner: React.FC = () => {
   const { isMobile } = useDeviceDetection();
-  
   return (
     <div className="flex justify-center items-center min-h-screen" role="status" aria-label="Chargement en cours">
       <div className={`loading-spinner ${isMobile ? 'mobile' : 'desktop'}`}>
@@ -176,52 +174,54 @@ const LoadingSpinner: React.FC = () => {
   );
 };
 
-// Composant pour les métadonnées par défaut
+// Métadonnées par défaut
 const DefaultHelmet: React.FC<{ pathname: string }> = ({ pathname }) => {
   const getPageMetadata = (path: string) => {
     const metaMap: Record<string, { title: string; description: string; lang: string }> = {
       '/': {
         title: 'Accueil - Consultation Juridique Expatriés',
         description: 'Service de consultation juridique pour expatriés francophones',
-        lang: 'fr'
+        lang: 'fr',
       },
       '/login': {
         title: 'Connexion - Consultation Juridique',
         description: 'Connectez-vous à votre compte',
-        lang: 'fr'
+        lang: 'fr',
       },
       '/pricing': {
         title: 'Tarifs - Consultation Juridique',
         description: 'Découvrez nos tarifs de consultation',
-        lang: 'fr'
+        lang: 'fr',
       },
       '/tarifs': {
         title: 'Tarifs - Consultation Juridique',
         description: 'Découvrez nos tarifs de consultation',
-        lang: 'fr'
+        lang: 'fr',
       },
       '/testimonials': {
         title: 'Témoignages Clients - Consultation Juridique Expatriés',
-        description: 'Découvrez les témoignages de nos clients expatriés et avocats partout dans le monde',
-        lang: 'fr'
+        description:
+          'Découvrez les témoignages de nos clients expatriés et avocats partout dans le monde',
+        lang: 'fr',
       },
       '/temoignages': {
         title: 'Témoignages Clients - Consultation Juridique Expatriés',
-        description: 'Découvrez les témoignages de nos clients expatriés et avocats partout dans le monde',
-        lang: 'fr'
+        description:
+          'Découvrez les témoignages de nos clients expatriés et avocats partout dans le monde',
+        lang: 'fr',
       },
-      // Ajouter d'autres pages selon besoin
     };
 
-    return metaMap[path] || {
-      title: 'Consultation Juridique Expatriés',
-      description: 'Service de consultation juridique pour expatriés',
-      lang: 'fr'
-    };
+    return (
+      metaMap[path] || {
+        title: 'Consultation Juridique Expatriés',
+        description: 'Service de consultation juridique pour expatriés',
+        lang: 'fr',
+      }
+    );
   };
 
   const metadata = getPageMetadata(pathname);
-
   return (
     <Helmet>
       <html lang={metadata.lang} />
@@ -236,52 +236,37 @@ const DefaultHelmet: React.FC<{ pathname: string }> = ({ pathname }) => {
 const App: React.FC = () => {
   const location = useLocation();
   const { isMobile } = useDeviceDetection();
-  
-  // Optimisations de performance
+
+  // SW + perf
   useEffect(() => {
-    // Enregistrer le Service Worker
     registerSW();
-    // Mesurer les performances
     measurePerformance();
   }, []);
-  
-  // Scroll to top on route change
+
+  // Scroll top on route change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
-  
-  // Préchargement des routes critiques
+
+  // Préchargement light
   useEffect(() => {
     if (!isMobile) {
-      // Précharger les pages importantes sur desktop
-      const preloadableRoutes = [...routeConfigs, ...protectedUserRoutes]
-        .filter(route => route.preload);
-      
-      preloadableRoutes.forEach(route => {
-        // Précharger après un délai pour ne pas impacter le chargement initial
+      const preloadableRoutes = [...routeConfigs, ...protectedUserRoutes].filter((r) => r.preload);
+      preloadableRoutes.forEach((route) => {
         setTimeout(() => {
-          if (route.component && typeof route.component === 'function' && 'load' in route.component) {
-            // Pour les composants lazy
-            const lazyComponent = route.component as React.LazyExoticComponent<React.ComponentType<Record<string, unknown>>>;
-            if (typeof lazyComponent._payload === 'function') {
-              lazyComponent._payload();
-            }
-          }
+          // (noop) garder simple, certains bundlers n’exposent pas _payload
         }, 2000);
       });
     }
   }, [isMobile]);
 
-  // Fonction pour créer les routes
   const renderRoute = (config: RouteConfig, index: number) => {
     const { path, component: Component, protected: isProtected, role, alias } = config;
-    
-    const routes = [path];
-    if (alias) routes.push(alias);
-    
-    return routes.map((routePath, routeIndex) => (
+    const routes = [path, ...(alias ? [alias] : [])];
+
+    return routes.map((routePath, i) => (
       <Route
-        key={`${index}-${routeIndex}-${routePath}`}
+        key={`${index}-${i}-${routePath}`}
         path={routePath}
         element={
           isProtected ? (
@@ -295,28 +280,21 @@ const App: React.FC = () => {
       />
     ));
   };
-  
+
   return (
     <HelmetProvider>
       <div className={`App ${isMobile ? 'mobile-layout' : 'desktop-layout'}`}>
         <DefaultHelmet pathname={location.pathname} />
-        
-        {/* SUSPENSE WRAPPER POUR TOUTES LES ROUTES */}
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
-            {/* Routes publiques */}
-            {routeConfigs.map((config, index) => renderRoute(config, index))}
-            
-            {/* Routes protégées utilisateur */}
-            {protectedUserRoutes.map((config, index) => renderRoute(config, index + 1000))}
-            
-            {/* Routes admin */}
-            {adminRoutes.map((config, index) => renderRoute(config, index + 2000))}
+            {routeConfigs.map((cfg, i) => renderRoute(cfg, i))}
+            {protectedUserRoutes.map((cfg, i) => renderRoute(cfg, i + 1000))}
+            {adminRoutes.map((cfg, i) => renderRoute(cfg, i + 2000))}
           </Routes>
         </Suspense>
       </div>
     </HelmetProvider>
-  ); 
+  );
 };
 
 export default App;

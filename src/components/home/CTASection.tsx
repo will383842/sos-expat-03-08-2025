@@ -35,7 +35,7 @@ const CTASection: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_60%,rgba(244,63,94,0.2)_0%,transparent_70%)]" />
       </div>
 
-      {/* ? Éléments flottants du code home.tsx */}
+      {/* ? ï¿½lï¿½ments flottants du code home.tsx */}
       <div className="absolute inset-0">
         {[...Array(12)].map((_, i) => (
           <div
@@ -61,7 +61,7 @@ const CTASection: React.FC = () => {
 
           <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black mb-4 sm:mb-6">
             <span className="text-white block">
-              {language === 'fr' ? 'Prêt pour' : 'Ready for'}
+              {language === 'fr' ? 'Prï¿½t pour' : 'Ready for'}
             </span>
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-red-300 via-rose-300 to-pink-300">
               {language === 'fr' ? 'l\'excellence ?' : 'excellence?'}
@@ -70,12 +70,12 @@ const CTASection: React.FC = () => {
           
           <p className="text-lg sm:text-xl lg:text-2xl text-white/80 mb-8 sm:mb-12 leading-relaxed max-w-3xl mx-auto">
             {language === 'fr'
-              ? 'Rejoignez l\'élite des expatriés qui ont choisi la tranquillité d\'esprit.'
+              ? 'Rejoignez l\'ï¿½lite des expatriï¿½s qui ont choisi la tranquillitï¿½ d\'esprit.'
               : 'Join the elite of expats who have chosen peace of mind.'
             }
             <span className="block mt-2 text-base sm:text-lg text-white/60">
               {language === 'fr'
-                ? 'Votre prochaine urgence sera votre dernière inquiétude.'
+                ? 'Votre prochaine urgence sera votre derniï¿½re inquiï¿½tude.'
                 : 'Your next emergency will be your last worry.'
               }
             </span>
@@ -103,19 +103,19 @@ const CTASection: React.FC = () => {
             </span>
             <span className="flex items-center gap-2 hover:text-white transition-colors">
               <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
-              {language === 'fr' ? '100% sécurisé' : '100% secure'}
+              {language === 'fr' ? '100% sï¿½curisï¿½' : '100% secure'}
             </span>
             <span className="flex items-center gap-2 hover:text-white transition-colors">
               <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
-              {language === 'fr' ? 'Activation instantanée' : 'Instant activation'}
+              {language === 'fr' ? 'Activation instantanï¿½e' : 'Instant activation'}
             </span>
           </div>
 
           <div className="mt-8 sm:mt-12 grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto">
             {[
-              { icon: Award, text: language === 'fr' ? 'N°1 des expatriés' : '#1 for expats' },
-              { icon: ShieldCheck, text: language === 'fr' ? 'Données protégées' : 'Data protected' },
-              { icon: Star, text: '4.9/5 étoiles' }
+              { icon: Award, text: language === 'fr' ? 'Nï¿½1 des expatriï¿½s' : '#1 for expats' },
+              { icon: ShieldCheck, text: language === 'fr' ? 'Donnï¿½es protï¿½gï¿½es' : 'Data protected' },
+              { icon: Star, text: '4.9/5 ï¿½toiles' }
             ].map((item, i) => (
               <div key={i} className="text-center group hover:scale-105 transition-transform">
                 <item.icon className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-red-300 group-hover:text-white transition-colors" />

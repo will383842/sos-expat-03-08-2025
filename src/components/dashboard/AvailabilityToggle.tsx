@@ -26,7 +26,7 @@ interface AvailabilityToggleProps {
   className?: string;
 }
 
-/** -------- Types locaux anti-any -------- */
+/** -------- Types locaux -------- */
 interface AppUser {
   uid?: string;
   id?: string;
@@ -41,9 +41,9 @@ interface AppUser {
   isVerified?: boolean;
 }
 type FireUserDoc = { isOnline?: boolean };
-type FireSosDoc  = { isOnline?: boolean; uid?: string };
+type FireSosDoc = { isOnline?: boolean; uid?: string };
 
-/** Helper sûr pour récupérer un userId string sans any */
+/** Helper sûr pour récupérer un userId string */
 type MaybeId = { id?: unknown; uid?: unknown };
 const getUserId = (u: unknown): string | null => {
   if (typeof u !== 'object' || u === null) return null;
@@ -53,11 +53,29 @@ const getUserId = (u: unknown): string | null => {
   return id ?? uid ?? null;
 };
 
+/** -------- Event global + anti-doublon -------- */
+declare global {
+  interface Window {
+    __availabilityDispatchLock?: number;
+  }
+}
+const useAvailabilityBroadcaster = () =>
+  useCallback((isOnline: boolean) => {
+    const now = Date.now();
+    if (window.__availabilityDispatchLock && now - window.__availabilityDispatchLock < 500) return;
+    window.__availabilityDispatchLock = now;
+    window.dispatchEvent(new CustomEvent('availability:changed', { detail: { isOnline } }));
+  }, []);
+
+/** ======================================================================== */
+
 const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => {
   // ✅ Hooks
   const { user } = useAuth();
   const authUser = (user as unknown) as AppUser | null;
   const { t, i18n } = useTranslation();
+
+  const broadcastAvailability = useAvailabilityBroadcaster();
 
   const userId = useMemo(() => getUserId(authUser), [authUser]);
 
@@ -77,7 +95,12 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
 
   // Rôles
   const isProvider = useMemo(() => {
-    return authUser?.role === 'lawyer' || authUser?.role === 'expat' || authUser?.type === 'lawyer' || authUser?.type === 'expat';
+    return (
+      authUser?.role === 'lawyer' ||
+      authUser?.role === 'expat' ||
+      authUser?.type === 'lawyer' ||
+      authUser?.type === 'expat'
+    );
   }, [authUser?.role, authUser?.type]);
 
   const isApprovedProvider = useMemo(() => {
@@ -85,7 +108,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
     return authUser.role === 'expat' || (authUser.role === 'lawyer' && authUser.isApproved === true);
   }, [isProvider, authUser]);
 
-  /** ---------- Logs d'activité ---------- */
+  /** ---------- Logs d'activité (silencieux en cas d'erreur) ---------- */
   const createStatusLog = useCallback(
     async (previousStatus: boolean, newStatus: boolean) => {
       if (!userId) return;
@@ -97,118 +120,129 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
           newStatus: newStatus ? 'online' : 'offline',
           timestamp: serverTimestamp(),
         });
-      } catch (error) {
-        console.error('Erreur création log:', error);
+      } catch {
+        // Permission/règles : ignorer pour éviter le spam console
       }
     },
     [userId]
   );
 
-  /** ---------- Écritures CORRIGÉES (vérité = sos_profiles) ---------- */
-  const writeSosProfile = useCallback(async (newStatus: boolean) => {
-    if (!userId || !authUser || !isProvider) return;
+  /** ---------- Écritures (vérité = sos_profiles) ---------- */
+  const writeSosProfile = useCallback(
+    async (newStatus: boolean) => {
+      if (!userId || !authUser || !isProvider) return;
 
-    const sosRef = doc(db, 'sos_profiles', userId);
-    const updateData = {
-      isOnline: newStatus,
-      availability: newStatus ? 'available' : 'unavailable',
-      lastStatusChange: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      isVisible: true,
-      isVisibleOnMap: true,
-    };
+      const sosRef = doc(db, 'sos_profiles', userId);
+      const updateData = {
+        isOnline: newStatus,
+        availability: newStatus ? 'available' : 'unavailable',
+        lastStatusChange: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isVisible: true,
+        isVisibleOnMap: true,
+      };
 
-    try {
-      // 1) Update direct
-      await updateDoc(sosRef, updateData);
-      return;
-    } catch (error) {
-      // 2) Existe ?
       try {
-        const snap = await getDoc(sosRef);
-        if (snap.exists()) {
-          console.error('❌ Document exists but update failed:', error);
-          throw error;
-        }
-
-        // 3) Créer si inexistant
-        const newProfile = {
-          uid: userId,
-          type: authUser.role || authUser.type,
-          fullName:
-            authUser.fullName ||
-            `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
-            'Expert',
-          email: authUser.email || '',
-          ...updateData,
-          isActive: true,
-          isApproved: (authUser.role || authUser.type) !== 'lawyer',
-          isVerified: !!authUser.isVerified,
-          rating: 5.0,
-          reviewCount: 0,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(sosRef, newProfile, { merge: true });
+        // 1) Update direct
+        await updateDoc(sosRef, updateData);
         return;
-      } catch (createError) {
-        console.warn('⚠️ Création SOS directe échouée, fallback query...', createError);
-        // 4) Fallback query par uid
+      } catch (error) {
+        // 2) Existe ?
         try {
-          const qSos = query(collection(db, 'sos_profiles'), where('uid', '==', userId));
-          const found = await getDocs(qSos);
-          if (!found.empty) {
-            const batch = writeBatch(db);
-            found.docs.forEach((d) => batch.update(d.ref, updateData));
-            await batch.commit();
-            return;
+          const snap = await getDoc(sosRef);
+          if (snap.exists()) {
+            throw error;
           }
-          // 5) Dernier recours : force create
-          await setDoc(
-            sosRef,
-            {
-              uid: userId,
-              type: authUser.role || authUser.type,
-              fullName:
-                authUser.fullName ||
-                `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
-                'Expert',
-              email: authUser.email || '',
-              ...updateData,
-              isActive: true,
-              isApproved: (authUser.role || authUser.type) !== 'lawyer',
-              isVerified: !!authUser.isVerified,
-              rating: 5.0,
-              reviewCount: 0,
-              createdAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-        } catch (finalError) {
-          console.error('💥 All fallbacks failed (SOS):', finalError);
-          throw finalError;
+          // 3) Create si inexistant
+          const base = {
+            uid: userId,
+            type: authUser.role || authUser.type,
+            fullName:
+              authUser.fullName ||
+              `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+              'Expert',
+            email: authUser.email || '',
+            isActive: true,
+            isApproved: (authUser.role || authUser.type) !== 'lawyer',
+            isVerified: !!authUser.isVerified,
+            rating: 5.0,
+            reviewCount: 0,
+            createdAt: serverTimestamp(),
+          };
+          await setDoc(sosRef, { ...base, ...updateData }, { merge: true });
+          return;
+        } catch {
+          // 4) Fallback query par uid
+          try {
+            const qSos = query(collection(db, 'sos_profiles'), where('uid', '==', userId));
+            const found = await getDocs(qSos);
+            if (!found.empty) {
+              const batch = writeBatch(db);
+              found.docs.forEach((d) => batch.update(d.ref, updateData));
+              await batch.commit();
+              return;
+            }
+            // 5) Dernier recours : force create
+            await setDoc(
+              sosRef,
+              {
+                uid: userId,
+                type: authUser.role || authUser.type,
+                fullName:
+                  authUser.fullName ||
+                  `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+                  'Expert',
+                email: authUser.email || '',
+                ...updateData,
+                isActive: true,
+                isApproved: (authUser.role || authUser.type) !== 'lawyer',
+                isVerified: !!authUser.isVerified,
+                rating: 5.0,
+                reviewCount: 0,
+                createdAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          } catch (finalError) {
+            throw finalError;
+          }
         }
       }
-    }
-  }, [userId, authUser, isProvider]);
+    },
+    [userId, authUser, isProvider]
+  );
 
-  const writeUsersPresenceBestEffort = useCallback(async (newStatus: boolean) => {
-    if (!userId) return;
-    const userRef = doc(db, 'users', userId);
-    const payload = {
-      isOnline: newStatus,
-      availability: newStatus ? 'available' : 'unavailable',
-      lastStatusChange: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-    try {
-      await updateDoc(userRef, payload);
-      console.log('✅ users presence updated');
-    } catch (e) {
-      console.warn('⚠️ Users presence update ignorée (rules/email) :', e);
-    }
-  }, [userId]);
+  /** users = best effort avec silence si rules bloquent */
+  const writeUsersPresenceBestEffort = useCallback(
+    async (newStatus: boolean) => {
+      if (!userId) return;
+      const userRef = doc(db, 'users', userId);
+      const payload = {
+        isOnline: newStatus,
+        availability: newStatus ? 'available' : 'unavailable',
+        lastStatusChange: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      try {
+        await updateDoc(userRef, payload);
+      } catch (e: any) {
+        const msg = e?.code || e?.message || '';
+        if (
+          typeof msg === 'string' &&
+          (msg.includes('permission') || msg.includes('Missing or insufficient permissions'))
+        ) {
+          // silencieux pour éviter le spam console
+          return;
+        }
+        // autres erreurs : log léger
+        // eslint-disable-next-line no-console
+        console.warn('users presence (best-effort) ignorée:', e);
+      }
+    },
+    [userId]
+  );
 
-  /** ---------- Toggle principal (ordre : SOS -> users) ---------- */
+  /** ---------- Toggle principal ---------- */
   const toggleAvailability = useCallback(async () => {
     if (!userId || !authUser || isLoading) return;
 
@@ -236,30 +270,27 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
       // Optimistic UI
       setIsAvailable(newStatus);
 
-      // 1) SOS (vérité) avec retry
+      // 1) SOS (vérité) avec retry simple
       let ok = false;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           await writeSosProfile(newStatus);
           ok = true;
           break;
-        } catch (e) {
-          console.error(`❌ SOS update attempt ${attempt} failed:`, e);
-          if (attempt === 3) throw e;
-          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        } catch {
+          if (attempt === 3) throw new Error('SOS update failed after retries');
+          await new Promise((r) => setTimeout(r, 300 * attempt));
         }
       }
-      if (!ok) throw new Error('SOS update failed after retries');
+      if (!ok) throw new Error('SOS update failed');
 
       // 2) users (best-effort)
       await writeUsersPresenceBestEffort(newStatus);
 
-      // Notifie l’app
+      // Notifie l’app (événement unique, anti-doublon)
       broadcastAvailability(newStatus);
-    } catch (error) {
-      console.error('Erreur toggle disponibilité:', error);
-
-      // Rollback
+    } catch {
+      // Rollback visuel
       skipNextSyncRef.current = false;
       if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
       setIsAvailable(previous);
@@ -277,19 +308,20 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
     createStatusLog,
     writeSosProfile,
     writeUsersPresenceBestEffort,
+    broadcastAvailability,
   ]);
 
-  /** ---------- Charger préférences ---------- */
+  /** ---------- Préférences ---------- */
   useEffect(() => {
     const prefs = getNotificationPreferences();
     setNotificationPrefs(prefs);
   }, []);
 
-  /** ---------- ÉCOUTE TEMPS RÉEL UNIFIÉE (priorité = sos_profiles) ---------- */
+  /** ---------- Écoute temps réel unifiée (priorité = sos_profiles) ---------- */
   useEffect(() => {
     if (!userId) return;
 
-    // initialise selon authUser
+    // init depuis l'utilisateur auth
     setIsAvailable(authUser?.isOnline === true);
 
     const sosRef = doc(db, 'sos_profiles', userId);
@@ -301,7 +333,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
       sosRef,
       (snap) => {
         if (snap.exists()) {
-          // Si SOS existe, on se base dessus et on coupe le fallback users
+          // SOS = source de vérité → coupe le fallback users
           if (unsubUser) {
             unsubUser();
             unsubUser = null;
@@ -310,7 +342,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
           const next = data?.isOnline === true;
           if (!skipNextSyncRef.current) setIsAvailable(next);
         } else {
-          // Fallback users si SOS n'existe pas (une seule fois)
+          // Fallback unique sur users si SOS inexistant
           if (!unsubUser) {
             unsubUser = onSnapshot(
               userRef,
@@ -321,13 +353,14 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
                   if (!skipNextSyncRef.current) setIsAvailable(next);
                 }
               },
-              (err) => console.error('❌ Users snapshot error:', err)
+              () => {
+                // ignore erreurs users (souvent rules)
+              }
             );
           }
         }
       },
-      (err) => {
-        console.error('❌ SOS snapshot error:', err);
+      () => {
         setStatusSyncError(t('availability.errors.syncFailed'));
       }
     );
@@ -363,7 +396,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
     return () => clearInterval(interval);
   }, [isAvailable, i18n.language, notificationPrefs]);
 
-  /** ---------- Cleanup ---------- */
+  /** ---------- Cleanup timeout ---------- */
   useEffect(() => {
     return () => {
       if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);

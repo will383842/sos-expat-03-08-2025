@@ -12,6 +12,7 @@ import {
   serverTimestamp, collection
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 /** ================================
  *  Types & Global
@@ -296,57 +297,6 @@ const useAvailabilityToggle = () => {
 };
 
 /** ================================
- *  PWA Install Hook
- *  ================================ */
-type BIPEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice?: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-};
-
-const usePWAInstall = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BIPEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-
-  useEffect(() => {
-    const onBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BIPEvent);
-    };
-    const onAppInstalled = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-      window.gtag?.('event', 'pwa_installed', { event_category: 'engagement' });
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    };
-  }, []);
-
-  const install = useCallback(async () => {
-    if (!deferredPrompt) return { started: false as const };
-    try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice) {
-        window.gtag?.('event', 'pwa_install_prompt', {
-          event_category: 'engagement',
-          outcome: choice.outcome,
-          platform: choice.platform,
-        });
-      }
-      return { started: true as const };
-    } catch {
-      return { started: false as const };
-    }
-  }, [deferredPrompt]);
-
-  return { install, isInstalled };
-};
-
-/** ================================
  *  Desktop Availability Toggle
  *  ================================ */
 const HeaderAvailabilityToggle = memo(() => {
@@ -515,7 +465,7 @@ LanguageDropdown.displayName = 'LanguageDropdown';
  *  ================================ */
 const PWAInstallArea = memo(({ scrolled }: { scrolled: boolean }) => {
   const { language } = useApp();
-  const { install, isInstalled } = usePWAInstall();
+  const { install, installed } = usePWAInstall();
   const [showSlogan, setShowSlogan] = useState(false);
 
   useEffect(() => {
@@ -550,7 +500,7 @@ const PWAInstallArea = memo(({ scrolled }: { scrolled: boolean }) => {
 
         <div className="hidden lg:block h-5 overflow-hidden">
           <div className={`text-xs ${scrolled ? 'text-gray-300' : 'text-gray-600'} transition-opacity duration-700 ease-in-out ${showSlogan ? 'opacity-100' : 'opacity-0'}`}>
-            {language === 'fr' ? "L'appli qui fait du bien !" : 'The feel-good app!'}{isInstalled ? ' 🎉' : ''}
+            {language === 'fr' ? "L'appli qui fait du bien !" : 'The feel-good app!'}{installed ? ' 🎉' : ''}
           </div>
         </div>
       </div>

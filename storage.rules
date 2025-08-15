@@ -2,37 +2,73 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    function isSignedIn() {
+    // ========= UTILITAIRES =========
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Autoriser uniquement des images, et ≤ 15 Mo
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    function isValidFileSize() {
+      return request.resource != null && request.resource.size < 15 * 1024 * 1024; // 15MB
+    }
+
     function isImage() {
-      return request.resource != null
-        && request.resource.contentType.matches('image/.*');
-    }
-    function isNotTooBig() {
-      return request.resource != null
-        && request.resource.size < 15 * 1024 * 1024;
+      return request.resource != null && request.resource.contentType.matches('image/.*');
     }
 
-    // Dossier des photos de profil: profilePhotos/<uid>/...
-    match /profilePhotos/{userId}/{allPaths=**} {
-      allow read: if true; // lecture via URL signée
-      allow write: if isSignedIn()
-                   && request.auth.uid == userId
-                   && isImage()
-                   && isNotTooBig();
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+    function isValidDocumentType() {
+      return request.resource != null && request.resource.contentType in [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
     }
 
-    // Dossier temporaire pour l’inscription
-    match /temp_profiles/{allPaths=**} {
-      allow read, write: if isSignedIn() && isImage() && isNotTooBig();
-      allow delete: if isSignedIn();
+    // ========= PHOTOS DE PROFIL =========
+    match /profilePhotos/{userId}/{fileName} {
+      // Lecture publique via URLs signées (download tokens)
+      allow read: if true;
+      allow write: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && isImage()
+                    && isValidFileSize();
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // Par défaut : refus
+    // ========= DOCUMENTS UTILISATEURS =========
+    match /documents/{userId}/{fileName} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && isValidDocumentType()
+                    && isValidFileSize();
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ========= DOSSIER TEMPORAIRE (INSCRIPTION) =========
+    match /temp_profiles/{fileName} {
+      allow read, write: if isAuthenticated() && isImage() && isValidFileSize();
+      allow delete: if isAdmin();
+    }
+
+    // ========= FACTURES / ADMIN =========
+    match /invoices/{userId}/{fileName} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write, delete: if isAdmin() && isValidDocumentType() && isValidFileSize();
+    }
+
+    // ========= SAUVEGARDES =========
+    match /backups/{fileName} {
+      allow read, write: if isAdmin();
+    }
+
+    // ========= PAR DÉFAUT =========
     match /{allPaths=**} {
       allow read, write: if false;
     }

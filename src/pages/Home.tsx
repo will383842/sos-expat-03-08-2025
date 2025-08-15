@@ -1,3 +1,4 @@
+// src/pages/Home.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -8,6 +9,7 @@ import {
 import Layout from '../components/layout/Layout';
 import ModernProfileCard from '../components/home/ModernProfileCard';
 import ProfilesCarousel from '../components/home/ProfileCarousel';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 /* ================================
    Types
@@ -39,59 +41,6 @@ declare global {
 }
 
 /* ================================
-   PWA install hook (pour le badge du Hero)
-   ================================ */
-type BIPEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice?: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-};
-
-const usePWAInstall = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BIPEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-
-  useEffect(() => {
-    const onBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BIPEvent);
-    };
-    const onAppInstalled = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-      if (typeof window !== 'undefined') {
-        window.gtag?.('event', 'pwa_installed', { event_category: 'engagement' });
-      }
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    };
-  }, []);
-
-  const install = useCallback(async () => {
-    if (!deferredPrompt) return { started: false as const };
-    try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice && typeof window !== 'undefined') {
-        window.gtag?.('event', 'pwa_install_prompt', {
-          event_category: 'engagement',
-          outcome: choice.outcome,
-          platform: choice.platform,
-        });
-      }
-      return { started: true as const };
-    } catch {
-      return { started: false as const };
-    }
-  }, [deferredPrompt]);
-
-  return { install, isInstalled, canInstall: !!deferredPrompt };
-};
-
-/* ================================
    Bouton PWA + hint sympa
    ================================ */
 function PWAInstallIconWithHint({
@@ -114,8 +63,8 @@ function PWAInstallIconWithHint({
     const isDesktop = !isIOS && !isAndroid;
 
     const prefix = 'Votre navigateur ne permet pas l’installation automatique. ';
-    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari → « Partager » → « Sur l’écran d’accueil ». 😊';
-    if (isAndroid) return prefix + 'Sur Android : Chrome → menu ⋮ → « Installer l’application ». 😊';
+    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari → « Partager » → « Sur l’écran d’accueil ».';
+    if (isAndroid) return prefix + 'Sur Android : Chrome → menu ⋮ → « Installer l’application ».';
     if (isDesktop) return prefix + 'Sur ordinateur : Chrome/Edge → icône « Installer » dans la barre d’adresse.';
     return prefix + 'Essayez avec Chrome/Edge (ordinateur) ou Safari/Chrome (mobile).';
   };
@@ -195,7 +144,7 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=12',
     typeEchange: 'avocat',
     comment:
-      'J’avais peur d’appeler un avocat, mais il a été super cool et super efficace. Il était en vacances dans le pays voisin et m’a trouvé la solution en moins de 15 minutes en s’appuyant sur la législation locale au Brésil.'
+      'Je redoutais d’appeler un avocat. Il a été cool, clair et ultra efficace : solution trouvée en 15 min grâce au droit local au Brésil.'
   },
   {
     id: 'us-woman',
@@ -205,7 +154,7 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=47',
     typeEchange: 'expatrié',
     comment:
-      'Nouvelle à Lyon, je paniquais pour la préfecture. Une expatriée m’a rappelée en quelques minutes, tout expliqué en français et en anglais. Je me suis sentie accompagnée du début à la fin.'
+      'Nouvelle à Lyon, panique préfecture. Une expatriée m’a rappelée en quelques minutes, tout expliqué en FR/EN. Je me suis sentie accompagnée.'
   },
   {
     id: 'cn-man',
@@ -215,7 +164,7 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=32',
     typeEchange: 'avocat',
     comment:
-      'Problème d’assurance santé internationale réglé dans la journée. L’avocat bilingue a clarifié chaque point au téléphone, documents à l’appui. Rapide, précis, impeccable.'
+      'Assurance santé internationale : réglé dans la journée. L’avocat bilingue a tout clarifié au téléphone, documents à l’appui. Net et précis.'
   },
   {
     id: 'th-woman',
@@ -225,7 +174,7 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=65',
     typeEchange: 'expatrié',
     comment:
-      'Hospitalisation imprévue pendant un voyage : une expatriée m’a guidée pour les démarches et a servi d’interprète. Rassurant, humain et très efficace.'
+      'Hospitalisation imprévue en voyage. Une expatriée m’a guidée pour les démarches et a servi d’interprète. Humain, rassurant, efficace.'
   },
   {
     id: 'ru-man',
@@ -235,7 +184,7 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=10',
     typeEchange: 'avocat',
     comment:
-      'Achat immobilier à Lisbonne : l’avocat m’a rappelé, vérifié les clauses et orienté vers la bonne étude notariale. Clair, rapide, sans surprise.'
+      'Achat à Lisbonne : l’avocat m’a rappelé, vérifié les clauses, orienté vers la bonne étude notariale. Rapide et sans surprise.'
   },
   {
     id: 'sn-woman',
@@ -245,7 +194,7 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=68',
     typeEchange: 'expatrié',
     comment:
-      'Mon dossier de visa pour le Canada traînait. Une expatriée à Montréal m’a donné les bons justificatifs et les délais réels. J’ai gagné des semaines.'
+      'Visa Canada en rade. Une expatriée à Montréal m’a donné les bons justificatifs et les vrais délais. J’ai gagné des semaines.'
   }
 ];
 
@@ -278,12 +227,18 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
   const onTouchEnd: React.TouchEventHandler<HTMLDivElement> = (e) => {
     if (touchStartX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 50) (dx > 0 ? prev() : next());
+    if (Math.abs(dx) > 50) {
+  if (dx > 0) {
+    prev();
+  } else {
+    next();
+  }
+}
     touchStartX.current = null;
   };
 
   const labelType = (t: TypeEchange) =>
-    t === 'avocat' ? 'Appel téléphonique avec un avocat' : 'Appel téléphonique avec un expatrié';
+    t === 'avocat' ? 'Appel avec un avocat' : 'Appel avec un·e expatrié·e';
 
   // handler de fallback d’image
   const onImgError = (e: React.SyntheticEvent<HTMLImageElement>, fallback: string) => {
@@ -379,7 +334,8 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
         }
         aria-label="Précédent"
       >
-        <ChevronLeft className="w-5 h-5 sm:w-6 h-6" />
+        {/* FIX cssConflict: h-5 + h-6 → sm:h-6 */}
+        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
       <button
         onClick={next}
@@ -390,7 +346,8 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
         }
         aria-label="Suivant"
       >
-        <ChevronRightIcon className="w-5 h-5 sm:w-6 h-6" />
+        {/* FIX cssConflict: h-5 + h-6 → sm:h-6 */}
+        <ChevronRightIcon className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
 
       {/* points */}
@@ -492,7 +449,8 @@ const PRICING_PLANS: PricingPlan[] = [
    Page
    ================================ */
 const OptimizedHomePage: React.FC = () => {
-  const { install, canInstall } = usePWAInstall();
+  const { install, canPrompt } = usePWAInstall();
+  const canInstall = !!canPrompt;
 
   const stats: Stat[] = [
     { value: '15K+', label: 'Expatriés aidés',    icon: <Users className="w-8 h-8" />, color: 'from-blue-500 to-cyan-500' },
@@ -502,10 +460,10 @@ const OptimizedHomePage: React.FC = () => {
   ];
 
   const features = [
-    { icon: <Zap className="w-8 h-8" />,        title: 'Connexion instantanée', description: 'Téléphonez à un expert en moins de 5 minutes, 24h/24 et 7j/7', color: 'from-yellow-500 to-orange-500' },
-    { icon: <Shield className="w-8 h-8" />,     title: 'Experts vérifiés',      description: 'Tous nos professionnels sont certifiés et évalués par la communauté', color: 'from-green-500 to-teal-500' },
-    { icon: <Globe className="w-8 h-8" />,      title: 'Couverture mondiale',   description: 'Plus de 50 pays couverts avec des experts locaux', color: 'from-blue-500 to-purple-500' },
-    { icon: <DollarSign className="w-8 h-8" />, title: 'Tarifs transparents',   description: 'Pas de frais cachés, consultations dès 29€', color: 'from-pink-500 to-red-500' }
+    { icon: <Zap className="w-8 h-8" />,        title: 'Connexion instantanée', description: 'Un expert en moins de 5 minutes, 24h/24 et 7j/7.', color: 'from-yellow-500 to-orange-500' },
+    { icon: <Shield className="w-8 h-8" />,     title: 'Experts vérifiés',      description: 'Des pros certifiés et notés par la communauté.', color: 'from-green-500 to-teal-500' },
+    { icon: <Globe className="w-8 h-8" />,      title: 'Couverture mondiale',   description: '50+ pays, des experts locaux proches de vous.', color: 'from-blue-500 to-purple-500' },
+    { icon: <DollarSign className="w-8 h-8" />, title: 'Tarifs transparents',   description: 'Aucun frais caché. Dès 29€ la consultation.', color: 'from-pink-500 to-red-500' }
   ];
 
   const onInstallClick = useCallback(() => { install(); }, [install]);
@@ -544,11 +502,13 @@ const OptimizedHomePage: React.FC = () => {
                 </span>
               </h1>
 
+              {/* H2 - inchangé */}
               <h2 className="text-2xl md:text-3xl text-white font-semibold max-w-4xl mx-auto mb-3 leading-relaxed">
                 Besoin d’aide, d’une solution, d’un coup de main immédiat ?
               </h2>
+              {/* H3 - plus fun */}
               <h3 className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed">
-                Téléphonez à un expert local en moins de 5 minutes, partout dans le monde.
+                Un expert local vous répond en moins de 5&nbsp;minutes, partout sur la planète.
               </h3>
 
               <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
@@ -605,11 +565,13 @@ const OptimizedHomePage: React.FC = () => {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               </div>
 
+              {/* H2 - inchangé */}
               <h2 className="text-5xl font-black text-gray-900 mb-4">
                 Nos <span className="bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">experts</span> à votre service
               </h2>
+              {/* intro plus fun */}
               <p className="text-lg text-gray-700 max-w-3xl mx-auto">
-                En moins de 5 minutes, un expert au téléphone pour résoudre tous vos besoins, où que vous soyez dans le monde et quelle que soit votre langue.
+                Moins de 5&nbsp;minutes, et ça sonne : un expert décroche, où que vous soyez, dans votre langue.
               </p>
             </div>
 
@@ -619,13 +581,6 @@ const OptimizedHomePage: React.FC = () => {
 
         {/* ================= Tarifs (DÉPLACÉ AVANT "Pourquoi choisir") ================= */}
         <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900 relative overflow-hidden" aria-labelledby="pricing-title">
-          {/* 
-            ========= NOTE D'INTÉGRATION (section Tarifs) =========
-            - Exemples de situations RASSEMBLÉS dans un seul bloc commun sous les 2 cartes (pas de distinction).
-            - Pour éditer les bénéfices/labels : modifiez `lawyerBenefits`, `expatBenefits`.
-            - Pour les exemples : éditez les tableaux puis `combinedExamples` (fusion et déduplication).
-          */}
-
           {/* Évite un avertissement si PRICING_PLANS référencé ailleurs */}
           {void PRICING_PLANS.length}
 
@@ -732,7 +687,7 @@ const OptimizedHomePage: React.FC = () => {
               );
             };
 
-            // Bénéfices concis
+            // Bénéfices (syntaxe boostée mais sens identique)
             const expatBenefits: string[] = [
               'Retours d’expérience concrets',
               'Conseils logement, banque, santé, transport',
@@ -750,7 +705,7 @@ const OptimizedHomePage: React.FC = () => {
               'Orientation vers les bonnes procédures'
             ];
 
-            // Exemples (fusionnés en un seul bloc commun, + ajouts)
+            // Exemples (fusionnés en un seul bloc commun)
             const expatExamples: string[] = [
               'Installation : logement, forfait mobile, banque',
               'Scolarité & assurances locales',
@@ -786,9 +741,11 @@ const OptimizedHomePage: React.FC = () => {
                       <Check className="w-5 h-5 text-green-400" />
                     </div>
 
+                    {/* H2 - inchangé */}
                     <h2 id="pricing-title" className="text-5xl font-black text-white mb-4">
                       Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
                     </h2>
+                    {/* intro plus fun */}
                     <p className="text-xl text-gray-300 max-w-3xl mx-auto">
                       Choisissez à qui vous voulez parler… <strong>un avocat</strong> ? <strong>Un expatrié</strong> ?
                     </p>
@@ -802,7 +759,7 @@ const OptimizedHomePage: React.FC = () => {
                       minutes={30}
                       euroPrice={19}
                       usdOverride={25}
-                      description="Conseils pratiques, concrets et locaux."
+                      description="Des conseils concrets, locaux, et tout de suite."
                       features={expatBenefits}
                       accentGradient="from-blue-600 to-indigo-600"
                       icon={<User className="w-4 h-4" />}
@@ -815,7 +772,7 @@ const OptimizedHomePage: React.FC = () => {
                       minutes={20}
                       euroPrice={49}
                       usdOverride={55}
-                      description="Réponse claire et actionnable sur votre cas."
+                      description="Une réponse claire, exploitable, adaptée à votre cas."
                       features={lawyerBenefits}
                       accentGradient="from-red-600 to-red-700"
                       icon={<Briefcase className="w-4 h-4" />}
@@ -834,11 +791,12 @@ const OptimizedHomePage: React.FC = () => {
                       <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-r from-green-500 to-blue-500">
                         <Sparkles className="text-white w-5 h-5" />
                       </div>
+                      {/* H3 - plus fun */}
                       <h3 id="examples-title" className="text-xl md:text-2xl font-extrabold text-white">
-                        Exemples de situations
+                        Situations concrètes
                       </h3>
                       <p className="text-gray-300 text-sm md:text-base">
-                        Un expert, quelle que soit votre situation.
+                        Un expert pour chaque besoin, point.
                       </p>
                     </div>
 
@@ -884,14 +842,6 @@ const OptimizedHomePage: React.FC = () => {
 
         {/* ================= Pourquoi choisir (MODIFIÉ) ================= */}
         <section className="py-32 bg-gradient-to-b from-white to-gray-50" aria-labelledby="why-title">
-          {/*
-            ──────────────────────────────────────────────────────────────
-            NOTE D’ÉDITION (section “Pourquoi choisir SOS Expat”)
-            - Pour modifier textes/icônes : mettez à jour le tableau `advantages`
-              (title, tagline, caption, icon, gradient).
-            - Icônes utilisées : Zap, Clock, Globe (déjà importées).
-            ──────────────────────────────────────────────────────────────
-          */}
           {void features.length}
 
           {(() => {
@@ -908,7 +858,7 @@ const OptimizedHomePage: React.FC = () => {
               {
                 id: 'speed-worldwide',
                 title: 'Un expert en 5 minutes',
-                tagline: 'Le seul service au monde, où que vous soyez.',
+                tagline: 'Le service qui vous suit partout.',
                 caption: 'Partout • 24/7 • < 5 min',
                 icon: <Zap className="w-6 h-6" />,
                 gradient: 'from-red-500 to-orange-500'
@@ -976,11 +926,13 @@ const OptimizedHomePage: React.FC = () => {
             return (
               <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center mb-12 sm:mb-16">
+                  {/* H2 - inchangé */}
                   <h2 id="why-title" className="text-5xl font-black text-gray-900 mb-6">
                     Pourquoi choisir <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">SOS Expats</span> ?
                   </h2>
+                  {/* intro plus fun */}
                   <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
-                    Pensée pour la vitesse, la clarté et l’accompagnement réel — sur mobile d’abord.
+                    Pensé pour aller vite, rester clair et vraiment vous accompagner — mobile d’abord.
                   </p>
                 </div>
 
@@ -994,16 +946,8 @@ const OptimizedHomePage: React.FC = () => {
           })()}
         </section>
 
-        {/* ================= Rejoignez SOS Expat (DÉPLACÉ AVANT AVIS) — FOND SOMBRE ================= */}
+        {/* ================= Rejoignez SOS Expat — FOND SOMBRE ================= */}
         <section className="py-28 bg-gradient-to-b from-gray-900 to-gray-950 relative overflow-hidden" aria-labelledby="join-title">
-          {/*
-            ──────────────────────────────────────────────────────────────
-            SECTION “Rejoignez SOS Expat”
-            - Modifier contenus : `joinTitle`, `joinSubtitle`, puis `lawyerCard` / `expatCard`.
-            - Modifier liens CTA : changez `ctaHref`.
-            - Couleur : teinte de fond sombre. Cartes blanches fixes, teinte plus foncée au hover.
-            ──────────────────────────────────────────────────────────────
-          */}
           {(() => {
             interface JoinCardProps {
               label: string;
@@ -1028,7 +972,6 @@ const OptimizedHomePage: React.FC = () => {
                 <article
                   className="group relative h-full flex flex-col rounded-3xl border border-gray-200 bg-white p-8 sm:p-10 shadow-sm transition-all duration-300 hover:shadow-2xl"
                 >
-                  {/* Teinte fixe + plus foncée au hover */}
                   <div className={`pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br ${gradient} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity duration-300`} />
                   <div className="relative z-10 flex-1 flex flex-col">
                     <div className="flex items-center justify-between">
@@ -1071,6 +1014,7 @@ const OptimizedHomePage: React.FC = () => {
               );
             };
 
+            // H2 via variable — inchangé
             const joinTitle = 'Faites partie du réseau SOS Expat';
             const joinSubtitle =
               'Avocats ou expatriés : rejoignez-nous et transformez vos compétences en opportunités réelles.';
@@ -1132,7 +1076,7 @@ const OptimizedHomePage: React.FC = () => {
           })()}
         </section>
 
-        {/* ================= AVIS (slider auto) — FOND CLAIR (inversé) ================= */}
+        {/* ================= AVIS (slider auto) — FOND CLAIR ================= */}
         <section className="py-28 sm:py-32 bg-gradient-to-b from-white to-gray-50 relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute -top-10 left-1/4 w-80 h-80 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
@@ -1141,7 +1085,6 @@ const OptimizedHomePage: React.FC = () => {
 
           <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-14">
-              {/* Badge rectangle : même fond que les cartes "Rejoignez" (fond blanc + bordure), plus visible */}
               <span className="inline-flex rounded-full p-[1px] bg-gradient-to-r from-yellow-400 to-orange-400 shadow-md mb-5 sm:mb-6">
                 <span className="inline-flex items-center gap-2 rounded-full bg-white px-5 sm:px-6 py-2.5 sm:py-3 border border-yellow-200/70 text-yellow-700">
                   <Star className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1150,11 +1093,13 @@ const OptimizedHomePage: React.FC = () => {
                 </span>
               </span>
 
+              {/* H2 - inchangé */}
               <h2 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
                 Ce que disent nos <span className="bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">utilisateurs</span>
               </h2>
+              {/* intro plus fun */}
               <p className="mt-3 sm:mt-4 text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
-                Témoignages réels, situations variées — pour que chacun puisse s’identifier.
+                Témoignages réels, situations variées — pour que chacun·e s’identifie.
               </p>
             </div>
 
@@ -1162,18 +1107,20 @@ const OptimizedHomePage: React.FC = () => {
           </div>
         </section>
 
-        {/* ================= CTA final — PRÊT À ÊTRE AIDÉ (optimisé) ================= */}
+        {/* ================= CTA final — PRÊT À ÊTRE AIDÉ ================= */}
         <section className="py-32 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20" />
           <div className="relative z-10 max-w-5xl mx-auto text-center px-6">
+            {/* H2 - inchangé */}
             <h2 className="text-5xl md:text-6xl font-black text-white mb-6 md:mb-8">
               Prêt à être aidé ?
             </h2>
+            {/* intro plus fun */}
             <p className="text-xl md:text-2xl text-white/95 mb-10 md:mb-12 leading-relaxed">
-              Rejoignez plus de <strong>15&nbsp;000 expatriés</strong> qui font confiance à SOS Expats pour leurs démarches à l'étranger.
+              Rejoignez plus de <strong>15&nbsp;000 expatriés</strong> qui nous font confiance pour avancer à l’étranger.
             </p>
 
-            {/* Petits points de réassurance */}
+            {/* Réassurance */}
             <div className="mb-10 flex flex-wrap items-center justify-center gap-3 text-white/90">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
                 <Shield className="w-4 h-4" /> Sécurisé

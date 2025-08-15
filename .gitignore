@@ -50,3 +50,13 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+# === secrets & env ===
+.env
+.env.*
+!.env.example
+firebase-debug.log
+serveremails/.env
+firebase/functions/.env
+# Firebase SW config réelle (non versionnée)
+public/firebase-config.js
+!public/firebase-config.example.js

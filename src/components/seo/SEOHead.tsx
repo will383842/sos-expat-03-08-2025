@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
-import { RouteMetadata } from '../config/routes';
+import { RouteMetadata } from '../../config/routes';
 
 interface SEOHeadProps {
   metadata: RouteMetadata;

@@ -39,8 +39,6 @@ export interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   register: (userData: Partial<User>, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  sendVerificationEmail: () => Promise<void>;
-  checkEmailVerification: () => Promise<boolean>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
   getLastLoginInfo: () => { date: Date | null; device: string | null };

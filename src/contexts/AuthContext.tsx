@@ -20,8 +20,8 @@ import {
   getRedirectResult,
   reload,
   sendEmailVerification,
-  fetchSignInMethodsForEmail, // ✅ ajouté
-  deleteUser,                 // ✅ ajouté
+  fetchSignInMethodsForEmail,
+  deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
@@ -73,6 +73,10 @@ interface AuthMetrics {
   roleRestrictionBlocks: number;
 }
 
+interface AppError extends Error {
+  code?: string;
+}
+
 /* =========================================================
    Helpers d’environnement / device
    ========================================================= */
@@ -89,8 +93,7 @@ const getDeviceInfo = (): DeviceInfo => {
 
   const ua = navigator.userAgent;
   const nav = navigator as NavigatorWithConnection;
-  const conn =
-    nav.connection || nav.mozConnection || nav.webkitConnection;
+  const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
 
   const type: DeviceType =
     /Android|iPhone|iPod/i.test(ua) ? 'mobile' :
@@ -118,16 +121,16 @@ const getDeviceInfo = (): DeviceInfo => {
 };
 
 /* =========================================================
-   Helpers email (locaux, pas de nouveau fichier)
+   Helpers email (locaux)
    ========================================================= */
-const normalizeEmail = (s: string) =>
+const normalizeEmail = (s: string): string =>
   (s ?? '')
     .trim()
     .toLowerCase()
-    .replace(/\u00A0/g, '')          // NBSP
-    .replace(/[\u2000-\u200D]/g, ''); // espaces fines / zero-width
+    .replace(/\u00A0/g, '')            // NBSP
+    .replace(/[\u2000-\u200D]/g, '');  // espaces fines / zero-width
 
-const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const isValidEmail = (e: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 type LogPayload = Record<string, unknown>;
 const logAuthEvent = async (type: string, data: LogPayload = {}): Promise<void> => {
@@ -169,7 +172,7 @@ const processProfilePhoto = async (
           return photoUrl.replace(/s\d+-c/, size);
         }
       } catch {
-        // fallback
+        /* no-op */ void 0;
       }
       return '/default-avatar.png';
     }
@@ -383,7 +386,7 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
     lastLoginAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isActive: true,
-  }).catch(() => {});
+  }).catch(() => { /* no-op */ });
 
   return {
     id: firebaseUser.uid,
@@ -539,11 +542,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     return () => unsub();
   }, [firebaseUser?.uid, firebaseUser?.emailVerified]);
 
-  // Écoute l’événement global "availabilityChanged" pour garder le contexte en phase
+  // Écoute l’événement global "availabilityChanged"
   type AvailabilityChangedDetail = { isOnline: boolean };
   type AvailabilityEventName = 'availabilityChanged' | 'availability:changed';
   const availabilityHandler = useCallback((e: Event) => {
-    const ce = e as CustomEvent<AvailabilityChangedDetail>;
+    const ce = (e as CustomEvent<AvailabilityChangedDetail>);
     if (typeof ce.detail?.isOnline === 'boolean') {
       setUser((prev) => (prev ? { ...prev, isOnline: ce.detail.isOnline } as User : prev));
     }
@@ -738,7 +741,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     })();
   }, []);
 
-  // ✅ REGISTER corrigé
+  // REGISTER corrigé (pré-check email + rollback Firestore)
   const register = async (userData: Partial<User>, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
@@ -746,48 +749,48 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     try {
       // Vérifs de base
       if (!userData.role || !['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
-        const e: any = new Error('Rôle utilisateur invalide ou manquant.');
-        e.code = 'sos/invalid-role';
-        throw e;
+        const err = new Error('Rôle utilisateur invalide ou manquant.') as AppError;
+        err.code = 'sos/invalid-role';
+        throw err;
       }
       if (!userData.email || !password) {
-        const e: any = new Error('Email et mot de passe sont obligatoires');
-        e.code = 'sos/missing-credentials';
-        throw e;
+        const err = new Error('Email et mot de passe sont obligatoires') as AppError;
+        err.code = 'sos/missing-credentials';
+        throw err;
       }
       if (password.length < 6) {
-        const e: any = new Error('Le mot de passe doit contenir au moins 6 caractères');
-        e.code = 'auth/weak-password';
-        throw e;
+        const err = new Error('Le mot de passe doit contenir au moins 6 caractères') as AppError;
+        err.code = 'auth/weak-password';
+        throw err;
       }
 
       // Normalisation + validation email
       const email = normalizeEmail(userData.email);
       if (!isValidEmail(email)) {
-        const e: any = new Error('Adresse email invalide');
-        e.code = 'auth/invalid-email';
-        throw e;
+        const err = new Error('Adresse email invalide') as AppError;
+        err.code = 'auth/invalid-email';
+        throw err;
       }
 
-      // ✅ Pré-check dans Auth (source de vérité)
+      // Pré-check Auth
       const methods = await fetchSignInMethodsForEmail(auth, email);
       if (methods.length > 0) {
         if (methods.includes('password')) {
-          const e: any = new Error('Cet email est déjà associé à un compte.');
-          e.code = 'auth/email-already-in-use';
-          throw e;
+          const err = new Error('Cet email est déjà associé à un compte.') as AppError;
+          err.code = 'auth/email-already-in-use';
+          throw err;
         }
         if (methods.includes('google.com')) {
-          const e: any = new Error('Cet email est lié à un compte Google.');
-          e.code = 'sos/email-linked-to-google';
-          throw e;
+          const err = new Error('Cet email est lié à un compte Google.') as AppError;
+          err.code = 'sos/email-linked-to-google';
+          throw err;
         }
-        const e: any = new Error("Email lié à un autre fournisseur d'identité.");
-        e.code = 'sos/email-linked-to-other';
-        throw e;
+        const err = new Error("Email lié à un autre fournisseur d'identité.") as AppError;
+        err.code = 'sos/email-linked-to-other';
+        throw err;
       }
 
-      // ✅ Création Auth
+      // Création Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
       // Photo de profil finale
@@ -798,11 +801,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         finalProfilePhotoURL = userData.profilePhoto;
       }
 
-      // ✅ Création Firestore + rollback si échec (évite comptes "fantômes")
+      // Création Firestore + rollback si échec
       try {
         await createUserDocumentInFirestore(cred.user, {
           ...userData,
-          email, // email normalisé
+          email,
           role: userData.role as User['role'],
           profilePhoto: finalProfilePhotoURL,
           photoURL: finalProfilePhotoURL,
@@ -810,7 +813,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           provider: 'password',
         });
       } catch (docErr) {
-        try { await deleteUser(cred.user); } catch {}
+        try { await deleteUser(cred.user); } catch { /* no-op */ }
         throw docErr;
       }
 
@@ -819,19 +822,20 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         await updateProfile(cred.user, {
           displayName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
           photoURL: finalProfilePhotoURL || null,
-        }).catch(() => {});
+        }).catch(() => { /* no-op */ });
       }
 
       // Email de vérification (non bloquant)
       try {
         await sendEmailVerification(cred.user);
       } catch {
-        // ignore
+        /* no-op */ void 0;
       }
 
       await logAuthEvent('registration_success', { userId: cred.user.uid, role: userData.role });
-    } catch (e: any) {
-      // Mapping d'erreurs clair (ne pas tout mapper vers "email déjà utilisé")
+    } catch (err) {
+      const e = err as AppError;
+      // Mapping d'erreurs clair
       let msg = 'Inscription impossible. Réessayez.';
       switch (e?.code) {
         case 'auth/email-already-in-use':
@@ -851,7 +855,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           msg = e.message || msg;
           break;
         default:
-          // garde message générique
           break;
       }
       setError(msg);
@@ -870,7 +873,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       const uid = user?.id || user?.uid;
       const role = user?.role;
       if (uid && (role === 'lawyer' || role === 'expat')) {
-        // important : forcer offline sur les deux collections
         await Promise.allSettled([writeSosPresence(uid, role, false), writeUsersPresenceBestEffort(uid, false)]);
       }
       await logAuthEvent('logout', { userId: uid });
@@ -888,37 +890,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
     } catch (e) {
       console.error('[Auth] logout error:', e);
-    }
-  };
-
-  const sendVerificationEmailSafe = async (): Promise<void> => {
-    if (!firebaseUser) throw new Error('Aucun utilisateur connecté');
-    try {
-      await sendEmailVerification(firebaseUser);
-      await logAuthEvent('verification_email_sent', { userId: firebaseUser.uid });
-    } catch (e) {
-      setError("Impossible d’envoyer l’email de vérification.");
-      throw e;
-    }
-  };
-
-  const checkEmailVerification = async (): Promise<boolean> => {
-    if (!firebaseUser) return false;
-    try {
-      await reload(firebaseUser);
-      const refreshed = auth.currentUser;
-      if (refreshed?.emailVerified) {
-        await updateDoc(doc(db, 'users', refreshed.uid), {
-          emailVerified: true,
-          isVerifiedEmail: true,
-          updatedAt: serverTimestamp(),
-        }).catch(() => {});
-        await refreshed.getIdToken(true);
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
     }
   };
 
@@ -955,10 +926,8 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     deviceInfo,
     login,
     loginWithGoogle,
-    register, // ✅ version corrigée
+    register,
     logout,
-    sendVerificationEmail: sendVerificationEmailSafe,
-    checkEmailVerification,
     clearError,
     refreshUser,
     getLastLoginInfo,
@@ -968,7 +937,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 };
 
 export default AuthProvider;
-
 /* =========================================================
    Compat : re-export d’un hook useAuth ici aussi
    (pour les imports existants: import { useAuth } from '../contexts/AuthContext')

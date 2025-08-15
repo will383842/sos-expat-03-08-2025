@@ -7,7 +7,9 @@ import { collection, query, where, getDocs, limit as fsLimit, onSnapshot } from 
 import { db } from '../../config/firebase';
 import { getDownloadURL, ref } from 'firebase/storage';
 import { storage } from '../../config/firebase';
-import ModernProfileCard, { Provider } from './ModernProfileCard';
+import ModernProfileCard from './ModernProfileCard';
+import type { Provider } from '@/types/provider';
+
 
 const DEFAULT_AVATAR = '/default-avatar.png';
 

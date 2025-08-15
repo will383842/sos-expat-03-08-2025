@@ -246,7 +246,10 @@ const Pricing: React.FC = () => {
 
               <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight">
                 <span className="bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
-                  {currentText.title}
+                  {language === 'fr' ? 'Tarifs ' : 'Transparent '}
+                </span>
+                <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+                  {language === 'fr' ? 'transparents' : 'pricing'}
                 </span>
               </h1>
 
@@ -292,7 +295,7 @@ const Pricing: React.FC = () => {
                   <div className="mt-4 bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 rounded-2xl flex items-center border border-green-400/30">
                     <CheckCircle className="w-5 h-5 mr-3" />
                     <span className="font-semibold">
-                      {`${currentText.applied} "${activePromo.code}" : ${activePromo.discountValue}${activePromo.discountType === 'percentage' ? '%' : '€'} ${currentText.discount}`}
+                      {`${currentText.applied} "${activePromo.code}" : ${activePromo.discountValue}${activePromo.discountType === 'percentage' ? '%' : '$'} ${currentText.discount}`}
                     </span>
                   </div>
                 )}
@@ -367,11 +370,11 @@ const Pricing: React.FC = () => {
                         <div className="flex items-end gap-3">
                           {hasDiscount ? (
                             <div className="flex items-end gap-3">
-                              <span className="text-gray-500 line-through text-2xl">{originalPrice}€</span>
-                              <span className="text-5xl font-black text-red-600 leading-none">{Math.round(discountedPrice)}€</span>
+                              <span className="text-gray-500 line-through text-2xl">{originalPrice}€ <span className="text-lg">(${originalPrice === 19 ? '25' : originalPrice === 49 ? '55' : Math.round(originalPrice * 1.1)})</span></span>
+                              <span className="text-5xl font-black text-red-600 leading-none">{Math.round(discountedPrice)}€ <span className="text-xl text-red-500">(${Math.round(discountedPrice) === 19 ? '25' : Math.round(discountedPrice) === 49 ? '55' : Math.round(discountedPrice * 1.1)})</span></span>
                             </div>
                           ) : (
-                            <span className="text-5xl font-black text-gray-900 leading-none">{originalPrice}€</span>
+                            <span className="text-5xl font-black text-gray-900 leading-none">{originalPrice}€ <span className="text-xl text-gray-600">(${originalPrice === 19 ? '25' : originalPrice === 49 ? '55' : Math.round(originalPrice * 1.1)})</span></span>
                           )}
                         </div>
                         <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white font-semibold">

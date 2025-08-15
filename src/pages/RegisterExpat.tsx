@@ -456,7 +456,7 @@ const PreviewCard = ({
           <p className="text-xs font-semibold text-gray-700 mb-1">{t.helpDomains}</p>
           <div className="flex flex-wrap gap-2">
             {helpTypes.map((h, i) => (
-              <span key={`${h}-${i}`} className="px-2 py-1 rounded-lg bg-white text-gray-800 text-xs border border-emerald-200">
+              <span key={`${h}-${i}`} className="px-2 py-1 rounded-lg bg-white text-gray-800 text-xs border-emerald-200 border">
                 {h}
               </span>
             ))}
@@ -632,7 +632,8 @@ const RegisterExpat: React.FC = () => {
   const valid = useMemo(() => ({
     firstName: !!form.firstName.trim(),
     lastName: !!form.lastName.trim(),
-    email: EMAIL_REGEX.test(form.email) && emailStatus.isAvailable !== false,
+    // 👉 pré-check email seulement informatif : on ne bloque que sur le format ici
+    email: EMAIL_REGEX.test(form.email),
     password: form.password.length >= 6,
     phone: !!form.phone.trim(),
     whatsappNumber: !!form.whatsappNumber.trim(),
@@ -645,7 +646,7 @@ const RegisterExpat: React.FC = () => {
     languages: (selectedLanguages as LanguageOption[]).length > 0,
     helpTypes: form.helpTypes.length > 0,
     acceptTerms: form.acceptTerms,
-  }), [form, selectedLanguages, emailStatus]);
+  }), [form, selectedLanguages]);
 
   // ---- Progress ----
   const progress = useMemo(() => {
@@ -744,7 +745,7 @@ const RegisterExpat: React.FC = () => {
     if (!valid.lastName) e.lastName = t.errors.lastNameRequired;
     if (!form.email.trim()) e.email = t.errors.emailRequired;
     else if (!EMAIL_REGEX.test(form.email)) e.email = t.errors.emailInvalid;
-    else if (emailStatus.isAvailable === false) e.email = t.errors.emailTaken;
+    // ⚠️ Ne bloque plus sur le pré-check d'unicité (Firebase fera foi au submit)
     if (!valid.password) e.password = t.errors.passwordTooShort;
     if (!valid.phone) e.phone = t.errors.phoneRequired;
     if (!valid.whatsappNumber) e.whatsappNumber = t.errors.whatsappRequired;
@@ -764,7 +765,7 @@ const RegisterExpat: React.FC = () => {
       return false;
     }
     return true;
-  }, [form, valid, emailStatus, t]);
+  }, [form, valid, t]);
 
   // Scroll vers le premier champ incomplet
   const scrollToFirstIncomplete = useCallback(() => {
@@ -1245,18 +1246,20 @@ const RegisterExpat: React.FC = () => {
                       )}
 
                       <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
-                        <MultiLanguageSelect
-                          value={selectedLanguages}
-                          onChange={(v: MultiValue<LanguageOption>) => {
-                            setSelectedLanguages(v);
-                            if (fieldErrors.languages) {
-                              setFieldErrors((prev) => {
-                                const rest = { ...prev };
-                                delete rest.languages;
-                                return rest;
-                              });
-                            }
-                          }}
+                       <MultiLanguageSelect
+                        value={selectedLanguages}
+                        onChange={(v: MultiValue<LanguageOption>) => {
+                          setSelectedLanguages(v);
+                          if (fieldErrors.languages) {
+                            setFieldErrors((prev) => {
+                              const rest = { ...prev };
+                              delete rest.languages;
+                              return rest;
+                            });
+                          }
+                        }}
+                        locale={lang}
+                        placeholder={lang === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
                         />
                       </Suspense>
 
@@ -1455,5 +1458,3 @@ const RegisterExpat: React.FC = () => {
 };
 
 export default RegisterExpat;
-
-

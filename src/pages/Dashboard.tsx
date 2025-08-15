@@ -338,18 +338,62 @@ const Dashboard: React.FC = () => {
     if (!user) navigate('/login');
   }, [user, navigate]);
 
-  // Status en temps réel
+  // --- MAJ instantanée via l'événement global émis par AvailabilityToggle ---
+  const handleAvailabilityEvent = useCallback((evt: Event) => {
+    const e = evt as CustomEvent<{ isOnline: boolean }>;
+    setCurrentStatus(!!e.detail?.isOnline);
+  }, []);
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(
-      doc(db, 'users', user.id),
-      (s) => {
-        if (s.exists()) setCurrentStatus(((s.data() as { isOnline?: boolean })?.isOnline) === true);
+    window.addEventListener('availability:changed', handleAvailabilityEvent as EventListener);
+    return () => window.removeEventListener('availability:changed', handleAvailabilityEvent as EventListener);
+  }, [handleAvailabilityEvent]);
+
+  // Status en temps réel (priorité = sos_profiles, fallback = users)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const sosRef = doc(db, 'sos_profiles', user.id);
+    const userRef = doc(db, 'users', user.id);
+
+    let unsubUsers: null | (() => void) = null;
+
+    const unsubSos = onSnapshot(
+      sosRef,
+      (snap) => {
+        if (snap.exists()) {
+          if (unsubUsers) {
+            unsubUsers();
+            unsubUsers = null;
+          }
+          const data = snap.data() as { isOnline?: boolean };
+          setCurrentStatus(data?.isOnline === true);
+        } else {
+          if (!unsubUsers) {
+            unsubUsers = onSnapshot(
+              userRef,
+              (s) => {
+                if (s.exists()) {
+                  const udata = s.data() as { isOnline?: boolean };
+                  setCurrentStatus(udata?.isOnline === true);
+                }
+              },
+              () => {
+                /* silent */
+              }
+            );
+          }
+        }
       },
-      () => {}
+      () => {
+        /* silent */
+      }
     );
-    return () => unsub();
-  }, [user]);
+
+    return () => {
+      unsubSos();
+      if (unsubUsers) unsubUsers();
+    };
+  }, [user?.id]);
 
   // Favoris
   useEffect(() => {
@@ -595,7 +639,22 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  if (!user) return null;
+  // Logout sans écran blanc
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  }, [logout, navigate]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
+        {language === 'fr' ? 'Redirection…' : 'Redirecting…'}
+      </div>
+    );
+  }
 
   // ===============================
   // Rendu
@@ -687,7 +746,7 @@ const Dashboard: React.FC = () => {
 
                     <li>
                       <button
-                        onClick={logout}
+                        onClick={handleLogout}
                         className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50"
                       >
                         <LogOut className="mr-3 h-5 w-5" />
@@ -1018,16 +1077,17 @@ const Dashboard: React.FC = () => {
                           {language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
                         </label>
                         <MultiLanguageSelect
-                          value={selectedLanguages}
-                          onChange={(opts) => {
-                            const normalized = (opts || []).map((o) => ({ value: o.value, label: o.label }));
-                            setSelectedLanguages(normalized);
-                            setProfileData((p) => ({ ...p, languages: normalized.map((o) => o.value) }));
-                          }}
-                          providerLanguages={[]}
-                          highlightShared
-                          locale={language === 'fr' ? 'fr' : 'en'}
-                        />
+                        value={selectedLanguages}
+                        onChange={(opts) => {
+                          const normalized = (opts || []).map((o) => ({ value: o.value, label: o.label }));
+                          setSelectedLanguages(normalized);
+                          setProfileData((p) => ({ ...p, languages: normalized.map((o) => o.value) }));
+                        }}
+                        providerLanguages={[]}
+                        highlightShared
+                        locale={language === 'fr' ? 'fr' : 'en'}
+                        placeholder={language === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
+                      />
                       </div>
 
                       <div className="md:col-span-2">

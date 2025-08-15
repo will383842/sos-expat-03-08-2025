@@ -961,19 +961,19 @@ const BookingRequest: React.FC = () => {
 
                     <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
                       <MultiLanguageSelect
-                        value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
-                        onChange={(selected) => {
-                          const selectedLangs = selected
-                            .map((opt: any) => languages.find((lang: any) => lang.code === opt.value))
-                            .filter(Boolean) as Language[];
-                          setLanguagesSpoken(selectedLangs);
-                          if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });
-                        }}
-                        providerLanguages={provider?.languages || provider?.languagesSpoken || []}
-                        highlightShared
-                        locale={language}
-                        showLanguageToggle={false}
-                      />
+                      value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
+                      onChange={(selected) => {
+                        const selectedLangs = selected
+                          .map((opt: any) => languages.find((lang: any) => lang.code === opt.value))
+                          .filter(Boolean) as Language[];
+                        setLanguagesSpoken(selectedLangs);
+                        if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });
+                      }}
+                      providerLanguages={provider?.languages || provider?.languagesSpoken || []}
+                      highlightShared
+                      locale={lang}
+                      showLanguageToggle={false}
+                    />
                     </Suspense>
 
                     {fieldErrors.languages && <p className="mt-2 text-sm text-red-600">{fieldErrors.languages}</p>}

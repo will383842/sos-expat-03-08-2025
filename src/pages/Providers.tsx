@@ -5,7 +5,8 @@ import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import { collection, query, getDocs, limit, where, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Provider, normalizeProvider, validateProvider } from '../types/Provider';
+import type { Provider } from '../types/provider';
+import { normalizeProvider, validateProvider } from '../types/provider';
 
 type ProviderType = 'all' | 'lawyer' | 'expat';
 type SortOption = 'rating' | 'price' | 'experience';

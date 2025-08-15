@@ -23,7 +23,7 @@ const SendToAll: React.FC = () => {
       }
 
       setStatus(`Email envoyé à ${filteredEmails.length} utilisateurs ✅`);
-    } catch (err: any) {
+    } catch (err) {
       setStatus('Erreur ❌ ' + err.message);
     }
   };

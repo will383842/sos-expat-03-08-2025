@@ -1,7 +1,6 @@
 ﻿import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  sendEmailVerification,
   sendPasswordResetEmail,
   updateProfile,
   signOut,
@@ -85,8 +84,7 @@ const registerUser = async (userData: Partial<User>, password: string): Promise<
       photoURL: userData.profilePhoto || null
     });
     
-    // Envoyer l'email de vérification
-    await sendEmailVerification(firebaseUser, verificationEmailConfig[userLanguage]);
+
     
     // Créer le document utilisateur dans Firestore
     const userDocData = {
@@ -401,10 +399,7 @@ export const sendVerificationEmail = async (userLanguage?: string) => {
       }
     }
     
-    // Utiliser la configuration correspondant à la langue
-    const emailConfig = verificationEmailConfig[userLanguage] || verificationEmailConfig.fr;
     
-    await sendEmailVerification(auth.currentUser, emailConfig);
     
     // Enregistrer l'événement
     await addDoc(collection(db, 'logs'), {
@@ -518,20 +513,7 @@ export const isEmailVerified = async (): Promise<boolean> => {
   });
 };
 
-// Mettre à jour le statut de vérification d'email dans Firestore
-const updateEmailVerificationStatus = async (userId: string, isVerified: boolean): Promise<void> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      emailVerified: isVerified,
-      isVerifiedEmail: isVerified,
-      updatedAt: serverTimestamp()
-    });
-  } catch (error) {
-    console.error('Error updating email verification status:', error);
-    throw error;
-  }
-};
+
 
 // Vérifier si l'utilisateur est banni
 export const isUserBanned = async (userId: string): Promise<boolean> => {
@@ -608,7 +590,6 @@ export {
   initRecaptcha,
   sendVerificationSMS,
   getUserData,
-  updateEmailVerificationStatus,
   isUserApproved,
   isUserAdmin
 }; 0 0 0 0

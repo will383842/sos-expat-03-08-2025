@@ -6,14 +6,15 @@ import { logError } from '../../utils/logging';
 import { Tabs, Tab } from "../../components/ui/tabs"; 
 
 // Importation des composants des pages (à créer)
-import CampaignsPage from "./CampaignsPage";
-import TemplatesManager from "./TemplatesManager";
-import SendToContact from "./SendToContact";
-import SendToOne from "./SendToOne";
-import SendToRoles from "./SendToRoles";
-import SendToSelection from "./SendToSelection";
-import LogsPage from "./LogsPage";
-import EmailPreviewModal from "./EmailPreviewModal";
+import CampaignsPage from "../../emails/admin/AdminEmails/CampaignsPage";
+import TemplatesManager from "../../emails/admin/AdminEmails/TemplatesManager";
+import SendToContact from "../../emails/admin/AdminEmails/SendToContact";
+import SendToOne from "../../emails/admin/AdminEmails/SendToOne";
+import SendToRoles from "../../emails/admin/AdminEmails/SendToRoles";
+import SendToSelection from "../../emails/admin/AdminEmails/SendToSelection";
+import LogsPage from "../../emails/admin/AdminEmails/LogsPage";
+import EmailPreviewModal from "../../emails/admin/AdminEmails/EmailPreviewModal";
+
 
 const AdminEmailsPage: React.FC = () => {
   const { user } = useAuth();

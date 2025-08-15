@@ -1263,18 +1263,19 @@ const RegisterExpat: React.FC = () => {
                         <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                       </label>
                       <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                        <ImageUploader
-                          locale={lang}
-                          currentImage={form.profilePhoto}
-                          onImageUploaded={(url: string) => {
-                            setForm((prev) => ({ ...prev, profilePhoto: url }));
-                            // Remonter vers le premier champ manquant après l’upload
-                            setTimeout(() => { scrollToFirstIncomplete(); }, 150);
-                          }}
-                          hideNativeFileLabel
-                          cropShape="round"
-                          outputSize={512}
-                        />
+                      <ImageUploader
+                        locale={lang}
+                        currentImage={form.profilePhoto}
+                        onImageUploaded={(url: string) => {
+                          setForm((prev) => ({ ...prev, profilePhoto: url }));
+                          setTimeout(() => { scrollToFirstIncomplete(); }, 150);
+                        }}
+                        hideNativeFileLabel
+                        cropShape="round"
+                        outputSize={512}
+                        uploadPath="registration_temp"
+                        isRegistration={true}
+                      />
                       </Suspense>
                       {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                       <p className="text-xs text-gray-500 mt-1">

@@ -1327,20 +1327,21 @@ const RegisterLawyer: React.FC = () => {
                         <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                       </label>
                       <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                        <ImageUploader
-                          locale={lang}
-                          currentImage={form.profilePhoto}
-                          onImageUploaded={(url: string) => {
-                            setForm((prev) => ({ ...prev, profilePhoto: url }));
-                            setFieldErrors((prev) => ({ ...prev, profilePhoto: '' }));
-                            setTouched((p) => ({ ...p, profilePhoto: true }));
-                            // Après upload, on continue au premier champ manquant (évite de se retrouver en bas)
-                            setTimeout(focusFirstMissingField, 80);
-                          }}
-                          hideNativeFileLabel
-                          cropShape="round"
-                          outputSize={512}
-                        />
+                      <ImageUploader
+                        locale={lang}
+                        currentImage={form.profilePhoto}
+                        onImageUploaded={(url: string) => {
+                          setForm((prev) => ({ ...prev, profilePhoto: url }));
+                          setFieldErrors((prev) => ({ ...prev, profilePhoto: '' }));
+                          setTouched((p) => ({ ...p, profilePhoto: true }));
+                          setTimeout(focusFirstMissingField, 80);
+                        }}
+                        hideNativeFileLabel
+                        cropShape="round"
+                        outputSize={512}
+                        uploadPath="registration_temp"
+                        isRegistration={true}
+                      />
                       </Suspense>
                       <FieldError error={fieldErrors.profilePhoto} show={!!fieldErrors.profilePhoto} />
                       <p className="text-xs text-gray-500 mt-1">

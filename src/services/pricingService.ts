@@ -1,6 +1,13 @@
-// src/services/pricingService.ts
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+// functions/src/services/pricingService.ts
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps } from 'firebase-admin/app';
+
+// Initialiser Firebase Admin si pas déjà fait
+if (!getApps().length) {
+  initializeApp();
+}
+
+const db = getFirestore();
 
 export interface ServiceConfig {
   totalAmount: number;
@@ -38,9 +45,9 @@ const DEFAULT_PRICING_CONFIG: PricingConfig = {
  */
 export const getPricingConfig = async (): Promise<PricingConfig> => {
   try {
-    const configDoc = await getDoc(doc(db, 'admin_config', 'pricing'));
+    const configDoc = await db.collection('admin_config').doc('pricing').get();
     
-    if (configDoc.exists()) {
+    if (configDoc.exists) {
       const data = configDoc.data() as PricingConfig;
       
       // Validation des données
@@ -73,32 +80,13 @@ export const getServicePricing = async (
 
 /**
  * 🔥 DÉTECTION AUTOMATIQUE DE LA DEVISE selon la localisation
+ * Note: Cette fonction est principalement pour le frontend, 
+ * dans les Functions elle retournera toujours 'eur' par défaut
  */
 export const detectUserCurrency = (): 'eur' | 'usd' => {
   try {
-    // 1. Préférence utilisateur stockée
-    const savedCurrency = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
-    if (savedCurrency && ['eur', 'usd'].includes(savedCurrency)) {
-      return savedCurrency;
-    }
-
-    // 2. Détection via timezone/locale du navigateur
-    const userLocale = navigator.language || 'fr-FR';
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
-    // Zones USD prioritaires
-    const usdZones = [
-      'America/', 'US/', 'Pacific/Honolulu', 'Pacific/Midway',
-      'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles'
-    ];
-    
-    const usdLocales = ['en-US', 'en-CA'];
-    
-    if (usdZones.some(zone => timezone.startsWith(zone)) || usdLocales.includes(userLocale)) {
-      return 'usd';
-    }
-
-    // 3. Fallback EUR pour l'Europe et le reste
+    // Dans l'environnement Functions, on ne peut pas accéder au localStorage ou navigator
+    // On retourne EUR par défaut
     return 'eur';
   } catch {
     return 'eur'; // Fallback sécurisé
@@ -106,11 +94,11 @@ export const detectUserCurrency = (): 'eur' | 'usd' => {
 };
 
 /**
- * Calcule les montants basés sur la configuration admin + devise auto
+ * Calcule les montants basés sur la configuration admin + devise
  */
 export const calculateServiceAmounts = async (
   serviceType: 'lawyer' | 'expat',
-  currency?: 'eur' | 'usd'
+  currency: 'eur' | 'usd' = 'eur'
 ): Promise<{
   totalAmount: number;
   connectionFeeAmount: number;
@@ -118,8 +106,7 @@ export const calculateServiceAmounts = async (
   duration: number;
   currency: string;
 }> => {
-  const finalCurrency = currency || detectUserCurrency();
-  const config = await getServicePricing(serviceType, finalCurrency);
+  const config = await getServicePricing(serviceType, currency);
   
   return {
     totalAmount: config.totalAmount,
@@ -164,42 +151,6 @@ const isValidServiceConfig = (config: any): config is ServiceConfig => {
     config.providerAmount >= 0 &&
     config.duration > 0
   );
-};
-
-/**
- * Hook React pour utiliser la configuration pricing
- */
-import { useState, useEffect } from 'react';
-
-export const usePricingConfig = () => {
-  const [config, setConfig] = useState<PricingConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const pricingConfig = await getPricingConfig();
-        setConfig(pricingConfig);
-      } catch (err) {
-        console.error('Erreur chargement pricing config:', err);
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
-        setConfig(DEFAULT_PRICING_CONFIG); // Fallback
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadConfig();
-  }, []);
-
-  const refreshConfig = async () => {
-    await loadConfig();
-  };
-
-  return { config, loading, error, refreshConfig };
 };
 
 /**

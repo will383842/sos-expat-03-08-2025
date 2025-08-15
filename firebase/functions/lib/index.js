@@ -37,9 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createPaymentIntent = exports.createAndScheduleCall = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = exports.initPricing = void 0;
-var initPricing_1 = require("./initPricing");
-Object.defineProperty(exports, "initPricing", { enumerable: true, get: function () { return initPricing_1.initPricing; } });
+exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createPaymentIntent = exports.createAndScheduleCall = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
 // Export des webhooks modernisés (remplace les anciens)
 // Configuration globale pour toutes les fonctions
 const v2_1 = require("firebase-functions/v2");

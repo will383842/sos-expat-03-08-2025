@@ -47,23 +47,23 @@ const I18N: Record<Locale, I18n> = {
     errors: {
       unsupportedFormat: 'Format non supporté. Formats acceptés: JPG, PNG, WEBP, GIF, HEIC, BMP, TIFF, AVIF',
       fileTooLarge: (sizeMB: number, maxSizeMB: number) => `L'image ne doit pas dépasser ${maxSizeMB}MB (actuelle: ${sizeMB.toFixed(1)}MB)`,
-      uploadFailed: (error: string) => `Erreur d’upload: ${error}`,
-      previewFailed: 'Erreur lors de la création de l’aperçu',
+      uploadFailed: (error: string) => `Erreur d'upload: ${error}`,
+      previewFailed: "Erreur lors de la création de l'aperçu",
       deleteFailed: 'Erreur lors de la suppression',
       imageLoadError: 'Erreur de chargement',
       cameraNotSupported: 'Caméra non supportée sur cet appareil',
-      cameraAccessFailed: 'Impossible d’accéder à la caméra',
+      cameraAccessFailed: "Impossible d'accéder à la caméra",
     },
     ui: {
-      dropHere: 'Déposez l’image ici',
+      dropHere: "Déposez l'image ici",
       clickOrDrag: 'Cliquez ou glissez une image',
       formatInfo: (maxSizeMB: number) => `JPG, PNG, WEBP, GIF, HEIC • Max ${maxSizeMB}MB`,
       uploading: (p: number) => `Upload en cours... ${p}%`,
       uploadSuccess: 'Image uploadée avec succès !',
-      replaceImage: 'Remplacer l’image',
-      removeImage: 'Supprimer l’image',
+      replaceImage: "Remplacer l'image",
+      removeImage: "Supprimer l'image",
       profileImage: 'Photo de profil',
-      converting: 'Conversion de l’image...',
+      converting: "Conversion de l'image...",
       takePhoto: 'Prendre une photo',
       chooseFromGallery: 'Galerie',
       webcamInfo: 'Ou utilisez la webcam via les boutons de remplacement',
@@ -141,7 +141,7 @@ const useDropzone = (opts: UseDropzoneOptions) => {
     if (files.length) opts.onDrop(files);
   };
   const acceptString = useMemo(() => {
-    // pour l’input, concatène le type + extensions
+    // pour l'input, concatène le type + extensions
     const parts = new Set<string>([
       ...Object.keys(opts.accept),
       ...Object.values(opts.accept).flat().map(String)
@@ -325,6 +325,7 @@ interface ImageUploaderProps {
   cropShape?: 'rect' | 'round';
   locale?: Locale;
   hideNativeFileLabel?: boolean;
+  isRegistration?: boolean;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -339,6 +340,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   outputSize = 512,
   cropShape = 'rect',
   locale = 'fr',
+  isRegistration = false,
 }) => {
   const t = I18N[locale];
 
@@ -460,7 +462,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     const processed = await (file instanceof File ? processImage(file) : processImage(new File([file], 'image.jpg', { type: 'image/jpeg' })));
     const ext = (processed.name.split('.').pop() || 'jpg').toLowerCase();
     const fileName = `${generateUniqueId()}.${ext}`;
-    const refObj: StorageReference = storageRef(storage, `${uploadPath}/${fileName}`);
+    const finalUploadPath = isRegistration ? 'registration_temp' : uploadPath;
+    const refObj: StorageReference = storageRef(storage, `${finalUploadPath}/${fileName}`);
 
     return new Promise((resolve, reject) => {
       const task = uploadBytesResumable(refObj, processed);
@@ -484,7 +487,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         }
       );
     });
-  }, [uploadPath, processImage]);
+  }, [uploadPath, processImage, isRegistration]);
 
   const handleFileSelect = useCallback(async (files: File[]) => {
     const file = files?.[0];
@@ -838,3 +841,4 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 };
 
 export default ImageUploader;
+

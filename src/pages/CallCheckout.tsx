@@ -18,6 +18,8 @@ import { httpsCallable, HttpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
+import { detectUserCurrency, calculateServiceAmounts, usePricingConfig } from '../services/pricingService';
+import { CurrencySelector } from '../components/checkout/CurrencySelector';
 
 /* ------------------------------ Stripe init ------------------------------ */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
@@ -32,6 +34,7 @@ interface ServiceData {
   clientPhone: string;
   commissionAmount: number;
   providerAmount: number;
+  currency?: string;
 }
 
 interface User {
@@ -82,7 +85,6 @@ interface CreateAndScheduleCallData {
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
-  /* facultatif: on passe le WhatsApp côté backend via champ optionnel */
   clientWhatsapp?: string;
 }
 
@@ -103,8 +105,7 @@ const getGtag = (): GtagFunction | undefined =>
 /* -------------------------------- i18n ----------------------------------- */
 type Lang = 'fr' | 'en';
 const useTranslation = () => {
-  // Si vous avez un contexte i18n global, branchez-le ici.
-  const { language: ctxLang } = { language: 'fr' as Lang }; // fallback minimal
+  const { language: ctxLang } = { language: 'fr' as Lang };
   const language: Lang = (ctxLang === 'en' ? 'en' : 'fr');
 
   const dict: Record<string, Record<Lang, string>> = {
@@ -240,7 +241,6 @@ const useSEO = (meta: {
       el.content = content;
     };
 
-    // Basic + OpenGraph + Twitter
     updateMeta('description', meta.description);
     updateMeta('keywords', meta.keywords);
     updateMeta('robots', 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
@@ -269,7 +269,6 @@ const useSEO = (meta: {
     updateMeta('twitter:image', meta.twitterImagePath);
     updateMeta('twitter:image:alt', meta.twitterImageAlt);
 
-    // Canonical & alternates
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement('link');
@@ -292,7 +291,6 @@ const useSEO = (meta: {
     xDef.href = meta.alternateUrls.fr;
     document.head.appendChild(xDef);
 
-    // JSON-LD
     let ld = document.querySelector('#structured-data') as HTMLScriptElement | null;
     if (!ld) {
       ld = document.createElement('script');
@@ -306,7 +304,7 @@ const useSEO = (meta: {
 
 /* ------------------------ Helpers: device & phone utils ------------------ */
 const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
-const isValidE164ish = (val: string) => /^\+?[1-9]\d{6,14}$/.test(val); // simple, robuste
+const isValidE164ish = (val: string) => /^\+?[1-9]\d{6,14}$/.test(val);
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -319,7 +317,6 @@ const useIsMobile = () => {
       mq.addEventListener('change', update);
       return () => mq.removeEventListener('change', update);
     } else {
-      // Safari < 14 fallback
       // @ts-ignore
       mq.addListener(update);
       // @ts-ignore
@@ -370,21 +367,24 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
   const elements = useElements();
   const { t, language } = useTranslation();
 
+  const serviceCurrency = (service.currency || 'eur').toLowerCase() as 'eur' | 'usd';
+  const currencySymbol = serviceCurrency === 'usd' ? '$' : '€';
+  const stripeCurrency = serviceCurrency;
+
   const validatePaymentData = useCallback(() => {
     if (!stripe || !elements) throw new Error(t('err.invalidConfig'));
     if (!user?.uid) throw new Error(t('err.unauth'));
     if (provider.id === user.uid) throw new Error(t('err.sameUser'));
-    if (service.amount < 5) throw new Error(t('err.minAmount'));
-    if (service.amount > 500) throw new Error(t('err.maxAmount'));
+    if (service.amount < (serviceCurrency === 'usd' ? 5 : 5)) throw new Error(t('err.minAmount'));
+    if (service.amount > (serviceCurrency === 'usd' ? 500 : 500)) throw new Error(t('err.maxAmount'));
 
     const total = Math.round((service.commissionAmount + service.providerAmount) * 100) / 100;
     const amountRounded = Math.round(service.amount * 100) / 100;
     if (Math.abs(amountRounded - total) > 0.01) throw new Error(t('err.amountSplit'));
-  }, [stripe, elements, user, provider, service, t]);
+  }, [stripe, elements, user, provider, service, t, serviceCurrency]);
 
   const persistPaymentDocs = useCallback(
     async (paymentIntentId: string) => {
-      // Enregistrements Firestore (robustes, non bloquants pour l'UX si jamais ça échoue)
       const baseDoc = {
         paymentIntentId,
         providerId: provider.id,
@@ -400,7 +400,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         amount: service.amount,
         commissionAmount: service.commissionAmount,
         providerAmount: service.providerAmount,
-        currency: 'eur',
+        currency: serviceCurrency,
         status: 'succeeded',
         createdAt: serverTimestamp(),
       };
@@ -421,12 +421,13 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         console.warn('provider payments mirror write error:', e);
       }
     },
-    [clientWhatsapp, provider, service, user]
+    [clientWhatsapp, provider, service, user, serviceCurrency]
   );
 
   const handlePaymentSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isProcessing) return; // anti double-click
+    if (isProcessing) return;
+    
     try {
       setIsProcessing(true);
       validatePaymentData();
@@ -438,10 +439,10 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         amount: service.amount,
         commissionAmount: service.commissionAmount,
         providerAmount: service.providerAmount,
-        currency: 'eur',
+        currency: stripeCurrency,
         serviceType: service.serviceType,
         providerId: provider.id,
-        clientId: user.uid!, // safe after validation
+        clientId: user.uid!,
         clientEmail: user.email || '',
         providerName: provider.fullName || provider.name || '',
         description: service.serviceType === 'lawyer_call'
@@ -453,6 +454,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
           clientPhone: service.clientPhone,
           clientWhatsapp: clientWhatsapp || '',
+          currency: serviceCurrency,
           timestamp: new Date().toISOString()
         }
       };
@@ -461,7 +463,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
       const clientSecret = res.data.clientSecret;
       if (!clientSecret) throw new Error(t('err.noClientSecret'));
 
-      // Choix de l'élément carte : mobile => CardElement (champ unique) / desktop => CardNumberElement
       const chosenCardElement = isMobile
         ? elements!.getElement(CardElement)
         : elements!.getElement(CardNumberElement);
@@ -490,7 +491,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         throw new Error(`${t('err.unexpectedStatus')}: ${status}`);
       }
 
-      // Ecritures Firestore (best-effort)
       await persistPaymentDocs(paymentIntent.id);
 
       const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
@@ -518,6 +518,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         service_type: service.serviceType,
         provider_id: provider.id,
         payment_intent: paymentIntent.id,
+        currency: serviceCurrency,
+        amount: service.amount,
       });
 
       onSuccess(paymentIntent.id);
@@ -543,7 +545,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     clientWhatsapp,
     language,
     isMobile,
-    persistPaymentDocs
+    persistPaymentDocs,
+    stripeCurrency,
+    serviceCurrency
   ]);
 
   const providerDisplayName = useMemo(
@@ -560,7 +564,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
   return (
     <form onSubmit={handlePaymentSubmit} className="space-y-4" noValidate>
-      {/* Champs carte : mobile = champ unique / desktop = 3 champs comme avant */}
       <div className="space-y-4">
         <label className="block text-sm font-semibold text-gray-700">
           <div className="flex items-center space-x-2">
@@ -570,7 +573,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         </label>
 
         {isMobile ? (
-          // ********* MOBILE: champ unique pour une UX ultra simple *********
           <div className="space-y-2" aria-live="polite">
             <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
               {t('card.number')}
@@ -590,9 +592,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
             </div>
           </div>
         ) : (
-          // ********* DESKTOP: on garde EXACTEMENT les 3 champs *********
           <>
-            {/* Numéro de carte */}
             <div className="space-y-2">
               <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
                 {t('card.number')}
@@ -607,7 +607,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
               </div>
             </div>
 
-            {/* Expiration / CVC */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
@@ -640,7 +639,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         )}
       </div>
 
-      {/* Récapitulatif */}
+      {/* Récapitulatif avec devise dynamique */}
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
         <h4 className="font-semibold text-gray-900 mb-3 text-sm">{t('summary.title')}</h4>
         <div className="space-y-2 text-sm">
@@ -672,11 +671,15 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           <div className="border-t border-gray-300 pt-2 mt-2">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">{t('summary.fee')}</span>
-              <span className="font-medium text-gray-800 text-xs">{service.commissionAmount.toFixed(2)} €</span>
+              <span className="font-medium text-gray-800 text-xs">
+                {service.commissionAmount.toFixed(2)} {currencySymbol}
+              </span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-gray-600">{t('summary.consult')}</span>
-              <span className="font-medium text-gray-800 text-xs">{service.providerAmount.toFixed(2)} €</span>
+              <span className="font-medium text-gray-800 text-xs">
+                {service.providerAmount.toFixed(2)} {currencySymbol}
+              </span>
             </div>
           </div>
 
@@ -684,14 +687,14 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
             <div className="flex justify-between items-center">
               <span className="font-bold text-gray-900">{t('summary.total')}</span>
               <span className="text-lg font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                {service.amount.toFixed(2)} €
+                {service.amount.toFixed(2)} {currencySymbol}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bouton payer */}
+      {/* Bouton payer avec devise */}
       <button
         type="submit"
         disabled={!stripe || isProcessing}
@@ -704,7 +707,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
             : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-lg hover:shadow-xl'
           }
         `}
-        aria-label={`${t('btn.pay')} ${service.amount.toFixed(2)}€`}
+        aria-label={`${t('btn.pay')} ${service.amount.toFixed(2)}${currencySymbol}`}
       >
         {isProcessing ? (
           <div className="flex items-center justify-center space-x-2">
@@ -714,7 +717,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         ) : (
           <div className="flex items-center justify-center space-x-2">
             <Lock className="w-5 h-5" aria-hidden="true" />
-            <span>{t('btn.pay')} {service.amount.toFixed(2)}€</span>
+            <span>{t('btn.pay')} {service.amount.toFixed(2)}{currencySymbol}</span>
           </div>
         )}
       </button>
@@ -739,8 +742,33 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  
+  // Configuration pricing
+  const { config: pricingConfig, loading: pricingLoading, error: pricingError } = usePricingConfig();
 
-  // Récup provider (pas de mocks)
+  // État pour la devise sélectionnée
+  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
+    if (serviceData?.currency && ['eur', 'usd'].includes(serviceData.currency)) {
+      return serviceData.currency as 'eur' | 'usd';
+    }
+    
+    try {
+      const saved = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
+      if (saved && ['eur', 'usd'].includes(saved)) return saved;
+    } catch {}
+    
+    return detectUserCurrency();
+  });
+
+  // Sauvegarder la devise sélectionnée
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('selectedCurrency', selectedCurrency);
+      localStorage.setItem('preferredCurrency', selectedCurrency);
+    } catch {}
+  }, [selectedCurrency]);
+
+  // Récup provider
   const provider = useMemo<Provider | null>(() => {
     if (selectedProvider?.id) return normalizeProvider(selectedProvider);
     try {
@@ -755,56 +783,52 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     return null;
   }, [selectedProvider]);
 
-  // Récup service (pas de mocks)
-  const baseService = useMemo<ServiceData | null>(() => {
-    if (serviceData?.amount && provider?.id) {
-      return {
-        providerId: provider.id,
-        serviceType: ((provider.role || provider.type) === 'lawyer' ? 'lawyer_call' : 'expat_call'),
-        providerRole: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
-        amount: serviceData.amount!,
-        duration: serviceData.duration ?? (provider.role === 'lawyer' || provider.type === 'lawyer' ? 20 : 30),
-        clientPhone: user?.phone || '',
-        commissionAmount: serviceData.commissionAmount ?? Math.round((serviceData.amount! * 0.2) * 100) / 100,
-        providerAmount: serviceData.providerAmount ?? Math.round((serviceData.amount! * 0.8) * 100) / 100
-      };
-    }
-    try {
-      const saved = sessionStorage.getItem('serviceData');
-      if (saved && provider?.id) {
-        const s = JSON.parse(saved) as ServiceData;
-        if (s?.amount) return s;
+  // Service recalculé selon la devise
+  const [serviceWithPricing, setServiceWithPricing] = useState<ServiceData | null>(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
+  
+  useEffect(() => {
+    const loadServicePricing = async () => {
+      if (!provider?.id || pricingLoading || pricingError) return;
+      
+      setLoadingPricing(true);
+      try {
+        const providerRole: 'lawyer' | 'expat' = (provider.role || provider.type || 'expat') as 'lawyer' | 'expat';
+        
+        const pricingData = await calculateServiceAmounts(providerRole, selectedCurrency);
+        
+        setServiceWithPricing({
+          providerId: provider.id,
+          serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
+          providerRole,
+          amount: pricingData.totalAmount,
+          duration: pricingData.duration,
+          clientPhone: user?.phone || '',
+          commissionAmount: pricingData.connectionFeeAmount,
+          providerAmount: pricingData.providerAmount,
+          currency: pricingData.currency
+        });
+      } catch (error) {
+        console.error('Erreur calcul pricing:', error);
+        setServiceWithPricing(null);
+      } finally {
+        setLoadingPricing(false);
       }
-    } catch (e) {
-      console.error('Service parse error:', e);
-    }
-    if (provider?.price !== undefined && provider?.id) {
-      const price = provider.price || ((provider.role === 'lawyer' || provider.type === 'lawyer') ? 49 : 19);
-      const duration = provider.duration || ((provider.role === 'lawyer' || provider.type === 'lawyer') ? 20 : 30);
-      return {
-        providerId: provider.id,
-        serviceType: ((provider.role || provider.type) === 'lawyer' ? 'lawyer_call' : 'expat_call'),
-        providerRole: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
-        amount: price,
-        duration,
-        clientPhone: user?.phone || '',
-        commissionAmount: Math.round(price * 0.2 * 100) / 100,
-        providerAmount: Math.round(price * 0.8 * 100) / 100
-      };
-    }
-    return null;
-  }, [serviceData, provider, user]);
+    };
 
-  /* ------------------------ Phone/WhatsApp visibles mobile ------------------------ */
+    loadServicePricing();
+  }, [provider, selectedCurrency, pricingLoading, pricingError, user]);
+
+  // Champs téléphone et WhatsApp
   const [clientPhone, setClientPhone] = useState<string>(() => {
-    const initial = normalizePhone(baseService?.clientPhone || '');
     try {
       const saved = sessionStorage.getItem('clientPhone');
-      return saved ? normalizePhone(saved) : initial;
+      return saved ? normalizePhone(saved) : normalizePhone(user?.phone || '');
     } catch {
-      return initial;
+      return normalizePhone(user?.phone || '');
     }
   });
+
   const [clientWhatsapp, setClientWhatsapp] = useState<string>(() => {
     try {
       return normalizePhone(sessionStorage.getItem('clientWhatsapp') || '');
@@ -814,17 +838,16 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   });
 
   useEffect(() => {
-    // autosave léger pour reprise checkout
     try {
       sessionStorage.setItem('clientPhone', clientPhone);
       sessionStorage.setItem('clientWhatsapp', clientWhatsapp);
-    } catch {/* noop */}
+    } catch {}
   }, [clientPhone, clientWhatsapp]);
 
   const service: ServiceData | null = useMemo(() => {
-    if (!baseService) return null;
-    return { ...baseService, clientPhone };
-  }, [baseService, clientPhone]);
+    if (!serviceWithPricing) return null;
+    return { ...serviceWithPricing, clientPhone };
+  }, [serviceWithPricing, clientPhone]);
 
   const [currentStep, setCurrentStep] = useState<StepType>('payment');
   const [callProgress, setCallProgress] = useState<number>(0);
@@ -903,7 +926,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
   const handlePaymentError = useCallback((msg: string) => setError(msg), []);
 
-  // Progression simulée de mise en relation (UI uniquement)
+  // Progression simulée de mise en relation
   useEffect(() => {
     if (currentStep === 'calling' && callProgress < 5) {
       const timer = setTimeout(() => {
@@ -917,7 +940,46 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     }
   }, [currentStep, callProgress]);
 
-  /* ------------------------- Guards (no mocks, UX) ----------------------- */
+  /* ------------------------- Guards ------------------------- */
+  
+  if (pricingLoading || loadingPricing) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 text-center max-w-sm mx-auto">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4" />
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Chargement des prix</h2>
+            <p className="text-gray-600 text-sm">
+              {pricingLoading ? 'Configuration en cours...' : 'Calcul des tarifs...'}
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (pricingError) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 text-center max-w-sm mx-auto">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Erreur de configuration</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Impossible de charger la configuration des prix. Veuillez réessayer.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-red-500 to-red-600 text-white"
+            >
+              Recharger
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!provider || !service) {
     return (
       <Layout>
@@ -1041,14 +1103,24 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
               <div className="text-right flex-shrink-0">
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                  {service.amount.toFixed(2)}€
+                  {selectedCurrency === 'usd' ? '
+             : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
                 </div>
                 <div className="text-xs text-gray-500">{service.duration} min</div>
               </div>
             </div>
           </section>
 
-          {/* Formulaire Téléphone / WhatsApp (VISIBLES MOBILE) */}
+          {/* Sélecteur de devise */}
+          <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
+            <CurrencySelector
+              serviceType={provider?.role === 'lawyer' || provider?.type === 'lawyer' ? 'lawyer' : 'expat'}
+              selectedCurrency={selectedCurrency}
+              onCurrencyChange={setSelectedCurrency}
+            />
+          </section>
+
+          {/* Formulaire Téléphone / WhatsApp */}
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
             <div className="space-y-4">
               <div>
@@ -1121,7 +1193,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                     onError={handlePaymentError}
                     isProcessing={isProcessing}
                     setIsProcessing={(p) => {
-                      // Validation téléphone avant submit
                       if (p && !isValidE164ish(clientPhone)) {
                         setError(t('err.invalidPhone'));
                         return;
@@ -1220,7 +1291,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                       </div>
                       <div className="flex justify-between">
                         <span>{t('summary.total')}:</span>
-                        <span className="font-medium text-green-600">{service.amount.toFixed(2)}€</span>
+                        <span className="font-medium text-green-600">
+                          {selectedCurrency === 'usd' ? '
+             : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Date:</span>
@@ -1232,19 +1306,19 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                   <div className="space-y-3">
                     <button
                       onClick={() => navigate(`/evaluation/${provider.id}`)}
-                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                     >
                       ⭐ {t('btn.evaluate')} {providerDisplayName}
                     </button>
                     <button
                       onClick={() => navigate(`/receipt/${paymentIntentId}`)}
-                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gray-500 hover:bg-gray-600 text-white"
+                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gray-500 hover:bg-gray-600 text-white transition-colors"
                     >
                       📄 {t('btn.receipt')}
                     </button>
                     <button
                       onClick={() => navigate('/')}
-                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white"
+                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white transition-colors"
                     >
                       🏠 {t('btn.home')}
                     </button>
@@ -1274,5 +1348,3 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
 CallCheckout.displayName = 'CallCheckout';
 export default React.memo(CallCheckout);
-
-

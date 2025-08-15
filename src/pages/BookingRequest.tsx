@@ -518,15 +518,19 @@ const BookingRequest: React.FC = () => {
   const isLawyer = provider.type === 'lawyer';
   const pricing = isLawyer ? FIXED_PRICING.lawyer : FIXED_PRICING.expat;
 
-  const sanitizeInput = (input: string): string => {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .trim();
-};
+   const sanitizeText = (
+    input: string,
+     opts: { trim?: boolean } = {}
+  ): string => {
+    const out = input
+       .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+     .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#x27;');
+     return opts.trim ? out.trim() : out;
+  };
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -534,14 +538,15 @@ const BookingRequest: React.FC = () => {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
-      let sanitizedValue = value;
-      if (name === 'phoneNumber' || name === 'whatsappNumber') sanitizedValue = value.replace(/[^\d\s+()-]/g, '');
-      else sanitizedValue = sanitizeInput(value);
-      setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
-    }
-    if (formError) setFormError('');
-    if (fieldErrors[name]) setFieldErrors((prev) => ({ ...prev, [name]: '' }));
-  };
+       let sanitizedValue = value;
+      if (name === 'phoneNumber' || name === 'whatsappNumber') {
+       sanitizedValue = value.replace(/[^\d\s+()-]/g, '');
+     } else {
+       // Préserver les espaces (y compris doubles), ne pas trim pendant la saisie
+        sanitizedValue = sanitizeText(value, { trim: false });
+      }
+    setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
+    };
 
   const notifyProviderOfRequest = async (
     targetProviderId: string,
@@ -636,8 +641,9 @@ const BookingRequest: React.FC = () => {
       providerReviewCount: selectedProvider.reviewCount,
       providerLanguages: (selectedProvider.languages || selectedProvider.languagesSpoken) as string[] | undefined,
       providerSpecialties: selectedProvider.specialties as string[] | undefined,
-      title: sanitizeInput(state.title),
-      description: sanitizeInput(state.description),
+      title: sanitizeText(state.title, { trim: true }),
+      description: sanitizeText(state.description, { trim: true }),
+
       clientLanguages: languagesSpoken.map((l) => l.code),
       clientLanguagesDetails: languagesSpoken.map((l) => ({ code: l.code, name: l.name })),
       price: pr.EUR,

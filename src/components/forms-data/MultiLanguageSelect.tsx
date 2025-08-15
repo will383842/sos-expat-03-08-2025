@@ -90,18 +90,21 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
     control: (provided, state) => ({
       ...provided,
       // Réinitialiser tous les styles pour hériter du parent
-      border: 'none',
-      background: 'transparent',
-      boxShadow: 'none',
-      minHeight: 'inherit',
-      height: 'inherit',
-      borderRadius: 'inherit',
-      fontSize: 'inherit',
-      fontFamily: 'inherit',
-      color: 'inherit',
-      cursor: 'inherit',
-      padding: '0',
-      margin: '0',
+    border: state.isFocused
+      ? '2px solid var(--input-border-focus, #dc2626)' // rouge (équivalent focus:ring-red-500/border-red-600)
+      : '2px solid var(--input-border, #e5e7eb)',       // gris-200
+   backgroundColor: 'var(--input-bg, #ffffff)',
+     boxShadow: 'none',
+     minHeight: '3rem',    // approx. py-3
+     height: 'auto',
+     borderRadius: '0.75rem', // rounded-xl
+     fontSize: 'inherit',
+     fontFamily: 'inherit',
+     color: 'inherit',
+    cursor: 'inherit',
+     padding: '0.5rem 0.75rem', // approx. px-3 py-2
+     margin: '0',
+
       outline: 'none',
       // Supprimer les transitions pour éviter les conflits
       transition: 'none',

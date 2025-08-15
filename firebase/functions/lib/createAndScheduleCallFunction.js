@@ -9,15 +9,9 @@ const logError_1 = require("./utils/logs/logError");
  * Crée et programme un appel entre client et prestataire
  */
 exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
-    memory: "128MiB",
-    timeoutSeconds: 30,
-    cors: [
-        'http://localhost:3000',
-        'http://localhost:5196',
-        'http://localhost:8080',
-        'https://sos-urgently-ac307.web.app',
-        'https://sos-urgently-ac307.firebaseapp.com'
-    ]
+    memory: "256MiB",
+    timeoutSeconds: 60,
+    cors: true // Simplifie pour accepter tous les origins
 }, async (request) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

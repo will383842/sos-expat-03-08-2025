@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { logError } from './utils/logs/logError';
 import { logCallRecord } from './utils/logs/logCallRecord';
 import { db } from './utils/firebase'; // ← AJOUTER CET IMPORT
+import { eurosToCents, centsToEuros, formatEuros } from './utils/paymentValidators';
 
 // Configuration Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {

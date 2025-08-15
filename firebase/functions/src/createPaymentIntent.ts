@@ -3,6 +3,13 @@ import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https
 import { stripeManager, StripePaymentData } from './StripeManager';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
+import { 
+  eurosToCents, 
+  validateAmount, 
+  calculateSplit, 
+  checkDailyLimit,
+  logPaymentAudit 
+} from './utils/paymentValidators';
 
 // =========================================
 // 🔧 FIX CRITIQUE: OPTIMISATION CPU - Configuration légère dès le départ

@@ -225,7 +225,7 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
       };
       try {
         await updateDoc(userRef, payload);
-      } catch (e: any) {
+      } catch (e: unknown) {
         const msg = e?.code || e?.message || '';
         if (
           typeof msg === 'string' &&
@@ -380,7 +380,8 @@ const AvailabilityToggle: FC<AvailabilityToggleProps> = ({ className = '' }) => 
       const disableUntil = localStorage.getItem('disableOnlineReminderUntil');
       if (disableUntil === today) return;
 
-      const langCode = i18n.language || 'en';
+      if (document.visibilityState !== 'visible') { return; }
+const langCode = i18n.language || 'en';
 
       if (notificationPrefs.enableSound || notificationPrefs.enableVoice) {
         playAvailabilityReminder(langCode, notificationPrefs);

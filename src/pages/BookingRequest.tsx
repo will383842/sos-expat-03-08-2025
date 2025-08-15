@@ -518,8 +518,15 @@ const BookingRequest: React.FC = () => {
   const isLawyer = provider.type === 'lawyer';
   const pricing = isLawyer ? FIXED_PRICING.lawyer : FIXED_PRICING.expat;
 
-  const sanitizeInput = (input: string): string =>
-    input.replace(/[<>]/g, '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;').replace(/\//g, '&#x2F;').trim();
+  const sanitizeInput = (input: string): string => {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .trim();
+};
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -964,7 +971,7 @@ const BookingRequest: React.FC = () => {
                       value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
                       onChange={(selected) => {
                         const selectedLangs = selected
-                          .map((opt: any) => languages.find((lang: any) => lang.code === opt.value))
+                          .map((opt: unknown) => languages.find((lang: unknown) => lang.code === opt.value))
                           .filter(Boolean) as Language[];
                         setLanguagesSpoken(selectedLangs);
                         if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });

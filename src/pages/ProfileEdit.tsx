@@ -65,7 +65,8 @@ const UPLOAD_CONFIG = {
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
-  const { user, authInitialized } = useAuth();
+  const { user, authInitialized, refreshUser } = useAuth()
+;
 if (!authInitialized) {
   return (
     <Layout>
@@ -381,7 +382,7 @@ if (user.role !== "client") {
       setuserData(prev => ({ ...(prev || {}), ...updateData }));
 
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erreur lors de la mise à jour:", err);
       
       // Messages d'erreur spécifiques

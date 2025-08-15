@@ -49,6 +49,55 @@ import { db, auth } from '../config/firebase';
 import { updateEmail as fbUpdateEmail, updateProfile as fbUpdateProfile } from 'firebase/auth';
 
 // ===============================
+// 🎨 DESIGN TOKENS (UI only — aucune incidence métier)
+// ===============================
+const UI = {
+  card:
+    'bg-white/80 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg',
+  sectionTitle: 'text-lg font-semibold text-gray-900 dark:text-gray-100',
+  text: 'text-gray-700 dark:text-gray-200',
+  textMuted: 'text-gray-500 dark:text-gray-400',
+  radiusSm: 'rounded-lg',
+  radiusFull: 'rounded-full'
+} as const;
+
+const ROLE = {
+  admin: {
+    header: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white',
+    chip: 'bg-amber-100 text-amber-700 border border-amber-200'
+  },
+  lawyer: {
+    header: 'bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white',
+    chip: 'bg-red-100 text-red-700 border border-red-200'
+  },
+  expat: {
+    header: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 text-white',
+    chip: 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+  },
+  client: {
+    header: 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white',
+    chip: 'bg-purple-100 text-purple-700 border border-purple-200'
+  },
+  defaultHeader: 'bg-gradient-to-r from-red-500 via-orange-500 to-purple-600 text-white'
+} as const;
+
+type RoleKey = 'admin' | 'lawyer' | 'expat' | 'client';
+const getHeaderClassForRole = (role?: string): string => {
+  if (role === 'admin') return ROLE.admin.header;
+  if (role === 'lawyer') return ROLE.lawyer.header;
+  if (role === 'expat') return ROLE.expat.header;
+  if (role === 'client') return ROLE.client.header;
+  return ROLE.defaultHeader;
+};
+const getChipClassForRole = (role?: string): string => {
+  if (role === 'admin') return ROLE.admin.chip;
+  if (role === 'lawyer') return ROLE.lawyer.chip;
+  if (role === 'expat') return ROLE.expat.chip;
+  if (role === 'client') return ROLE.client.chip;
+  return 'bg-white/20';
+};
+
+// ===============================
 // Types
 // ===============================
 interface Call {
@@ -131,7 +180,7 @@ type TabType =
 type CallStatus = 'completed' | 'pending' | 'in_progress' | 'failed';
 
 // ===============================
-// Sous-composants UI
+// Sous-composants UI (logique inchangée, styles modernisés)
 // ===============================
 const Field: React.FC<{
   label: string;
@@ -141,13 +190,13 @@ const Field: React.FC<{
   type?: 'text' | 'email' | 'number';
 }> = ({ label, value, onChange, placeholder, type = 'text' }) => (
   <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+      className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-red-500 transition"
     />
   </div>
 );
@@ -180,12 +229,12 @@ const ChipInput: React.FC<{
         {value.map((v, i) => (
           <span
             key={`${v}-${i}`}
-            className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-100"
+            className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-100 dark:bg-white/10 dark:text-white dark:border-white/10"
           >
             {v}
             <button
               type="button"
-              className="hover:text-blue-900"
+              className="hover:opacity-80"
               onClick={() => remove(i)}
               aria-label={`Supprimer ${v}`}
             >
@@ -205,9 +254,9 @@ const ChipInput: React.FC<{
             }
           }}
           placeholder={placeholder}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+          className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
         />
-        <Button type="button" onClick={add} size="small">
+        <Button type="button" onClick={add} size="small" title="Ajouter">
           Ajouter
         </Button>
       </div>
@@ -217,8 +266,8 @@ const ChipInput: React.FC<{
 
 const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
-    <p className="text-sm font-medium text-gray-500">{label}</p>
-    <p className="mt-1 text-sm text-gray-900">{value || '—'}</p>
+    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+    <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{value || '—'}</p>
   </div>
 );
 
@@ -228,13 +277,13 @@ const PillsRow: React.FC<{ label: string; items: string[]; color: 'blue' | 'gree
   color
 }) => {
   const colorMap: Record<'blue' | 'green' | 'red', string> = {
-    blue: 'bg-blue-100 text-blue-800',
-    green: 'bg-green-100 text-green-800',
-    red: 'bg-red-100 text-red-800'
+    blue: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300',
+    green: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+    red: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
   };
   return (
     <div>
-      <p className="text-sm font-medium text-gray-500 mb-1">{label}</p>
+      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</p>
       <div className="flex flex-wrap gap-1">
         {(items || []).length > 0 ? (
           items.map((it, i) => (
@@ -243,7 +292,7 @@ const PillsRow: React.FC<{ label: string; items: string[]; color: 'blue' | 'gree
             </span>
           ))
         ) : (
-          <span className="text-sm text-gray-900">—</span>
+          <span className="text-sm text-gray-900 dark:text-gray-100">—</span>
         )}
       </div>
     </div>
@@ -254,19 +303,23 @@ const Alert: React.FC<{ type: 'success' | 'error'; message: string }> = ({ type,
   const cfg =
     type === 'success'
       ? {
-          bg: 'bg-green-50',
-          border: 'border-green-200',
-          text: 'text-green-800',
-          icon: <Check className="h-5 w-5 text-green-400 mr-2" />
+          bg: 'bg-green-50 dark:bg-green-500/10',
+          border: 'border-green-200 dark:border-green-500/20',
+          text: 'text-green-800 dark:text-green-200',
+          icon: <Check className="h-5 w-5 mr-2" />
         }
       : {
-          bg: 'bg-red-50',
-          border: 'border-red-200',
-          text: 'text-red-800',
-          icon: <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+          bg: 'bg-red-50 dark:bg-red-500/10',
+          border: 'border-red-200 dark:border-red-500/20',
+          text: 'text-red-800 dark:text-red-200',
+          icon: <AlertTriangle className="h-5 w-5 mr-2" />
         };
   return (
-    <div className={`mb-2 ${cfg.bg} ${cfg.border} ${cfg.text} rounded-md p-4`}>
+    <div
+      className={`mb-2 ${cfg.bg} ${cfg.border} ${cfg.text} rounded-xl p-4 shadow-sm transition`}
+      role="alert"
+      aria-live="polite"
+    >
       <div className="flex items-start">
         {cfg.icon}
         <span>{message}</span>
@@ -446,19 +499,23 @@ const Dashboard: React.FC = () => {
   const getStatusBadge = (status: CallStatus): JSX.Element => {
     const statusConfig: Record<CallStatus, { className: string; text: string }> = {
       completed: {
-        className: 'px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium',
+        className:
+          'px-2 py-1 bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300 rounded-full text-xs font-medium',
         text: language === 'fr' ? 'Terminé' : 'Completed'
       },
       pending: {
-        className: 'px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium',
+        className:
+          'px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300 rounded-full text-xs font-medium',
         text: language === 'fr' ? 'En attente' : 'Pending'
       },
       in_progress: {
-        className: 'px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium',
+        className:
+          'px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300 rounded-full text-xs font-medium',
         text: language === 'fr' ? 'En cours' : 'In progress'
       },
       failed: {
-        className: 'px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium',
+        className:
+          'px-2 py-1 bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300 rounded-full text-xs font-medium',
         text: language === 'fr' ? 'Échoué' : 'Failed'
       }
     };
@@ -466,11 +523,9 @@ const Dashboard: React.FC = () => {
     return <span className={config.className}>{config.text}</span>;
   };
 
-  // Palette alignée Home
-  const gradientHeader =
-    'bg-gradient-to-r from-red-500 via-orange-500 to-purple-600 text-white shadow-sm';
-  const softCard =
-    'bg-white/90 backdrop-blur border border-gray-200 rounded-xl shadow-sm';
+  // Palette alignée Home (fallback si rôle non défini)
+  const headerGradient = getHeaderClassForRole(user?.role);
+  const softCard = UI.card;
 
   // ===============================
   // PHOTO : persistance immédiate (users + sos_profiles + Auth)
@@ -650,7 +705,7 @@ const Dashboard: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         {language === 'fr' ? 'Redirection…' : 'Redirecting…'}
       </div>
     );
@@ -661,13 +716,13 @@ const Dashboard: React.FC = () => {
   // ===============================
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-b from-red-50 via-purple-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 via-rose-50/40 to-white dark:from-gray-950 dark:via-gray-950 dark:to-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* SIDEBAR GAUCHE */}
             <div className="lg:col-span-1">
               <div className={`${softCard} overflow-hidden`}>
-                <div className={`p-6 ${gradientHeader}`}>
+                <div className={`p-6 ${headerGradient}`}>
                   <div className="flex items-center space-x-4">
                     {user.profilePhoto ? (
                       <img
@@ -681,14 +736,14 @@ const Dashboard: React.FC = () => {
                       </div>
                     )}
                     <div>
-                      <h2 className="text-xl font-semibold leading-tight">
+                      <h2 className="text-xl font-extrabold leading-tight">
                         {user.firstName} {user.lastName}
                       </h2>
-                      <p className="text-white/90 text-sm flex items-center gap-1">
+                      <p className="text-white/90 text-sm flex items-center gap-1" title={user.email}>
                         <Mail className="w-4 h-4" />
                         {user.email}
                       </p>
-                      <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20">
+                      <span className={`inline-block mt-2 px-2.5 py-1 ${UI.radiusFull} text-xs font-semibold bg-white/20`}>
                         {user.role === 'lawyer'
                           ? language === 'fr'
                             ? 'Avocat'
@@ -697,6 +752,8 @@ const Dashboard: React.FC = () => {
                           ? language === 'fr'
                             ? 'Expatrié'
                             : 'Expat'
+                          : user.role === 'admin'
+                          ? 'Admin'
                           : language === 'fr'
                           ? 'Client'
                           : 'Client'}
@@ -720,14 +777,28 @@ const Dashboard: React.FC = () => {
                       <li key={item.key}>
                         <button
                           onClick={() => setActiveTab(item.key as TabType)}
-                          className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                            activeTab === (item.key as TabType)
-                              ? 'bg-red-50 text-red-700'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
+                          className={`group relative w-full flex items-center px-4 py-2 text-sm font-medium ${UI.radiusSm} transition-all
+                            ${activeTab === (item.key as TabType)
+                              ? 'bg-gradient-to-r from-red-50 to-orange-50 text-red-700 dark:from-white/5 dark:to-white/10 dark:text-white'
+                              : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}
+                          `}
+                          title={language === 'fr' ? item.fr : item.en}
                         >
+                          {/* Barre active à gauche (UI only) */}
+                          <span
+                            className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 ${
+                              activeTab === item.key
+                                ? 'bg-gradient-to-b from-red-500 to-orange-500 dark:from-red-500 dark:to-orange-500'
+                                : 'bg-transparent'
+                            } ${UI.radiusSm}`}
+                          />
                           {item.icon}
                           {language === 'fr' ? item.fr : item.en}
+                          {activeTab === (item.key as TabType) && (
+                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-white/10 dark:text-white">
+                              Actif
+                            </span>
+                          )}
                         </button>
                       </li>
                     ))}
@@ -736,7 +807,7 @@ const Dashboard: React.FC = () => {
                       <li>
                         <button
                           onClick={() => navigate('/admin/dashboard')}
-                          className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50"
+                          className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                         >
                           <Shield className="mr-3 h-5 w-5" />
                           {language === 'fr' ? 'Administration' : 'Admin panel'}
@@ -747,7 +818,7 @@ const Dashboard: React.FC = () => {
                     <li>
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50"
+                        className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                       >
                         <LogOut className="mr-3 h-5 w-5" />
                         {language === 'fr' ? 'Déconnexion' : 'Logout'}
@@ -757,13 +828,13 @@ const Dashboard: React.FC = () => {
                 </nav>
 
                 <div className="p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
                     {language === 'fr' ? 'Statut de disponibilité' : 'Availability status'}
                   </h3>
                   {user && (user.role === 'lawyer' || user.role === 'expat') ? (
                     <AvailabilityToggle className="justify-center" />
                   ) : (
-                    <p className="text-gray-500 text-center">
+                    <p className={`${UI.textMuted} text-center`}>
                       {language === 'fr'
                         ? 'Statut disponible uniquement pour les prestataires'
                         : 'Status available only for providers'}
@@ -778,7 +849,7 @@ const Dashboard: React.FC = () => {
               {/* PROFIL — lecture seule */}
               {activeTab === 'profile' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader} flex justify-between items-center`}>
+                  <div className={`px-6 py-4 ${headerGradient} flex justify-between items-center`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mon profil' : 'My profile'}
                     </h2>
@@ -796,7 +867,7 @@ const Dashboard: React.FC = () => {
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                        <h3 className={`${UI.sectionTitle} mb-4`}>
                           {language === 'fr' ? 'Informations personnelles' : 'Personal information'}
                         </h3>
                         <div className="space-y-4">
@@ -813,13 +884,15 @@ const Dashboard: React.FC = () => {
                           )}
                           {user.role !== 'client' && (
                             <div>
-                              <p className="text-sm font-medium text-gray-500">
+                              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
                                 {language === 'fr' ? 'Statut' : 'Status'}
                               </p>
                               <div className="mt-1 flex items-center">
                                 <span
                                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                    currentStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    currentStatus
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
                                   }`}
                                 >
                                   <span
@@ -842,7 +915,7 @@ const Dashboard: React.FC = () => {
                       </div>
 
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                        <h3 className={`${UI.sectionTitle} mb-4`}>
                           {language === 'fr' ? 'Photo & bio' : 'Photo & bio'}
                         </h3>
                         <div className="flex items-start gap-6">
@@ -850,15 +923,15 @@ const Dashboard: React.FC = () => {
                             <img
                               src={`${user.profilePhoto}?v=${(user.updatedAt as Date | undefined)?.valueOf?.() || Date.now()}`}
                               alt={user.firstName}
-                              className="w-32 h-32 rounded-full object-cover border border-gray-200"
+                              className="w-32 h-32 rounded-full object-cover border border-white/30 dark:border-white/10"
                             />
                           ) : (
-                            <div className="w-32 h-32 bg-red-100 rounded-full flex items-center justify-center">
-                              <User className="h-16 w-16 text-red-600" />
+                            <div className="w-32 h-32 bg-red-100 dark:bg-white/10 rounded-full flex items-center justify-center">
+                              <User className="h-16 w-16 text-red-600 dark:text-white/70" />
                             </div>
                           )}
                           <div className="flex-1">
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            <p className={`${UI.text} whitespace-pre-wrap`}>
                               {(user as { bio?: string }).bio ||
                                 (language === 'fr' ? 'Aucune description.' : 'No description.')}
                             </p>
@@ -868,8 +941,8 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {user.role !== 'client' && (
-                      <div className="mt-6 pt-6 border-t border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-white/10">
+                        <h3 className={`${UI.sectionTitle} mb-4`}>
                           {language === 'fr' ? 'Informations professionnelles' : 'Professional information'}
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -936,7 +1009,7 @@ const Dashboard: React.FC = () => {
               {/* PARAMÈTRES — édition complète */}
               {activeTab === 'settings' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                  <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Paramètres' : 'Settings'}
                     </h2>
@@ -948,7 +1021,7 @@ const Dashboard: React.FC = () => {
 
                     {/* Photo de profil : mise à jour immédiate */}
                     <section>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      <h3 className={`${UI.sectionTitle} mb-2`}>
                         {language === 'fr' ? 'Photo de profil' : 'Profile photo'}
                       </h3>
                       <div className="flex items-center gap-6">
@@ -956,11 +1029,11 @@ const Dashboard: React.FC = () => {
                           <img
                             src={`${profileData.profilePhoto}?v=${Date.now()}`}
                             alt="preview"
-                            className="w-24 h-24 rounded-full object-cover border"
+                            className="w-24 h-24 rounded-full object-cover border border-white/30 dark:border-white/10"
                           />
                         ) : (
-                          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center">
-                            <User className="h-10 w-10 text-red-600" />
+                          <div className="w-24 h-24 bg-red-100 dark:bg-white/10 rounded-full flex items-center justify-center">
+                            <User className="h-10 w-10 text-red-600 dark:text-white/70" />
                           </div>
                         )}
                         <ImageUploader
@@ -970,7 +1043,7 @@ const Dashboard: React.FC = () => {
                           onImageUploaded={handleInstantPhotoPersist}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         {language === 'fr'
                           ? 'La nouvelle photo remplace immédiatement l’ancienne dans tout le dashboard.'
                           : 'The new photo replaces the old one immediately across the dashboard.'}
@@ -986,7 +1059,7 @@ const Dashboard: React.FC = () => {
                         type="email"
                       />
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {language === 'fr' ? 'Téléphone' : 'Phone'}
                         </label>
                         <div className="flex gap-2">
@@ -995,7 +1068,7 @@ const Dashboard: React.FC = () => {
                             onChange={(e) =>
                               setProfileData((p) => ({ ...p, phoneCountryCode: e.target.value }))
                             }
-                            className="w-28 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="w-28 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
                             <option value="+33">🇫🇷 +33</option>
                             <option value="+1">🇺🇸 +1</option>
@@ -1007,7 +1080,7 @@ const Dashboard: React.FC = () => {
                           <input
                             value={profileData.phone}
                             onChange={(e) => setProfileData((p) => ({ ...p, phone: e.target.value }))}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                             placeholder="612345678"
                           />
                         </div>
@@ -1042,7 +1115,7 @@ const Dashboard: React.FC = () => {
 
                       {/* WhatsApp */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           WhatsApp
                         </label>
                         <div className="flex gap-2">
@@ -1051,7 +1124,7 @@ const Dashboard: React.FC = () => {
                             onChange={(e) =>
                               setProfileData((p) => ({ ...p, whatsappCountryCode: e.target.value }))
                             }
-                            className="w-28 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="w-28 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
                             <option value="+33">🇫🇷 +33</option>
                             <option value="+1">🇺🇸 +1</option>
@@ -1065,7 +1138,7 @@ const Dashboard: React.FC = () => {
                             onChange={(e) =>
                               setProfileData((p) => ({ ...p, whatsappNumber: e.target.value }))
                             }
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                             placeholder="612345678"
                           />
                         </div>
@@ -1073,32 +1146,36 @@ const Dashboard: React.FC = () => {
 
                       {/* Langues — même sélecteur que l’inscription */}
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
                         </label>
                         <MultiLanguageSelect
-                        value={selectedLanguages}
-                        onChange={(opts) => {
-                          const normalized = (opts || []).map((o) => ({ value: o.value, label: o.label }));
-                          setSelectedLanguages(normalized);
-                          setProfileData((p) => ({ ...p, languages: normalized.map((o) => o.value) }));
-                        }}
-                        providerLanguages={[]}
-                        highlightShared
-                        locale={language === 'fr' ? 'fr' : 'en'}
-                        placeholder={language === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
-                      />
+                          value={selectedLanguages}
+                          onChange={(opts) => {
+                            const normalized = (opts || []).map((o) => ({ value: o.value, label: o.label }));
+                            setSelectedLanguages(normalized);
+                            setProfileData((p) => ({ ...p, languages: normalized.map((o) => o.value) }));
+                          }}
+                          providerLanguages={[]}
+                          highlightShared
+                          locale={language === 'fr' ? 'fr' : 'en'}
+                          placeholder={
+                            language === 'fr'
+                              ? 'Rechercher et sélectionner les langues...'
+                              : 'Search and select languages...'
+                          }
+                        />
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {language === 'fr' ? 'Description / Bio' : 'Description / Bio'}
                         </label>
                         <textarea
                           value={profileData.bio || ''}
                           onChange={(e) => setProfileData((p) => ({ ...p, bio: e.target.value }))}
                           rows={5}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           placeholder={
                             language === 'fr' ? 'Votre bio professionnelle…' : 'Your professional bio…'
                           }
@@ -1120,9 +1197,7 @@ const Dashboard: React.FC = () => {
                         <Field
                           label={language === 'fr' ? 'Année de diplôme' : 'Graduation year'}
                           type="number"
-                          value={String(
-                            profileData.graduationYear || new Date().getFullYear() - 5
-                          )}
+                          value={String(profileData.graduationYear || new Date().getFullYear() - 5)}
                           onChange={(v) =>
                             setProfileData((p) => ({
                               ...p,
@@ -1131,7 +1206,7 @@ const Dashboard: React.FC = () => {
                           }
                         />
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {language === 'fr' ? 'Spécialités' : 'Specialties'}
                           </label>
                           <ChipInput
@@ -1141,7 +1216,7 @@ const Dashboard: React.FC = () => {
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {language === 'fr' ? "Pays d'intervention" : 'Countries of practice'}
                           </label>
                           <ChipInput
@@ -1160,7 +1235,7 @@ const Dashboard: React.FC = () => {
                           onChange={(v) => setProfileData((p) => ({ ...p, barNumber: v }))}
                         />
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {language === 'fr' ? 'Formations' : 'Educations'}
                           </label>
                           <ChipInput
@@ -1184,7 +1259,7 @@ const Dashboard: React.FC = () => {
                           }
                         />
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {language === 'fr' ? "Types d'aide" : 'Help types'}
                           </label>
                           <ChipInput
@@ -1194,7 +1269,7 @@ const Dashboard: React.FC = () => {
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {language === 'fr' ? "Pays d'intervention" : 'Countries of intervention'}
                           </label>
                           <ChipInput
@@ -1209,7 +1284,7 @@ const Dashboard: React.FC = () => {
                     )}
 
                     {/* Sauvegarde */}
-                    <div className="pt-4 border-t border-gray-200">
+                    <div className="pt-4 border-t border-gray-200 dark:border-white/10">
                       <Button
                         onClick={saveSettings}
                         loading={isLoading}
@@ -1226,7 +1301,7 @@ const Dashboard: React.FC = () => {
               {/* APPELS */}
               {activeTab === 'calls' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                  <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes appels' : 'My calls'}
                     </h2>
@@ -1235,27 +1310,30 @@ const Dashboard: React.FC = () => {
                     {calls.length > 0 ? (
                       <div className="space-y-4">
                         {calls.map((call) => (
-                          <div key={call.id} className="border border-gray-200 rounded-lg p-4">
+                          <div
+                            key={call.id}
+                            className="border border-gray-200 dark:border-white/10 rounded-xl p-4 hover:bg-gray-50/60 dark:hover:bg-white/[0.04] transition"
+                          >
                             <div className="flex justify-between items-start">
                               <div>
-                                <h3 className="font-medium text-gray-900">{call.title}</h3>
-                                <p className="text-sm text-gray-500">{call.description}</p>
+                                <h3 className="font-medium text-gray-900 dark:text-gray-100">{call.title}</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{call.description}</p>
                                 <div className="mt-2 flex items-center space-x-4 text-sm">
                                   <div className="flex items-center">
                                     <Clock className="w-4 h-4 text-gray-400 mr-1" />
-                                    <span>{formatDuration(call.duration)}</span>
+                                    <span className={UI.text}>{formatDuration(call.duration)}</span>
                                   </div>
                                   <div className="flex items-center">
                                     <CreditCard className="w-4 h-4 text-gray-400 mr-1" />
-                                    <span>{formatPrice(call.price)}</span>
+                                    <span className={UI.text}>{formatPrice(call.price)}</span>
                                   </div>
                                   <div className="flex items-center">
                                     <Calendar className="w-4 h-4 text-gray-400 mr-1" />
-                                    <span>{formatDate(call.createdAt)}</span>
+                                    <span className={UI.text}>{formatDate(call.createdAt)}</span>
                                   </div>
                                 </div>
                                 <div className="mt-2">
-                                  <p className="text-sm text-gray-700">
+                                  <p className={`${UI.text} text-sm`}>
                                     {user.role === 'client'
                                       ? `${language === 'fr' ? 'Prestataire' : 'Provider'}: ${call.providerName}`
                                       : `${language === 'fr' ? 'Client' : 'Client'}: ${call.clientName}`}
@@ -1277,7 +1355,7 @@ const Dashboard: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500 text-center py-8">
+                      <p className={`${UI.textMuted} text-center py-8`}>
                         {language === 'fr'
                           ? "Vous n'avez pas encore effectué d'appels."
                           : "You haven't made any calls yet."}
@@ -1290,7 +1368,7 @@ const Dashboard: React.FC = () => {
               {/* MESSAGES */}
               {activeTab === 'messages' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                  <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes messages' : 'My messages'}
                     </h2>
@@ -1307,13 +1385,13 @@ const Dashboard: React.FC = () => {
               {/* AVIS */}
               {activeTab === 'reviews' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                  <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes avis' : 'My reviews'}
                     </h2>
                   </div>
                   <div className="p-6">
-                    <p className="text-gray-500 text-center py-8">
+                    <p className={`${UI.textMuted} text-center py-8`}>
                       {language === 'fr' ? 'Aucun avis pour le moment.' : 'No reviews yet.'}
                     </p>
                   </div>
@@ -1323,7 +1401,7 @@ const Dashboard: React.FC = () => {
               {/* NOTIFICATIONS */}
               {activeTab === 'notifications' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                  <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Notifications' : 'Notifications'}
                     </h2>
@@ -1331,7 +1409,7 @@ const Dashboard: React.FC = () => {
                   <div className="p-6">
                     {(user?.role === 'lawyer' || user?.role === 'expat') && (
                       <div className="mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        <h3 className={`${UI.sectionTitle} mb-4`}>
                           {language === 'fr' ? 'Préférences de notifications' : 'Notification preferences'}
                         </h3>
                         <NotificationSettings />
@@ -1339,7 +1417,7 @@ const Dashboard: React.FC = () => {
                     )}
 
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      <h3 className={`${UI.sectionTitle} mb-4`}>
                         {language === 'fr' ? 'Historique des notifications' : 'Notification history'}
                       </h3>
                       {notifications.length > 0 ? (
@@ -1348,19 +1426,21 @@ const Dashboard: React.FC = () => {
                             <div
                               key={n.id}
                               className={`p-4 rounded-lg border ${
-                                n.isRead ? 'bg-white border-gray-200' : 'bg-blue-50 border-blue-200'
+                                n.isRead
+                                  ? 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10'
+                                  : 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20'
                               }`}
                             >
                               <div className="flex justify-between">
-                                <h4 className="font-medium text-gray-900">{n.title}</h4>
-                                <span className="text-sm text-gray-500">{formatDate(n.createdAt)}</span>
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100">{n.title}</h4>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{formatDate(n.createdAt)}</span>
                               </div>
-                              <p className="mt-1 text-gray-600">{n.message}</p>
+                              <p className="mt-1 text-gray-600 dark:text-gray-300">{n.message}</p>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-500 text-center py-8">
+                        <p className={`${UI.textMuted} text-center py-8`}>
                           {language === 'fr'
                             ? "Vous n'avez pas de notifications."
                             : "You don't have any notifications."}
@@ -1374,7 +1454,7 @@ const Dashboard: React.FC = () => {
               {/* FAVORIS */}
               {activeTab === 'favorites' && (
                 <div className={`${softCard} overflow-hidden`}>
-                  <div className={`px-6 py-4 ${gradientHeader}`}>
+                  <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
                       {language === 'fr' ? 'Mes favoris' : 'My favorites'}
                     </h2>
@@ -1383,15 +1463,18 @@ const Dashboard: React.FC = () => {
                     {favorites.length > 0 ? (
                       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {favorites.map((f) => (
-                          <li key={f.id} className="border rounded-lg p-4 flex items-center gap-3">
+                          <li
+                            key={f.id}
+                            className="border border-gray-200 dark:border-white/10 rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50/60 dark:hover:bg-white/[0.04] transition"
+                          >
                             <img
                               src={(f.photo || '/default-avatar.png') + `?v=${Date.now()}`}
                               alt={f.name}
-                              className="w-12 h-12 rounded-full object-cover border"
+                              className="w-12 h-12 rounded-full object-cover border border-white/30 dark:border-white/10"
                             />
                             <div className="flex-1">
-                              <p className="font-medium text-gray-900">{f.name}</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">{f.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
                                 {f.type === 'lawyer'
                                   ? language === 'fr'
                                     ? 'Avocat'
@@ -1406,7 +1489,7 @@ const Dashboard: React.FC = () => {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-gray-500 text-center py-12">
+                      <p className={`${UI.textMuted} text-center py-12`}>
                         {language === 'fr' ? 'Aucun favori pour le moment.' : 'No favorites yet.'}
                       </p>
                     )}

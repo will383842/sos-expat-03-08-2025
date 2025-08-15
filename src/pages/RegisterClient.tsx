@@ -26,8 +26,6 @@ import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { serverTimestamp, FieldValue } from 'firebase/firestore';
-import { fetchSignInMethodsForEmail } from 'firebase/auth';
-import { auth } from '../config/firebase';
 import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
 
@@ -548,7 +546,6 @@ const RegisterClient: React.FC = () => {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [emailCheck, setEmailCheck] = useState<EmailCheckState>({ state: 'idle' });
   const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastCheckedRef = useRef<string>('');
 
   // ==========================
   // SEO / meta
@@ -645,7 +642,6 @@ const RegisterClient: React.FC = () => {
         return;
       }
       if (
-        lastCheckedRef.current === email &&
         (emailCheck.state === 'available' ||
           emailCheck.state === 'exists-password' ||
           emailCheck.state === 'exists-google')
@@ -656,8 +652,6 @@ const RegisterClient: React.FC = () => {
       setEmailCheck({ state: 'checking' });
       emailDebounceRef.current = setTimeout(async () => {
         try {
-          const methods = await fetchSignInMethodsForEmail(auth, email);
-          lastCheckedRef.current = email;
           if (methods.length === 0) setEmailCheck({ state: 'available' });
           else if (methods.includes('password'))
             setEmailCheck({ state: 'exists-password', methods });

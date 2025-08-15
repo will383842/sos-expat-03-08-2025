@@ -60,7 +60,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).changedKeys();
     }
 
-    // Mise à jour limitée aux champs photo (utilisée pour users et providers)
+    // Photo uniquement (users/providers)
     function onlyPhotoFieldsChanged() {
       return changedKeys().hasOnly(['profilePhoto','photoURL','avatar','updatedAt']);
     }
@@ -71,18 +71,25 @@ service cloud.firestore {
              request.resource.data.email == request.auth.token.email;
     }
 
-    // MAJ "présence" élargie
-    function presenceOnlyUpdate() {
-      return changedKeys().hasOnly(
-        ['isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','updatedAt','isVisible','isVisibleOnMap']
-      );
+    // === Nouveau: set de champs de présence centralisé ===
+    function presenceFields() {
+      // NB: ajout de lastActiveAt et ua pour couvrir les mises à jour de présence côté client
+      return [
+        'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','lastActiveAt',
+        'updatedAt','isVisible','isVisibleOnMap','ua'
+      ];
     }
 
-    // MAJ étendue pour sos_profiles (présence + champs standards)
+    // MAJ "présence" autorisée si TOUS les champs modifiés appartiennent à presenceFields()
+    function presenceOnlyUpdate() {
+      return changedKeys().hasOnly(presenceFields());
+    }
+
+    // MAJ étendue pour sos_profiles (présence + champs standards) — pas de champs sensibles
     function sosProfileUpdate() {
       let allowedFields = [
-        'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','updatedAt',
-        'isVisible','isVisibleOnMap','profilePhoto','photoURL','avatar',
+        'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','lastActiveAt','updatedAt',
+        'isVisible','isVisibleOnMap','ua','profilePhoto','photoURL','avatar',
         'fullName','email','phone','phoneCountryCode','languages','country',
         'description','bio','specialties','helpTypes','yearsOfExperience',
         'interventionCountries','practiceCountries'
@@ -103,11 +110,12 @@ service cloud.firestore {
                      hasValidUserFields() &&
                      request.resource.data.email == request.auth.token.email;
 
+      // Autoriser: photo seule, email sync, présence seule, ou MAJ sans champs sensibles
       allow update: if (
                       isAuthenticated() && request.auth.uid == userId && isNotBanned() && (
+                        presenceOnlyUpdate() ||
                         onlyPhotoFieldsChanged() ||
                         emailSelfSynced() ||
-                        presenceOnlyUpdate() ||
                         hasNoSensitiveChanges()
                       )
                     ) || isAdmin();
@@ -127,6 +135,8 @@ service cloud.firestore {
                       isAdmin()
                     );
 
+      // Propriétaire: MAJ champs autorisés (voir sosProfileUpdate) ou présenceOnly.
+      // Jamais de champs sensibles (role, isApproved, isBanned, etc.).
       allow update: if isAuthenticated() && (
                       (resource.data.uid == request.auth.uid && sosProfileUpdate()) ||
                       (profileId == request.auth.uid && sosProfileUpdate()) ||
@@ -156,8 +166,8 @@ service cloud.firestore {
       allow update: if isAdmin()
                     || (
                          isDocOwner() && isNotBanned() && hasValidProviderFields() && (
-                           onlyPhotoFieldsChanged() ||
                            presenceOnlyUpdate() ||
+                           onlyPhotoFieldsChanged() ||
                            hasNoSensitiveChanges()
                          )
                        );

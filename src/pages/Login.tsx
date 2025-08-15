@@ -362,6 +362,18 @@ const Login: React.FC = () => {
     password: '',
     rememberMe: false
   });
+  // Debounce timers for field-level validation (stable, browser env -> number)
+  const emailDebounceRef = useRef<number | null>(null);
+  const passwordDebounceRef = useRef<number | null>(null);
+
+  // Cleanup debounced validators on unmount
+  useEffect(() => {
+    return () => {
+      if (emailDebounceRef.current) window.clearTimeout(emailDebounceRef.current);
+      if (passwordDebounceRef.current) window.clearTimeout(passwordDebounceRef.current);
+    };
+  }, []);
+
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isFormTouched, setIsFormTouched] = useState<boolean>(false);
@@ -569,20 +581,20 @@ const Login: React.FC = () => {
         setFormErrors(prev => ({ ...prev, [field]: undefined }));
       }
 
-      if (isFormTouched && typeof value === 'string') {
-        const timeoutId = setTimeout(() => {
-          const fieldError = validateField(field as keyof LoginFormData, value);
-          if (fieldError) {
-            setFormErrors(prev => ({ ...prev, [field]: fieldError }));
-          }
-        }, 300);
-
-        return () => clearTimeout(timeoutId);
+      if (typeof value === 'string') {
+        const ref = field === 'email' ? emailDebounceRef : field === 'password' ? passwordDebounceRef : null;
+        if (ref) {
+          if (ref.current) window.clearTimeout(ref.current);
+          ref.current = window.setTimeout(() => {
+            const err = validateField(field as keyof LoginFormData, value);
+            if (err) {
+              setFormErrors(prev => ({ ...prev, [field]: err }));
+            }
+          }, 300);
+        }
       }
-
-      return undefined;
     },
-    [formErrors, isFormTouched, validateField]
+    [formErrors, validateField]
   );
 
   // ✅ CORRECTION: Fonction pour effacer les données sauvegardées

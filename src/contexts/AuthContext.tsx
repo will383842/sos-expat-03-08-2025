@@ -1,13 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  ReactNode,
-  useContext,
-} from 'react';
+import React, { ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -915,7 +907,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     return { date: user.lastLoginAt || null, device: `${deviceType} (${os})` };
   }, [user, deviceInfo]);
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     user,
     firebaseUser,
     isUserLoggedIn,
@@ -931,7 +923,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     clearError,
     refreshUser,
     getLastLoginInfo,
-  };
+  }), [user, firebaseUser, isUserLoggedIn, isLoading, authInitialized, error, authMetrics, deviceInfo, login, loginWithGoogle, register, logout, clearError, refreshUser, getLastLoginInfo]);
 
   return <BaseAuthContext.Provider value={value}>{children}</BaseAuthContext.Provider>;
 };

@@ -11,6 +11,8 @@ import { logError } from '../../utils/logging';
 import Modal from '../../components/common/Modal';
 import { validateDataIntegrity, cleanupObsoleteData } from '../../utils/firestore';
 import testNotificationSystem from '../../services/notifications/notificationService';
+import { PricingManagement } from '../../components/admin/PricingManagement';
+import { FinancialAnalytics } from '../../components/admin/FinancialAnalytics';
 
 // Interface pour les paramètres admin
 interface AdminSettings {
@@ -165,7 +167,7 @@ const AdminDashboard: React.FC = () => {
     for (let i = 0; i < keys.length - 1; i++) {
       current = current[keys[i]] as Record<string, unknown>;
     }
-    current[keys[keys.length - 1]] = value;
+    (current as Record<string, unknown>)[keys[keys.length - 1]] = value;
 
     setSettings(newSettings);
   };
@@ -403,6 +405,30 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <Users className="w-8 h-8 text-orange-600" />
                 </div>
+              </div>
+            </div>
+
+            {/* Section Gestion des Prix */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Gestion des Frais de Mise en Relation
+                </h2>
+              </div>
+              <div className="p-6">
+                <PricingManagement />
+              </div>
+            </div>
+
+            {/* Section Analytics Financiers */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Analytics Financiers
+                </h2>
+              </div>
+              <div className="p-6">
+                <FinancialAnalytics />
               </div>
             </div>
 
@@ -662,4 +688,3 @@ const AdminDashboard: React.FC = () => {
 };
 
 export default AdminDashboard;
-

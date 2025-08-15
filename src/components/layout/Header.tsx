@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu, X, Phone, Shield, ChevronDown, Globe, User, UserPlus,
@@ -250,7 +250,7 @@ const useAvailabilityToggle = () => {
         if (!snap.exists()) return;
         const data = snap.data() as any;
         const next = data?.isOnline === true;
-        setIsOnline(next);
+        setIsOnline(prev => (prev !== next ? next : prev));
       },
       (err) => console.error('Erreur snapshot sos_profiles:', err)
     );

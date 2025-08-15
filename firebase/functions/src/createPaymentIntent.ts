@@ -5,8 +5,6 @@ import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 import {
   toCents,
-  validateAmount,
-  calculateSplit,
   checkDailyLimit,
   logPaymentAudit,
   formatAmount,

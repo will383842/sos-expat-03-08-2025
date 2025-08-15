@@ -2,20 +2,12 @@
 
 // ====== EXPORTS PRINCIPAUX ======
 
-// Configuration globale pour toutes les fonctions
-import { setGlobalOptions } from 'firebase-functions/v2';
-setGlobalOptions({
-  region: 'us-central1', // Garde la même région que ton frontend
-  cors: true
-});
-
 // Export des webhooks modernisés (remplace les anciens)
 // Configuration globale pour toutes les fonctions
 import { setGlobalOptions } from 'firebase-functions/v2';
 setGlobalOptions({
   region: 'europe-west1',
-  cors: true
-});
+  });
 // Export des webhooks modernisés (remplace les anciens)
 export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
 

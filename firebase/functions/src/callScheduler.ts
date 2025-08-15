@@ -2,7 +2,6 @@ import { logCallRecord } from './utils/logs/logCallRecord';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 import { twilioCallManager, CallSessionState } from './TwilioCallManager';
-import { validateAmount, getPricingConfig } from './utils/paymentValidators';
 // Assurer que Firebase Admin est initialisé
 if (!admin.apps.length) {
   admin.initializeApp();

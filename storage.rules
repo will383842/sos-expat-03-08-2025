@@ -30,7 +30,7 @@ service firebase.storage {
       ];
     }
 
-    // ========= PHOTOS DE PROFIL =========
+    // ========= PHOTOS DE PROFIL (règles existantes, garder) =========
     match /profilePhotos/{userId}/{fileName} {
       // Lecture publique via URLs signées (download tokens)
       allow read: if true;
@@ -41,7 +41,21 @@ service firebase.storage {
       allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // ========= DOCUMENTS UTILISATEURS =========
+    // ========= ✅ NOUVEAU: PHOTOS TEMPORAIRES POUR INSCRIPTION =========
+    match /registration_temp/{fileName} {
+      // ✅ Permettre upload temporaire SANS authentification pendant l'inscription
+      allow read, write: if isImage() && isValidFileSize();
+      allow delete: if isAdmin();
+    }
+
+    // ========= DOSSIER TEMPORAIRE (modifier pour être plus permissif) =========
+    match /temp_profiles/{fileName} {
+      // ✅ Modifier : plus besoin d'authentification
+      allow read, write: if isImage() && isValidFileSize();
+      allow delete: if isAdmin();
+    }
+
+    // ========= DOCUMENTS UTILISATEURS (garder existant) =========
     match /documents/{userId}/{fileName} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow write: if isAuthenticated()
@@ -51,19 +65,13 @@ service firebase.storage {
       allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // ========= DOSSIER TEMPORAIRE (INSCRIPTION) =========
-    match /temp_profiles/{fileName} {
-      allow read, write: if isAuthenticated() && isImage() && isValidFileSize();
-      allow delete: if isAdmin();
-    }
-
-    // ========= FACTURES / ADMIN =========
+    // ========= FACTURES / ADMIN (garder existant) =========
     match /invoices/{userId}/{fileName} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow write, delete: if isAdmin() && isValidDocumentType() && isValidFileSize();
     }
 
-    // ========= SAUVEGARDES =========
+    // ========= SAUVEGARDES (garder existant) =========
     match /backups/{fileName} {
       allow read, write: if isAdmin();
     }

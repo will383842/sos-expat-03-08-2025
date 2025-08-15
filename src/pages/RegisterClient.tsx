@@ -1,3 +1,8 @@
+// =============================================================================
+// FICHIER: src/pages/RegisterClient.tsx
+// Version: sans check d’unicité email + libellés plus fun 😄
+// =============================================================================
+
 import React, {
   useState,
   useCallback,
@@ -5,7 +10,6 @@ import React, {
   useEffect,
   lazy,
   Suspense,
-  useRef,
 } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -75,15 +79,6 @@ interface FieldValidation {
   languagesSpoken: boolean;
   terms: boolean;
 }
-
-type EmailCheckState =
-  | { state: 'idle' }
-  | { state: 'checking' }
-  | { state: 'available' }
-  | { state: 'invalid' }
-  | { state: 'exists-password'; methods: string[] }
-  | { state: 'exists-google'; methods: string[] }
-  | { state: 'error' };
 
 type NavState = Readonly<{ selectedProvider?: Provider }>;
 
@@ -179,35 +174,34 @@ type LangKey = 'fr' | 'en';
 const i18nConfig: Record<LangKey, I18nShape> = {
   fr: {
     meta: {
-      title:
-        "Inscription Client - SOS Expats | Accédez à l'aide de la communauté",
+      title: 'Inscription Client - SOS Expats | Rejoignez la team 💙',
       description:
-        "Créez votre compte client en moins d'une minute et accédez à notre réseau d'aidants. Support 24/7, multilingue.",
+        "Créez votre compte client en 60 secondes chrono et accédez à notre réseau d'aidants ultra bienveillants. Support 24/7, multilingue.",
       keywords:
-        'inscription client, expatriation, aide, expats, 24/7, multilingue',
+        'inscription client, expatriation, aide, expats, 24/7, multilingue, communauté',
     },
     ui: {
-      heroTitle: 'Votre inscription, en moins de 1 minute',
+      heroTitle: "Inscription éclair ⚡️ (moins d’1 minute)",
       badge247: 'Disponible 24/7',
       badgeMulti: 'Multilingue',
       title: 'Inscription Client',
-      subtitle: "Créez votre compte pour accéder à notre réseau d'experts",
-      alreadyRegistered: 'Déjà inscrit ?',
+      subtitle: "Un petit compte et vous voilà connecté(e) à nos experts ✨",
+      alreadyRegistered: 'Déjà parmi nous ?',
       login: 'Se connecter',
       personalInfo: 'Vos infos perso',
-      acceptTerms: "J'accepte les",
-      termsLink: 'conditions générales pour clients',
-      createAccount: "C'est parti ! 🚀",
+      acceptTerms: 'J’ai lu et j’accepte les',
+      termsLink: 'conditions générales clients',
+      createAccount: 'Je crée mon compte ✨',
       required: 'obligatoire',
-      loading: 'Création magique en cours...',
-      progressHint: 'Encore quelques petites choses à remplir ! ⭐',
-      passwordStrength: 'Force de votre mot de passe',
+      loading: 'On prépare votre espace magique… ✨',
+      progressHint: 'Plus que quelques cases et c’est bon ! ⭐',
+      passwordStrength: 'Solidité du mot de passe',
       progressLabel: 'Progression',
-      loadingLanguages: 'Chargement des langues...',
+      loadingLanguages: 'On charge les langues…',
       ariaShowPassword: 'Afficher le mot de passe',
       ariaHidePassword: 'Masquer le mot de passe',
       footerBanner:
-        "🌟 En vous inscrivant, vous rejoignez notre super communauté et accédez instantanément à de l'aide qualifiée !",
+        "🌟 Bienvenue ! En vous inscrivant, vous rejoignez une communauté d’entraide ultra réactive — prêts à vous filer un coup de main !",
     },
     fields: {
       firstName: 'Votre prénom',
@@ -218,85 +212,80 @@ const i18nConfig: Record<LangKey, I18nShape> = {
     actions: {
       addLanguage: 'Ajouter une langue',
       remove: 'Supprimer',
-      specifyLanguage: 'Dites-nous quelle langue !',
+      specifyLanguage: 'Quelle langue avez-vous en tête ?',
       add: 'Ajouter',
     },
     help: {
-      minPassword: '6 caractères minimum (aucune autre contrainte !)',
+      minPassword: '6 caractères minimum (et c’est tout ✔️)',
       emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'Comment vous appelez-vous ? 😊',
-      firstNameHint:
-        "Comment on vous appelle ? Un petit prénom sympa et on est partis ✨",
+      firstNamePlaceholder: 'On vous appelle comment ? 😊',
+      firstNameHint: 'Un petit prénom sympa et on démarre ! ✨',
       emailHint:
-        "On vous écrit uniquement pour votre compte et les mises en relation. Pas de spam 🤝",
+        "On vous écrit seulement pour votre compte et les mises en relation. Promis, pas de spam 🤝",
       passwordTip:
         'Astuce : plus c’est long, mieux c’est — 6+ caractères suffisent ici 💪',
-      dataSecure: 'Vos données sont chiffrées et sécurisées',
+      dataSecure: 'Vos données sont chiffrées et bien au chaud',
     },
     errors: {
-      title: 'Petites corrections à faire :',
-      firstNameRequired: "On aimerait connaître votre prénom ! 😊",
-      firstNameTooShort:
-        'Votre prénom mérite plus de 2 caractères pour briller ! ✨',
-      emailRequired:
-        'Il nous faut votre email pour vous contacter ! 📧',
-      emailInvalid:
-        "Cette adresse email a l'air bizarre... Essayez quelque chose comme nom@exemple.com 🤔",
+      title: 'Oups, quelques retouches :',
+      firstNameRequired: 'On aimerait connaître votre prénom ! 😊',
+      firstNameTooShort: '2 caractères minimum pour un prénom qui claque ✨',
+      emailRequired: 'Votre email nous permet de vous contacter 📧',
+      emailInvalid: 'Hmm… cet email semble étrange. Essayez nom@exemple.com 🤔',
       passwordRequired:
-        'Il faut un petit mot de passe pour sécuriser votre compte ! 🔐',
-      passwordTooShort:
-        "Juste 6 caractères minimum, c'est tout ce qu'on demande ! 😉",
+        'Un mot de passe est nécessaire pour sécuriser votre compte 🔐',
+      passwordTooShort: '6 caractères minimum et c’est gagné 😉',
       languagesRequired:
-        'Dites-nous quelles langues vous parlez, ça nous aide ! 🌍',
-      termsRequired: 'Un petit clic sur les conditions pour finaliser ! ✅',
+        'Dites-nous quelles langues vous parlez, ça nous aide 🌍',
+      termsRequired: 'Un p’tit clic sur les conditions pour finaliser ✅',
       registrationError:
-        'Oups ! Un petit souci technique. Réessayez dans un instant ! 🔧',
+        'Petit souci technique. On réessaie dans un instant 🔧',
       emailAlreadyExists:
-        'Cette adresse est déjà prise ! Vous pouvez vous connecter à la place ? 🔄',
+        'Cette adresse est déjà utilisée. Essayez la connexion 🔄',
       networkError:
-        'Problème de connexion ! Vérifiez votre wifi et on réessaie ? 📶',
+        'Problème de connexion. Vérifiez votre wifi et réessayons 📶',
       tooManyRequests:
-        'Trop de tentatives ! Prenez une pause et réessayez dans quelques minutes ! ⏰',
+        'Trop de tentatives. Une mini pause et on repart ⏰',
     },
     success: {
       fieldValid: 'Parfait ! ✨',
-      emailValid: 'Super email ! 👌',
-      passwordValid: 'Mot de passe au top ! 🔒',
-      allFieldsValid: "Tout est parfait ! Vous êtes prêt(e) ! 🎉",
+      emailValid: 'Email au top ! 👌',
+      passwordValid: 'Mot de passe validé ! 🔒',
+      allFieldsValid: 'Tout est bon ! Prêt(e) à décoller 🚀',
     },
     termsHref: '/cgu-clients',
     jsonLdName: 'Inscription Client',
   },
   en: {
     meta: {
-      title:
-        'Client Registration - SOS Expats | Get help from the community',
+      title: 'Client Sign-up - SOS Expats | Join the crew 💙',
       description:
-        'Create your client account in under 1 minute and access our helper network. 24/7, multilingual support.',
-      keywords: 'client registration, expat, help, 24/7, multilingual',
+        'Create your client account in under 60 seconds and tap into a super helpful network. 24/7, multilingual support.',
+      keywords:
+        'client registration, expat, help, 24/7, multilingual, community',
     },
     ui: {
-      heroTitle: 'Register in under 1 minute',
+      heroTitle: 'Speedy sign-up ⚡️ (under 1 minute)',
       badge247: 'Available 24/7',
       badgeMulti: 'Multilingual',
       title: 'Client Registration',
-      subtitle: 'Create your account to access our network of experts',
-      alreadyRegistered: 'Already registered?',
+      subtitle: 'One quick account and you’re in with the experts ✨',
+      alreadyRegistered: 'Already with us?',
       login: 'Log in',
       personalInfo: 'Your personal info',
-      acceptTerms: 'I accept the',
-      termsLink: 'general terms for clients',
-      createAccount: "Let's go! 🚀",
+      acceptTerms: 'I have read and accept the',
+      termsLink: 'client terms & conditions',
+      createAccount: 'Create my account ✨',
       required: 'required',
-      loading: 'Creating magic...',
-      progressHint: 'Just a few more things to fill! ⭐',
-      passwordStrength: 'Your password strength',
+      loading: 'Setting things up for you… ✨',
+      progressHint: 'Just a few bits left — you got this! ⭐',
+      passwordStrength: 'Password strength',
       progressLabel: 'Progress',
-      loadingLanguages: 'Loading languages...',
+      loadingLanguages: 'Fetching languages…',
       ariaShowPassword: 'Show password',
       ariaHidePassword: 'Hide password',
       footerBanner:
-        '🌟 By registering, you join our amazing community and get instant access to qualified help!',
+        '🌟 Welcome aboard! By signing up, you join a caring, quick-to-help community — ready when you are!',
     },
     fields: {
       firstName: 'Your first name',
@@ -307,49 +296,42 @@ const i18nConfig: Record<LangKey, I18nShape> = {
     actions: {
       addLanguage: 'Add a language',
       remove: 'Remove',
-      specifyLanguage: 'Tell us which language!',
+      specifyLanguage: 'Which language did you have in mind?',
       add: 'Add',
     },
     help: {
-      minPassword: '6 characters minimum (no other requirements!)',
+      minPassword: '6 characters minimum (yep, that’s it ✔️)',
       emailPlaceholder: 'you@example.com',
-      firstNamePlaceholder: "What's your name? 😊",
-      firstNameHint:
-        'How should we call you? A friendly first name is perfect ✨',
+      firstNamePlaceholder: "What should we call you? 😊",
+      firstNameHint: 'Drop your friendly first name and we’re off ✨',
       emailHint:
-        'We email you only for your account & connections. No spam 🤝',
+        'We’ll only email you about your account & connections. No spam 🤝',
       passwordTip:
-        'Tip: longer is stronger — but 6+ chars is enough here 💪',
-      dataSecure: 'Your data is encrypted & secure',
+        'Pro tip: longer is stronger — 6+ chars is enough here 💪',
+      dataSecure: 'Your data is encrypted and cozy',
     },
     errors: {
-      title: 'Small fixes needed:',
-      firstNameRequired: "We'd love to know your first name! 😊",
-      firstNameTooShort:
-        'Your name deserves more than 2 characters to shine! ✨',
-      emailRequired: 'We need your email to contact you! 📧',
-      emailInvalid:
-        'This email looks weird... Try something like name@example.com 🤔',
-      passwordRequired:
-        'You need a little password to secure your account! 🔐',
-      passwordTooShort:
-        "Just 6 characters minimum, that's all we ask! 😉",
+      title: 'Whoops, a few tweaks:',
+      firstNameRequired: 'We’d love to know your first name! 😊',
+      firstNameTooShort: 'At least 2 characters so your name can shine ✨',
+      emailRequired: 'We need your email to reach you 📧',
+      emailInvalid: 'Hmm… that email looks off. Try name@example.com 🤔',
+      passwordRequired: 'A password is needed to secure your account 🔐',
+      passwordTooShort: 'Minimum 6 characters and you’re good 😉',
       languagesRequired:
-        'Tell us what languages you speak, it helps us! 🌍',
-      termsRequired: 'A quick click on the terms to finalize! ✅',
+        'Tell us the languages you speak — super helpful 🌍',
+      termsRequired: 'One quick click on the terms to finish ✅',
       registrationError:
-        'Oops! A little technical hiccup. Try again in a moment! 🔧',
-      emailAlreadyExists:
-        "This address is already taken! Can you log in instead? 🔄",
-      networkError: "Connection problem! Check your wifi and let's try again? 📶",
-      tooManyRequests:
-        'Too many attempts! Take a breather and try again in a few minutes! ⏰',
+        'Tiny technical hiccup. Please try again in a moment 🔧',
+      emailAlreadyExists: 'This email is already in use. Try logging in 🔄',
+      networkError: 'Connection issue. Check your wifi and we’ll retry 📶',
+      tooManyRequests: 'Too many attempts. Take a short break and try again ⏰',
     },
     success: {
       fieldValid: 'Perfect! ✨',
       emailValid: 'Great email! 👌',
-      passwordValid: 'Password on point! 🔒',
-      allFieldsValid: "Everything is perfect! You're ready! 🎉",
+      passwordValid: 'Password looks good! 🔒',
+      allFieldsValid: 'All set! Ready for take-off 🚀',
     },
     termsHref: '/terms-conditions-clients',
     jsonLdName: 'Client Registration',
@@ -544,8 +526,6 @@ const RegisterClient: React.FC = () => {
   const [showCustomLanguage, setShowCustomLanguage] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [emailCheck, setEmailCheck] = useState<EmailCheckState>({ state: 'idle' });
-  const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ==========================
   // SEO / meta
@@ -632,49 +612,7 @@ const RegisterClient: React.FC = () => {
   }, []);
 
   // ==========================
-  // Vérification email (Auth)
-  // ==========================
-  const scheduleEmailCheck = useCallback(
-    (rawEmail: string) => {
-      const email = normalizeEmail(rawEmail);
-      if (!email || !isEmailFormatValid(email)) {
-        setEmailCheck({ state: 'invalid' });
-        return;
-      }
-      if (
-        (emailCheck.state === 'available' ||
-          emailCheck.state === 'exists-password' ||
-          emailCheck.state === 'exists-google')
-      ) {
-        return;
-      }
-      if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
-      setEmailCheck({ state: 'checking' });
-      emailDebounceRef.current = setTimeout(async () => {
-        try {
-          if (methods.length === 0) setEmailCheck({ state: 'available' });
-          else if (methods.includes('password'))
-            setEmailCheck({ state: 'exists-password', methods });
-          else if (methods.includes('google.com'))
-            setEmailCheck({ state: 'exists-google', methods });
-          else setEmailCheck({ state: 'error' });
-        } catch (err) {
-          if (import.meta.env.DEV) console.debug('email check error:', err);
-          setEmailCheck({ state: 'error' });
-        }
-      }, 400);
-    },
-    [emailCheck.state]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
-    };
-  }, []);
-
-  // ==========================
-  // Validation champs
+  // Validation champs (sans vérification d'unicité email)
   // ==========================
   const validateField = useCallback(
     (fieldName: string, value: string | string[] | boolean) => {
@@ -702,7 +640,7 @@ const RegisterClient: React.FC = () => {
             errors.email = t.errors.emailInvalid;
             validation.email = false;
           } else {
-            validation.email = true;
+            validation.email = true; // ✅ Plus d'unicité ici
           }
           break;
 
@@ -742,15 +680,9 @@ const RegisterClient: React.FC = () => {
     [t.errors, isValidEmail]
   );
 
-  const handleFieldBlur = useCallback(
-    (fieldName: string) => {
-      setTouched((prev) => ({ ...prev, [fieldName]: true }));
-      if (fieldName === 'email' && isEmailFormatValid(formData.email)) {
-        scheduleEmailCheck(formData.email);
-      }
-    },
-    [formData.email, scheduleEmailCheck]
-  );
+  const handleFieldBlur = useCallback((fieldName: string) => {
+    setTouched((prev) => ({ ...prev, [fieldName]: true }));
+  }, []);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -759,14 +691,8 @@ const RegisterClient: React.FC = () => {
       const { errors, validation } = validateField(name, value);
       setFieldErrors((prev) => ({ ...prev, [name]: errors[name as keyof FieldErrors] }));
       setFieldValidation((prev) => ({ ...prev, ...validation }));
-
-      if (name === 'email') {
-        const v = value.toString();
-        if (isEmailFormatValid(v)) scheduleEmailCheck(v);
-        else setEmailCheck({ state: v.trim() ? 'invalid' : 'idle' });
-      }
     },
-    [validateField, scheduleEmailCheck]
+    [validateField]
   );
 
   // Langues
@@ -851,7 +777,6 @@ const RegisterClient: React.FC = () => {
       terms: true,
     });
 
-    // ⚠️ Ne bloque PAS la soumission sur le pré-check email (Firebase fera foi au submit)
     return Object.keys(allErrors).length === 0;
   }, [formData, termsAccepted, validateField]);
 
@@ -927,8 +852,6 @@ const RegisterClient: React.FC = () => {
       fieldValidation.languagesSpoken &&
       fieldValidation.terms &&
       !isLoading;
-
-    // ❌ ne tient plus compte du pré-check email
     return formReady;
   }, [fieldValidation, isLoading]);
 
@@ -1111,32 +1034,11 @@ const RegisterClient: React.FC = () => {
                     <p id="email-hint" className="mt-1 text-xs text-gray-500">
                       {t.help.emailHint}
                     </p>
-
                     <FieldError error={fieldErrors.email} show={!!(fieldErrors.email && touched.email)} />
-
-                    {/* Statut Auth (informatif, ne bloque pas) */}
-                    {touched.email && isEmailFormatValid(formData.email) && (
-                      <div className="mt-1 text-xs">
-                        {emailCheck.state === 'checking' && (
-                          <div className="text-gray-500">Vérification de l’email…</div>
-                        )}
-                        {emailCheck.state === 'available' && <FieldSuccess show message={t.success.emailValid} />}
-                        {emailCheck.state === 'exists-password' && (
-                          <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                            Cet email semble déjà associé à un compte. Si la création échoue,
-                            utilisez la connexion avec email/mot de passe.
-                          </div>
-                        )}
-                        {emailCheck.state === 'exists-google' && (
-                          <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                            Email lié à Google. Vous pourrez utiliser “Se connecter avec Google”.
-                          </div>
-                        )}
-                        {emailCheck.state === 'error' && (
-                          <div className="text-amber-600">Vérification impossible pour le moment, réessayez.</div>
-                        )}
-                      </div>
-                    )}
+                    <FieldSuccess
+                      show={fieldValidation.email && touched.email && !fieldErrors.email}
+                      message={t.success.emailValid}
+                    />
                   </div>
 
                   {/* Mot de passe */}
@@ -1193,12 +1095,16 @@ const RegisterClient: React.FC = () => {
                       }
                     >
                       <div className={`${getInputClassName('languagesSpoken')} p-0`}>
-                        <MultiLanguageSelect 
-                      value={selectedLanguages} 
-                      onChange={handleLanguagesChange}
-                      locale={langKey}
-                      placeholder={langKey === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
-                    />
+                        <MultiLanguageSelect
+                          value={selectedLanguages}
+                          onChange={handleLanguagesChange}
+                          locale={langKey}
+                          placeholder={
+                            langKey === 'fr'
+                              ? 'Rechercher et sélectionner les langues…'
+                              : 'Search and select languages…'
+                          }
+                        />
                       </div>
                     </Suspense>
 

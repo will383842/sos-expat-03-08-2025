@@ -3,15 +3,13 @@ import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect, useRe
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Phone,
-  CheckCircle, XCircle, Users, Camera, X, ArrowRight, Info, MapPin, MessageCircle
+  CheckCircle, Users, Camera, X, ArrowRight, Info, MapPin, MessageCircle
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { MultiValue } from 'react-select';
+import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
 
 // ===== Lazy (perf) =====
@@ -151,7 +149,6 @@ const COUNTRY_CODES = [
 
 // ===== Types =====
 interface LanguageOption { value: string; label: string }
-interface EmailCheckStatus { isChecking: boolean; isAvailable: boolean | null; hasBeenChecked: boolean; }
 interface ExpatFormData {
   firstName: string; lastName: string; email: string; password: string;
   phone: string; phoneCountryCode: string; whatsappCountryCode: string; whatsappNumber: string;
@@ -527,12 +524,12 @@ const RegisterExpat: React.FC = () => {
   const navigate = useNavigate();
 
   // --- Types sûrs ---
-  type NavState = Readonly<{ selectedProvider?: Provider }>;
+  type LocalNavState = Readonly<{ selectedProvider?: Provider }>;
   function isProviderLike(v: unknown): v is Provider {
     if (typeof v !== 'object' || v === null) return false;
     const o = v as Record<string, unknown>;
     return typeof o.id === 'string' && typeof o.name === 'string' && (o.type === 'lawyer' || o.type === 'expat');
-    }
+  }
 
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -540,7 +537,7 @@ const RegisterExpat: React.FC = () => {
 
   useEffect(() => {
     const rawState: unknown = location.state;
-    const state = (rawState ?? null) as NavState | null;
+    const state = (rawState ?? null) as LocalNavState | null;
     const sp = state?.selectedProvider;
     if (isProviderLike(sp)) {
       try { sessionStorage.setItem('selectedProvider', JSON.stringify(sp)); } catch { /* no-op */ }
@@ -612,11 +609,6 @@ const RegisterExpat: React.FC = () => {
   const refHelp = useRef<HTMLDivElement | null>(null);
   const refCGU = useRef<HTMLDivElement | null>(null);
 
-  // Email status
-  const [emailStatus, setEmailStatus] = useState<EmailCheckStatus>({ isChecking: false, isAvailable: null, hasBeenChecked: false });
-  const [emailCheckTimeout, setEmailCheckTimeout] = useState<number | null>(null);
-  useEffect(() => () => { if (emailCheckTimeout) window.clearTimeout(emailCheckTimeout); }, [emailCheckTimeout]);
-
   // ---- Options ----
   const countryOptions = useMemo(() => mapDuo(COUNTRIES, lang), [lang]);
   const helpTypeOptions = useMemo(() => mapDuo(HELP_TYPES, lang), [lang]);
@@ -632,8 +624,7 @@ const RegisterExpat: React.FC = () => {
   const valid = useMemo(() => ({
     firstName: !!form.firstName.trim(),
     lastName: !!form.lastName.trim(),
-    // 👉 pré-check email seulement informatif : on ne bloque que sur le format ici
-    email: EMAIL_REGEX.test(form.email),
+    email: EMAIL_REGEX.test(form.email), // ✅ format uniquement
     password: form.password.length >= 6,
     phone: !!form.phone.trim(),
     whatsappNumber: !!form.whatsappNumber.trim(),
@@ -648,50 +639,34 @@ const RegisterExpat: React.FC = () => {
     acceptTerms: form.acceptTerms,
   }), [form, selectedLanguages]);
 
-  // ---- Progress ----
+  // ---- Progress (sans emailStatus) ----
   const progress = useMemo(() => {
-    const flags = Object.values(valid);
-    const done = flags.filter(Boolean).length;
-    return Math.round((done / flags.length) * 100);
-  }, [valid]);
-
-  // ---- Email uniqueness (Firestore) ----
-  const checkEmailAvailability = useCallback(async (email: string) => {
-    const clean = email.trim().toLowerCase();
-    if (!EMAIL_REGEX.test(clean)) return false;
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('emailLower', '==', clean));
-    const snap = await getDocs(q);
-    return snap.empty;
-  }, []);
-
-  const handleEmailCheck = useCallback(
-    (email: string) => {
-      if (emailCheckTimeout) window.clearTimeout(emailCheckTimeout);
-      if (!email || !EMAIL_REGEX.test(email)) {
-        setEmailStatus({ isChecking: false, isAvailable: null, hasBeenChecked: false });
-        return;
-      }
-      setEmailStatus((prev) => ({ ...prev, isChecking: true }));
-      const to = window.setTimeout(async () => {
-        try {
-          const ok = await checkEmailAvailability(email);
-          setEmailStatus({ isChecking: false, isAvailable: ok, hasBeenChecked: true });
-        } catch {
-          setEmailStatus({ isChecking: false, isAvailable: false, hasBeenChecked: true });
-        }
-      }, 700);
-      setEmailCheckTimeout(to);
-    },
-    [emailCheckTimeout, checkEmailAvailability]
-  );
+    const fields = [
+      !!form.firstName.trim(),
+      !!form.lastName.trim(),
+      EMAIL_REGEX.test(form.email),
+      form.password.length >= 6,
+      !!form.phone.trim(),
+      !!form.whatsappNumber.trim(),
+      !!form.currentCountry,
+      !!form.currentPresenceCountry,
+      !!form.interventionCountry,
+      form.yearsAsExpat >= 1,
+      form.bio.trim().length >= 50,
+      !!form.profilePhoto,
+      (selectedLanguages as LanguageOption[]).length > 0,
+      form.helpTypes.length > 0,
+      form.acceptTerms,
+    ];
+    const done = fields.filter(Boolean).length;
+    return Math.round((done / fields.length) * 100);
+  }, [form, selectedLanguages]);
 
   // ---- Handlers ----
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { name, value, type, checked } = e.target as HTMLInputElement;
       setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value }));
-      if (name === 'email') handleEmailCheck(value);
       if (fieldErrors[name]) {
         setFieldErrors((prev) => {
           const rest = { ...prev };
@@ -701,7 +676,7 @@ const RegisterExpat: React.FC = () => {
       }
       if (formError) setFormError('');
     },
-    [fieldErrors, formError, handleEmailCheck]
+    [fieldErrors, formError]
   );
 
   const onHelpSelect = useCallback(
@@ -745,7 +720,7 @@ const RegisterExpat: React.FC = () => {
     if (!valid.lastName) e.lastName = t.errors.lastNameRequired;
     if (!form.email.trim()) e.email = t.errors.emailRequired;
     else if (!EMAIL_REGEX.test(form.email)) e.email = t.errors.emailInvalid;
-    // ⚠️ Ne bloque plus sur le pré-check d'unicité (Firebase fera foi au submit)
+    // ⚠️ On ne bloque pas sur l’unicité (Firebase fera foi au submit)
     if (!valid.password) e.password = t.errors.passwordTooShort;
     if (!valid.phone) e.phone = t.errors.phoneRequired;
     if (!valid.whatsappNumber) e.whatsappNumber = t.errors.whatsappRequired;
@@ -1044,34 +1019,17 @@ const RegisterExpat: React.FC = () => {
                           autoComplete="email"
                           value={form.email}
                           onChange={onChange}
-                          onBlur={(e) => handleEmailCheck(e.target.value)}
-                          aria-describedby="email-help email-status"
-                          className={`w-full block z-[1] pl-11 pr-4 py-3 rounded-xl border-2
-                                      ${THEME.ring} focus:bg-white transition
-                                      !bg-white !opacity-100 !visible !h-auto ${
-                                        emailStatus.hasBeenChecked
-                                          ? (emailStatus.isAvailable ? '!border-green-300' : '!border-red-300')
-                                          : (fieldErrors.email ? '!border-red-500' : (valid.email ? '!border-green-300' : '!border-gray-300'))
-                                      }`}
+                          aria-describedby="email-help"
+                          className={`w-full block z-[1] pl-11 pr-4 py-3 rounded-xl border-2 ${THEME.ring} focus:bg-white transition
+                                      ${fieldErrors.email ? '!border-red-500 bg-red-50' : valid.email ? '!border-green-300 bg-green-50' : '!border-gray-300'}`}
                           placeholder={t.help.emailPlaceholder}
                         />
                       </div>
                       <p id="email-help" className="mt-1 text-xs text-gray-500">
                         {lang === 'en' ? 'We only email for your account & connections. 🤝' : 'On vous écrit seulement pour le compte & les mises en relation. 🤝'}
                       </p>
-                      {emailStatus.isChecking && <p id="email-status" className="mt-1 text-sm text-emerald-700" aria-live="polite">{lang === 'en' ? 'Checking email…' : 'Vérification de l’email…'}</p>}
-                      {emailStatus.hasBeenChecked && emailStatus.isAvailable && (
-                        <p id="email-status" className="mt-1 text-sm text-green-600" aria-live="polite">
-                          <CheckCircle className="inline w-4 h-4 mr-1" />
-                          {lang === 'en' ? 'Email available' : 'Email disponible'}
-                        </p>
-                      )}
-                      {emailStatus.hasBeenChecked && emailStatus.isAvailable === false && (
-                        <p id="email-status" className="mt-1 text-sm text-red-600" aria-live="polite">
-                          <XCircle className="inline w-4 h-4 mr-1" />
-                          {lang === 'en' ? 'This email is already in use' : 'Cet email est déjà utilisé'}
-                        </p>
-                      )}
+                      {fieldErrors.email && <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>}
+                      <FieldSuccess show={valid.email}>{lang === 'en' ? 'Looks good! 👌' : 'Email au top ! 👌'}</FieldSuccess>
                     </div>
 
                     {/* Password */}
@@ -1246,20 +1204,20 @@ const RegisterExpat: React.FC = () => {
                       )}
 
                       <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
-                       <MultiLanguageSelect
-                        value={selectedLanguages}
-                        onChange={(v: MultiValue<LanguageOption>) => {
-                          setSelectedLanguages(v);
-                          if (fieldErrors.languages) {
-                            setFieldErrors((prev) => {
-                              const rest = { ...prev };
-                              delete rest.languages;
-                              return rest;
-                            });
-                          }
-                        }}
-                        locale={lang}
-                        placeholder={lang === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
+                        <MultiLanguageSelect
+                          value={selectedLanguages}
+                          onChange={(v: MultiValue<LanguageOption>) => {
+                            setSelectedLanguages(v);
+                            if (fieldErrors.languages) {
+                              setFieldErrors((prev) => {
+                                const rest = { ...prev };
+                                delete rest.languages;
+                                return rest;
+                              });
+                            }
+                          }}
+                          locale={lang}
+                          placeholder={lang === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
                         />
                       </Suspense>
 

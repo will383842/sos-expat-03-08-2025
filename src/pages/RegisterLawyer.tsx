@@ -9,8 +9,6 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
 
@@ -104,7 +102,7 @@ const COUNTRY_CODES = [
   { code: '+82', flag: '🇰🇷', fr: 'Corée du Sud', en: 'South Korea' },
   { code: '+65', flag: '🇸🇬', fr: 'Singapour', en: 'Singapore' },
   { code: '+212', flag: '🇲🇦', fr: 'Maroc', en: 'Morocco' },
-  { code: '+216', flag: '🇹🇳', fr: 'Tunisie', en: 'Tunisia' },
+  { code: '+216', flag: '🇹🇳', fr: 'Tunisia', en: 'Tunisia' },
   { code: '+213', flag: '🇩🇿', fr: 'Algérie', en: 'Algeria' },
   { code: '+971', flag: '🇦🇪', fr: 'Émirats', en: 'UAE' },
   { code: '+55', flag: '🇧🇷', fr: 'Brésil', en: 'Brazil' },
@@ -127,7 +125,6 @@ interface LawyerFormData {
   availability: 'available' | 'busy' | 'offline'; acceptTerms: boolean;
 }
 interface LanguageOption { value: string; label: string }
-interface EmailCheckStatus { isChecking: boolean; isAvailable: boolean | null; hasBeenChecked: boolean; }
 
 // ===== i18n (fun) =====
 const I18N = {
@@ -530,11 +527,6 @@ const RegisterLawyer: React.FC = () => {
     bio: useRef<HTMLTextAreaElement | null>(null),
   };
 
-  // Email status
-  const [emailStatus, setEmailStatus] = useState<EmailCheckStatus>({ isChecking: false, isAvailable: null, hasBeenChecked: false });
-  const [emailCheckTimeout, setEmailCheckTimeout] = useState<number | null>(null);
-  useEffect(() => () => { if (emailCheckTimeout) window.clearTimeout(emailCheckTimeout); }, [emailCheckTimeout]);
-
   // ---- Options (bilingue) ----
   const countryOptions = useMemo(() => mapDuo(COUNTRIES, lang), [lang]);
   const specialtyOptions = useMemo(() => mapDuo(SPECIALTIES, lang), [lang]);
@@ -546,11 +538,11 @@ const RegisterLawyer: React.FC = () => {
   // ---- Password strength ----
   const pwdStrength = useMemo(() => computePasswordStrength(form.password), [form.password]);
 
-  // ---- Progress ----
+  // ---- Progress (ne vérifie plus la dispo email) ----
   const progress = useMemo(() => {
     const fields = [
       !!form.firstName, !!form.lastName,
-      EMAIL_REGEX.test(form.email) && emailStatus.isAvailable !== false,
+      EMAIL_REGEX.test(form.email),
       form.password.length >= 6,
       !!form.phone, !!form.whatsappNumber,
       !!form.currentCountry, !!form.currentPresenceCountry,
@@ -564,38 +556,7 @@ const RegisterLawyer: React.FC = () => {
     ];
     const done = fields.filter(Boolean).length;
     return Math.round((done / fields.length) * 100);
-  }, [form, selectedLanguages, emailStatus]);
-
-  // ---- Email uniqueness (Firestore) ----
-  const checkEmailAvailability = useCallback(async (email: string) => {
-    const clean = email.trim().toLowerCase();
-    if (!EMAIL_REGEX.test(clean)) return false;
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('emailLower', '==', clean));
-    const snap = await getDocs(q);
-    return snap.empty;
-  }, []);
-
-  const handleEmailCheck = useCallback(
-    (email: string) => {
-      if (emailCheckTimeout) window.clearTimeout(emailCheckTimeout);
-      if (!email || !EMAIL_REGEX.test(email)) {
-        setEmailStatus({ isChecking: false, isAvailable: null, hasBeenChecked: false });
-        return;
-      }
-      setEmailStatus((prev) => ({ ...prev, isChecking: true }));
-      const to = window.setTimeout(async () => {
-        try {
-          const ok = await checkEmailAvailability(email);
-          setEmailStatus({ isChecking: false, isAvailable: ok, hasBeenChecked: true });
-        } catch {
-          setEmailStatus({ isChecking: false, isAvailable: false, hasBeenChecked: true });
-        }
-      }, 650);
-      setEmailCheckTimeout(to);
-    },
-    [emailCheckTimeout, checkEmailAvailability]
-  );
+  }, [form, selectedLanguages]);
 
   // ---- Classes ----
   const baseInput = 'block w-full min-h-[44px] px-4 py-3 rounded-xl border transition-all duration-200 text-sm focus:outline-none';
@@ -617,7 +578,7 @@ const RegisterLawyer: React.FC = () => {
       const { name, value, type, checked } = e.target as HTMLInputElement;
       setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value }));
 
-      if (name === 'email') handleEmailCheck(value);
+      // (plus d’appel handleEmailCheck)
       if (name === 'currentCountry') {
         const other = lang === 'en' ? 'Other' : 'Autre';
         setShowCustomCountry(value === other);
@@ -628,7 +589,7 @@ const RegisterLawyer: React.FC = () => {
         });
       }
     },
-    [fieldErrors, handleEmailCheck, lang]
+    [fieldErrors, lang]
   );
 
   // ---- Sélections multi (pays de pratique / spécialités) ----
@@ -695,7 +656,7 @@ const RegisterLawyer: React.FC = () => {
     });
   }, []);
 
-  // ---- Validation complète ----
+  // ---- Validation complète (ne bloque plus sur "email déjà utilisé") ----
   const validateAll = useCallback(() => {
     const e: Record<string, string> = {};
     if (!form.firstName.trim()) e.firstName = t.errors.firstNameRequired;
@@ -703,7 +664,6 @@ const RegisterLawyer: React.FC = () => {
 
     if (!form.email.trim()) e.email = t.errors.emailRequired;
     else if (!EMAIL_REGEX.test(form.email)) e.email = t.errors.emailInvalid;
-    else if (emailStatus.isAvailable === false) e.email = t.errors.emailTaken;
 
     if (!form.password || form.password.length < 6) e.password = t.errors.passwordTooShort;
 
@@ -731,7 +691,7 @@ const RegisterLawyer: React.FC = () => {
     }
 
     return Object.keys(e).length === 0;
-  }, [form, selectedLanguages, emailStatus, t]);
+  }, [form, selectedLanguages, t]);
 
   // ---- Missing checklist (UX clair) ----
   const missing = useMemo(() => {
@@ -739,7 +699,7 @@ const RegisterLawyer: React.FC = () => {
     return [
       { key: 'firstName', ok: !!form.firstName, labelFr: 'Prénom', labelEn: 'First name' },
       { key: 'lastName', ok: !!form.lastName, labelFr: 'Nom', labelEn: 'Last name' },
-      { key: 'email', ok: EMAIL_REGEX.test(form.email) && emailStatus.isAvailable !== false, labelFr: 'Email valide', labelEn: 'Valid email' },
+      { key: 'email', ok: EMAIL_REGEX.test(form.email), labelFr: 'Email valide', labelEn: 'Valid email' },
       { key: 'password', ok: form.password.length >= 6, labelFr: 'Mot de passe (≥ 6 caractères)', labelEn: 'Password (≥ 6 chars)' },
       { key: 'phone', ok: !!form.phone, labelFr: 'Téléphone', labelEn: 'Phone' },
       { key: 'whatsappNumber', ok: !!form.whatsappNumber, labelFr: 'WhatsApp', labelEn: 'WhatsApp' },
@@ -753,7 +713,7 @@ const RegisterLawyer: React.FC = () => {
       { key: 'educations', ok: form.educations.some((v) => v.trim().length > 0), labelFr: 'Au moins une formation', labelEn: 'At least one education' },
       { key: 'acceptTerms', ok: !!form.acceptTerms, labelFr: 'Accepter les CGU', labelEn: 'Accept T&Cs' },
     ];
-  }, [form, selectedLanguages, emailStatus]);
+  }, [form, selectedLanguages]);
 
   const focusFirstMissingField = useCallback(() => {
     const first = missing.find((m) => !m.ok);
@@ -806,7 +766,7 @@ const RegisterLawyer: React.FC = () => {
         avatar: form.profilePhoto,
         languages: languageCodes,
         languagesSpoken: languageCodes,
-        specialties: form.specialties, // <= specialties bien envoyées ✅
+        specialties: form.specialties,
         education: form.educations.map((e) => e.trim()).filter(Boolean),
         yearsOfExperience: form.yearsOfExperience,
         graduationYear: form.graduationYear,
@@ -855,9 +815,8 @@ const RegisterLawyer: React.FC = () => {
       (selectedLanguages as LanguageOption[]).length > 0 &&
       form.educations.some((e) => e.trim().length > 0) &&
       form.acceptTerms &&
-      emailStatus.isAvailable !== false &&
       !isLoading && !isSubmitting;
-  }, [form, selectedLanguages, emailStatus, isLoading, isSubmitting]);
+  }, [form, selectedLanguages, isLoading, isSubmitting]);
 
   // ===== RENDER =====
   return (
@@ -996,7 +955,7 @@ const RegisterLawyer: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* EMAIL — clics & saisie fiables */}
+                    {/* EMAIL */}
                     <div className="mt-4">
                       <label htmlFor="email" className="block text-sm font-semibold text-gray-800 mb-1">
                         {t.email} <span className="text-red-500">*</span>
@@ -1008,36 +967,21 @@ const RegisterLawyer: React.FC = () => {
                           type="email" autoComplete="email"
                           value={form.email}
                           onChange={onChange}
-                          onBlur={(e) => { markTouched('email'); handleEmailCheck(e.target.value); }}
+                          onBlur={() => { markTouched('email'); }}
                           placeholder={t.help.emailPlaceholder}
-                          aria-describedby="email-help email-status"
+                          aria-describedby="email-help"
                           className={`${getInputClassName('email', true)} relative z-10`}
                         />
                       </div>
                       <p id="email-help" className="mt-1 text-xs text-gray-500">
                         {lang === 'en' ? 'We only email you for account & bookings. 🤝' : 'On vous écrit seulement pour le compte & les réservations. 🤝'}
                       </p>
-                      {emailStatus.isChecking && (
-                        <p id="email-status" className="mt-1 text-sm text-indigo-700" aria-live="polite">
-                          {lang === 'en' ? 'Checking email…' : 'Vérification de l’email…'}
-                        </p>
-                      )}
-                      {emailStatus.hasBeenChecked && emailStatus.isAvailable && EMAIL_REGEX.test(form.email) && (
-                        <p id="email-status" className="mt-1 text-sm text-green-600" aria-live="polite">
-                          <CheckCircle className="inline w-4 h-4 mr-1" /> {lang === 'en' ? 'Email available' : 'Email disponible'}
-                        </p>
-                      )}
-                      {emailStatus.hasBeenChecked && emailStatus.isAvailable === false && (
-                        <p id="email-status" className="mt-1 text-sm text-red-600" aria-live="polite">
-                          <XCircle className="inline w-4 h-4 mr-1" /> {lang === 'en' ? 'This email is already in use' : 'Cet email est déjà utilisé'}
-                        </p>
-                      )}
                       <FieldError
                         error={fieldErrors.email || (!EMAIL_REGEX.test(form.email) && touched.email ? t.errors.emailInvalid : undefined)}
                         show={!!(touched.email && (!!fieldErrors.email || !EMAIL_REGEX.test(form.email)))}
                       />
                       <FieldSuccess
-                        show={!!touched.email && EMAIL_REGEX.test(form.email) && emailStatus.isAvailable !== false}
+                        show={!!touched.email && EMAIL_REGEX.test(form.email)}
                         message={t.success.emailValid}
                       />
                     </div>

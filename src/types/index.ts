@@ -21,9 +21,46 @@ export interface Review {
   rating: number
   comment?: string
   createdAt: number | Date
+  
+  // Client information
+  clientId?: string
+  clientName?: string
+  clientCountry?: string
   authorName?: string
   authorId?: string
+  
+  // Provider information
+  providerId?: string
+  providerName?: string
+  
+  // Service information
+  serviceType?: 'lawyer_call' | 'expat_call'
+  callId?: string
+  
+  // Status and moderation
+  status?: 'pending' | 'published' | 'hidden'
+  reportedCount?: number
+  
+  // Additional fields
   helpfulVotes?: number
+}
+
+export interface Report {
+  id: string
+  type: 'contact' | 'user' | 'review' | 'call'
+  reporterId: string
+  reporterName: string
+  targetId: string
+  targetType: 'contact' | 'user' | 'review' | 'call'
+  reason: string
+  details: any
+  status: 'pending' | 'dismissed' | 'resolved'
+  createdAt: any
+  updatedAt: any
+  firstName?: any
+  lastName?: any
+  email?: any
+  priority: any
 }
 
 export interface Testimonial {
@@ -71,8 +108,6 @@ export interface SosProfile {
 export type Document = DocumentData
 
 // Re-export selected types from the provider domain, aliasing `Provider` to avoid conflict
-
-// Re-export selected types from the provider domain, aliasing `Provider` to avoid conflict
 export type { Provider as ProviderDoc } from './provider'
 
 /**
@@ -92,4 +127,3 @@ export interface AvailabilitySlot {
   /** Optional IANA timezone like 'Europe/Paris' */
   timezone?: string
 }
-

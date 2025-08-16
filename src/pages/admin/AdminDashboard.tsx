@@ -1,4 +1,4 @@
-// src/pages/admin/AdminDashboard.tsx
+// src/pages/admin/AdminDashboard.tsx - VERSION CORRIGÉE
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,7 +13,8 @@ import {
   Trash,
   Mail,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/common/Button';
@@ -27,17 +28,19 @@ import { validateDataIntegrity, cleanupObsoleteData } from '../../utils/firestor
 import testNotificationSystem from '../../services/notifications/notificationService';
 import { PricingManagement } from '../../components/admin/PricingManagement';
 import { FinancialAnalytics } from '../../components/admin/FinancialAnalytics';
-import { usePricingConfig } from '../../services/pricingService';
+import { usePricingConfig, clearPricingCache } from '../../services/pricingService';
+import PricingMigrationPanel from '../../components/admin/PricingMigrationPanel'; // ✅ AJOUT
 
-// Interface pour les paramètres admin
+// Interface pour les paramètres admin (SIMPLIFIÉ - sans commission)
 interface AdminSettings {
-  sosCommission: {
-    lawyer: { type: 'fixed' | 'percentage'; amount: number };
-    expat: { type: 'fixed' | 'percentage'; amount: number };
-  };
   twilioSettings: {
     maxAttempts: number;
     timeoutSeconds: number;
+  };
+  notificationSettings: {
+    enableEmail: boolean;
+    enableSMS: boolean;
+    enableWhatsApp: boolean;
   };
   createdAt: unknown;
   updatedAt?: unknown;
@@ -51,7 +54,6 @@ interface IntegrityReport {
   fixes: IntegrityFix[];
 }
 
-// Interface pour les corrections d'intégrité
 interface IntegrityFix {
   type: string;
   description: string;
@@ -67,9 +69,40 @@ interface Stats {
   providerRevenue: number;
 }
 
+// Helpers de typage & normalisation
+function normalizeAdminSettings(input: unknown): AdminSettings {
+  const partial = (input ?? {}) as Partial<AdminSettings>;
+  const twilio = partial.twilioSettings ?? {} as AdminSettings['twilioSettings'];
+  const notif = partial.notificationSettings ?? {} as AdminSettings['notificationSettings'];
+
+  return {
+    twilioSettings: {
+      maxAttempts: typeof twilio.maxAttempts === 'number' ? twilio.maxAttempts : 3,
+      timeoutSeconds: typeof twilio.timeoutSeconds === 'number' ? twilio.timeoutSeconds : 30,
+    },
+    notificationSettings: {
+      enableEmail: typeof notif.enableEmail === 'boolean' ? notif.enableEmail : true,
+      enableSMS: typeof notif.enableSMS === 'boolean' ? notif.enableSMS : true,
+      enableWhatsApp: typeof notif.enableWhatsApp === 'boolean' ? notif.enableWhatsApp : true,
+    },
+    createdAt: partial.createdAt ?? serverTimestamp(),
+    updatedAt: partial.updatedAt,
+    updatedBy: typeof partial.updatedBy === 'string' ? partial.updatedBy : undefined,
+  };
+}
+
 const AdminDashboard: React.FC = () => {
+  
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // extraction sûre de l'ID et du rôle pour éviter any
+  const userId = typeof (user as { id?: unknown } | null)?.id === 'string'
+    ? (user as { id?: string }).id
+    : undefined;
+  const userRole = typeof (user as { role?: unknown } | null)?.role === 'string'
+    ? (user as { role?: string }).role
+    : undefined;
 
   // États avec valeurs par défaut
   const [settings, setSettings] = useState<AdminSettings | null>(null);
@@ -89,56 +122,31 @@ const AdminDashboard: React.FC = () => {
     providerRevenue: 0
   });
 
-  // Hook pricing
-  const { pricing: pricingConfig, loading: pricingLoading, error: pricingError } = usePricingConfig();
+  // Hook pricing - VERSION CORRIGÉE avec gestion d'erreur
+  const { pricing: pricingConfig, loading: pricingLoading, error: pricingError, reload: reloadPricing } = usePricingConfig();
 
-  // ------- helpers -------
-  type TestFn = (id: string) => Promise<unknown>;
-  type TestFns = TestFn | undefined;
-
-  const getCallable = (
-    obj: unknown,
-    key: 'sendTestNotification' | 'testNotification' | 'sendTest' | 'triggerTest'
-  ): TestFns => {
-    if (obj && typeof obj === 'object') {
-      const value = (obj as Record<string, unknown>)[key];
-      if (typeof value === 'function') {
-        return value as TestFn;
-      }
-    }
-    return undefined;
-  };
-
+  // Notification helper (simplifié)
   const invokeTestNotification = async (providerId: string): Promise<void> => {
     const candidate = testNotificationSystem as unknown;
-
-    // 1) Si c'est directement une fonction
+    
     if (typeof candidate === 'function') {
-      const fn = candidate as TestFn;
-      await fn(providerId);
+      await (candidate as (id: string) => Promise<unknown>)(providerId);
       return;
     }
-
-    // 2) Sinon, essayer les méthodes usuelles d'un service
-    const tryOrder: TestFns[] = [
-      getCallable(candidate, 'sendTestNotification'),
-      getCallable(candidate, 'testNotification'),
-      getCallable(candidate, 'sendTest'),
-      getCallable(candidate, 'triggerTest')
-    ];
-
-    for (const fn of tryOrder) {
-      if (fn) {
-        await fn(providerId);
-        return;
+    
+    if (candidate && typeof candidate === 'object') {
+      const methods = ['sendTestNotification', 'testNotification', 'sendTest', 'triggerTest'];
+      for (const method of methods) {
+        const fn = (candidate as Record<string, unknown>)[method];
+        if (typeof fn === 'function') {
+          await (fn as (id: string) => Promise<unknown>)(providerId);
+          return;
+        }
       }
     }
-
-    throw new Error(
-      "Impossible d'invoquer le test de notification : ni fonction exportée, ni méthode de service connue détectée."
-    );
+    
+    throw new Error("Service de notification non disponible");
   };
-  // -----------------------
 
   // Load platform statistics
   const loadStats = useCallback(async (): Promise<void> => {
@@ -162,9 +170,9 @@ const AdminDashboard: React.FC = () => {
 
       paymentsSnapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data() as Record<string, unknown>;
-        const amount = data.amount;
-        const platformFee = data.platformFee;
-        const providerAmount = data.providerAmount;
+        const amount = data.amount as number | undefined;
+        const platformFee = (data.platformFee || data.connectionFeeAmount || data.commissionAmount) as number | undefined;
+        const providerAmount = data.providerAmount as number | undefined;
 
         if (typeof amount === 'number') totalRevenue += amount;
         if (typeof platformFee === 'number') platformRevenue += platformFee;
@@ -183,24 +191,35 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user]);
 
-  // Load admin settings and statistics
+  // Load admin settings (SIMPLIFIÉ - sans commission)
   const loadAdminData = useCallback(async (): Promise<void> => {
     if (!user) return;
 
     try {
       const settingsRef = doc(db, 'admin_settings', 'main');
       const settingsDoc = await getDoc(settingsRef);
+      
       if (settingsDoc.exists()) {
-        setSettings(settingsDoc.data() as AdminSettings);
+        const data = settingsDoc.data() as Record<string, unknown>;
+        // Migration: exclure sosCommission si présent
+        const { sosCommission, ...cleanSettings } = data as Record<string, unknown>;
+        setSettings(normalizeAdminSettings(cleanSettings));
+        
+        // Si sosCommission existait, marquer pour migration
+        if (sosCommission) {
+          console.warn('🔄 Migration détectée: sosCommission retiré de admin_settings. Utilisez admin_config/pricing.');
+        }
       } else {
+        // Paramètres par défaut SANS commission
         const defaultSettings: AdminSettings = {
-          sosCommission: {
-            lawyer: { type: 'fixed', amount: 9 },
-            expat: { type: 'fixed', amount: 5 }
-          },
           twilioSettings: {
             maxAttempts: 3,
             timeoutSeconds: 30
+          },
+          notificationSettings: {
+            enableEmail: true,
+            enableSMS: true,
+            enableWhatsApp: true
           },
           createdAt: serverTimestamp()
         };
@@ -223,8 +242,8 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user, loadAdminData]);
 
-  // Handle settings change
-  const handleSettingsChange = (path: string, value: string | number): void => {
+  // Handle settings change (SIMPLIFIÉ)
+  const handleSettingsChange = (path: string, value: string | number | boolean): void => {
     if (!settings) return;
 
     const newSettings: AdminSettings = JSON.parse(JSON.stringify(settings));
@@ -239,7 +258,7 @@ const AdminDashboard: React.FC = () => {
     setSettings(newSettings);
   };
 
-  // Save settings
+  // Save settings (SIMPLIFIÉ)
   const saveSettings = async (): Promise<void> => {
     if (!settings || !user) return;
 
@@ -248,14 +267,27 @@ const AdminDashboard: React.FC = () => {
       await setDoc(doc(db, 'admin_settings', 'main'), {
         ...settings,
         updatedAt: serverTimestamp(),
-        updatedBy: user.id
+        updatedBy: userId
       });
-      alert('Paramètres sauvegardés avec succès !');
+      alert('✅ Paramètres sauvegardés avec succès !');
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Erreur lors de la sauvegarde');
+      alert('❌ Erreur lors de la sauvegarde');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Refresh pricing cache
+  const handleRefreshPricing = async (): Promise<void> => {
+    try {
+      clearPricingCache();
+      await reloadPricing();
+      await loadStats(); // Recharger aussi les stats
+      alert('✅ Cache pricing actualisé !');
+    } catch (error) {
+      console.error('Error refreshing pricing:', error);
+      alert('❌ Erreur lors de l\'actualisation'); // ✅ corrigé apostrophe
     }
   };
 
@@ -268,7 +300,7 @@ const AdminDashboard: React.FC = () => {
       setShowIntegrityModal(true);
     } catch (error) {
       console.error('Error checking integrity:', error);
-      alert("Erreur lors de la vérification d'intégrité");
+      alert("❌ Erreur lors de la vérification d'intégrité");
     } finally {
       setIsCheckingIntegrity(false);
     }
@@ -276,7 +308,7 @@ const AdminDashboard: React.FC = () => {
 
   // Clean obsolete data
   const handleCleanupData = async (): Promise<void> => {
-    if (!confirm('Êtes-vous sûr de vouloir nettoyer les données obsolètes ? Cette action est irréversible.')) {
+    if (!confirm('⚠️ Êtes-vous sûr de vouloir nettoyer les données obsolètes ? Cette action est irréversible.')) {
       return;
     }
 
@@ -284,13 +316,13 @@ const AdminDashboard: React.FC = () => {
     try {
       const success = await cleanupObsoleteData();
       if (success) {
-        alert('Nettoyage des données terminé avec succès');
+        alert('✅ Nettoyage des données terminé avec succès');
       } else {
-        alert('Erreur lors du nettoyage des données');
+        alert('❌ Erreur lors du nettoyage des données');
       }
     } catch (error) {
       console.error('Error cleaning data:', error);
-      alert('Erreur lors du nettoyage des données');
+      alert('❌ Erreur lors du nettoyage des données');
     } finally {
       setIsCleaningData(false);
     }
@@ -298,7 +330,7 @@ const AdminDashboard: React.FC = () => {
 
   // Test notification system
   const handleTestNotifications = async (): Promise<void> => {
-    if (!confirm("Voulez-vous tester le système de notifications ? Cela enverra un email/SMS/WhatsApp de test à un prestataire.")) {
+    if (!confirm("🔔 Voulez-vous tester le système de notifications ?")) {
       return;
     }
 
@@ -306,17 +338,17 @@ const AdminDashboard: React.FC = () => {
     try {
       const testProviderId = prompt("Entrez l'ID du prestataire pour le test:") || 'test-provider-id';
       await invokeTestNotification(testProviderId);
-      alert('Test de notification envoyé avec succès ! Vérifiez les logs de la console pour les détails.');
+      alert('✅ Test de notification envoyé avec succès !');
     } catch (error) {
       console.error('Erreur lors du test de notification:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-      alert(`Erreur lors du test de notification: ${errorMessage}`);
+      alert(`❌ Erreur lors du test de notification: ${errorMessage}`);
     } finally {
       setIsTestingNotifications(false);
     }
   };
 
-  // Check authentication
+  // Guards
   if (!user) {
     return (
       <AdminLayout>
@@ -327,8 +359,7 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  // Check admin role
-  if (user?.role !== 'admin') {
+  if (userRole !== 'admin') {
     return (
       <AdminLayout>
         <div className="min-h-screen flex items-center justify-center">
@@ -357,7 +388,7 @@ const AdminDashboard: React.FC = () => {
         onError={(error: Error, errorInfo: React.ErrorInfo) => {
           logError({
             origin: 'frontend',
-            userId: user?.id,
+            userId: userId,
             error: error.message,
             context: {
               component: 'AdminDashboard',
@@ -376,6 +407,10 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-gray-600 mt-1">Gestion des paramètres et statistiques de la plateforme</p>
                 </div>
                 <div className="flex space-x-4">
+                  <Button onClick={handleRefreshPricing} className="bg-blue-600 hover:bg-blue-700">
+                    <RefreshCw size={20} className="mr-2" />
+                    Actualiser Pricing
+                  </Button>
                   <Button onClick={saveSettings} loading={isSaving} className="bg-red-600 hover:bg-red-700">
                     <Save size={20} className="mr-2" />
                     Sauvegarder
@@ -457,10 +492,33 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Section Gestion des Prix */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
+            {/* 🔥 NOUVEAU: Panel de Migration (à ajouter EN PREMIER) */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Gestion des Frais de Mise en Relation</h2>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Shield className="w-5 h-5 mr-2 text-blue-600" />
+                  🔧 Migration & Diagnostic du Système de Pricing
+                </h2>
+              </div>
+              <div className="p-6">
+                <PricingMigrationPanel />
+              </div>
+            </div>
+
+            {/* 🔥 NOUVEAU: Section Pricing Principale (en haut) */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+                    💰 Gestion des Prix et Commissions
+                  </h2>
+                  {pricingError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      <span className="text-red-600 text-sm">⚠️ {pricingError}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="p-6">
                 <PricingManagement />
@@ -468,93 +526,181 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Section Analytics Financiers */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Analytics Financiers</h2>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                  📊 Analytics Financiers
+                </h2>
               </div>
               <div className="p-6">
                 <FinancialAnalytics />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Commission Settings */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-200">
+            {/* Aperçu des Tarifs Actuels */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2" />
-                    Frais SOS (Commission plateforme)
+                    <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                    📋 Aperçu des Tarifs Actuels
                   </h2>
-                </div>
-                <div className="p-6 space-y-6">
-                  {/* Lawyer Commission */}
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-3">Appels Avocat</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Type de commission</label>
-                        <select
-                          value={settings?.sosCommission.lawyer.type || 'fixed'}
-                          onChange={(e) => handleSettingsChange('sosCommission.lawyer.type', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          <option value="fixed">Montant fixe</option>
-                          <option value="percentage">Pourcentage</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Montant {settings?.sosCommission.lawyer.type === 'percentage' ? '(%)' : '(€)'}
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={settings?.sosCommission.lawyer.amount || 0}
-                          onChange={(e) => handleSettingsChange('sosCommission.lawyer.amount', parseFloat(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                        />
-                      </div>
+                  {pricingLoading && (
+                    <div className="flex items-center text-sm text-gray-500">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
+                      Chargement...
                     </div>
-                  </div>
-
-                  {/* Expat Commission */}
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-3">Appels Expatrié</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Type de commission</label>
-                        <select
-                          value={settings?.sosCommission.expat.type || 'fixed'}
-                          onChange={(e) => handleSettingsChange('sosCommission.expat.type', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          <option value="fixed">Montant fixe</option>
-                          <option value="percentage">Pourcentage</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Montant {settings?.sosCommission.expat.type === 'percentage' ? '(%)' : '(€)'}
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={settings?.sosCommission.expat.amount || 0}
-                          onChange={(e) => handleSettingsChange('sosCommission.expat.amount', parseFloat(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              {/* Twilio Settings */}
+              <div className="p-6">
+                {pricingConfig ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Avocat EUR */}
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <h3 className="font-medium text-blue-900 mb-3 flex items-center">
+                        👨‍⚖️ Appel Avocat (EUR)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-bold">{pricingConfig.lawyer.eur.totalAmount.toFixed(2)}€</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            {pricingConfig.lawyer.eur.connectionFeeAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part avocat:</span>
+                          <span className="font-medium text-green-600">
+                            {pricingConfig.lawyer.eur.providerAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.lawyer.eur.duration} min</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Avocat USD */}
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <h3 className="font-medium text-blue-900 mb-3 flex items-center">
+                        👨‍⚖️ Appel Avocat (USD)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-bold">${pricingConfig.lawyer.usd.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            ${pricingConfig.lawyer.usd.connectionFeeAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part avocat:</span>
+                          <span className="font-medium text-green-600">
+                            ${pricingConfig.lawyer.usd.providerAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.lawyer.usd.duration} min</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expatrié EUR */}
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <h3 className="font-medium text-green-900 mb-3 flex items-center">
+                        🌍 Appel Expatrié (EUR)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-bold">{pricingConfig.expat.eur.totalAmount.toFixed(2)}€</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            {pricingConfig.expat.eur.connectionFeeAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part expatrié:</span>
+                          <span className="font-medium text-green-600">
+                            {pricingConfig.expat.eur.providerAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.expat.eur.duration} min</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expatrié USD */}
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <h3 className="font-medium text-green-900 mb-3 flex items-center">
+                        🌍 Appel Expatrié (USD)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-bold">${pricingConfig.expat.usd.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            ${pricingConfig.expat.usd.connectionFeeAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part expatrié:</span>
+                          <span className="font-medium text-green-600">
+                            ${pricingConfig.expat.usd.providerAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.expat.usd.duration} min</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                    <div className="flex items-center mb-3">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+                      <h3 className="font-medium text-yellow-900">Configuration pricing non disponible</h3>
+                    </div>
+                    <p className="text-sm text-yellow-800 mb-4">
+                      {pricingError || "Impossible de charger la configuration des prix depuis admin_config/pricing."}
+                    </p>
+                    <button
+                      onClick={handleRefreshPricing}
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition-colors"
+                    >
+                      🔄 Réessayer
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Paramètres Twilio (SIMPLIFIÉ) */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                     <Phone className="w-5 h-5 mr-2" />
-                    Paramètres d'appel (Twilio)
+                    ☎️ Paramètres d'appel (Twilio)
                   </h2>
                 </div>
                 <div className="p-6 space-y-4">
@@ -582,199 +728,44 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Commission Calculation Preview - VERSION DYNAMIQUE */}
-            <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2" />
-                  Aperçu des calculs de commission (Prix actuels)
-                </h2>
-                {pricingLoading && <p className="text-sm text-gray-500 mt-1">⏳ Chargement des prix en cours...</p>}
-                {pricingError && (
-                  <p className="text-sm text-red-600 mt-1">⚠️ Erreur: {pricingError} (Utilisation des valeurs par défaut)</p>
-                )}
-              </div>
-
-              <div className="p-6">
-                {pricingConfig ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Avocat EUR */}
-                    <div className="bg-blue-50 rounded-lg p-4" data-price-source="admin">
-                      <h3 className="font-medium text-blue-900 mb-3">
-                        👨‍⚖️ Appel Avocat ({pricingConfig.lawyer.eur.totalAmount}€)
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-medium">{pricingConfig.lawyer.eur.totalAmount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            {pricingConfig.lawyer.eur.connectionFeeAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part avocat:</span>
-                          <span className="font-medium text-green-600">
-                            {pricingConfig.lawyer.eur.providerAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.lawyer.eur.duration} min</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Taux commission:</span>
-                          <span>
-                            {(
-                              (pricingConfig.lawyer.eur.connectionFeeAmount / pricingConfig.lawyer.eur.totalAmount) *
-                              100
-                            ).toFixed(1)}
-                            %
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Avocat USD */}
-                    <div className="bg-blue-50 rounded-lg p-4" data-price-source="admin">
-                      <h3 className="font-medium text-blue-900 mb-3">
-                        👨‍⚖️ Appel Avocat (${pricingConfig.lawyer.usd.totalAmount})
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-medium">${pricingConfig.lawyer.usd.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            ${pricingConfig.lawyer.usd.connectionFeeAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part avocat:</span>
-                          <span className="font-medium text-green-600">
-                            ${pricingConfig.lawyer.usd.providerAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.lawyer.usd.duration} min</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Taux commission:</span>
-                          <span>
-                            {(
-                              (pricingConfig.lawyer.usd.connectionFeeAmount / pricingConfig.lawyer.usd.totalAmount) *
-                              100
-                            ).toFixed(1)}
-                            %
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expatrié EUR */}
-                    <div className="bg-green-50 rounded-lg p-4" data-price-source="admin">
-                      <h3 className="font-medium text-green-900 mb-3">
-                        🌍 Appel Expatrié ({pricingConfig.expat.eur.totalAmount}€)
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-medium">{pricingConfig.expat.eur.totalAmount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            {pricingConfig.expat.eur.connectionFeeAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part expatrié:</span>
-                          <span className="font-medium text-green-600">
-                            {pricingConfig.expat.eur.providerAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.expat.eur.duration} min</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Taux commission:</span>
-                          <span>
-                            {(
-                              (pricingConfig.expat.eur.connectionFeeAmount / pricingConfig.expat.eur.totalAmount) *
-                              100
-                            ).toFixed(1)}
-                            %
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expatrié USD */}
-                    <div className="bg-green-50 rounded-lg p-4" data-price-source="admin">
-                      <h3 className="font-medium text-green-900 mb-3">
-                        🌍 Appel Expatrié (${pricingConfig.expat.usd.totalAmount})
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-medium">${pricingConfig.expat.usd.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            ${pricingConfig.expat.usd.connectionFeeAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part expatrié:</span>
-                          <span className="font-medium text-green-600">
-                            ${pricingConfig.expat.usd.providerAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.expat.usd.duration} min</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Taux commission:</span>
-                          <span>
-                            {(
-                              (pricingConfig.expat.usd.connectionFeeAmount / pricingConfig.expat.usd.totalAmount) *
-                              100
-                            ).toFixed(1)}
-                            %
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+              {/* Paramètres de notifications */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Mail className="w-5 h-5 mr-2" />
+                    🔔 Paramètres de notifications
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">Email activé</label>
+                    <input
+                      type="checkbox"
+                      checked={settings?.notificationSettings?.enableEmail ?? true}
+                      onChange={(e) => handleSettingsChange('notificationSettings.enableEmail', e.target.checked)}
+                      className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    />
                   </div>
-                ) : (
-                  // Fallback si pas de pricing config
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                    <div className="flex items-center mb-3">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
-                      <h3 className="font-medium text-yellow-900">Configuration pricing non disponible</h3>
-                    </div>
-                    <p className="text-sm text-yellow-800 mb-4">
-                      Impossible de charger la configuration des prix depuis admin_config/pricing.
-                      Utilisez la section "Gestion des Frais de Mise en Relation" ci-dessus pour configurer les prix.
-                    </p>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition-colors"
-                    >
-                      🔄 Recharger la page
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">SMS activé</label>
+                    <input
+                      type="checkbox"
+                      checked={settings?.notificationSettings?.enableSMS ?? true}
+                      onChange={(e) => handleSettingsChange('notificationSettings.enableSMS', e.target.checked)}
+                      className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    />
                   </div>
-                )}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">WhatsApp activé</label>
+                    <input
+                      type="checkbox"
+                      checked={settings?.notificationSettings?.enableWhatsApp ?? true}
+                      onChange={(e) => handleSettingsChange('notificationSettings.enableWhatsApp', e.target.checked)}
+                      className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -783,7 +774,7 @@ const AdminDashboard: React.FC = () => {
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <Star className="w-5 h-5 mr-2" />
-                  Gestion des avis
+                  ⭐ Gestion des avis
                 </h2>
               </div>
               <div className="p-6">

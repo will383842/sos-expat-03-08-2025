@@ -1,6 +1,6 @@
 // src/pages/CallCheckout.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Phone, Clock, Shield, Check, AlertCircle, CreditCard, Lock, Calendar } from 'lucide-react';
+import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar, Phone, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
@@ -25,16 +25,19 @@ import { CurrencySelector } from '../components/checkout/CurrencySelector';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
 
 /* --------------------------------- Types --------------------------------- */
+type Currency = 'eur' | 'usd';
+type ServiceKind = 'lawyer' | 'expat';
+
 interface ServiceData {
   providerId: string;
   serviceType: 'lawyer_call' | 'expat_call';
-  providerRole: 'lawyer' | 'expat';
+  providerRole: ServiceKind;
   amount: number;
   duration: number;
   clientPhone: string;
   commissionAmount: number;
   providerAmount: number;
-  currency?: string;
+  currency?: Currency;
 }
 
 interface User {
@@ -79,7 +82,7 @@ interface CreateAndScheduleCallData {
   providerPhone: string;
   clientPhone: string;
   serviceType: 'lawyer_call' | 'expat_call';
-  providerType: 'lawyer' | 'expat';
+  providerType: ServiceKind;
   paymentIntentId: string;
   amount: number;
   delayMinutes?: number;
@@ -179,7 +182,7 @@ const useTranslation = () => {
       en: 'Data protected by SSL. Call launched automatically after payment.'
     },
 
-    'form.phone': { fr: 'Numéro de téléphone', en: 'Phone number' },
+    'form.phone': { fr: 'Numéro de téléphone', en: 'Phone number' }, // conservé pour i18n (non utilisé à l’écran)
     'form.whatsapp': { fr: 'Numéro WhatsApp (facultatif)', en: 'WhatsApp number (optional)' },
     'form.phonePlaceholder': { fr: 'ex: +33612345678', en: 'e.g. +447911123456' },
     'form.whatsappPlaceholder': { fr: 'ex: +33612345678', en: 'e.g. +447911123456' },
@@ -304,7 +307,7 @@ const useSEO = (meta: {
 
 /* ------------------------ Helpers: device & phone utils ------------------ */
 const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
-const isValidE164ish = (val: string) => /^\+?[1-9]\d{6,14}$/.test(val);
+
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -320,11 +323,75 @@ const useIsMobile = () => {
       // @ts-expect-error - Legacy MediaQueryList API (Safari < 14)
       mq.addListener(update);
       // @ts-expect-error - Legacy MediaQueryList API (Safari < 14)
-      return () => mq.removeListener(update);
+      return () => mq.removeListener('change', update);
     }
   }, []);
   return isMobile;
 };
+
+/* --------------------- Price tracing: hook & helpers --------------------- */
+interface PricingEntry {
+  totalAmount: number;
+  connectionFeeAmount: number;
+  providerAmount: number;
+  duration: number;
+}
+interface PricingConfigShape {
+  lawyer: Record<Currency, PricingEntry>;
+  expat: Record<Currency, PricingEntry>;
+}
+type TraceAttributes = {
+  [K in `data-${string}`]?: string | number;
+} & { title?: string };
+
+function usePriceTracing() {
+  const { pricing, loading } = usePricingConfig() as { pricing?: PricingConfigShape; loading: boolean };
+
+  const getTraceAttributes = (
+    serviceType: ServiceKind,
+    currency: Currency,
+    providerOverride?: number
+  ): TraceAttributes => {
+    if (loading) {
+      return {
+        'data-price-source': 'loading',
+        'data-currency': currency,
+        title: 'Prix en cours de chargement...'
+      };
+    }
+
+    if (typeof providerOverride === 'number') {
+      return {
+        'data-price-source': 'provider',
+        'data-currency': currency,
+        'data-service-type': serviceType,
+        title: `Prix personnalisé du prestataire (${providerOverride}${currency === 'eur' ? '€' : '$'})`
+      };
+    }
+
+    if (pricing) {
+      const config = pricing[serviceType][currency];
+      return {
+        'data-price-source': 'admin',
+        'data-currency': currency,
+        'data-service-type': serviceType,
+        'data-total-amount': config.totalAmount,
+        'data-connection-fee': config.connectionFeeAmount,
+        'data-provider-amount': config.providerAmount,
+        'data-duration': config.duration,
+        title: `Prix admin: ${config.totalAmount}${currency === 'eur' ? '€' : '$'} (Frais: ${config.connectionFeeAmount}${currency === 'eur' ? '€' : '$'}, Provider: ${config.providerAmount}${currency === 'eur' ? '€' : '$'}, ${config.duration}min)`
+      };
+    }
+
+    return {
+      'data-price-source': 'fallback',
+      'data-currency': currency,
+      title: `Prix par défaut (${serviceType === 'lawyer' ? '49€' : '19€'})`
+    };
+  };
+
+  return { getTraceAttributes };
+}
 
 /* -------------------------- Stripe card element opts --------------------- */
 const cardElementOptions = {
@@ -347,6 +414,23 @@ const singleCardElementOptions = {
   hidePostalCode: true,
 } as const;
 
+/* -------------------------- Fallback pricing helper ---------------------- */
+const toCurrency = (c: unknown): Currency => (c === 'usd' ? 'usd' : 'eur');
+
+function getFallbackPricing(role: ServiceKind, currency: Currency) {
+  const table: Record<ServiceKind, Record<Currency, PricingEntry>> = {
+    lawyer: {
+      eur: { totalAmount: 49, connectionFeeAmount: 10, providerAmount: 39, duration: 20 },
+      usd: { totalAmount: 55, connectionFeeAmount: 12, providerAmount: 43, duration: 20 },
+    },
+    expat: {
+      eur: { totalAmount: 19, connectionFeeAmount: 6, providerAmount: 13, duration: 15 },
+      usd: { totalAmount: 21, connectionFeeAmount: 7, providerAmount: 14, duration: 15 },
+    },
+  };
+  return table[role][currency];
+}
+
 /* ------------------------------ Payment Form ----------------------------- */
 interface PaymentFormProps {
   user: User;
@@ -356,34 +440,38 @@ interface PaymentFormProps {
   onError: (error: string) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
-  clientWhatsapp?: string;
   isMobile: boolean;
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
-  user, provider, service, onSuccess, onError, isProcessing, setIsProcessing, clientWhatsapp, isMobile
+  user, provider, service, onSuccess, onError, isProcessing, setIsProcessing, isMobile
 }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { t, language } = useTranslation();
+  const { getTraceAttributes } = usePriceTracing();
 
-  const serviceCurrency = (service.currency || 'eur').toLowerCase() as 'eur' | 'usd';
+  const serviceCurrency = (service.currency || 'eur').toLowerCase() as Currency;
   const currencySymbol = serviceCurrency === 'usd' ? '$' : '€';
   const stripeCurrency = serviceCurrency;
+
+  const priceInfo = useMemo(
+    () => getTraceAttributes(service.serviceType === 'lawyer_call' ? 'lawyer' : 'expat', serviceCurrency),
+    [getTraceAttributes, service.serviceType, serviceCurrency]
+  );
 
   const validatePaymentData = useCallback(() => {
     if (!stripe || !elements) throw new Error(t('err.invalidConfig'));
     if (!user?.uid) throw new Error(t('err.unauth'));
     if (provider.id === user.uid) throw new Error(t('err.sameUser'));
-    if (service.amount < (serviceCurrency === 'usd' ? 5 : 5)) throw new Error(t('err.minAmount'));
-    if (service.amount > (serviceCurrency === 'usd' ? 500 : 500)) throw new Error(t('err.maxAmount'));
+    if (service.amount < 5) throw new Error(t('err.minAmount'));
+    if (service.amount > 500) throw new Error(t('err.maxAmount'));
 
     const total = Math.round((service.commissionAmount + service.providerAmount) * 100) / 100;
     const amountRounded = Math.round(service.amount * 100) / 100;
     if (Math.abs(amountRounded - total) > 0.01) throw new Error(t('err.amountSplit'));
-  }, [stripe, elements, user, provider, service, t, serviceCurrency]);
+  }, [stripe, elements, user, provider, service, t]);
 
-  // Confirmation avant paiement pour montants élevés
   const validateCurrencyBeforePayment = useCallback(() => {
     const confirmMessage =
       `Confirmer le paiement de ${service.amount.toFixed(2)}${currencySymbol} en ${serviceCurrency.toUpperCase()} ?`;
@@ -404,7 +492,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         clientEmail: user.email || '',
         clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         clientPhone: service.clientPhone,
-        clientWhatsapp: clientWhatsapp || '',
+        clientWhatsapp: '', // plus d’input WhatsApp
         serviceType: service.serviceType,
         duration: service.duration,
         amount: service.amount,
@@ -417,21 +505,15 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
       try {
         await setDoc(doc(db, 'payments', paymentIntentId), baseDoc, { merge: true });
-      } catch (e) {
-        console.warn('payments doc write error:', e);
-      }
+      } catch { /* no-op */ }
       try {
         await setDoc(doc(db, 'users', user.uid!, 'payments', paymentIntentId), baseDoc, { merge: true });
-      } catch (e) {
-        console.warn('user payments mirror write error:', e);
-      }
+      } catch { /* no-op */ }
       try {
         await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true });
-      } catch (e) {
-        console.warn('provider payments mirror write error:', e);
-      }
+      } catch { /* no-op */ }
     },
-    [clientWhatsapp, provider, service, user, serviceCurrency]
+    [provider, service, user, serviceCurrency]
   );
 
   const handlePaymentSubmit = useCallback(async (e: React.FormEvent) => {
@@ -441,7 +523,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     try {
       setIsProcessing(true);
 
-      // Vérification UX avant validations Stripe
       if (!validateCurrencyBeforePayment()) {
         setIsProcessing(false);
         return;
@@ -470,7 +551,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           duration: String(service.duration),
           clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
           clientPhone: service.clientPhone,
-          clientWhatsapp: clientWhatsapp || '',
+          clientWhatsapp: '',
           currency: serviceCurrency,
           timestamp: new Date().toISOString()
         }
@@ -518,9 +599,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         clientId: user.uid!,
         providerPhone: provider.phoneNumber || provider.phone || '',
         clientPhone: service.clientPhone,
-        clientWhatsapp: clientWhatsapp || '',
+        clientWhatsapp: '',
         serviceType: service.serviceType,
-        providerType: (provider.role || provider.type || 'expat') as 'lawyer' | 'expat',
+        providerType: (provider.role || provider.type || 'expat') as ServiceKind,
         paymentIntentId: paymentIntent.id,
         amount: service.amount,
         delayMinutes: 5,
@@ -560,7 +641,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     t,
     onSuccess,
     onError,
-    clientWhatsapp,
     language,
     isMobile,
     persistPaymentDocs,
@@ -669,7 +749,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
                 className="w-5 h-5 rounded-full object-cover"
                 onError={(e) => {
                   const target = e.currentTarget;
-                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(providerDisplayName)}&size=40`;
+                  const name = providerDisplayName;
+                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40`;
                 }}
                 alt=""
                 loading="lazy"
@@ -704,7 +785,10 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           <div className="border-t-2 border-gray-400 pt-2 mt-2">
             <div className="flex justify-between items-center">
               <span className="font-bold text-gray-900">{t('summary.total')}</span>
-              <span className="text-lg font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
+              <span
+                className="text-lg font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent"
+                {...priceInfo}
+              >
                 {service.amount.toFixed(2)} {currencySymbol}
               </span>
             </div>
@@ -712,7 +796,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         </div>
       </div>
 
-      {/* Bouton payer avec devise */}
+      {/* Bouton payer */}
       <button
         type="submit"
         disabled={!stripe || isProcessing}
@@ -753,61 +837,73 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 });
 PaymentForm.displayName = 'PaymentForm';
 
-/* ------------------------------ Page wrapper ----------------------------- */
+/* ------------------------------ Debug pricing types ---------------------- */
+interface DebugPriceEntry {
+  element: Element;
+  source: string;
+  currency: string;
+  serviceType?: string;
+  text: string;
+}
+interface DebugPricingAPI {
+  showAllPrices: () => DebugPriceEntry[];
+  highlightBySource: (source: 'admin' | 'provider' | 'fallback' | 'loading') => void;
+  clearHighlights: () => void;
+}
+declare global {
+  interface Window {
+    debugPricing?: DebugPricingAPI;
+  }
+}
 
+/* ------------------------------ Page wrapper ----------------------------- */
 const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceData, onGoBack }) => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  
-  // Configuration pricing - on ne récupère que loading/error (évite l'erreur de propriété .config et la var inutilisée)
-  const { loading: pricingLoading, error: pricingError } = usePricingConfig();
+  const { getTraceAttributes } = usePriceTracing();
 
-  // 1) Initialisation devise corrigée
-  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>('eur');
+  // On ne bloque pas l’affichage si la config pricing échoue
+  const { error: pricingError } = usePricingConfig();
+
+  // Devise
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>('eur');
 
   useEffect(() => {
     const initializeCurrency = () => {
       if (serviceData?.currency && ['eur', 'usd'].includes(serviceData.currency)) {
-        setSelectedCurrency(serviceData.currency as 'eur' | 'usd');
+        setSelectedCurrency(serviceData.currency as Currency);
         return;
       }
       try {
-        const saved = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
+        const saved = sessionStorage.getItem('selectedCurrency') as Currency | null;
         if (saved && ['eur', 'usd'].includes(saved)) {
           setSelectedCurrency(saved);
           return;
         }
-      } catch (e) {
-        console.warn('sessionStorage selectedCurrency read failed', e);
-      }
+      } catch { /* no-op */ }
       try {
-        const preferred = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
+        const preferred = localStorage.getItem('preferredCurrency') as Currency | null;
         if (preferred && ['eur', 'usd'].includes(preferred)) {
           setSelectedCurrency(preferred);
           return;
         }
-      } catch (e) {
-        console.warn('localStorage preferredCurrency read failed', e);
-      }
+      } catch { /* no-op */ }
       const detected = detectUserCurrency();
       setSelectedCurrency(detected);
     };
     initializeCurrency();
   }, [serviceData?.currency]);
 
-  // Sauvegarde défensive
   useEffect(() => {
     try {
       sessionStorage.setItem('selectedCurrency', selectedCurrency);
       localStorage.setItem('preferredCurrency', selectedCurrency);
-    } catch (e) {
-      console.warn('persist selectedCurrency failed', e);
-    }
+    } catch { /* no-op */ }
   }, [selectedCurrency]);
 
-  // Récup provider
+  // Provider
   const provider = useMemo<Provider | null>(() => {
     if (selectedProvider?.id) return normalizeProvider(selectedProvider);
     try {
@@ -816,120 +912,123 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
         const p = JSON.parse(saved) as Provider;
         if (p?.id) return normalizeProvider(p);
       }
-    } catch (e) {
-      console.error('Provider parse error:', e);
-    }
+    } catch { /* no-op */ }
     return null;
   }, [selectedProvider]);
 
-  // 2) Handler devise + logs
+  // Pricing (avec fallback)
   const [serviceWithPricing, setServiceWithPricing] = useState<ServiceData | null>(null);
-  const [loadingPricing, setLoadingPricing] = useState(false);
+  const [isFallback, setIsFallback] = useState<boolean>(false);
 
-  const handleCurrencyChange = useCallback((newCurrency: 'eur' | 'usd') => {
+  const handleCurrencyChange = useCallback((newCurrency: Currency) => {
     setSelectedCurrency(newCurrency);
     try {
       sessionStorage.setItem('selectedCurrency', newCurrency);
       localStorage.setItem('preferredCurrency', newCurrency);
-    } catch (e) {
-      console.warn('persist currency after change failed', e);
-    }
-    if (serviceWithPricing) {
-      setLoadingPricing(true);
-    }
-  }, [serviceWithPricing]);
+    } catch { /* no-op */ }
+  }, []);
 
-  // Service recalculé selon la devise
   useEffect(() => {
     const loadServicePricing = async () => {
-      if (!provider?.id || pricingLoading || pricingError || !selectedCurrency) return;
+      if (!provider?.id || !selectedCurrency) return;
 
-      setLoadingPricing(true);
+      const providerRole: ServiceKind = (provider.role || provider.type || 'expat') as ServiceKind;
+
       try {
-        const providerRole: 'lawyer' | 'expat' = (provider.role || provider.type || 'expat') as 'lawyer' | 'expat';
-
-        console.log(`🔄 Recalcul prix: ${providerRole} en ${selectedCurrency.toUpperCase()}`);
-
-        const pricingData = await calculateServiceAmounts(providerRole, selectedCurrency);
-
+        const fromService = await calculateServiceAmounts(providerRole, selectedCurrency);
         setServiceWithPricing({
           providerId: provider.id,
           serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
           providerRole,
-          amount: pricingData.totalAmount,
-          duration: pricingData.duration,
-          clientPhone: user?.phone || '',
-          commissionAmount: pricingData.connectionFeeAmount,
-          providerAmount: pricingData.providerAmount,
-          currency: pricingData.currency
+          amount: fromService.totalAmount,
+          duration: fromService.duration,
+          clientPhone: normalizePhone(user?.phone || ''), // aucune saisie visible
+          commissionAmount: fromService.connectionFeeAmount,
+          providerAmount: fromService.providerAmount,
+          currency: toCurrency(fromService.currency),
         });
-
-        console.log(`✅ Prix calculé: ${pricingData.totalAmount}${pricingData.currency === 'usd' ? '$' : '€'}`);
-      } catch (error) {
-        console.error('❌ Erreur calcul pricing:', error);
-        setServiceWithPricing(null);
-      } finally {
-        setLoadingPricing(false);
+        setIsFallback(false);
+      } catch (calcErr) {
+        const fb = getFallbackPricing(providerRole, selectedCurrency);
+        setServiceWithPricing({
+          providerId: provider.id,
+          serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
+          providerRole,
+          amount: fb.totalAmount,
+          duration: fb.duration,
+          clientPhone: normalizePhone(user?.phone || ''),
+          commissionAmount: fb.connectionFeeAmount,
+          providerAmount: fb.providerAmount,
+          currency: selectedCurrency, // Currency strict
+        });
+        setIsFallback(true);
+        console.error('[PRICING FALLBACK] calculateServiceAmounts failed, using fallback', {
+          error: calcErr,
+          providerRole,
+          currency: selectedCurrency,
+          fallback: fb,
+        });
       }
     };
 
     loadServicePricing();
-  }, [provider, selectedCurrency, pricingLoading, pricingError, user]);
-
-  // Champs téléphone et WhatsApp
-  const [clientPhone, setClientPhone] = useState<string>(() => {
-    try {
-      const saved = sessionStorage.getItem('clientPhone');
-      return saved ? normalizePhone(saved) : normalizePhone(user?.phone || '');
-    } catch (e) {
-      console.warn('sessionStorage clientPhone read failed', e);
-      return normalizePhone(user?.phone || '');
-    }
-  });
-
-  const [clientWhatsapp, setClientWhatsapp] = useState<string>(() => {
-    try {
-      return normalizePhone(sessionStorage.getItem('clientWhatsapp') || '');
-    } catch (e) {
-      console.warn('sessionStorage clientWhatsapp read failed', e);
-      return '';
-    }
-  });
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('clientPhone', clientPhone);
-      sessionStorage.setItem('clientWhatsapp', clientWhatsapp);
-    } catch (e) {
-      console.warn('persist phone/whatsapp failed', e);
-    }
-  }, [clientPhone, clientWhatsapp]);
+  }, [provider, selectedCurrency, user]);
 
   const service: ServiceData | null = useMemo(() => {
     if (!serviceWithPricing) return null;
-    return { ...serviceWithPricing, clientPhone };
-  }, [serviceWithPricing, clientPhone]);
+    return serviceWithPricing;
+  }, [serviceWithPricing]);
 
-  // Logs debug supplémentaires
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log(`💱 CallCheckout currency changed: ${selectedCurrency}`);
-      console.log(`📊 Service data:`, service);
-      console.log(`💰 Amount: ${service?.amount}${selectedCurrency === 'usd' ? '$' : '€'}`);
-    }
-  }, [selectedCurrency, service]);
-
-  const [currentStep, setCurrentStep] = useState<StepType>('payment');
-  const [callProgress, setCallProgress] = useState<number>(0);
-  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string>('');
-
-  const isLawyer = useMemo(() => (provider?.role || provider?.type) === 'lawyer', [provider]);
-  const providerDisplayName = useMemo(
-    () => provider?.fullName || provider?.name || `${provider?.firstName || ''} ${provider?.lastName || ''}`.trim() || 'Expert',
-    [provider]
+  const cardTraceAttrs = useMemo(
+    () => getTraceAttributes(
+      (provider?.role === 'lawyer' || provider?.type === 'lawyer') ? 'lawyer' : 'expat',
+      selectedCurrency
+    ),
+    [getTraceAttributes, provider?.role, provider?.type, selectedCurrency]
   );
+
+  // expose debug helper
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    if (!window.debugPricing) {
+      window.debugPricing = {
+        showAllPrices: () => {
+          const elements = document.querySelectorAll('[data-price-source]');
+          const prices: DebugPriceEntry[] = [];
+          elements.forEach(el => {
+            prices.push({
+              element: el,
+              source: el.getAttribute('data-price-source') || 'unknown',
+              currency: el.getAttribute('data-currency') || 'unknown',
+              serviceType: el.getAttribute('data-service-type') || undefined,
+              text: (el.textContent || '').trim()
+            });
+          });
+          console.table(prices);
+          return prices;
+        },
+        highlightBySource: (source) => {
+          document.querySelectorAll('.debug-price-highlight').forEach(el => {
+            el.classList.remove('debug-price-highlight');
+            (el as HTMLElement).style.outline = '';
+            (el as HTMLElement).style.backgroundColor = '';
+          });
+          document.querySelectorAll(`[data-price-source="${source}"]`).forEach(el => {
+            el.classList.add('debug-price-highlight');
+            (el as HTMLElement).style.outline = '3px solid red';
+            (el as HTMLElement).style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+          });
+        },
+        clearHighlights: () => {
+          document.querySelectorAll('.debug-price-highlight').forEach(el => {
+            el.classList.remove('debug-price-highlight');
+            (el as HTMLElement).style.outline = '';
+            (el as HTMLElement).style.backgroundColor = '';
+          });
+        }
+      };
+      console.log('🔍 Debug pricing disponible: window.debugPricing');
+    }
+  }
 
   /* --------------------------------- SEO --------------------------------- */
   useSEO({
@@ -988,6 +1087,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     else navigate('/', { replace: true });
   }, [onGoBack, navigate]);
 
+  const [currentStep, setCurrentStep] = useState<StepType>('payment');
+  const [callProgress, setCallProgress] = useState<number>(0);
+  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string>('');
+
   const handlePaymentSuccess = useCallback((pid: string) => {
     setPaymentIntentId(pid);
     setCurrentStep('calling');
@@ -996,7 +1101,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
   const handlePaymentError = useCallback((msg: string) => setError(msg), []);
 
-  // Progression simulée de mise en relation
   useEffect(() => {
     if (currentStep === 'calling' && callProgress < 5) {
       const timer = setTimeout(() => {
@@ -1010,45 +1114,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     }
   }, [currentStep, callProgress]);
 
-  /* ------------------------- Guards ------------------------- */
-  if (pricingLoading || loadingPricing) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 text-center max-w-sm mx-auto">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Chargement des prix</h2>
-            <p className="text-gray-600 text-sm">
-              {pricingLoading ? 'Configuration en cours...' : 'Calcul des tarifs...'}
-            </p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (pricingError) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 text-center max-w-sm mx-auto">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Erreur de configuration</h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Impossible de charger la configuration des prix. Veuillez réessayer.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-red-500 to-red-600 text-white"
-            >
-              Recharger
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
+  /* ------------------------- Guards minimales ------------------------- */
   if (!provider || !service) {
     return (
       <Layout>
@@ -1105,35 +1171,20 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     );
   }
 
-  // Garde devise invalide
-  if (selectedCurrency && !['eur', 'usd'].includes(selectedCurrency)) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 text-center max-w-sm mx-auto">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Devise non supportée</h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Devise "{selectedCurrency}" non reconnue. Retour à EUR.
-            </p>
-            <button
-              onClick={() => handleCurrencyChange('eur')}
-              className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-red-500 to-red-600 text-white"
-            >
-              Continuer en EUR
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   /* ------------------------------ Render page ---------------------------- */
   return (
     <Layout>
       <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)]">
         <div className="max-w-lg mx-auto px-4 py-4">
-          {/* Header mobile-first */}
+          {(pricingError || isFallback) && (
+            <div className="mb-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+              {language === 'fr'
+                ? 'Les tarifs affichés utilisent une configuration de secours. La configuration centrale sera rechargée automatiquement.'
+                : 'Displayed prices are using a fallback configuration. Central pricing will be reloaded automatically.'}
+            </div>
+          )}
+
+          {/* Header */}
           <div className="mb-4">
             <button
               onClick={goBack}
@@ -1158,17 +1209,18 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             </div>
           </div>
 
-          {/* Provider compact card */}
+          {/* Provider card */}
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
             <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">
                 <img
                   src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
-                  alt={providerDisplayName}
+                  alt={provider.fullName || provider.name || 'Expert'}
                   className="w-12 h-12 rounded-lg object-cover ring-2 ring-white shadow-sm"
                   onError={(e) => {
                     const target = e.currentTarget;
-                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(providerDisplayName)}&size=100&background=4F46E5&color=fff`;
+                    const name = provider.fullName || provider.name || 'Expert';
+                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=4F46E5&color=fff`;
                   }}
                   loading="lazy"
                 />
@@ -1176,12 +1228,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
               </div>
 
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 truncate text-sm">{providerDisplayName}</h3>
+                <h3 className="font-bold text-gray-900 truncate text-sm">{provider.fullName || provider.name || 'Expert'}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                    isLawyer ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                    (provider.role || provider.type) === 'lawyer' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                   }`}>
-                    {isLawyer ? (language === 'fr' ? 'Avocat' : 'Lawyer') : (language === 'fr' ? 'Expert' : 'Expert')}
+                    {(provider.role || provider.type) === 'lawyer' ? (language === 'fr' ? 'Avocat' : 'Lawyer') : (language === 'fr' ? 'Expert' : 'Expert')}
                   </span>
                   <span className="text-gray-600 text-xs">{provider?.country || 'FR'}</span>
                 </div>
@@ -1193,8 +1245,11 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
               </div>
 
-              {/* Marqueurs debug prix */}
-              <div className="text-right flex-shrink-0" data-price-source="admin" data-currency={selectedCurrency}>
+              {/* Traçabilité prix */}
+              <div
+                className="text-right flex-shrink-0"
+                {...cardTraceAttrs}
+              >
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
                   {selectedCurrency === 'usd' ? '$' : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
                 </div>
@@ -1206,55 +1261,11 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
           {/* Sélecteur de devise */}
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
             <CurrencySelector
-              serviceType={provider?.role === 'lawyer' || provider?.type === 'lawyer' ? 'lawyer' : 'expat'}
+              serviceType={(provider?.role === 'lawyer' || provider?.type === 'lawyer') ? 'lawyer' : 'expat'}
               selectedCurrency={selectedCurrency}
               onCurrencyChange={handleCurrencyChange}
               className="mb-4"
             />
-          </section>
-
-          {/* Formulaire Téléphone / WhatsApp */}
-          <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="clientPhone" className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('form.phone')} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="clientPhone"
-                  name="clientPhone"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  required
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(normalizePhone(e.target.value))}
-                  placeholder={t('form.phonePlaceholder')}
-                  className="appearance-none block w-full px-3 py-3 border-2 border-gray-200 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900"
-                />
-                <p className="mt-2 text-xs text-gray-500">{t('form.phoneHelp')}</p>
-                {!isValidE164ish(clientPhone) && clientPhone.length > 0 && (
-                  <p className="mt-1 text-xs text-red-600" role="alert" aria-live="assertive">{t('err.invalidPhone')}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="clientWhatsapp" className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('form.whatsapp')}
-                </label>
-                <input
-                  id="clientWhatsapp"
-                  name="clientWhatsapp"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel-national"
-                  value={clientWhatsapp}
-                  onChange={(e) => setClientWhatsapp(normalizePhone(e.target.value))}
-                  placeholder={t('form.whatsappPlaceholder')}
-                  className="appearance-none block w-full px-3 py-3 border-2 border-gray-200 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900"
-                />
-              </div>
-            </div>
           </section>
 
           {/* Contenu principal */}
@@ -1286,14 +1297,9 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                     onError={handlePaymentError}
                     isProcessing={isProcessing}
                     setIsProcessing={(p) => {
-                      if (p && !isValidE164ish(clientPhone)) {
-                        setError(t('err.invalidPhone'));
-                        return;
-                      }
                       setError('');
                       setIsProcessing(p);
                     }}
-                    clientWhatsapp={clientWhatsapp}
                     isMobile={isMobile}
                   />
                 </Elements>
@@ -1305,15 +1311,15 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 <div className="mb-6">
                   <Phone
                     size={32}
-                    className={`mx-auto mb-4 animate-pulse ${isLawyer ? 'text-blue-600' : 'text-green-600'}`}
+                    className={`mx-auto mb-4 animate-pulse ${(provider.role || provider.type) === 'lawyer' ? 'text-blue-600' : 'text-green-600'}`}
                     aria-hidden="true"
                   />
                   <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('ui.connecting')}</h2>
                   <p className="text-gray-600 text-sm">
                     {callProgress < 3
-                      ? `${language === 'fr' ? 'Nous contactons' : 'Contacting'} ${providerDisplayName}...`
+                      ? `${language === 'fr' ? 'Nous contactons' : 'Contacting'} ${provider.fullName || provider.name || 'Expert'}...`
                       : callProgress === 3
-                      ? `${providerDisplayName} ${language === 'fr' ? 'a accepté !' : 'accepted!'}`
+                      ? `${(provider.fullName || provider.name || 'Expert')} ${language === 'fr' ? 'a accepté !' : 'accepted!'}`
                       : callProgress === 4
                       ? `${language === 'fr' ? 'Connexion établie !' : 'Connected!'}`
                       : `${language === 'fr' ? 'Consultation en cours...' : 'Consultation in progress...'}`}
@@ -1340,7 +1346,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
 
                 <div className="flex justify-center mb-4">
-                  <div className={`animate-spin rounded-full border-2 ${isLawyer ? 'border-blue-500' : 'border-red-500'} border-t-transparent w-8 h-8`} />
+                  <div className={`animate-spin rounded-full border-2 ${(provider.role || provider.type) === 'lawyer' ? 'border-blue-500' : 'border-red-500'} border-t-transparent w-8 h-8`} />
                 </div>
 
                 {paymentIntentId && (
@@ -1367,8 +1373,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                   </h2>
                   <p className="text-gray-600 text-sm mb-4">
                     {language === 'fr'
-                      ? `Votre consultation avec ${providerDisplayName} s'est terminée avec succès.`
-                      : `Your consultation with ${providerDisplayName} finished successfully.`}
+                      ? `Votre consultation avec ${(provider.fullName || provider.name || 'Expert')} s'est terminée avec succès.`
+                      : `Your consultation with ${(provider.fullName || provider.name || 'Expert')} finished successfully.`}
                   </p>
 
                   <div className="bg-gray-50 rounded-lg p-4 mb-6">
@@ -1376,7 +1382,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                     <div className="space-y-2 text-sm text-gray-600">
                       <div className="flex justify-between">
                         <span>{t('summary.expert')}:</span>
-                        <span className="font-medium">{providerDisplayName}</span>
+                        <span className="font-medium">{provider.fullName || provider.name || 'Expert'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>{t('summary.duration')}:</span>
@@ -1385,7 +1391,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                       <div className="flex justify-between">
                         <span>{t('summary.total')}:</span>
                         <span className="font-medium text-green-600">
-                           {selectedCurrency === 'usd' ? '$' : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
+                          {(service.currency === 'usd' ? '$' : '')}{service.amount.toFixed(2)}{(service.currency === 'eur' ? '€' : '')}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -1400,7 +1406,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                       onClick={() => navigate(`/evaluation/${provider.id}`)}
                       className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                     >
-                      ⭐ {t('btn.evaluate')} {providerDisplayName}
+                      ⭐ {t('btn.evaluate')} {provider.fullName || provider.name || 'Expert'}
                     </button>
                     <button
                       onClick={() => navigate(`/receipt/${paymentIntentId}`)}

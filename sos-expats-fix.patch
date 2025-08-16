@@ -1,0 +1,503 @@
+diff --git a/src/utils/ts.ts b/src/utils/ts.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/utils/ts.ts
+@@ -0,0 +1,43 @@
++// src/utils/ts.ts
++export const toErrorMessage = (error: unknown): string =>
++  error instanceof Error ? error.message : String(error ?? 'Unknown error');
++
++// Convertit tout (Firebase Timestamp, number ms, string ISO, Date) -> Date
++export const toDate = (v: any): Date | null => {
++  try {
++    if (!v && v !== 0) return null;
++    if (v?.toDate) return v.toDate(); // Firestore Timestamp
++    if (v instanceof Date) return v;
++    if (typeof v === 'number') return new Date(v);
++    if (typeof v === 'string') return new Date(v);
++    return null;
++  } catch {
++    return null;
++  }
++};
++
++// formatDate qui accepte Date | number | Firebase Timestamp | string
++export const formatAnyDate = (v: any, locale = 'fr-FR'): string => {
++  const d = toDate(v);
++  return d ? d.toLocaleString(locale) : '—';
++};
+diff --git a/src/types/global.d.ts b/src/types/global.d.ts
+new file mode 100644
+index 0000000..2222222
+--- /dev/null
++++ b/src/types/global.d.ts
+@@ -0,0 +1,9 @@
++// src/types/global.d.ts
++declare global {
++  interface Window {
++    gtag?: (...args: any[]) => void;
++  }
++}
++
++export {};
++
+diff --git a/src/types.ts b/src/types.ts
+index e69de29..3333333 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -1,0 +1,65 @@
++// Harmonisation des types App (évite la collision avec firebase/auth.User)
++export type ReviewStatus = 'pending' | 'published' | 'hidden' | 'dismissed' | 'resolved';
++
++export interface Review {
++  id: string;
++  rating: number;
++  comment?: string;
++  createdAt?: Date | number | any;
++  updatedAt?: Date | number | any;
++  status?: ReviewStatus;
++  clientName?: string;
++  clientCountry?: string;
++  providerName?: string;
++  serviceType?: 'lawyer_call' | 'expat_call' | string;
++  reportedCount?: number;
++  clientId?: string;
++  providerId?: string;
++  callId?: string;
++}
++
++export interface Coupon {
++  id: string;
++  code: string;
++  type: 'fixed' | 'percentage';
++  amount: number;
++  min_order_amount: number;
++  active: boolean;
++  created_at: Date | number | any;
++  updated_at: Date | number | any;
++  valid_from?: Date | number | any;
++  valid_until?: Date | number | any;
++  created_by: string;
++  usage_limit?: number;
++  used_count?: number;
++}
++
++export interface AppUser {
++  id: string;
++  role: 'client' | 'lawyer' | 'expat' | string;
++  email: string;
++  firstName?: string;
++  lastName?: string;
++  name?: string;
++  fullName?: string;
++  country?: string;
++  currentCountry?: string;
++  photoURL?: string | null;
++  createdAt?: Date | number | any;
++  updatedAt?: Date | number | any;
++  lastLoginAt?: Date | number | any;
++  education?: string[] | string;
++}
+diff --git a/src/pages/admin/AdminPromoCodes.tsx b/src/pages/admin/AdminPromoCodes.tsx
+index 1234567..4444444 100644
+--- a/src/pages/admin/AdminPromoCodes.tsx
++++ b/src/pages/admin/AdminPromoCodes.tsx
+@@ -1,10 +1,12 @@
+ import React from 'react';
++import type { Coupon } from '@/types';
++import { toErrorMessage } from '@/utils/ts';
+ 
+ // ... reste des imports
+ 
+ // --- exemples d'endroits signalés par TS ---
+-        error: `Error saving coupon: ${error.message}`,
++        error: `Error saving coupon: ${toErrorMessage(error)}`,
+@@
+-        error: `Error deleting coupon: ${error.message}`,
++        error: `Error deleting coupon: ${toErrorMessage(error)}`,
+@@
+-        error: `Error toggling coupon status: ${error.message}`,
++        error: `Error toggling coupon status: ${toErrorMessage(error)}`,
+@@
+-        setCoupons(prev =>
+-          prev.map(coupon =>
+-            coupon.id === updated.id ? { ...coupon, ...updated } : coupon
+-          )
+-        );
++        setCoupons(prev =>
++          prev.map(c =>
++            c.id === updated.id ? ({ ...c, ...updated } as Coupon) : c
++          )
++        );
+@@
+-        const payload = { ...formValues, updated_at: new Date() };
++        const payload: Partial<Coupon> = {
++          ...formValues,
++          valid_from: formValues.valid_from || null,
++          valid_until: formValues.valid_until || null,
++          updated_at: new Date(),
++        };
+diff --git a/src/pages/admin/AdminReviews.tsx b/src/pages/admin/AdminReviews.tsx
+index 89abcde..5555555 100644
+--- a/src/pages/admin/AdminReviews.tsx
++++ b/src/pages/admin/AdminReviews.tsx
+@@ -1,10 +1,13 @@
+ import React from 'react';
++import type { Review } from '@/types';
++import { formatAnyDate, toErrorMessage } from '@/utils/ts';
++import type { QueryConstraint } from 'firebase/firestore';
+ 
+ // ... imports firestore existants
+ 
+@@
+-const publishedReviews = reviewsData.filter(review => review.status === 'published').length;
+-const pendingReviews = reviewsData.filter(review => review.status === 'pending').length;
+-const hiddenReviews = reviewsData.filter(review => review.status === 'hidden').length;
++const publishedReviews = reviewsData.filter(r => (r.status ?? 'pending') === 'published').length;
++const pendingReviews   = reviewsData.filter(r => (r.status ?? 'pending') === 'pending').length;
++const hiddenReviews    = reviewsData.filter(r => (r.status ?? 'pending') === 'hidden').length;
+@@
+-const queryConstraints: (QueryOrderByConstraint | QueryLimitConstraint)[] = [];
++const queryConstraints: QueryConstraint[] = [];
+@@
+-const raw = doc.data();
+-const item = { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate() || new Date() };
++const raw = (doc.data() as any) || {};
++const item = {
++  id: doc.id,
++  ...raw,
++  createdAt: raw.createdAt?.toDate?.() ?? raw.createdAt ?? new Date(),
++};
+@@
+-  {formatDate(review.createdAt)}
++  {formatAnyDate(review.createdAt)}
+@@
+-  {formatDate(selectedReview.createdAt)}
++  {formatAnyDate(selectedReview.createdAt)}
+@@
+-  setSelectedReview({ ...selectedReview, status: 'published' });
++  setSelectedReview(prev => (prev ? ({ ...prev, status: 'published' } as Review) : prev));
+@@
+-  setSelectedReview({ ...selectedReview, status: 'hidden' });
++  setSelectedReview(prev => (prev ? ({ ...prev, status: 'hidden' } as Review) : prev));
+@@
+-  error: `Error ...: ${error.message}`,
++  error: `Error ...: ${toErrorMessage(error)}`,
+diff --git a/src/pages/admin/ReviewsManagement.tsx b/src/pages/admin/ReviewsManagement.tsx
+index 1122334..6666666 100644
+--- a/src/pages/admin/ReviewsManagement.tsx
++++ b/src/pages/admin/ReviewsManagement.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
++import { formatAnyDate } from '@/utils/ts';
+ 
+@@
+-  return review.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
++  return (review.comment ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          review.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          review.clientCountry.toLowerCase().includes(searchTerm.toLowerCase());
+@@
+-  {formatDate(review.createdAt)}
++  {formatAnyDate(review.createdAt)}
+@@
+-  {formatDate(selectedReview.createdAt)}
++  {formatAnyDate(selectedReview.createdAt)}
+diff --git a/src/pages/admin/AdminReports.tsx b/src/pages/admin/AdminReports.tsx
+index 2233445..7777777 100644
+--- a/src/pages/admin/AdminReports.tsx
++++ b/src/pages/admin/AdminReports.tsx
+@@ -1,6 +1,22 @@
+ import React from 'react';
+ 
++type ReportStatus = 'pending' | 'dismissed' | 'resolved';
++interface Report {
++  id: string;
++  type: 'contact' | string;
++  reporterId: string;
++  reporterName: string;
++  targetId: string;
++  targetType: 'contact' | string;
++  reason: string;
++  details?: any;
++  status: ReportStatus;
++  createdAt?: any;
++  updatedAt?: any;
++  priority?: any;
++  firstName?: any;
++}
+@@
+- setReports(prev => [...prev, ...contactReports]);
++ const safe = contactReports.map(r => ({
++   ...r,
++   status: (['pending','dismissed','resolved'] as const).includes(r.status as any) ? r.status as ReportStatus : 'pending'
++ }));
++ setReports(prev => [...prev, ...safe]);
+diff --git a/src/pages/admin/AdminUsers.tsx b/src/pages/admin/AdminUsers.tsx
+index 3344556..8888888 100644
+--- a/src/pages/admin/AdminUsers.tsx
++++ b/src/pages/admin/AdminUsers.tsx
+@@ -1,12 +1,16 @@
+ import React from 'react';
++import { collection, query, where, orderBy, limit, type Query } from 'firebase/firestore';
++import { toErrorMessage } from '@/utils/ts';
+ 
+@@
+-let usersQuery = collection(db, 'users');
++const usersRef = collection(db, 'users');
++let usersQuery: Query = query(usersRef);
+@@
+-  usersQuery = query(usersQuery, where('role', '==', selectedRole));
++  usersQuery = query(usersQuery, where('role', '==', selectedRole));
+@@
+-  usersQuery = query(usersQuery, where('country', '==', selectedCountry));
++  usersQuery = query(usersQuery, where('country', '==', selectedCountry));
+@@
+-  usersQuery = query(usersQuery, orderBy(sortField, sortDirection));
++  usersQuery = query(usersQuery, orderBy(sortField, sortDirection));
+@@
+-  usersQuery = query(usersQuery, limit(page * USERS_PER_PAGE));
++  usersQuery = query(usersQuery, limit(page * USERS_PER_PAGE));
+@@
+-const usersData = snapshot.docs.map(user => ({ createdAt: ..., id: user.id }));
++const usersData = snapshot.docs.map(d => {
++  const raw = d.data() as any;
++  return {
++    id: d.id,
++    createdAt: raw.createdAt?.toDate?.() ?? raw.createdAt,
++    lastLoginAt: raw.lastLoginAt?.toDate?.() ?? raw.lastLoginAt,
++    updatedAt: raw.updatedAt?.toDate?.() ?? raw.updatedAt,
++    country: raw.country,
++    currentCountry: raw.currentCountry,
++  };
++});
+@@
+-const uniqueCountries = Array.from(new Set(usersData.map(user => user.country || user.currentCountry || 'Non spécifié')))
++const uniqueCountries = Array.from(new Set(usersData.map(user => user.country || user.currentCountry || 'Non spécifié')));
+@@
+-  error: `Error loading users: ${error.message}`,
++  error: `Error loading users: ${toErrorMessage(error)}`,
+@@
+-  error: `Error deleting user: ${error.message}`,
++  error: `Error deleting user: ${toErrorMessage(error)}`,
+@@
+-  error: `Error banning user: ${error.message}`,
++  error: `Error banning user: ${toErrorMessage(error)}`,
+@@
+-  error: `Error unbanning user: ${error.message}`,
++  error: `Error unbanning user: ${toErrorMessage(error)}`,
+@@
+-  error: `Error toggling online status: ${error.message}`,
++  error: `Error toggling online status: ${toErrorMessage(error)}`,
+@@
+-  error: `Error toggling visibility: ${error.message}`,
++  error: `Error toggling visibility: ${toErrorMessage(error)}`,
+@@
+-  error: `Error toggling featured status: ${error.message}`,
++  error: `Error toggling featured status: ${toErrorMessage(error)}`,
+diff --git a/src/pages/Checkout.tsx b/src/pages/Checkout.tsx
+index 4455667..9999999 100644
+--- a/src/pages/Checkout.tsx
++++ b/src/pages/Checkout.tsx
+@@ -340,7 +340,7 @@
+-  value={user.firstName}
++  value={user?.firstName ?? ''}
+@@
+-  value={user.lastName}
++  value={user?.lastName ?? ''}
+@@
+-  value={user.email}
++  value={user?.email ?? ''}
+diff --git a/src/pages/Contact.tsx b/src/pages/Contact.tsx
+index 5566778..aaaaaaa 100644
+--- a/src/pages/Contact.tsx
++++ b/src/pages/Contact.tsx
+@@ -980,3 +980,3 @@
+-  <FieldSuccess show={validStates.email}>
++  <FieldSuccess show={!!validStates.email}>
+diff --git a/src/pages/Dashboard.tsx b/src/pages/Dashboard.tsx
+index 6677889..bbbbbbb 100644
+--- a/src/pages/Dashboard.tsx
++++ b/src/pages/Dashboard.tsx
+@@ -255,3 +255,6 @@
+-  <Button type="button" onClick={add} size="small" title="Ajouter">
+-    Ajouter
+-  </Button>
++  <Button type="button" onClick={add} size="small" aria-label="Ajouter">
++    Ajouter
++  </Button>
+diff --git a/src/pages/ProfileEdit.tsx b/src/pages/ProfileEdit.tsx
+index 7788990..ccccccc 100644
+--- a/src/pages/ProfileEdit.tsx
++++ b/src/pages/ProfileEdit.tsx
+@@ -1,10 +1,13 @@
+-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile } from 'firebase/auth';
++import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile, getAuth, type User as FirebaseUser } from 'firebase/auth';
++import { ref, deleteObject } from 'firebase/storage';
++import { doc, updateDoc } from 'firebase/firestore';
+ 
+@@
+-const docRef = doc(db, "users", user.uid);
++const auth = getAuth();
++const authUser = auth.currentUser;
++if (!authUser?.uid) return;
++const docRef = doc(db, "users", authUser.uid);
+@@
+-const file = e.target.files[0];
++const file = e.target.files?.[0];
++if (!file) return;
+@@
+-const checkEmailUniqueness = useCallback(async (email) => {
++const checkEmailUniqueness = useCallback(async (email: string) => {
+@@
+-const credential = EmailAuthProvider.credential(user.email, passwords.current);
+-await reauthenticateWithCredential(user, credential);
++const credential = EmailAuthProvider.credential(authUser.email!, passwords.current);
++await reauthenticateWithCredential(authUser, credential);
+@@
+-await updatePassword(user, passwords.new);
++await updatePassword(authUser, passwords.new);
+@@
+-await updateProfile(user, { photoURL });
++await updateProfile(authUser, { photoURL });
+@@
+-const newRef = ref(storage, `profilePhotos/${user.uid}/${Date.now()}_${photo.file.name}`);
++const newRef = ref(storage, `profilePhotos/${authUser.uid}/${Date.now()}_${photo.file.name}`);
+@@
+- setUser((prevUser) => ({
++ // Remplace par ton setter réel (ex: setUserData)
++ setUserData?.((prevUser) => ({
+    ...prevUser,
+    ...updateData
+  }));
+@@
+- if (err.code === 'auth/wrong-password') {
++ if ((err as any)?.code === 'auth/wrong-password') {
+@@
+- } else if (err.code === 'auth/weak-password') {
++ } else if ((err as any)?.code === 'auth/weak-password') {
+@@
+- } else if (err.code === 'auth/email-already-in-use') {
++ } else if ((err as any)?.code === 'auth/email-already-in-use') {
+@@
+- } else if (err.code === 'auth/requires-recent-login') {
++ } else if ((err as any)?.code === 'auth/requires-recent-login') {
+@@
+- } else if (err.message) {
+-   errorMessage = err.message;
++ } else if ((err as any)?.message) {
++   errorMessage = (err as any).message;
+diff --git a/src/utils/auth.ts b/src/utils/auth.ts
+index 8899aa0..ddddddd 100644
+--- a/src/utils/auth.ts
++++ b/src/utils/auth.ts
+@@ -1,8 +1,17 @@
+-import { User } from '../types';
++import { AppUser } from '../types';
++import { toErrorMessage } from '@/utils/ts';
+ 
+@@
+- error: `Registration error: ${error.message}`,
++ error: `Registration error: ${toErrorMessage(error)}`,
+@@
+- error: `Login error: ${error.message}`,
++ error: `Login error: ${toErrorMessage(error)}`,
+@@
+- error: `Google login error: ${error.message}`,
++ error: `Google login error: ${toErrorMessage(error)}`,
+@@
+- error: `Logout error: ${error.message}`,
++ error: `Logout error: ${toErrorMessage(error)}`,
+@@
+- error: `Password reset error: ${error.message}`,
++ error: `Password reset error: ${toErrorMessage(error)}`,
+@@
+- error: `Verification email error: ${error.message}`,
++ error: `Verification email error: ${toErrorMessage(error)}`,
+@@
+- error: `Verification SMS error: ${error.message}`,
++ error: `Verification SMS error: ${toErrorMessage(error)}`,
+@@
+- const smsConfig = verificationSmsConfig[userLanguage || 'fr'];
++ const verificationSmsConfig = {
++   fr: { message: 'Votre code: {{code}}' },
++   en: { message: 'Your code: {{code}}' },
++ } as const;
++ type LangKey = keyof typeof verificationSmsConfig;
++ const lang = ((userLanguage as LangKey) || 'fr');
++ const smsConfig = verificationSmsConfig[lang];
+@@
+- sendVerificationSMS(to, code, locale, { smsTemplate: smsConfig.message })
++ sendVerificationSMS({ to, code, template: smsConfig.message, locale })
+diff --git a/src/utils/firestore.ts b/src/utils/firestore.ts
+index aabbccd..eeeeeee 100644
+--- a/src/utils/firestore.ts
++++ b/src/utils/firestore.ts
+@@ -1,10 +1,12 @@
+-import { User, Notification, EnhancedSettings } from '../types';
++import { AppUser /*, Notification, EnhancedSettings */ } from '../types';
++import { toDate } from '@/utils/ts';
+ 
+@@
+- .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
++ .sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0));
+@@
+- if (reviewData.providerId && truthy(reviewData.rating)) {
++ if ((reviewData as any).providerId && truthy((reviewData as any).rating)) {
+diff --git a/src/services/analytics.ts b/src/services/analytics.ts
+index bbccee0..ffffff0 100644
+--- a/src/services/analytics.ts
++++ b/src/services/analytics.ts
+@@ -160,8 +160,8 @@
+-  if (typeof gtag !== 'undefined') {
+-    gtag('event', data.action, {
++  if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
++    window.gtag('event', data.action, {
+       // ...
+     });
+   }
+@@
+-  await this.incrementCounter(`conversions_${data.conviderType}_${data.providerType}`);
++  await this.incrementCounter(`conversions_${data.providerType}_${data.providerType}`);
+@@
+-  if (typeof gtag !== 'undefined') {
+-    gtag('event', 'conversion', {
++  if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
++    window.gtag('event', 'conversion', {
+       // ...
+     });
+   }
+@@
+-  duration: navigation.loadEventEnd - navigation.navigationStart,
++  const baseline = (navigation as any)?.startTime ?? 0;
++  duration: (navigation?.loadEventEnd ?? 0) - baseline,
+diff --git a/src/utils/performance.ts b/src/utils/performance.ts
+index 13579bd..1010101 100644
+--- a/src/utils/performance.ts
++++ b/src/utils/performance.ts
+@@ -115,9 +115,10 @@
+-  domReady: safe(perfData.domContentLoadedEventEnd - perfData.navigationStart),
+-  windowLoad: safe(perfData.loadEventEnd - perfData.navigationStart),
+-  totalTime: safe(perfData.loadEventEnd - perfData.navigationStart)
++  const baseline = (perfData as any)?.startTime ?? 0;
++  domReady: safe((perfData.domContentLoadedEventEnd ?? 0) - baseline),
++  windowLoad: safe((perfData.loadEventEnd ?? 0) - baseline),
++  totalTime: safe((perfData.loadEventEnd ?? 0) - baseline)
+@@
+-  // @ts-expect-error name exists on PerformancePaintTiming
++  // (directive retirée car non nécessaire)
+diff --git a/src/pages/admin/AdminReviews.tsx b/src/pages/admin/AdminReviews.tsx
+index 5555555..5555556 100644
+--- a/src/pages/admin/AdminReviews.tsx
++++ b/src/pages/admin/AdminReviews.tsx
+@@ -200,7 +200,7 @@
+-  {getStatusBadge(review.status || 'pending')}
++  {getStatusBadge((review.status ?? 'pending'))}
+diff --git a/src/pages/Contact.tsx b/src/pages/Contact.tsx
+index aaaaaaa..aaaaaab 100644
+--- a/src/pages/Contact.tsx
++++ b/src/pages/Contact.tsx
+@@ -600,3 +600,3 @@
+-const FieldSuccess: React.FC<{ show: boolean; children: React.ReactNode }> = ({ show, children }) =>
++const FieldSuccess: React.FC<{ show: boolean; children: React.ReactNode }> = ({ show, children }) =>
+   show ? <div className="text-green-600">{children}</div> : null

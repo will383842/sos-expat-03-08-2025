@@ -1,4 +1,4 @@
-// src/components/home/ProfileCarousel.tsx - VERSION CORRIGÉE AVEC DEBUG
+// src/components/home/ProfileCarousel.tsx - VERSION CORRIGÉE AVEC DEBUG (isActive non bloquant + fallback pays)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
@@ -25,10 +25,10 @@ const ROTATE_INTERVAL_MS = 30000;
 const ROTATE_COUNT = 8;
 
 // Composant ProfileCarousel
-const ProfileCarousel: React.FC<ProfileCarouselProps> = ({ 
+const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
   className = "",
   showStats = false,
-  pageSize = 12 
+  pageSize = 12
 }) => {
   const { language } = useApp();
   const { user, isLoading: authLoading } = useAuth();
@@ -49,9 +49,9 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
   // Navigation avec URL SEO
   const handleProfileClick = useCallback((provider: Provider) => {
     console.log('🔗 Navigation vers le profil de:', provider.name);
-    
+
     const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
-    const countrySlug = provider.country
+    const countrySlug = (provider.country || 'monde')
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -61,15 +61,15 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]/g, '-');
-    
+
     const seoUrl = `/${typeSlug}/${countrySlug}/francais/${nameSlug}-${provider.id}`;
-    
+
     try {
       sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
     } catch (error) {
       console.warn('⚠️ Erreur sessionStorage:', error);
     }
-    
+
     navigate(seoUrl, {
       state: {
         selectedProvider: provider,
@@ -95,9 +95,9 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
     // Éviter les profils récemment affichés
     const notRecent = prioritized.filter(p => !recentlyShown.current.has(p.id));
-    
+
     let selected = notRecent.slice(0, MAX_VISIBLE);
-    
+
     // Si pas assez, compléter avec tous les profils
     if (selected.length < MAX_VISIBLE) {
       const remaining = prioritized.filter(p => !selected.includes(p));
@@ -106,7 +106,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
     // Mémoriser les profils affichés
     selected.forEach(p => recentlyShown.current.add(p.id));
-    
+
     // Nettoyer le cache de récence
     if (recentlyShown.current.size > 40) {
       const oldEntries = Array.from(recentlyShown.current).slice(0, 20);
@@ -124,12 +124,12 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
       // 🔧 DÉBUT DEBUG FIREBASE
       console.log('🔍 DÉMARRAGE DEBUG FIREBASE - ProfileCarousel');
-      
+
       // 🔍 1. REQUÊTE SIMPLE SANS FILTRES
       console.log('📡 Test requête basique...');
       const simpleQuery = query(collection(db, 'sos_profiles'));
       const simpleSnapshot = await getDocs(simpleQuery);
-      
+
       console.log(`📊 TOUS LES DOCUMENTS sos_profiles: ${simpleSnapshot.size}`);
       simpleSnapshot.docs.forEach((doc, index) => {
         const data = doc.data();
@@ -150,7 +150,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         where('isVisible', '==', true)
       );
       const visibleSnapshot = await getDocs(visibleQuery);
-      
+
       console.log(`📊 Documents isVisible=true: ${visibleSnapshot.size}`);
       visibleSnapshot.docs.forEach((doc, index) => {
         console.log(`Visible ${index + 1}: ${doc.id}`);
@@ -163,7 +163,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         where('type', 'in', ['lawyer', 'expat'])
       );
       const typeSnapshot = await getDocs(typeQuery);
-      
+
       console.log(`📊 Documents type in [lawyer,expat]: ${typeSnapshot.size}`);
       typeSnapshot.docs.forEach((doc, index) => {
         const data = doc.data();
@@ -173,12 +173,12 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       // 🔍 4. VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS
       console.log('\n🔍 VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS');
       const potentialIds = ['expat2', 'expat3', 'avocat1', 'EXPAT 3', 'EXPAT3']; // Adaptez selon vos IDs réels
-      
+
       for (const profileId of potentialIds) {
         try {
           const docRef = doc(db, 'sos_profiles', profileId);
           const docSnap = await getDoc(docRef);
-          
+
           if (docSnap.exists()) {
             const data = docSnap.data();
             console.log(`✅ ${profileId} existe:`, {
@@ -208,10 +208,10 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         where('type', 'in', ['lawyer', 'expat']),
         fsLimit(50)
       );
-      
+
       const snapshot = await getDocs(sosProfilesQuery);
       console.log(`📊 Documents récupérés par requête finale: ${snapshot.size}`);
-      
+
       if (snapshot.empty) {
         console.log('⚠️ Aucun document avec filtres');
         setOnlineProviders([]);
@@ -221,28 +221,33 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
       // Transformer les données
       const transformedProviders: Provider[] = [];
-      
-      for (const doc of snapshot.docs) {
+
+      for (const docSnap of snapshot.docs) {
         try {
-          const data = doc.data();
-          const docId = doc.id;
-          
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
           // 🔍 Log de transformation détaillé
           console.log(`\n🔄 TRAITEMENT ${docId}:`);
 
-          const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Expert';
+          const fullName =
+            data.fullName ||
+            `${data.firstName || ''} ${data.lastName || ''}`.trim() ||
+            'Expert';
+
           const type = data.type || 'expat';
-          const country = data.currentPresenceCountry || data.country || '';
+
+          // ✅ Fallback pays (on n'exclut plus le profil si vide)
+          const country: string =
+            data.currentPresenceCountry ||
+            data.country ||
+            data.currentCountry ||
+            'Monde';
 
           console.log(`1️⃣ Données de base: nom="${fullName}", type="${type}", pays="${country}"`);
 
-          if (!country) {
-            console.log(`❌ ${docId}: REJETÉ - Pas de pays`);
-            continue;
-          }
-
           // Gérer l'avatar
-          let avatar = data.profilePhoto || data.photoURL || data.avatar || '';
+          let avatar: string = data.profilePhoto || data.photoURL || data.avatar || '';
           if (avatar && avatar.startsWith('user_uploads/')) {
             try {
               const storageRef = ref(storage, avatar);
@@ -250,12 +255,12 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             } catch {
               avatar = DEFAULT_AVATAR;
             }
-          } else if (!avatar.startsWith('http')) {
+          } else if (!avatar || !avatar.startsWith('http')) {
             avatar = DEFAULT_AVATAR;
           }
 
           const provider: Provider = {
-            id: doc.id,
+            id: docSnap.id,
             name: fullName,
             type: type as 'lawyer' | 'expat',
             country,
@@ -264,7 +269,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             specialties: Array.isArray(data.specialties) ? data.specialties : [],
             rating: typeof data.rating === 'number' && data.rating >= 0 && data.rating <= 5 ? data.rating : 4.5,
             reviewCount: typeof data.reviewCount === 'number' && data.reviewCount >= 0 ? data.reviewCount : 0,
-            yearsOfExperience: typeof data.yearsOfExperience === 'number' ? data.yearsOfExperience : data.yearsAsExpat || 0,
+            yearsOfExperience: typeof data.yearsOfExperience === 'number' ? data.yearsOfExperience : (data.yearsAsExpat || 0),
             isOnline: data.isOnline === true,
             avatar,
             profilePhoto: avatar,
@@ -274,16 +279,16 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             isApproved: data.isApproved === true
           };
 
-          // 🔧 NOUVELLE LOGIQUE DE VALIDATION CLAIRE
+          // 🔧 NOUVELLE LOGIQUE DE VALIDATION
           const isLawyer = provider.type === 'lawyer';
           const isExpat = provider.type === 'expat';
-          
+
           // Vérifications de base
           const hasValidData = provider.name.trim() !== '' && provider.country.trim() !== '';
           const isVisible = data.isVisible !== false; // true par défaut
-          const isActive = data.isActive !== false;   // true par défaut
+          const isActive = data.isActive !== false;   // true par défaut (⚠️ non bloquant maintenant)
           const notBanned = data.isBanned !== true;
-          
+
           // Logique d'approbation
           let isApproved = true;
           if (isLawyer) {
@@ -296,12 +301,13 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             console.log(`🌍 Validation expat ${provider.name}: isApproved=${data.isApproved} → ${isApproved}`);
           }
 
-          const shouldInclude = hasValidData && isVisible && isActive && notBanned && isApproved;
+          // ✅ isActive n'est PLUS un critère bloquant
+          const shouldInclude = hasValidData && isVisible && notBanned && isApproved;
 
           console.log(`🔍 Décision finale ${provider.name}:`, {
             hasValidData,
             isVisible: `${data.isVisible} → ${isVisible}`,
-            isActive: `${data.isActive} → ${isActive}`,
+            isActive_infoOnly: `${data.isActive} (non bloquant)`,
             notBanned,
             isApproved: `${data.isApproved} → ${isApproved}`,
             shouldInclude
@@ -315,7 +321,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           }
 
         } catch (error) {
-          console.error('❌ Erreur transformation document:', doc.id, error);
+          console.error('❌ Erreur transformation document:', docSnap.id, error);
         }
       }
 
@@ -323,7 +329,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       console.log('Profils finaux:', transformedProviders.map(p => ({ id: p.id, name: p.name, type: p.type })));
 
       setOnlineProviders(transformedProviders.slice(0, pageSize));
-      
+
       // Sélection initiale intelligente
       const initialVisible = selectVisibleProviders(transformedProviders);
       setVisibleProviders(initialVisible);
@@ -332,7 +338,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       console.error('❌ Erreur lors du chargement ProfileCarousel:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(`Erreur de chargement: ${errorMessage}`);
-      
+
       setOnlineProviders([]);
       setVisibleProviders([]);
     } finally {
@@ -345,49 +351,49 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     if (onlineProviders.length === 0) return;
 
     console.log('🔄 Rotation des profils...');
-    
+
     // Garder une partie des profils actuels
     const keepCount = Math.max(0, MAX_VISIBLE - ROTATE_COUNT);
     const toKeep = visibleProviders.slice(0, keepCount);
-    
+
     // Sélectionner de nouveaux profils
-    const availableForRotation = onlineProviders.filter(p => 
-      !toKeep.find(kept => kept.id === p.id) && 
+    const availableForRotation = onlineProviders.filter(p =>
+      !toKeep.find(kept => kept.id === p.id) &&
       !recentlyShown.current.has(p.id)
     );
-    
+
     let newProviders = availableForRotation.slice(0, ROTATE_COUNT);
     if (newProviders.length < ROTATE_COUNT) {
       const fallback = onlineProviders.filter(p => !toKeep.find(kept => kept.id === p.id));
       newProviders = [...newProviders, ...fallback].slice(0, ROTATE_COUNT);
     }
-    
+
     // Mélanger les nouveaux profils
     const shuffledNew = newProviders.sort(() => Math.random() - 0.5);
-    
+
     // Combiner le résultat final
     const rotated = [...toKeep, ...shuffledNew].sort(() => Math.random() - 0.5);
-    
+
     setVisibleProviders(rotated.slice(0, MAX_VISIBLE));
     setRotationIndex(prev => prev + 1);
-    
+
     // Mémoriser les nouveaux profils
     shuffledNew.forEach(p => recentlyShown.current.add(p.id));
   }, [onlineProviders, visibleProviders]);
 
   // Mise à jour du statut en ligne en temps réel
   const updateProviderOnlineStatus = useCallback((providerId: string, isOnline: boolean) => {
-    setOnlineProviders(prevProviders => 
-      prevProviders.map(provider => 
-        provider.id === providerId 
+    setOnlineProviders(prevProviders =>
+      prevProviders.map(provider =>
+        provider.id === providerId
           ? { ...provider, isOnline }
           : provider
       )
     );
 
-    setVisibleProviders(prevVisible => 
-      prevVisible.map(provider => 
-        provider.id === providerId 
+    setVisibleProviders(prevVisible =>
+      prevVisible.map(provider =>
+        provider.id === providerId
           ? { ...provider, isOnline }
           : provider
       )
@@ -405,7 +411,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     visibleProviders.forEach(provider => {
       const providerRef = collection(db, 'sos_profiles');
       const providerQuery = query(providerRef, where('__name__', '==', provider.id));
-      
+
       const unsubscribe = onSnapshot(
         providerQuery,
         (snapshot) => {
@@ -413,7 +419,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             if (change.type === 'modified') {
               const data = change.doc.data();
               const newOnlineStatus = data.isOnline === true;
-              
+
               if (newOnlineStatus !== provider.isOnline) {
                 updateProviderOnlineStatus(change.doc.id, newOnlineStatus);
               }
@@ -485,7 +491,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return (
       <div className={`text-center py-8 ${className}`}>
         <p className="text-red-600 mb-4">{error}</p>
-        <button 
+        <button
           onClick={loadInitialProviders}
           className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
         >
@@ -591,31 +597,31 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           0% { transform: translateX(0); }
           100% { transform: translateX(-33.333%); }
         }
-        
+
         .animate-infinite-scroll {
           animation: infinite-scroll 60s linear infinite;
         }
-        
+
         .animate-infinite-scroll:hover {
           animation-play-state: paused;
         }
-        
+
         .scrollbar-hide {
           scrollbar-width: none;
           -ms-overflow-style: none;
         }
-        
+
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
-        
+
         @media (max-width: 768px) {
           .overflow-x-auto {
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
           }
         }
-        
+
         @media (prefers-reduced-motion: reduce) {
           .animate-infinite-scroll,
           .animate-spin {

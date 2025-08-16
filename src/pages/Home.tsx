@@ -7,9 +7,10 @@ import {
   Sparkles, ChevronLeft, ChevronRight as ChevronRightIcon, Briefcase, User
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import ModernProfileCard from '../components/home/ModernProfileCard';
+// import ModernProfileCard from '../components/home/ModernProfileCard';
 import ProfilesCarousel from '../components/home/ProfileCarousel';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { usePricingConfig, detectUserCurrency } from '../services/pricingService';
 
 /* ================================
    Types
@@ -228,12 +229,12 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
     if (touchStartX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(dx) > 50) {
-  if (dx > 0) {
-    prev();
-  } else {
-    next();
-  }
-}
+      if (dx > 0) {
+        prev();
+      } else {
+        next();
+      }
+    }
     touchStartX.current = null;
   };
 
@@ -468,6 +469,26 @@ const OptimizedHomePage: React.FC = () => {
 
   const onInstallClick = useCallback(() => { install(); }, [install]);
 
+  // ======= Pricing dynamique =======
+  const { pricing, loading: pricingLoading, error: pricingError } = usePricingConfig();
+
+  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
+    try {
+      const saved = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
+      return saved && ['eur', 'usd'].includes(saved) ? saved : detectUserCurrency();
+    } catch {
+      return detectUserCurrency();
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('preferredCurrency', selectedCurrency);
+    } catch {
+      /* ignore */
+    }
+  }, [selectedCurrency]);
+
   return (
     <Layout>
       <div className="min-h-screen bg-gray-950">
@@ -575,7 +596,8 @@ const OptimizedHomePage: React.FC = () => {
               </p>
             </div>
 
-            <ProfilesCarousel CardComponent={ModernProfileCard} />
+            {/* Correction: suppression de la prop CardComponent non supportée */}
+            <ProfilesCarousel />
           </div>
         </section>
 
@@ -587,7 +609,7 @@ const OptimizedHomePage: React.FC = () => {
           {(() => {
             const DEFAULT_USD_RATE = 1.08 as const;
 
-            const formatCurrency = (value: number, currency: 'EUR' | 'USD'): string => {
+            const formatBothCurrencies = (value: number, currency: 'EUR' | 'USD'): string => {
               return new Intl.NumberFormat(currency === 'EUR' ? 'fr-FR' : 'en-US', {
                 style: 'currency',
                 currency,
@@ -599,7 +621,7 @@ const OptimizedHomePage: React.FC = () => {
               badge: string;
               title: string;
               minutes: number;
-              euroPrice: number;
+              euroPrice: number; // utilisé comme "amount" générique en mode dynamique
               usdOverride?: number;
               description: string;
               features: string[];
@@ -608,17 +630,42 @@ const OptimizedHomePage: React.FC = () => {
               icon: React.ReactNode;
               lightColor: string;
               borderColor: string;
+              currency?: 'eur' | 'usd'; // optionnel pour le mode dynamique
             }
 
-            const PriceBlock: React.FC<{ euro: number; usdRate?: number; usdOverride?: number; minutes: number }> = ({ euro, usdRate, usdOverride, minutes }) => {
+            const PriceBlock: React.FC<{
+              euro: number;
+              usdRate?: number;
+              usdOverride?: number;
+              minutes: number;
+              currency?: 'eur' | 'usd';
+            }> = ({ euro, usdRate, usdOverride, minutes, currency }) => {
+              // Mode dynamique : on affiche uniquement la devise sélectionnée
+              if (currency) {
+                const code = currency.toUpperCase() as 'EUR' | 'USD';
+                const formatted = formatBothCurrencies(euro, code);
+                return (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durée">
+                    <div className="flex items-end gap-3">
+                      <span className="text-5xl font-black text-gray-900 leading-none">{formatted}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white font-semibold">
+                      <Clock className="w-4 h-4" />
+                      <span>{minutes} minutes</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Mode statique : EUR principal + USD entre parenthèses
               const effectiveRate: number = typeof usdRate === 'number' ? usdRate : DEFAULT_USD_RATE;
               const usdValue = typeof usdOverride === 'number' ? usdOverride : Math.round(euro * effectiveRate);
 
               return (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durée">
                   <div className="flex items-end gap-3">
-                    <span className="text-5xl font-black text-gray-900 leading-none">{formatCurrency(euro, 'EUR')}</span>
-                    <span className="text-2xl font-extrabold text-gray-700 leading-none">({formatCurrency(usdValue, 'USD')})</span>
+                    <span className="text-5xl font-black text-gray-900 leading-none">{formatBothCurrencies(euro, 'EUR')}</span>
+                    <span className="text-2xl font-extrabold text-gray-700 leading-none">({formatBothCurrencies(usdValue, 'USD')})</span>
                   </div>
                   <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white font-semibold">
                     <Clock className="w-4 h-4" />
@@ -640,7 +687,8 @@ const OptimizedHomePage: React.FC = () => {
               accentGradient,
               icon,
               lightColor,
-              borderColor
+              borderColor,
+              currency
             }) => {
               return (
                 <article
@@ -660,7 +708,7 @@ const OptimizedHomePage: React.FC = () => {
                     <h3 className="text-2xl font-extrabold text-gray-900 mb-2">{title}</h3>
                     <p className="text-gray-700 mb-6 leading-relaxed">{description}</p>
 
-                    <PriceBlock euro={euroPrice} usdRate={usdRate} usdOverride={usdOverride} minutes={minutes} />
+                    <PriceBlock euro={euroPrice} usdRate={usdRate} usdOverride={usdOverride} minutes={minutes} currency={currency} />
 
                     <ul className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3" role="list" aria-label="Bénéfices inclus">
                       {features.map((f, i) => (
@@ -687,7 +735,7 @@ const OptimizedHomePage: React.FC = () => {
               );
             };
 
-            // Bénéfices (syntaxe boostée mais sens identique)
+            // Bénéfices (identiques)
             const expatBenefits: string[] = [
               'Retours d’expérience concrets',
               'Conseils logement, banque, santé, transport',
@@ -705,7 +753,7 @@ const OptimizedHomePage: React.FC = () => {
               'Orientation vers les bonnes procédures'
             ];
 
-            // Exemples (fusionnés en un seul bloc commun)
+            // Exemples (fusionnés)
             const expatExamples: string[] = [
               'Installation : logement, forfait mobile, banque',
               'Scolarité & assurances locales',
@@ -721,18 +769,13 @@ const OptimizedHomePage: React.FC = () => {
               'Trouver un job (CV local, entretiens, contrats)',
               'Rencontrer d’autres expatriés (réseau & entraide)'
             ];
-
             const combinedExamples: string[] = Array.from(
               new Set([...expatExamples, ...lawyerExamples, ...additionalExamples])
             );
 
-            return (
+            // --------- Fallback statique (ancien rendu) ----------
+            const renderStaticPricing = (): JSX.Element => (
               <>
-                <div className="absolute inset-0">
-                  <div className="absolute top-0 left-1/3 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
-                  <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-full blur-3xl" />
-                </div>
-
                 <div className="relative z-10 max-w-7xl mx-auto px-6">
                   <div className="text-center mb-16">
                     <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-6">
@@ -834,6 +877,167 @@ const OptimizedHomePage: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+              </>
+            );
+
+            // --------- Rendu principal de la section pricing ----------
+            return (
+              <>
+                <div className="absolute inset-0">
+                  <div className="absolute top-0 left-1/3 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-gradient-to-r from-green-500/10 to-teal-500/10 rounded-full blur-3xl" />
+                </div>
+
+                <div className="relative z-10 max-w-7xl mx-auto px-6">
+                  <div className="text-center mb-16">
+                    <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-6">
+                      <DollarSign className="w-5 h-5 text-green-400" />
+                      <span className="text-green-300 font-bold">Transparence totale • Pas de frais cachés</span>
+                      <Check className="w-5 h-5 text-green-400" />
+                    </div>
+
+                    {/* H2 - inchangé */}
+                    <h2 id="pricing-title" className="text-5xl font-black text-white mb-4">
+                      Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
+                    </h2>
+                    {/* intro plus fun */}
+                    <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+                      Choisissez à qui vous voulez parler… <strong>un avocat</strong> ? <strong>Un expatrié</strong> ?
+                    </p>
+                  </div>
+
+                  {/* --- Intégration dynamique --- */}
+                  {pricingLoading ? (
+                    <div className="text-center py-16">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4" />
+                      <p className="text-white">Chargement des tarifs...</p>
+                    </div>
+                  ) : (pricingError || !pricing) ? (
+                    renderStaticPricing()
+                  ) : (
+                    <>
+                      {/* Sélecteur de devise */}
+                      <div className="text-center mb-8">
+                        <div className="inline-flex bg-white/10 rounded-full p-1 backdrop-blur-sm border border-white/20">
+                          <button
+                            onClick={() => setSelectedCurrency('eur')}
+                            className={`px-6 py-2 rounded-full transition-all font-semibold ${
+                              selectedCurrency === 'eur'
+                                ? 'bg-white text-gray-900'
+                                : 'text-white hover:bg-white/10'
+                            }`}
+                          >
+                            🇪🇺 EUR
+                          </button>
+                          <button
+                            onClick={() => setSelectedCurrency('usd')}
+                            className={`px-6 py-2 rounded-full transition-all font-semibold ${
+                              selectedCurrency === 'usd'
+                                ? 'bg-white text-gray-900'
+                                : 'text-white hover:bg-white/10'
+                            }`}
+                          >
+                            🇺🇸 USD
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Grid avec prix dynamiques */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                        {/* Card Expatrié - Prix dynamique */}
+                        <OfferCard
+                          badge="Offre Expatrié"
+                          title="1 échange avec un expatrié expérimenté"
+                          minutes={pricing.expat[selectedCurrency].duration}
+                          euroPrice={pricing.expat[selectedCurrency].totalAmount}
+                          description="Des conseils concrets, locaux, et tout de suite."
+                          features={expatBenefits}
+                          accentGradient="from-blue-600 to-indigo-600"
+                          icon={<User className="w-4 h-4" />}
+                          lightColor="bg-blue-50"
+                          borderColor="border-blue-200"
+                          currency={selectedCurrency}
+                        />
+
+                        {/* Card Avocat - Prix dynamique */}
+                        <OfferCard
+                          badge="Offre Avocat"
+                          title="1 consultation avec un avocat qualifié"
+                          minutes={pricing.lawyer[selectedCurrency].duration}
+                          euroPrice={pricing.lawyer[selectedCurrency].totalAmount}
+                          description="Une réponse claire, exploitable, adaptée à votre cas."
+                          features={lawyerBenefits}
+                          accentGradient="from-red-600 to-red-700"
+                          icon={<Briefcase className="w-4 h-4" />}
+                          lightColor="bg-red-50"
+                          borderColor="border-red-200"
+                          currency={selectedCurrency}
+                        />
+                      </div>
+
+                      {/* Indicateur source prix */}
+                      <div className="text-center mt-6">
+                        <span className="text-xs text-white/60 bg-white/10 px-3 py-1 rounded-full">
+                          💰 Tarifs mis à jour depuis la console admin
+                        </span>
+                      </div>
+
+                      {/* Bloc EXEMPLES commun */}
+                      <div
+                        className="mt-10 rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm p-6 md:p-8"
+                        role="region"
+                        aria-labelledby="examples-title"
+                      >
+                        <div className="flex flex-col items-center gap-3 mb-6">
+                          <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-r from-green-500 to-blue-500">
+                            <Sparkles className="text-white w-5 h-5" />
+                          </div>
+                          {/* H3 - plus fun */}
+                          <h3 id="examples-title" className="text-xl md:text-2xl font-extrabold text-white">
+                            Situations concrètes
+                          </h3>
+                          <p className="text-gray-300 text-sm md:text-base">
+                            Un expert pour chaque besoin, point.
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                          {combinedExamples.map((ex, i) => (
+                            <div
+                              key={i}
+                              className="group flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+                            >
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-green-500 to-blue-500">
+                                <Check className="w-3.5 h-3.5 text-white" />
+                              </span>
+                              <span className="text-white/90">{ex}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Garanties / points-clés */}
+                      <div className="mt-14 text-center">
+                        <div className="inline-flex items-center space-x-6 bg-white/5 backdrop-blur-sm rounded-2xl px-8 py-4 border border-white/10">
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <Shield className="w-5 h-5" />
+                            <span className="font-medium">Confidentialité & sécurité</span>
+                          </div>
+                          <div className="w-px h-6 bg-white/20" />
+                          <div className="flex items-center space-x-2 text-blue-400">
+                            <Globe className="w-5 h-5" />
+                            <span className="font-medium">Experts dans 150+ pays</span>
+                          </div>
+                          <div className="w-px h-6 bg-white/20" />
+                          <div className="flex items-center space-x-2 text-purple-400">
+                            <Zap className="w-5 h-5" />
+                            <span className="font-medium">Réservation instantanée — appel en 5 minutes</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </>
             );

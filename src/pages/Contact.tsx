@@ -982,7 +982,7 @@ const Contact: React.FC = () => {
                         aria-describedby="email-error"
                         aria-invalid={!!formErrors.email}
                       />
-                      <FieldSuccess show={validStates.email}>
+                      <FieldSuccess show={!!validStates.email}>
                         {lang === 'fr' ? 'Email nickel ! 📧' : 'Perfect email! 📧'}
                       </FieldSuccess>
                       <ErrorMessage error={formErrors.email} fieldName="email" />

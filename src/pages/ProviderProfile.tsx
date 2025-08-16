@@ -50,10 +50,159 @@ import { usePricingConfig, detectUserCurrency } from '../services/pricingService
 // 👉 Ajout: sélecteur de devise
 import { CurrencySelector } from '../components/checkout/CurrencySelector';
 
-// Performance & constants
+/* =====================================================================
+   🔍 Système de traçabilité des prix (hook + composant wrapper)
+   - Pas de `any`
+   - Utilisable dans tous les composants
+===================================================================== */
+export function usePriceTracing() {
+  const { pricing, loading } = usePricingConfig();
+
+  const getTraceAttributes = (
+    serviceType: 'lawyer' | 'expat',
+    currency: 'eur' | 'usd',
+    providerOverride?: number
+  ): Record<string, string | number> => {
+    if (loading) {
+      return {
+        'data-price-source': 'loading',
+        'data-currency': currency,
+        title: 'Prix en cours de chargement...',
+      };
+    }
+
+    if (typeof providerOverride === 'number') {
+      return {
+        'data-price-source': 'provider',
+        'data-currency': currency,
+        'data-service-type': serviceType,
+        title: `Prix personnalisé du prestataire (${providerOverride}${currency === 'eur' ? '€' : '$'})`,
+      };
+    }
+
+    if (pricing) {
+      const config = pricing[serviceType][currency];
+      return {
+        'data-price-source': 'admin',
+        'data-currency': currency,
+        'data-service-type': serviceType,
+        'data-total-amount': config.totalAmount,
+        'data-connection-fee': config.connectionFeeAmount,
+        'data-provider-amount': config.providerAmount,
+        'data-duration': config.duration,
+        title: `Prix admin: ${config.totalAmount}${currency === 'eur' ? '€' : '$'} (Frais: ${config.connectionFeeAmount}${currency === 'eur' ? '€' : '$'}, Provider: ${config.providerAmount}${currency === 'eur' ? '€' : '$'}, ${config.duration}min)`,
+      };
+    }
+
+    return {
+      'data-price-source': 'fallback',
+      'data-currency': currency,
+      title: `Prix par défaut (${serviceType === 'lawyer' ? '49€' : '19€'})`,
+    };
+  };
+
+  return { getTraceAttributes };
+}
+
+interface TracedPriceProps {
+  children: React.ReactNode;
+  serviceType: 'lawyer' | 'expat';
+  currency: 'eur' | 'usd';
+  providerOverride?: number;
+  className?: string;
+}
+
+export const TracedPrice: React.FC<TracedPriceProps> = ({
+  children,
+  serviceType,
+  currency,
+  providerOverride,
+  className = '',
+}) => {
+  const { getTraceAttributes } = usePriceTracing();
+  const traceAttrs = getTraceAttributes(serviceType, currency, providerOverride);
+
+  return (
+    <span className={className} {...traceAttrs}>
+      {children}
+    </span>
+  );
+};
+
+/* Helper console debug (dev uniquement, sans `any`) */
+declare global {
+  interface Window {
+    debugPricing?: {
+      showAllPrices: () => Array<{
+        element: Element;
+        source: string;
+        currency: string;
+        serviceType?: string;
+        text: string;
+      }>;
+      highlightBySource: (source: 'admin' | 'provider' | 'fallback' | 'loading') => void;
+      clearHighlights: () => void;
+    };
+  }
+}
+
+if (import.meta.env.DEV) {
+  window.debugPricing = {
+    showAllPrices: () => {
+      const elements = document.querySelectorAll('[data-price-source]');
+      const prices: Array<{
+        element: Element;
+        source: string;
+        currency: string;
+        serviceType?: string;
+        text: string;
+      }> = [];
+
+      elements.forEach((el) => {
+        prices.push({
+          element: el,
+          source: el.getAttribute('data-price-source') || 'unknown',
+          currency: el.getAttribute('data-currency') || 'unknown',
+          serviceType: el.getAttribute('data-service-type') || undefined,
+          text: el.textContent?.trim() || '',
+        });
+      });
+
+      // eslint-disable-next-line no-console
+      console.table(prices);
+      return prices;
+    },
+    highlightBySource: (source) => {
+      document.querySelectorAll('.debug-price-highlight').forEach((el) => {
+        el.classList.remove('debug-price-highlight');
+        (el as HTMLElement).style.outline = '';
+        (el as HTMLElement).style.backgroundColor = '';
+      });
+
+      document.querySelectorAll(`[data-price-source="${source}"]`).forEach((el) => {
+        el.classList.add('debug-price-highlight');
+        (el as HTMLElement).style.outline = '3px solid red';
+        (el as HTMLElement).style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+      });
+    },
+    clearHighlights: () => {
+      document.querySelectorAll('.debug-price-highlight').forEach((el) => {
+        el.classList.remove('debug-price-highlight');
+        (el as HTMLElement).style.outline = '';
+        (el as HTMLElement).style.backgroundColor = '';
+      });
+    },
+  };
+
+  // eslint-disable-next-line no-console
+  console.log('🔍 Debug pricing disponible: window.debugPricing');
+}
+
+/* ===================================================================== */
+
 const IMAGE_SIZES = {
-  AVATAR_MOBILE: 112, // w-28 h-28
-  AVATAR_DESKTOP: 128, // w-32 h-32
+  AVATAR_MOBILE: 112,
+  AVATAR_DESKTOP: 128,
   MODAL_MAX_WIDTH: 1200,
   MODAL_MAX_HEIGHT: 800,
 } as const;
@@ -115,7 +264,6 @@ const TEXTS = {
     experience: 'Expérience',
     years: 'ans',
     minutes: 'minutes',
-    // 👉 Ajout
     memberSince: 'Inscrit depuis le',
   },
   en: {
@@ -164,7 +312,6 @@ const TEXTS = {
     experience: 'Experience',
     years: 'yrs',
     minutes: 'minutes',
-    // 👉 Ajout
     memberSince: 'Member since',
   },
 } as const;
@@ -286,7 +433,7 @@ const detectLanguage = (): 'fr' | 'en' => {
   if (typeof navigator !== 'undefined' && navigator.language) {
     return navigator.language.toLowerCase().startsWith('fr') ? 'fr' : 'en';
   }
-  return 'en'; // fallback
+  return 'en';
 };
 
 const safeNormalize = (v?: string): string =>
@@ -1350,14 +1497,15 @@ const ProviderProfile: React.FC = () => {
                         <Phone size={14} />
                         <span>Appel en ~5 min</span>
                       </div>
-                      <div
+                      {/* ✅ Traçabilité via composant wrapper */}
+                      <TracedPrice
+                        serviceType={provider.type}
+                        currency={selectedCurrency}
+                        providerOverride={typeof provider.price === 'number' ? provider.price : undefined}
                         className="mt-4 text-3xl sm:text-4xl font-black text-gray-900"
-                        // 👉 Traçabilité de la source du prix (ne change pas l'UI)
-                        data-price-source={priceInfo.source}
-                        title={`price source: ${priceInfo.source}, currency: ${selectedCurrency}`}
                       >
                         {priceInfo.price != null ? `${currencySymbol}${Math.round(priceInfo.price)}` : `${currencySymbol}--`}
-                      </div>
+                      </TracedPrice>
                       <div className="text-gray-600">
                         {priceInfo.duration ? `${priceInfo.duration} ${t('minutes')}` : '--'}
                       </div>
@@ -1624,7 +1772,7 @@ const ProviderProfile: React.FC = () => {
                         <span>{t('speaks')} {formatLanguages(languagesList, detectedLang)}</span>
                       </div>
 
-                      {/* 👉 Ajout: "Inscrit depuis le / Member since" (contenu seulement, pas de design) */}
+                      {/* 👉 Ajout: "Inscrit depuis le / Member since" */}
                       {joinDateText && (
                         <div className="flex items-center gap-2">
                           <span className="text-gray-600">{joinDateText}</span>

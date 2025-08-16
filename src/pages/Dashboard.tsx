@@ -256,7 +256,7 @@ const ChipInput: React.FC<{
           placeholder={placeholder}
           className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
         />
-        <Button type="button" onClick={add} size="small" title="Ajouter">
+        <Button type="button" onClick={add} size="small">
           Ajouter
         </Button>
       </div>

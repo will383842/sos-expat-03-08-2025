@@ -419,7 +419,7 @@ const Checkout: React.FC = () => {
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
-                      <LoadingSpinner size="sm" />
+                      <LoadingSpinner size="small" />
                       <span className="ml-2">Traitement en cours...</span>
                   </div>
                 ) : (

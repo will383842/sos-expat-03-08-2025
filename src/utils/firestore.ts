@@ -16,57 +16,15 @@ import {
   serverTimestamp,
   Timestamp,
   increment,
-  arrayUnion,
   writeBatch,
   onSnapshot,
-  deleteDoc,
 } from 'firebase/firestore';
-import {
-  ref,
-  uploadBytes,
-  uploadString,
-  getDownloadURL,
-  deleteObject,
-} from 'firebase/storage';
+import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../config/firebase';
 
 // Import correct du type User depuis contexts/types
 import type { User } from '../contexts/types';
-import type {
-  CallRecord,
-  Payment,
-  Review,
-  Document as UserDocument,
-  Testimonial,
-  CallSession,
-  SosProfile,
-} from '../types';
-
-// Interface pour Notification
-interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  read: boolean;
-  createdAt: Date;
-}
-
-// Interface pour EnhancedSettings
-interface EnhancedSettings {
-  theme: 'light' | 'dark' | 'auto';
-  language: string;
-  notifications: {
-    email: boolean;
-    push: boolean;
-    sms: boolean;
-  };
-  privacy: {
-    profileVisible: boolean;
-    showOnMap: boolean;
-  };
-}
+import type { CallRecord, Payment, Review, CallSession } from '../types';
 
 // ========================= Utils =========================
 const toDate = (v: unknown): Date | null => {
@@ -74,7 +32,8 @@ const toDate = (v: unknown): Date | null => {
     if (!v) return null;
     if (v instanceof Date) return v;
     if (v instanceof Timestamp) return v.toDate();
-    if (typeof v?.toDate === 'function') return (v as { toDate(): Date }).toDate();
+    const maybe = (v as any);
+    if (typeof maybe?.toDate === 'function') return maybe.toDate();
     const d = new Date(v as string | number);
     return isNaN(d.getTime()) ? null : d;
   } catch {
@@ -95,11 +54,11 @@ export const firstString = (val: unknown, preferredLang: string = 'fr'): string 
     return joined || undefined;
   }
   if (typeof val === 'object') {
-    if (typeof (val as Record<string, unknown>)[preferredLang] === 'string' && (val as Record<string, unknown>)[preferredLang] && ((val as Record<string, unknown>)[preferredLang] as string).trim()) {
-      return ((val as Record<string, unknown>)[preferredLang] as string).trim();
-    }
-    for (const k of Object.keys(val as Record<string, unknown>)) {
-      const v = (val as Record<string, unknown>)[k];
+    const obj = val as Record<string, unknown>;
+    const byLang = obj[preferredLang];
+    if (typeof byLang === 'string' && byLang.trim()) return byLang.trim();
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
       if (typeof v === 'string' && v.trim()) return v.trim();
     }
   }
@@ -107,12 +66,10 @@ export const firstString = (val: unknown, preferredLang: string = 'fr'): string 
 };
 
 // ========================= Normalization =========================
-// IMPORTANT FIX: do NOT force uid = docId; keep real uid if present.
-// Also avoid spreading ...userData at the end (prevents overwriting normalized fields).
-export const normalizeUserData = (userData: Record<string, unknown>, docId: string): User => {
+export const normalizeUserData = (userData: Record<string, any>, docId: string): User => {
   return {
     id: docId,
-    uid: (userData?.uid as string) || docId, // ✅ keep real UID if provided
+    uid: (userData?.uid as string) || docId,
     role: (userData?.role as string) || 'client',
     country: (userData?.country as string) || (userData?.currentCountry as string) || '',
     fullName:
@@ -130,15 +87,18 @@ export const normalizeUserData = (userData: Record<string, unknown>, docId: stri
     currentCountry: (userData?.currentCountry as string) || '',
     preferredLanguage: (userData?.preferredLanguage as string) || 'fr',
     profilePhoto:
-      (userData?.profilePhoto as string) || (userData?.photoURL as string) || (userData?.avatar as string) || '/default-avatar.png',
+      (userData?.profilePhoto as string) ||
+      (userData?.photoURL as string) ||
+      (userData?.avatar as string) ||
+      '/default-avatar.png',
     isActive: userData?.isActive !== false,
-    isApproved: !!(userData?.isApproved),
-    isVerified: !!(userData?.isVerified),
+    isApproved: !!userData?.isApproved,
+    isVerified: !!userData?.isVerified,
     isVisibleOnMap: userData?.isVisibleOnMap !== false,
-    isAvailable: !!(userData?.isAvailable),
-    isBanned: !!(userData?.isBanned),
+    isAvailable: !!userData?.isAvailable,
+    isBanned: !!userData?.isBanned,
     banReason: (userData?.banReason as string) || '',
-    profileCompleted: !!(userData?.profileCompleted),
+    profileCompleted: !!userData?.profileCompleted,
     stripeCustomerId: (userData?.stripeCustomerId as string) || '',
     stripeAccountId: (userData?.stripeAccountId as string) || '',
     notificationPreferences:
@@ -148,17 +108,22 @@ export const normalizeUserData = (userData: Record<string, unknown>, docId: stri
         sms: false,
       },
     deviceTokens: Array.isArray(userData?.deviceTokens) ? (userData.deviceTokens as string[]) : [],
-    marketingConsent: !!(userData?.marketingConsent),
+    marketingConsent: !!userData?.marketingConsent,
     lastActive: toDate(userData?.lastActive) || new Date(),
-    createdByAdmin: !!(userData?.createdByAdmin),
-    isTestProfile: !!(userData?.isTestProfile),
+    createdByAdmin: !!userData?.createdByAdmin,
+    isTestProfile: !!userData?.isTestProfile,
     isCallable: userData?.isCallable !== false,
 
     // Nouveaux champs requis
     lang: (userData?.lang as string) || (userData?.preferredLanguage as string) || 'fr',
     avatar:
-      (userData?.avatar as string) || (userData?.profilePhoto as string) || (userData?.photoURL as string) || '/default-avatar.png',
-    isSOS: (userData?.isSOS as boolean) || ((userData?.role as string) === 'lawyer' || (userData?.role as string) === 'expat'),
+      (userData?.avatar as string) ||
+      (userData?.profilePhoto as string) ||
+      (userData?.photoURL as string) ||
+      '/default-avatar.png',
+    isSOS:
+      (userData?.isSOS as boolean) ||
+      ((userData?.role as string) === 'lawyer' || (userData?.role as string) === 'expat'),
     points: Number(userData?.points ?? 0),
     affiliateCode: (userData?.affiliateCode as string) || `SOS-${docId.substring(0, 6).toUpperCase()}`,
     referralBy: truthy(userData?.referralBy) ? (userData?.referralBy as string) : null,
@@ -172,7 +137,7 @@ export const normalizeUserData = (userData: Record<string, unknown>, docId: stri
     totalEarnings: Number(userData?.totalEarnings ?? 0),
     averageRating: Number(userData?.averageRating ?? 5.0),
 
-    // Champs supplémentaires utilisés ailleurs (laisser tels quels si présents)
+    // Champs supplémentaires
     mainLanguage: userData?.mainLanguage as string | undefined,
     languages: Array.isArray(userData?.languages) ? (userData.languages as string[]) : [],
     city: (userData?.city as string) || '',
@@ -185,16 +150,13 @@ export const normalizeUserData = (userData: Record<string, unknown>, docId: stri
     graduationYear: truthy(userData?.graduationYear) ? Number(userData.graduationYear) : undefined,
     successRate: truthy(userData?.successRate) ? Number(userData.successRate) : undefined,
     duration: truthy(userData?.duration) ? Number(userData.duration) : undefined,
-    price: truthy(userData?.price)
-      ? Number(userData.price)
-      : (userData?.role as string) === 'lawyer'
-      ? 49
-      : 19,
+    price:
+      truthy(userData?.price) ? Number(userData.price) : (userData?.role as string) === 'lawyer' ? 49 : 19,
     rating: Number(userData?.rating ?? userData?.averageRating ?? 5),
     reviewCount: Number(userData?.reviewCount ?? 0),
     lastSeen: toDate(userData?.lastSeen),
 
-    // champs riches (laisser string/array/objet)
+    // champs riches
     description: userData?.description as string | undefined,
     professionalDescription: userData?.professionalDescription as string | undefined,
     experienceDescription: userData?.experienceDescription as string | undefined,
@@ -351,7 +313,7 @@ export const createUserProfile = async (userData: Partial<User>) => {
           phoneCountryCode: userData.phoneCountryCode || '+33',
           languages: Array.isArray(userData.languages) ? userData.languages : ['Français'],
           country,
-          city: userData.city || '',
+          city: (userData as any).city || '',
           description: userData.bio || '',
           profilePhoto: finalProfilePhoto,
           photoURL: finalProfilePhoto,
@@ -359,28 +321,28 @@ export const createUserProfile = async (userData: Partial<User>) => {
           isActive: true,
           isOnline: true,
           availability: 'available',
-          motivation: (userData as unknown as { motivation?: string }).motivation || '',
+          motivation: (userData as any).motivation || '',
           isApproved: !!userData.isApproved,
           specialties:
             userData.role === 'lawyer'
-              ? ((userData as unknown as { specialties?: string[] }).specialties || [])
-              : ((userData as unknown as { helpTypes?: string[] }).helpTypes || []),
+              ? ((userData as any).specialties || [])
+              : ((userData as any).helpTypes || []),
           yearsOfExperience:
             userData.role === 'lawyer'
-              ? Number((userData as unknown as { yearsOfExperience?: number }).yearsOfExperience ?? 0)
-              : Number((userData as unknown as { yearsAsExpat?: number }).yearsAsExpat ?? 0),
+              ? Number((userData as any).yearsOfExperience ?? 0)
+              : Number((userData as any).yearsAsExpat ?? 0),
           price: userData.role === 'lawyer' ? 49 : 19,
           graduationYear:
-            truthy((userData as unknown as { graduationYear?: number }).graduationYear)
-              ? Number((userData as unknown as { graduationYear?: number }).graduationYear)
+            truthy((userData as any).graduationYear)
+              ? Number((userData as any).graduationYear)
               : new Date().getFullYear() - 5,
-          certifications: (userData as unknown as { certifications?: string[] }).certifications || [],
+          certifications: (userData as any).certifications || [],
           responseTime: '< 5 minutes',
           successRate: userData.role === 'lawyer' ? 95 : 90,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          interventionCountries: Array.isArray((userData as unknown as { interventionCountries?: string[] }).interventionCountries)
-            ? (userData as unknown as { interventionCountries: string[] }).interventionCountries
+          interventionCountries: Array.isArray((userData as any).interventionCountries)
+            ? (userData as any).interventionCountries
             : country
             ? [country]
             : [],
@@ -405,6 +367,13 @@ export const updateUserProfile = async (userId: string, userData: Partial<User>)
     console.error('Error updating user profile:', error);
     throw error;
   }
+};
+
+type EnhancedSettings = {
+  theme: 'light' | 'dark' | 'auto';
+  language: string;
+  notifications: { email: boolean; push: boolean; sms: boolean };
+  privacy: { profileVisible: boolean; showOnMap: boolean };
 };
 
 export const updateUserEnhancedSettings = async (
@@ -459,14 +428,11 @@ export const updateUserOnlineStatus = async (userId: string, isOnline: boolean) 
     } else {
       const userDoc = await getDoc(userRef);
       if (userDoc.exists()) {
-        const u = userDoc.data();
+        const u = userDoc.data() as any;
         await setDoc(sosProfileRef, {
           uid: userId,
           type: u.role || 'expat',
-          fullName:
-            u.fullName ||
-            `${u.firstName || ''} ${u.lastName || ''}`.trim() ||
-            'Expert',
+          fullName: u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Expert',
           firstName: u.firstName || '',
           lastName: u.lastName || '',
           email: u.email || '',
@@ -507,7 +473,7 @@ export const listenToUserOnlineStatus = (
   const userRef = doc(db, 'users', userId);
   return onSnapshot(userRef, (snap) => {
     if (snap.exists()) {
-      callback(!!snap.data().isOnline);
+      callback(!!(snap.data() as any).isOnline);
     }
   });
 };
@@ -560,10 +526,10 @@ export const createReviewRecord = async (reviewData: Partial<Review>) => {
     const sosRef = doc(db, 'sos_profiles', providerId);
     const sosSnap = await getDoc(sosRef);
     if (sosSnap.exists()) {
-      const p = sosSnap.data();
+      const p = sosSnap.data() as any;
       const currentRating = Number(p.rating || 0);
       const currentCount = Number(p.reviewCount || 0);
-      const newRating = ((currentRating * currentCount) + Number(reviewData.rating)) / (currentCount + 1);
+      const newRating = (currentRating * currentCount + Number(reviewData.rating)) / (currentCount + 1);
       await updateDoc(sosRef, {
         rating: newRating,
         reviewCount: increment(1),
@@ -615,24 +581,22 @@ export const getAllReviews = async (options?: {
   minRating?: number;
   limit?: number;
 }) => {
-  let reviewsQuery = collection(db, 'reviews');
-  const constraints = [];
-  
+  const base = collection(db, 'reviews');
+  const constraints: any[] = [];
+
   if (options?.status) constraints.push(where('status', '==', options.status));
   if (options?.providerId) constraints.push(where('providerId', '==', options.providerId));
-  if (truthy(options?.minRating)) constraints.push(where('rating', '>=', options?.minRating!));
-  
+  if (typeof options?.minRating === 'number') constraints.push(where('rating', '>=', options.minRating));
+
   constraints.push(orderBy('createdAt', 'desc'));
-  
-  if (truthy(options?.limit)) constraints.push(fsLimit(options!.limit!));
 
-  if (constraints.length > 0) {
-    reviewsQuery = query(reviewsQuery, ...constraints);
-  }
+  if (typeof options?.limit === 'number') constraints.push(fsLimit(options.limit));
 
-  const snapshot = await getDocs(reviewsQuery);
+  const q = constraints.length ? query(base, ...constraints) : base;
+
+  const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => {
-    const data = d.data();
+    const data = d.data() as any;
     return {
       id: d.id,
       ...data,
@@ -646,7 +610,7 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
   try {
     const reviewsCol = collection(db, 'reviews');
 
-    let q1 = query(
+    const q1 = query(
       reviewsCol,
       where('providerId', '==', providerIdOrUid),
       where('status', '==', 'published'),
@@ -672,7 +636,7 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
         const sub = await getDocs(collection(db, 'sos_profiles', providerIdOrUid, 'reviews'));
         return sub.docs
           .map((d) => {
-            const data = d.data();
+            const data = d.data() as any;
             return {
               id: d.id,
               ...data,
@@ -691,7 +655,7 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
     }
 
     return snap.docs.map((d) => {
-      const data = d.data();
+      const data = d.data() as any;
       return {
         id: d.id,
         ...data,
@@ -739,6 +703,9 @@ export const uploadImage = async (file: File, folder: string = 'images') => {
 };
 
 export const resizeImage = async (imageUrl: string, _maxWidth: number, _maxHeight: number) => {
+  // éviter warning vars non utilisées
+  void _maxWidth;
+  void _maxHeight;
   // Placeholder: use a real image service if needed
   return imageUrl;
 };
@@ -760,28 +727,25 @@ export const createCallSession = async (sessionData: Partial<CallSession>) => {
     status: 'initiating',
     timestamp: serverTimestamp(),
     details: {
-      clientId: (sessionData as unknown as { clientId?: string }).clientId,
-      providerId: (sessionData as unknown as { providerId?: string }).providerId,
-      providerType: (sessionData as unknown as { providerType?: string }).providerType,
+      clientId: (sessionData as any).clientId,
+      providerId: (sessionData as any).providerId,
+      providerType: (sessionData as any).providerType,
     },
   });
   return sessionId;
 };
 
-export const updateCallSession = async (
-  sessionId: string,
-  sessionData: Partial<CallSession>
-) => {
+export const updateCallSession = async (sessionId: string, sessionData: Partial<CallSession>) => {
   const sessionRef = doc(db, 'call_sessions', sessionId);
   const updateWithTimestamp = { ...sessionData, updatedAt: serverTimestamp() };
   await updateDoc(sessionRef, updateWithTimestamp);
 
   // simple log if status changes
-  if ((sessionData as unknown as { status?: string }).status) {
+  if ((sessionData as any).status) {
     await addDoc(collection(db, 'call_logs'), {
       callSessionId: sessionId,
       type: 'status_change',
-      newStatus: (sessionData as unknown as { status: string }).status,
+      newStatus: (sessionData as any).status,
       timestamp: serverTimestamp(),
       details: sessionData,
     });
@@ -821,7 +785,9 @@ export const createInvoiceRecord = async (invoiceData: Record<string, unknown>) 
   return invoiceDoc.id;
 };
 
-export const getInvoicesForPayment = async (paymentId: string): Promise<Record<string, unknown>[]> => {
+export const getInvoicesForPayment = async (
+  paymentId: string
+): Promise<Record<string, unknown>[]> => {
   const invoicesRef = collection(db, 'invoices');
   const q = query(invoicesRef, where('paymentId', '==', paymentId));
   const querySnapshot = await getDocs(q);
@@ -881,7 +847,7 @@ export const updateExistingProfiles = async () => {
       let count = 0;
       let batch = writeBatch(db);
       for (const profileDoc of sosSnapshot.docs) {
-        const profileData = profileDoc.data();
+        const profileData = profileDoc.data() as any;
         const updates: Record<string, unknown> = {};
 
         if (!profileData.language) updates.language = profileData.preferredLanguage || 'fr';
@@ -911,9 +877,10 @@ export const updateExistingProfiles = async () => {
         }
 
         if (!profileData.uid) updates.uid = profileDoc.id;
-        if (!truthy(profileData.rating) || profileData.rating < 0 || profileData.rating > 5) {
-          updates.rating = 5.0;
-        }
+
+        const rating = Number(profileData.rating);
+        if (!Number.isFinite(rating) || rating < 0 || rating > 5) updates.rating = 5.0;
+
         if (!truthy(profileData.reviewCount)) updates.reviewCount = 0;
         if (!truthy(profileData.price)) updates.price = profileData.type === 'lawyer' ? 49 : 19;
         if (!truthy(profileData.duration)) updates.duration = profileData.type === 'lawyer' ? 20 : 30;
@@ -940,7 +907,7 @@ export const updateExistingProfiles = async () => {
       let count = 0;
       let batch = writeBatch(db);
       for (const userDoc of usersSnapshot.docs) {
-        const u = userDoc.data();
+        const u = userDoc.data() as any;
         const updates: Record<string, unknown> = {};
 
         if (!u.fullName) updates.fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
@@ -977,7 +944,7 @@ export const fixAllProfiles = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Utilisateur non authentifié');
     const adminDoc = await getDoc(doc(db, 'users', currentUser.uid));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || (adminDoc.data() as any).role !== 'admin') {
       throw new Error('Accès non autorisé - Admin requis');
     }
 
@@ -992,8 +959,8 @@ export const fixAllProfiles = async () => {
     let count = 0;
 
     for (const profileDoc of sosSnapshot.docs) {
-      const profileData = profileDoc.data();
-      const updates: Record<string, unknown> = {
+      const profileData = profileDoc.data() as any;
+      const updates: Record<string, any> = {
         isVisible: true,
         isVisibleOnMap: true,
         isActive: true,
@@ -1002,15 +969,18 @@ export const fixAllProfiles = async () => {
 
       if (!profileData.type) {
         const pair = usersSnapshot.docs.find((d) => d.id === profileDoc.id);
-        updates.type = pair ? (pair.data().role === 'lawyer' ? 'lawyer' : 'expat') : 'expat';
+        updates.type = pair ? ((pair.data() as any).role === 'lawyer' ? 'lawyer' : 'expat') : 'expat';
       }
       if (!profileData.uid) updates.uid = profileDoc.id;
-      if (!truthy(profileData.rating) || profileData.rating < 0 || profileData.rating > 5) {
-        updates.rating = 5.0;
-      }
+
+      const rating = Number(profileData.rating);
+      if (!Number.isFinite(rating) || rating < 0 || rating > 5) updates.rating = 5.0;
+
       if (!truthy(profileData.reviewCount)) updates.reviewCount = 0;
-      if (!truthy(profileData.price)) updates.price = updates.type === 'lawyer' ? 49 : 19;
-      if (!truthy(profileData.duration)) updates.duration = updates.type === 'lawyer' ? 20 : 30;
+      if (!truthy(profileData.price))
+        updates.price = updates.type === 'lawyer' ? 49 : 19;
+      if (!truthy(profileData.duration))
+        updates.duration = updates.type === 'lawyer' ? 20 : 30;
       if (profileData.isApproved === undefined) {
         updates.isApproved = updates.type === 'lawyer' ? !!profileData.isVerified : true;
       }
@@ -1025,16 +995,16 @@ export const fixAllProfiles = async () => {
     }
 
     for (const userDoc of usersSnapshot.docs) {
-      const u = userDoc.data();
+      const u = userDoc.data() as any;
       const updates: Record<string, unknown> = {
         updatedAt: serverTimestamp(),
       };
       if (u.role === 'lawyer' || u.role === 'expat') {
-        updates.isVisible = true;
-        updates.isVisibleOnMap = true;
-        updates.isActive = true;
-        if (u.role === 'lawyer' && u.isApproved === undefined) updates.isApproved = !!u.isVerified;
-        if (u.role === 'expat' && u.isApproved === undefined) updates.isApproved = true;
+        (updates as any).isVisible = true;
+        (updates as any).isVisibleOnMap = true;
+        (updates as any).isActive = true;
+        if (u.role === 'lawyer' && u.isApproved === undefined) (updates as any).isApproved = !!u.isVerified;
+        if (u.role === 'expat' && u.isApproved === undefined) (updates as any).isApproved = true;
       }
       batch.update(userDoc.ref, updates);
       count++;
@@ -1099,7 +1069,7 @@ export const cleanupObsoleteData = async (): Promise<boolean> => {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Utilisateur non authentifié');
     const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-    if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+    if (!userDoc.exists() || (userDoc.data() as any).role !== 'admin') {
       throw new Error('Accès non autorisé - Admin requis');
     }
 

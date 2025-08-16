@@ -1,27 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Bell, 
-  Mail, 
-  MessageSquare, 
-  Smartphone, 
-  Send, 
-  CheckCircle, 
-  XCircle, 
-  Clock,
-  User,
+import {
+  Bell,
+  Mail,
+  MessageSquare,
+  Smartphone,
+  Send,
+  CheckCircle,
+  XCircle,
   Globe,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  BarChart3,
 } from 'lucide-react';
-import { collection, query, getDocs, orderBy, limit, where } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  getDocs,
+  orderBy,
+  limit,
+  Timestamp,
+  getDoc,
+  doc as fsDoc,
+} from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 import { useAuth } from '../../contexts/AuthContext';
-import  testNotificationSystem  from '../../services/notifications/notificationService';
+import notificationService, {
+  MultiChannelNotification,
+} from '../../services/notifications/notificationService';
 
 interface NotificationLog {
   id: string;
@@ -39,74 +49,107 @@ interface NotificationLog {
   success: boolean;
 }
 
+interface NotificationStats {
+  totalNotifications: number;
+  successfulNotifications: number;
+  failedNotifications: number;
+  emailSuccess: number;
+  smsSuccess: number;
+  whatsappSuccess: number;
+  pushSuccess: number;
+}
+
 const AdminNotifications: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+
   const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [showTestModal, setShowTestModal] = useState(false);
   const [testProviderId, setTestProviderId] = useState('');
   const [isTestingNotifications, setIsTestingNotifications] = useState(false);
-  const [stats, setStats] = useState({
+
+  const [stats, setStats] = useState<NotificationStats>({
     totalNotifications: 0,
     successfulNotifications: 0,
     failedNotifications: 0,
     emailSuccess: 0,
     smsSuccess: 0,
     whatsappSuccess: 0,
-    pushSuccess: 0
+    pushSuccess: 0,
   });
 
   useEffect(() => {
-    // Check if user is admin
-    if (!currentUser || currentUser.role !== 'admin') {
+    // Check admin
+    if (!currentUser || (currentUser as unknown as { role?: string }).role !== 'admin') {
       navigate('/admin/login');
       return;
     }
-
-    loadNotificationLogs();
+    void loadNotificationLogs();
   }, [currentUser, navigate]);
 
   const loadNotificationLogs = async () => {
     try {
       setIsLoading(true);
-      
+
       const notificationsQuery = query(
         collection(db, 'notification_logs'),
         orderBy('timestamp', 'desc'),
         limit(100)
       );
-      
+
       const notificationsSnapshot = await getDocs(notificationsQuery);
-      
-      const notificationsData = notificationsSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        timestamp: doc.data().timestamp?.toDate() || new Date()
-      })) as NotificationLog[];
-      
+
+      const notificationsData = notificationsSnapshot.docs.map((d) => {
+        const data = d.data() as Omit<NotificationLog, 'id' | 'timestamp'> & {
+          timestamp?: Timestamp | Date;
+        };
+        return {
+          id: d.id,
+          ...data,
+          timestamp:
+            data.timestamp instanceof Timestamp
+              ? data.timestamp.toDate()
+              : data.timestamp instanceof Date
+              ? data.timestamp
+              : new Date(),
+        };
+      }) as NotificationLog[];
+
       setNotificationLogs(notificationsData);
-      
-      // Calculer les statistiques
+
+      // Stats
       const totalNotifications = notificationsData.length;
-      const successfulNotifications = notificationsData.filter(n => n.success).length;
+      const successfulNotifications = notificationsData.filter((n) => n.success).length;
       const failedNotifications = totalNotifications - successfulNotifications;
-      
-      let emailSuccess = 0, smsSuccess = 0, whatsappSuccess = 0, pushSuccess = 0;
-      
-      notificationsData.forEach(notification => {
-        notification.results?.forEach(result => {
-          if (result.success) {
-            switch (result.channel) {
-              case 'email': emailSuccess++; break;
-              case 'sms': smsSuccess++; break;
-              case 'whatsapp': whatsappSuccess++; break;
-              case 'push': pushSuccess++; break;
+
+      let emailSuccess = 0,
+        smsSuccess = 0,
+        whatsappSuccess = 0,
+        pushSuccess = 0;
+
+      notificationsData.forEach((n) => {
+        n.results?.forEach((r) => {
+          if (r.success) {
+            switch (r.channel) {
+              case 'email':
+                emailSuccess++;
+                break;
+              case 'sms':
+                smsSuccess++;
+                break;
+              case 'whatsapp':
+                whatsappSuccess++;
+                break;
+              case 'push':
+                pushSuccess++;
+                break;
             }
           }
         });
       });
-      
+
       setStats({
         totalNotifications,
         successfulNotifications,
@@ -114,9 +157,8 @@ const AdminNotifications: React.FC = () => {
         emailSuccess,
         smsSuccess,
         whatsappSuccess,
-        pushSuccess
+        pushSuccess,
       });
-      
     } catch (error) {
       console.error('Error loading notification logs:', error);
     } finally {
@@ -125,50 +167,95 @@ const AdminNotifications: React.FC = () => {
   };
 
   const handleTestNotifications = async () => {
-    if (!testProviderId.trim()) {
+    const providerId = testProviderId.trim();
+    if (!providerId) {
       alert('Veuillez entrer un ID de prestataire valide');
       return;
     }
-    
+
     setIsTestingNotifications(true);
     try {
-      await testNotificationSystem(testProviderId);
-      alert('Test de notification envoyé avec succès ! Vérifiez les logs pour les détails.');
-      setShowTestModal(false);
-      setTestProviderId('');
-      // Recharger les logs
-      loadNotificationLogs();
+      // Récupérer le prestataire pour avoir email/phone/etc.
+      const providerRef = fsDoc(db, 'sos_profiles', providerId);
+      const snap = await getDoc(providerRef);
+      if (!snap.exists()) {
+        throw new Error("Prestataire introuvable");
+      }
+      const p = snap.data() as {
+        email?: string;
+        phone?: string;
+        name?: string;
+        firstName?: string;
+        lastName?: string;
+        country?: string;
+      };
+
+      const recipientName =
+        p.name || [p.firstName, p.lastName].filter(Boolean).join(' ') || `Provider ${providerId}`;
+
+      // Construire la notification de test multi-canaux
+      const payload: MultiChannelNotification = {
+        type: 'admin_test',
+        recipientEmail: p.email,
+        recipientPhone: p.phone,
+        recipientName,
+        recipientCountry: p.country,
+        emailSubject: 'Test de notification • Admin',
+        emailHtml: `
+          <h2>Test de notification</h2>
+          <p>Ceci est un envoi de test depuis l’interface admin.</p>
+          <p><strong>Prestataire:</strong> ${recipientName} (${providerId})</p>
+        `.trim(),
+        smsMessage: `Test de notification Admin pour ${recipientName}`,
+        whatsappMessage: `🧪 *Test Admin*\nPrestataire: ${recipientName}\nID: ${providerId}`,
+      };
+
+      const ok = await notificationService.sendMultiChannelNotification(payload);
+
+      if (ok) {
+        alert('Test de notification envoyé avec succès ! Vérifiez les logs pour les détails.');
+        setShowTestModal(false);
+        setTestProviderId('');
+        void loadNotificationLogs();
+      } else {
+        alert("L’envoi de test n’a pas abouti (voir logs).");
+      }
     } catch (error) {
       console.error('Erreur lors du test de notification:', error);
-      alert(`Erreur lors du test de notification: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Erreur lors du test de notification: ${errorMessage}`);
     } finally {
       setIsTestingNotifications(false);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('fr-FR', {
+  const formatDate = (date: Date) =>
+    new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     }).format(date);
-  };
 
   const getChannelIcon = (channel: string) => {
     switch (channel) {
-      case 'email': return <Mail size={16} className="text-blue-600" />;
-      case 'sms': return <MessageSquare size={16} className="text-green-600" />;
-      case 'whatsapp': return <MessageSquare size={16} className="text-green-500" />;
-      case 'push': return <Smartphone size={16} className="text-purple-600" />;
-      default: return <Bell size={16} className="text-gray-600" />;
+      case 'email':
+        return <Mail size={16} className="text-blue-600" />;
+      case 'sms':
+        return <MessageSquare size={16} className="text-green-600" />;
+      case 'whatsapp':
+        return <MessageSquare size={16} className="text-green-500" />;
+      case 'push':
+        return <Smartphone size={16} className="text-purple-600" />;
+      default:
+        return <Bell size={16} className="text-gray-600" />;
     }
   };
 
-  const getStatusBadge = (success: boolean) => {
-    return success ? (
+  const getStatusBadge = (success: boolean) =>
+    success ? (
       <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center">
         <CheckCircle size={12} className="mr-1" />
         Succès
@@ -179,7 +266,6 @@ const AdminNotifications: React.FC = () => {
         Échec
       </span>
     );
-  };
 
   return (
     <AdminLayout>
@@ -195,10 +281,7 @@ const AdminNotifications: React.FC = () => {
                 <Send size={18} className="mr-2" />
                 Tester les notifications
               </Button>
-              <Button
-                onClick={loadNotificationLogs}
-                variant="outline"
-              >
+              <Button onClick={loadNotificationLogs} variant="outline">
                 <RefreshCw size={18} className="mr-2" />
                 Actualiser
               </Button>
@@ -218,37 +301,44 @@ const AdminNotifications: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Succès</p>
-                  <p className="text-3xl font-bold text-green-600 mt-1">{stats.successfulNotifications}</p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">
+                    {stats.successfulNotifications}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="w-6 h-6 text-green-600" />
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Échecs</p>
-                  <p className="text-3xl font-bold text-red-600 mt-1">{stats.failedNotifications}</p>
+                  <p className="text-3xl font-bold text-red-600 mt-1">
+                    {stats.failedNotifications}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                   <XCircle className="w-6 h-6 text-red-600" />
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Taux de succès</p>
                   <p className="text-3xl font-bold text-blue-600 mt-1">
-                    {stats.totalNotifications > 0 ? Math.round((stats.successfulNotifications / stats.totalNotifications) * 100) : 0}%
+                    {stats.totalNotifications > 0
+                      ? Math.round((stats.successfulNotifications / stats.totalNotifications) * 100)
+                      : 0}
+                    %
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -294,19 +384,19 @@ const AdminNotifications: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Destinataire
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Type
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Canaux
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Statut
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
                   </tr>
@@ -316,7 +406,7 @@ const AdminNotifications: React.FC = () => {
                     <tr>
                       <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
                         <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" />
                         </div>
                         <p className="mt-2">Chargement des notifications...</p>
                       </td>
@@ -341,16 +431,20 @@ const AdminNotifications: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            notification.type === 'call_request' 
-                              ? 'bg-red-100 text-red-800'
-                              : notification.type === 'call_missed'
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              notification.type === 'call_request'
+                                ? 'bg-red-100 text-red-800'
+                                : notification.type === 'call_missed'
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {notification.type === 'call_request' ? 'Demande d\'appel' :
-                             notification.type === 'call_missed' ? 'Appel manqué' :
-                             notification.type}
+                            }`}
+                          >
+                            {notification.type === 'call_request'
+                              ? "Demande d'appel"
+                              : notification.type === 'call_missed'
+                              ? 'Appel manqué'
+                              : notification.type}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -405,7 +499,7 @@ const AdminNotifications: React.FC = () => {
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
                     <p>
-                      Ce test enverra une notification de démonstration au prestataire sélectionné 
+                      Ce test enverra une notification de démonstration au prestataire sélectionné
                       via tous les canaux disponibles (email, SMS, WhatsApp, push).
                     </p>
                   </div>
@@ -456,4 +550,3 @@ const AdminNotifications: React.FC = () => {
 };
 
 export default AdminNotifications;
-

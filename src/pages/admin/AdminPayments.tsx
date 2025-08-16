@@ -26,7 +26,8 @@ import {
   startAfter,
   DocumentSnapshot,
   DocumentData,
-  QueryDocumentSnapshot
+  QueryDocumentSnapshot,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import AdminLayout from '../../components/admin/AdminLayout';
@@ -42,12 +43,12 @@ type PaymentStatus = 'all' | 'authorized' | 'captured' | 'refunded' | 'canceled'
 
 // Interface pour les données Firestore des paiements
 interface FirestorePaymentData {
-  createdAt?: any; // Firestore Timestamp
-  updatedAt?: any; 
-  paidAt?: any;
-  capturedAt?: any;
-  canceledAt?: any;
-  refundedAt?: any;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp; 
+  paidAt?: Timestamp;
+  capturedAt?: Timestamp;
+  canceledAt?: Timestamp;
+  refundedAt?: Timestamp;
   status: string;
   amount: number;
   currency: string;
@@ -70,10 +71,10 @@ interface FirestorePaymentData {
 
 // Interface pour les données Firestore des appels
 interface FirestoreCallData {
-  createdAt?: any; // Firestore Timestamp
-  updatedAt?: any;
-  startedAt?: any;
-  endedAt?: any;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  startedAt?: Timestamp;
+  endedAt?: Timestamp;
   status: string;
   duration?: number;
   serviceType?: string;
@@ -113,7 +114,7 @@ const AdminPayments: React.FC = () => {
       const baseQuery = collection(db, 'payments');
       
       // Appliquer les filtres
-      const constraints: any[] = [orderBy('createdAt', 'desc')];
+      const constraints = [orderBy('createdAt', 'desc')];
       
       if (selectedStatus !== 'all') {
         constraints.push(where('status', '==', selectedStatus));
@@ -144,12 +145,12 @@ const AdminPayments: React.FC = () => {
         return {
           ...data,
           id: docSnapshot.id,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-          paidAt: data.paidAt?.toDate() || undefined,
-          capturedAt: data.capturedAt?.toDate() || undefined,
-          canceledAt: data.canceledAt?.toDate() || undefined,
-          refundedAt: data.refundedAt?.toDate() || undefined
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(),
+          paidAt: data.paidAt instanceof Timestamp ? data.paidAt.toDate() : undefined,
+          capturedAt: data.capturedAt instanceof Timestamp ? data.capturedAt.toDate() : undefined,
+          canceledAt: data.canceledAt instanceof Timestamp ? data.canceledAt.toDate() : undefined,
+          refundedAt: data.refundedAt instanceof Timestamp ? data.refundedAt.toDate() : undefined
         } as Payment;
       });
       
@@ -187,10 +188,10 @@ const AdminPayments: React.FC = () => {
           const callData: CallRecord = {
             ...data,
             id: callDoc.id,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-            startedAt: data.startedAt?.toDate() || undefined,
-            endedAt: data.endedAt?.toDate() || undefined
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(),
+            startedAt: data.startedAt instanceof Timestamp ? data.startedAt.toDate() : undefined,
+            endedAt: data.endedAt instanceof Timestamp ? data.endedAt.toDate() : undefined
           } as CallRecord;
           
           setPaymentCall(callData);
@@ -708,4 +709,3 @@ const AdminPayments: React.FC = () => {
 };
 
 export default AdminPayments;
-

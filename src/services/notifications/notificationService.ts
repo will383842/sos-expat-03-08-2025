@@ -10,7 +10,7 @@ export interface NotificationData {
   timestamp?: Date;
   read?: boolean;
   userId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>; // ✅ plus de any
 }
 
 export interface ToastNotification {
@@ -41,6 +41,22 @@ export interface MultiChannelNotification {
   whatsappMessage?: string;
 }
 
+// ✅ Typage des réponses Firebase
+interface MultiChannelResponse {
+  success: boolean;
+  results: Array<{
+    channel: 'email' | 'sms' | 'whatsapp' | 'push';
+    success: boolean;
+    error?: string;
+  }>;
+}
+
+interface PushResponse {
+  success: boolean;
+  successCount: number;
+  failureCount: number;
+}
+
 class NotificationService {
   private notifications: NotificationData[] = [];
   private listeners: ((notifications: NotificationData[]) => void)[] = [];
@@ -61,9 +77,7 @@ class NotificationService {
       ...notification
     };
 
-    // Émettre l'événement pour l'UI
     window.dispatchEvent(new CustomEvent('show-toast', { detail: toast }));
-    
     return id;
   }
 
@@ -88,9 +102,6 @@ class NotificationService {
     this.notifyListeners();
   }
 
-  /**
-   * Marque une notification comme lue
-   */
   markAsRead(index: number): void {
     if (this.notifications[index]) {
       this.notifications[index].read = true;
@@ -98,43 +109,26 @@ class NotificationService {
     }
   }
 
-  /**
-   * Supprime une notification
-   */
   removeNotification(index: number): void {
     this.notifications.splice(index, 1);
     this.notifyListeners();
   }
 
-  /**
-   * Efface toutes les notifications
-   */
   clearAll(): void {
     this.notifications = [];
     this.notifyListeners();
   }
 
-  /**
-   * Récupère toutes les notifications
-   */
   getNotifications(): NotificationData[] {
     return [...this.notifications];
   }
 
-  /**
-   * Compte les notifications non lues
-   */
   getUnreadCount(): number {
     return this.notifications.filter(n => !n.read).length;
   }
 
-  /**
-   * S'abonne aux changements de notifications
-   */
   subscribe(listener: (notifications: NotificationData[]) => void): () => void {
     this.listeners.push(listener);
-    
-    // Retourne une fonction de désabonnement
     return () => {
       const index = this.listeners.indexOf(listener);
       if (index > -1) {
@@ -149,8 +143,8 @@ class NotificationService {
   async sendMultiChannelNotification(data: MultiChannelNotification): Promise<boolean> {
     try {
       const result = await this.sendNotificationFn(data);
-      const response = result.data as { success: boolean; results: any[] };
-      
+      const response = result.data as MultiChannelResponse; // ✅ typé
+
       if (response.success) {
         this.showToast({
           type: 'success',
@@ -183,8 +177,8 @@ class NotificationService {
   async sendPushNotification(data: PushNotificationPayload): Promise<boolean> {
     try {
       const result = await this.sendPushNotificationFn(data);
-      const response = result.data as { success: boolean; successCount: number; failureCount: number };
-      
+      const response = result.data as PushResponse; // ✅ typé
+
       if (response.success) {
         this.showToast({
           type: 'success',
@@ -214,18 +208,18 @@ class NotificationService {
   /**
    * Notifications prédéfinies pour les événements SOS Expat
    */
-  notifyNewSOS(clientName: string, location: string): void {
+  notifyNewSOS(clientName: string, location: string, urgency?: string): void {
     this.addNotification({
       type: 'sos',
       title: '🚨 Nouveau SOS',
-      message: `${clientName} a besoin d'aide à ${location}`,
-      metadata: { clientName, location, priority: 'urgent' }
+      message: `${clientName} a besoin d'aide à ${location} (Urgence: ${urgency ?? 'N/A'})`,
+      metadata: { clientName, location, urgency, priority: 'urgent' }
     });
 
     this.showToast({
       type: 'error',
       title: '🚨 Nouveau SOS',
-      message: `${clientName} - ${location}`,
+      message: `${clientName} - ${location} (Urgence: ${urgency ?? 'N/A'})`,
       duration: 10000
     });
   }
@@ -264,16 +258,10 @@ class NotificationService {
     });
   }
 
-  /**
-   * Notifie les listeners des changements
-   */
   private notifyListeners(): void {
     this.listeners.forEach(listener => listener([...this.notifications]));
   }
 
-  /**
-   * Demande la permission pour les notifications navigateur
-   */
   async requestBrowserNotificationPermission(): Promise<boolean> {
     if (!('Notification' in window)) {
       console.warn('Ce navigateur ne supporte pas les notifications');
@@ -292,9 +280,6 @@ class NotificationService {
     return false;
   }
 
-  /**
-   * Affiche une notification navigateur
-   */
   showBrowserNotification(title: string, options?: NotificationOptions): void {
     if (Notification.permission === 'granted') {
       const notification = new Notification(title, {
@@ -302,8 +287,6 @@ class NotificationService {
         badge: '/icons/sos-expat-badge-72.png',
         ...options
       });
-
-      // Auto-fermeture après 5 secondes
       setTimeout(() => notification.close(), 5000);
     }
   }
@@ -312,7 +295,6 @@ class NotificationService {
 // Instance singleton
 export const notificationService = new NotificationService();
 
-// Types d'événements pour l'interface
 export type NotificationEventType = 
   | 'new-sos'
   | 'call-completed' 
@@ -322,10 +304,13 @@ export type NotificationEventType =
   | 'provider-online'
   | 'provider-offline';
 
-// Helpers pour les notifications spécifiques à SOS Expat
 export const sosNotifications = {
-  newEmergency: (clientName: string, location: string, urgency: 'low' | 'medium' | 'high' | 'critical') => 
-    notificationService.notifyNewSOS(clientName, location),
+  newEmergency: (
+    clientName: string,
+    location: string,
+    urgency: 'low' | 'medium' | 'high' | 'critical'
+  ) => 
+    notificationService.notifyNewSOS(clientName, location, urgency),
     
   callStarted: (clientName: string, providerName: string) =>
     notificationService.addNotification({

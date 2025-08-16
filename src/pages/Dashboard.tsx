@@ -391,15 +391,6 @@ const Dashboard: React.FC = () => {
     if (!user) navigate('/login');
   }, [user, navigate]);
 
-  // --- MAJ instantanée via l'événement global émis par AvailabilityToggle ---
-  const handleAvailabilityEvent = useCallback((evt: Event) => {
-    const e = evt as CustomEvent<{ isOnline: boolean }>;
-    setCurrentStatus(!!e.detail?.isOnline);
-  }, []);
-  useEffect(() => {
-    window.addEventListener('availability:changed', handleAvailabilityEvent as EventListener);
-    return () => window.removeEventListener('availability:changed', handleAvailabilityEvent as EventListener);
-  }, [handleAvailabilityEvent]);
 
   // Status en temps réel (priorité = sos_profiles, fallback = users)
   useEffect(() => {

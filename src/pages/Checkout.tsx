@@ -188,9 +188,10 @@ const Checkout: React.FC = () => {
     };
   };
 
-  if (!user) {
-    return <LoadingSpinner />;
-  }
+  if (isLoading) {
+  return null; // ou un petit skeleton non bloquant si tu préfères
+}
+
 
   const plans = servicePlans[serviceType || ''];
   if (!plans || plans.length === 0) {

@@ -3,9 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============ UTILITAIRES ============
-    function isAuthenticated() {
-      return request.auth != null;
-    }
+    function isAuthenticated() { return request.auth != null; }
 
     function isAdmin() {
       return isAuthenticated() &&
@@ -13,7 +11,7 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // ✅ Mode développement — à déclencher via doc settings/env
+    // mode dev (laisse "prod" dans settings/env pour rester bridé)
     function isDevMode() {
       return exists(/databases/$(database)/documents/settings/env)
         && get(/databases/$(database)/documents/settings/env).data.mode == 'dev';
@@ -25,91 +23,40 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
     }
 
-    function isDocOwner() {
-      return isAuthenticated() && resource.data.uid == request.auth.uid;
+    function isDocOwner() { return isAuthenticated() && resource.data.uid == request.auth.uid; }
+    function creatingOwnDoc() { return isAuthenticated() && request.resource.data.uid == request.auth.uid; }
+
+    function changedKeys() { return request.resource.data.diff(resource.data).changedKeys(); }
+    function affectedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // Champs sensibles communs que l'utilisateur ne doit pas toucher
+    function hasSensitiveChanges() {
+      return affectedKeys().hasAny(['role','isAdmin','isApproved','isBanned','uid','type','isVerified']);
     }
 
-    function creatingOwnDoc() {
-      return isAuthenticated() && request.resource.data.uid == request.auth.uid;
-    }
-
-    function isProviderRole() {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['lawyer', 'expat'];
-    }
-
-    function hasValidUserFields() {
-      return request.resource.data.keys().hasAll(['email','role','firstName','lastName']) &&
-        request.resource.data.email is string &&
-        request.resource.data.role in ['client','lawyer','expat','admin'] &&
-        request.resource.data.firstName is string &&
-        request.resource.data.lastName is string;
-    }
-
-    function hasNoSensitiveChanges() {
-      return !request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['role','isAdmin','isApproved','isBanned','uid','email','type','isVerified']);
-    }
-
-    function isPublicProfile() {
-      return (resource.data.isVisible == true || resource.data.isVisibleOnMap == true) &&
-             (resource.data.type in ['lawyer','expat']);
-    }
-
-    function changedKeys() {
-      return request.resource.data.diff(resource.data).changedKeys();
-    }
-
-    function onlyPhotoFieldsChanged() {
-      return changedKeys().hasOnly(['profilePhoto','photoURL','avatar','updatedAt']);
-    }
-
+    // Exception sécurisée: l'email Firestore doit matcher l'email du token
     function emailSelfSynced() {
+      // Autorise si SEULES ces clés changent...
       return changedKeys().hasOnly(['email','emailLower','updatedAt']) &&
-             request.resource.data.email == request.auth.token.email;
-    }
-
-    function presenceFields() {
-      return [
-        'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','lastActiveAt',
-        'updatedAt','isVisible','isVisibleOnMap','ua'
-      ];
-    }
-
-    function presenceOnlyUpdate() {
-      return changedKeys().hasOnly(presenceFields());
-    }
-
-    function sosProfileUpdate() {
-      let allowedFields = [
-        'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','lastActiveAt','updatedAt',
-        'isVisible','isVisibleOnMap','ua','profilePhoto','photoURL','avatar',
-        'fullName','email','phone','phoneCountryCode','languages','country',
-        'description','bio','specialties','helpTypes','yearsOfExperience',
-        'interventionCountries','practiceCountries'
-      ];
-      return changedKeys().hasOnly(allowedFields);
+             // ...et si l'email écrit == email du token (après refresh du token côté client)
+             request.resource.data.email == request.auth.token.email &&
+             request.resource.data.emailLower == (request.auth.token.email == null ? null : lower(request.auth.token.email));
     }
 
     // =============== USERS ===============
     match /users/{userId} {
-      allow read: if (isAuthenticated() && request.auth.uid == userId) ||
-                   isAdmin() ||
-                   (resource.data.isApproved == true && resource.data.role in ['lawyer','expat']) ||
-                   isDevMode();
+      allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin() || isDevMode();
 
-      allow create: if (isAuthenticated() &&
-                     request.auth.uid == userId &&
-                     creatingOwnDoc() &&
-                     hasValidUserFields()) || isDevMode();
+      allow create: if (isAuthenticated() && request.auth.uid == userId && creatingOwnDoc())
+                    || isAdmin() || isDevMode();
 
+      // Autorise MAJ par le propriétaire :
+      //  - soit MAJ e-mail "self-synced" (cf. emailSelfSynced)
+      //  - soit MAJ classique sans toucher aux champs sensibles
       allow update: if (
                       isAuthenticated() && request.auth.uid == userId && isNotBanned() && (
-                        presenceOnlyUpdate() ||
-                        onlyPhotoFieldsChanged() ||
                         emailSelfSynced() ||
-                        hasNoSensitiveChanges()
+                        !hasSensitiveChanges()
                       )
                     ) || isAdmin() || isDevMode();
 
@@ -120,21 +67,26 @@ service cloud.firestore {
     match /sos_profiles/{profileId} {
       allow read: if true;
 
-      allow create: if (isAuthenticated() && (
-                      (request.resource.data.uid == request.auth.uid &&
-                       request.resource.data.type in ['lawyer','expat']) ||
-                      (profileId == request.auth.uid &&
-                       request.resource.data.type in ['lawyer','expat']) ||
-                      isAdmin()
-                    )) || isDevMode();
+      allow create: if isAuthenticated()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.type in ['lawyer','expat']
+        || isAdmin() || isDevMode();
 
-      allow update: if (isAuthenticated() && (
-                      (resource.data.uid == request.auth.uid && sosProfileUpdate()) ||
-                      (profileId == request.auth.uid && sosProfileUpdate()) ||
-                      ((resource.data.uid == request.auth.uid || profileId == request.auth.uid) &&
-                       presenceOnlyUpdate()) ||
-                      isAdmin()
-                    )) || isDevMode();
+      // Autorise update par le propriétaire. Email interdit SAUF si self-synced.
+      function sosSensitive() { return affectedKeys().hasAny(['uid','role','type','isAdmin','isApproved','isBanned']); }
+      function sosEmailSelfSynced() {
+        return changedKeys().hasOnly(['email','emailLower','updatedAt']) &&
+               request.resource.data.email == request.auth.token.email &&
+               request.resource.data.emailLower == (request.auth.token.email == null ? null : lower(request.auth.token.email));
+      }
+
+      allow update: if (
+        isAuthenticated() &&
+        (profileId == request.auth.uid || resource.data.uid == request.auth.uid) &&
+        (
+          sosEmailSelfSynced() || !sosSensitive()
+        )
+      ) || isAdmin() || isDevMode();
 
       allow delete: if isAdmin() || isDevMode();
     }
@@ -148,18 +100,14 @@ service cloud.firestore {
                request.resource.data.fullName is string;
       }
 
-      allow read: if isPublicProfile() || isDocOwner() || isAdmin() || isDevMode();
+      allow read: if isDocOwner() || isAdmin() || isDevMode();
 
-      allow create: if ((creatingOwnDoc() && isProviderRole() && hasValidProviderFields())
-                    || isAdmin()) || isDevMode();
+      allow create: if ((creatingOwnDoc() && hasValidProviderFields()) || isAdmin()) || isDevMode();
 
       allow update: if isAdmin()
                     || (
-                         isDocOwner() && isNotBanned() && hasValidProviderFields() && (
-                           presenceOnlyUpdate() ||
-                           onlyPhotoFieldsChanged() ||
-                           hasNoSensitiveChanges()
-                         )
+                         isDocOwner() && isNotBanned()
+                         && !affectedKeys().hasAny(['uid','role','email','isAdmin','isApproved','isBanned','type'])
                        ) || isDevMode();
 
       allow delete: if isAdmin() || isDevMode();
@@ -168,18 +116,18 @@ service cloud.firestore {
     // ========= CALLS =========
     match /calls/{callId} {
       allow read: if (isAuthenticated() &&
-                    (request.auth.uid == resource.data.clientId ||
-                     request.auth.uid == resource.data.providerId) ||
-                  isAdmin()) || isDevMode();
+                      (request.auth.uid == resource.data.clientId ||
+                       request.auth.uid == resource.data.providerId) ||
+                     isAdmin()) || isDevMode();
 
       allow create: if (isAuthenticated() && isNotBanned() &&
-                     request.resource.data.clientId == request.auth.uid &&
-                     request.resource.data.keys().hasAll(['clientId','providerId','serviceType'])) || isDevMode();
+                        request.resource.data.clientId == request.auth.uid &&
+                        request.resource.data.keys().hasAll(['clientId','providerId','serviceType'])) || isDevMode();
 
       allow update: if ((isAuthenticated() && isNotBanned() &&
-                        (request.auth.uid == resource.data.clientId ||
-                         request.auth.uid == resource.data.providerId)) ||
-                     isAdmin()) || isDevMode();
+                         (request.auth.uid == resource.data.clientId ||
+                          request.auth.uid == resource.data.providerId)) ||
+                        isAdmin()) || isDevMode();
 
       allow delete: if isAdmin() || isDevMode();
     }
@@ -194,13 +142,13 @@ service cloud.firestore {
       }
 
       allow read: if (isAuthenticated() &&
-                    (request.auth.uid == resource.data.clientId ||
-                     request.auth.uid == resource.data.providerId) ||
-                  isAdmin()) || isDevMode();
+                      (request.auth.uid == resource.data.clientId ||
+                       request.auth.uid == resource.data.providerId) ||
+                     isAdmin()) || isDevMode();
 
       allow create: if (isAuthenticated() && isNotBanned() &&
-                     request.resource.data.clientId == request.auth.uid &&
-                     hasValidPaymentFields()) || isDevMode();
+                        request.resource.data.clientId == request.auth.uid &&
+                        hasValidPaymentFields()) || isDevMode();
 
       allow update: if (isAdmin() && hasValidPaymentFields()) || isDevMode();
       allow delete: if isAdmin() || isDevMode();
@@ -208,13 +156,6 @@ service cloud.firestore {
 
     // ========== REVIEWS ==========
     match /reviews/{reviewId} {
-      function hasValidReviewFields() {
-        return request.resource.data.keys().hasAll(['clientId','providerId','rating','comment']) &&
-               request.resource.data.rating is number &&
-               request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
-               request.resource.data.comment is string && request.resource.data.comment.size() > 0;
-      }
-
       allow read: if resource.data.isPublic == true ||
                    (isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
@@ -222,13 +163,10 @@ service cloud.firestore {
                    isAdmin() || isDevMode();
 
       allow create: if (isAuthenticated() && isNotBanned() &&
-                     request.resource.data.clientId == request.auth.uid &&
-                     hasValidReviewFields()) || isDevMode();
+                        request.resource.data.clientId == request.auth.uid) || isDevMode();
 
       allow update: if ((isAuthenticated() && request.auth.uid == resource.data.clientId &&
-                        hasValidReviewFields() &&
-                        !request.resource.data.diff(resource.data).affectedKeys()
-                          .hasAny(['clientId','providerId','isPublic'])) ||
+                         !affectedKeys().hasAny(['clientId','providerId','isPublic'])) ||
                         isAdmin()) || isDevMode();
 
       allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin()) || isDevMode();
@@ -237,9 +175,7 @@ service cloud.firestore {
     // ============ DOCUMENTS ============
     match /documents/{documentId} {
       allow read: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
-      allow create: if (isAuthenticated() &&
-                     request.resource.data.userId == request.auth.uid &&
-                     request.resource.data.keys().hasAll(['userId','type','filename'])) || isDevMode();
+      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid) || isDevMode();
       allow update: if isAdmin() || isDevMode();
       allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
     }
@@ -248,26 +184,24 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
       allow create: if isAdmin() || isDevMode();
-      allow update: if ((isAuthenticated() && request.auth.uid == resource.data.userId &&
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead','readAt'])) ||
-                       isAdmin()) || isDevMode();
+      allow update: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
       allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
     }
 
     // ================= CALL_SESSIONS =================
     match /call_sessions/{sessionId} {
       allow read: if ((isAuthenticated() &&
-                    (request.auth.uid == resource.data.clientId ||
-                     request.auth.uid == resource.data.providerId) ||
-                  isAdmin())) || isDevMode();
+                      (request.auth.uid == resource.data.clientId ||
+                       request.auth.uid == resource.data.providerId) ||
+                     isAdmin())) || isDevMode();
 
       allow create: if (isAuthenticated() && isNotBanned() &&
-                     request.resource.data.clientId == request.auth.uid) || isDevMode();
+                        request.resource.data.clientId == request.auth.uid) || isDevMode();
 
       allow update: if ((isAuthenticated() && isNotBanned() &&
-                        (request.auth.uid == resource.data.clientId ||
-                         request.auth.uid == resource.data.providerId)) ||
-                     isAdmin()) || isDevMode();
+                         (request.auth.uid == resource.data.clientId ||
+                          request.auth.uid == resource.data.providerId)) ||
+                        isAdmin()) || isDevMode();
 
       allow delete: if isAdmin() || isDevMode();
     }
@@ -275,12 +209,12 @@ service cloud.firestore {
     // ================== INVOICE_RECORDS ==================
     match /invoice_records/{invoiceId} {
       allow read: if ((isAuthenticated() &&
-                    (request.auth.uid == resource.data.clientId ||
-                     request.auth.uid == resource.data.providerId) ||
-                  isAdmin())) || isDevMode();
+                      (request.auth.uid == resource.data.clientId ||
+                       request.auth.uid == resource.data.providerId) ||
+                     isAdmin())) || isDevMode();
 
       allow create: if (isAuthenticated() &&
-                      (request.auth.uid == request.resource.data.clientId || isAdmin())) || isDevMode();
+                        (request.auth.uid == request.resource.data.clientId || isAdmin())) || isDevMode();
 
       allow update: if isAdmin() || isDevMode();
       allow delete: if isAdmin() || isDevMode();
@@ -289,7 +223,7 @@ service cloud.firestore {
     // =================== NOTIFICATION_LOGS ===================
     match /notification_logs/{logId} {
       allow read: if ((isAuthenticated() &&
-                    (request.auth.uid == resource.data.recipientId || isAdmin()))) || isDevMode();
+                      (request.auth.uid == resource.data.recipientId || isAdmin()))) || isDevMode();
       allow create: if (isAuthenticated() && isNotBanned()) || isDevMode();
       allow update: if isAdmin() || isDevMode();
       allow delete: if isAdmin() || isDevMode();
@@ -300,10 +234,10 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if isAdmin() || isDevMode();
     }
-    match /analytics/{analyticsId} { allow read, write: if isAdmin() || isDevMode(); }
-    match /app_settings/{settingId} { allow read, write: if isAdmin() || isDevMode(); }
-    match /admin_settings/{settingId} { allow read, write: if isAdmin() || isDevMode(); }
-    match /backups/{backupId} { allow read, write: if isAdmin() || isDevMode(); }
+    match /analytics/{analyticsId}     { allow read, write: if isAdmin() || isDevMode(); }
+    match /app_settings/{settingId}    { allow read, write: if isAdmin() || isDevMode(); }
+    match /admin_settings/{settingId}  { allow read, write: if isAdmin() || isDevMode(); }
+    match /backups/{backupId}          { allow read, write: if isAdmin() || isDevMode(); }
 
     match /contact_messages/{messageId} {
       allow read: if isAdmin() || isDevMode();
@@ -327,23 +261,19 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || isDevMode();
     }
 
+    // Catch-all (prod fermée si pas dev)
     match /{document=**} {
       allow read, write: if false || isDevMode();
     }
   }
 }
 
+// Règles dédiées admin_config (claims admin)
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Lecture ouverte (ou restreins si tu veux)
     match /admin_config/{docId} {
       allow read: if true;
-
-      // Ecriture réservée aux admins (custom claim)
       allow write: if request.auth != null && request.auth.token.admin == true;
     }
-
-    // …tes autres règles
   }
 }

@@ -101,7 +101,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       case 'checking':
         return (
           <div className="min-h-screen flex flex-col items-center justify-center p-4">
-            <LoadingSpinner size="large" color="blue" />
+            <LoadingSpinner size="large" color="red" />
             <p className="mt-4 text-sm text-gray-600 text-center">
               {authState === 'loading' ? t('auth.initializing') : t('auth.verifyingAccess')}
             </p>

@@ -963,7 +963,7 @@ const Login: React.FC = () => {
         <div className="text-center max-w-sm w-full">
           <div className="bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/20">
             <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-              <LoadingSpinner size="large" color="white" />
+              <LoadingSpinner size="large" color="red" />
             </div>
             <h2 className="text-xl font-black text-white mb-3">{t('loading.message')}</h2>
             <p className="text-base text-gray-400 mb-6">Vérification de vos identifiants...</p>

@@ -40,6 +40,7 @@ import {
   limit,
   orderBy,
   getDocs,
+  writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
@@ -241,17 +242,19 @@ const createSOSProfile = async (
 ): Promise<void> => {
   try {
     const sosRef = doc(db, 'sos_profiles', uid);
+    const extra = userData as Record<string, unknown>;
+
     const country =
-      userData.currentCountry || 
-      (userData as { residenceCountry?: string }).residenceCountry || 
+      userData.currentCountry ||
+      (userData as { residenceCountry?: string }).residenceCountry ||
       userData.currentPresenceCountry ||
       userData.country || '';
-    
-    const languages = (userData.languages as string[] | undefined) || 
-                     (userData.languagesSpoken as string[] | undefined) || 
+
+    const languages = (userData.languages as string[] | undefined) ||
+                     (userData.languagesSpoken as string[] | undefined) ||
                      ['Français'];
 
-    const baseProfile = {
+    const baseProfile: Record<string, unknown> = {
       uid,
       id: uid,
       type: role,
@@ -297,20 +300,19 @@ const createSOSProfile = async (
       updatedAt: serverTimestamp(),
     };
 
-    // Ajouter des champs spécifiques selon le rôle
     if (role === 'lawyer') {
       Object.assign(baseProfile, {
         specialties: userData.specialties || [],
-        education: userData.education || userData.educations || [],
+        education: (userData as Record<string, unknown>)['education'] || [],
         graduationYear: userData.graduationYear || new Date().getFullYear() - 5,
-        barAdmission: userData.barAdmission || '',
-        licenseNumber: userData.licenseNumber || '',
+        ...(typeof extra['barAdmission'] === 'string' && { barAdmission: extra['barAdmission'] }),
+        ...(typeof extra['licenseNumber'] === 'string' && { licenseNumber: extra['licenseNumber'] }),
       });
     } else if (role === 'expat') {
       Object.assign(baseProfile, {
         helpTypes: userData.helpTypes || [],
-        yearsAsExpat: userData.yearsAsExpat || userData.yearsOfExperience || 0,
-        originCountry: userData.originCountry || '',
+        yearsAsExpat: (userData as Record<string, unknown>)['yearsAsExpat'] || userData.yearsOfExperience || 0,
+        ...(typeof extra['originCountry'] === 'string' && { originCountry: extra['originCountry'] }),
         residenceCountry: userData.residenceCountry || country,
       });
     }
@@ -328,8 +330,8 @@ const createUserDocumentInFirestore = async (
   const emailLower = (firebaseUser.email || '').trim().toLowerCase();
   const userRef = doc(db, 'users', firebaseUser.uid);
   const docSnap = await getDoc(userRef);
+  const extra = userData as Record<string, unknown>;
 
-  // Mise à jour si existe
   if (docSnap.exists()) {
     const existing = docSnap.data() as Partial<User>;
     await updateDoc(userRef, {
@@ -349,7 +351,6 @@ const createUserDocumentInFirestore = async (
     } as User;
   }
 
-  // Création
   const providerId = firebaseUser.providerData[0]?.providerId;
   const role = userData.role as User['role'];
   if (!role || !['client', 'lawyer', 'expat', 'admin'].includes(role)) {
@@ -407,7 +408,6 @@ const createUserDocumentInFirestore = async (
     lastLoginAt: new Date(),
   };
 
-  // Ajouter des champs spécifiques selon le rôle
   const newUser: Partial<User> & {
     id: string;
     uid: string;
@@ -415,9 +415,7 @@ const createUserDocumentInFirestore = async (
     role: User['role'];
   } = { ...baseUserData };
 
-  if (role === 'client') {
-    // Pas de champs supplémentaires spécifiques pour client
-  } else if (role === 'lawyer') {
+  if (role === 'lawyer') {
     Object.assign(newUser, {
       phone: userData.phone || '',
       phoneNumber: userData.phone || '',
@@ -429,14 +427,14 @@ const createUserDocumentInFirestore = async (
       currentPresenceCountry: userData.currentPresenceCountry || '',
       practiceCountries: userData.practiceCountries || [],
       specialties: userData.specialties || [],
-      education: userData.education || userData.educations || [],
+      education: (extra['education'] as string[]) || [],
       yearsOfExperience: userData.yearsOfExperience || 0,
       graduationYear: userData.graduationYear || new Date().getFullYear() - 5,
       bio: userData.bio || userData.description || '',
       description: userData.bio || userData.description || '',
       availability: userData.availability || 'available',
-      barAdmission: userData.barAdmission || '',
-      licenseNumber: userData.licenseNumber || '',
+      ...(typeof extra['barAdmission'] === 'string' && { barAdmission: extra['barAdmission'] as string }),
+      ...(typeof extra['licenseNumber'] === 'string' && { licenseNumber: extra['licenseNumber'] as string }),
       price: 49,
       duration: 30,
     });
@@ -453,24 +451,23 @@ const createUserDocumentInFirestore = async (
       interventionCountry: userData.interventionCountry || '',
       country: userData.currentPresenceCountry || userData.country || '',
       helpTypes: userData.helpTypes || [],
-      yearsAsExpat: userData.yearsAsExpat || userData.yearsOfExperience || 0,
-      yearsOfExperience: userData.yearsOfExperience || userData.yearsAsExpat || 0,
+      yearsAsExpat: (extra['yearsAsExpat'] as number) || userData.yearsOfExperience || 0,
+      yearsOfExperience: userData.yearsOfExperience || (extra['yearsAsExpat'] as number) || 0,
       bio: userData.bio || userData.description || '',
       description: userData.bio || userData.description || '',
       availability: userData.availability || 'available',
-      originCountry: userData.originCountry || '',
+      originCountry: (extra['originCountry'] as string) || '',
       residenceCountry: userData.residenceCountry || userData.currentCountry || '',
       price: 19,
       duration: 30,
     });
   } else if (role === 'admin') {
     Object.assign(newUser, {
-      permissions: userData.permissions || ['read', 'write'],
-      department: userData.department || 'general',
+      permissions: (extra['permissions'] as string[]) || ['read', 'write'],
+      department: (extra['department'] as string) || 'general',
     });
   }
 
-  // Créer le document dans Firestore avec les timestamps serveur
   const firestoreData = {
     ...newUser,
     createdAt: serverTimestamp(),
@@ -480,7 +477,6 @@ const createUserDocumentInFirestore = async (
 
   await setDoc(userRef, firestoreData);
 
-  // Créer le profil SOS si nécessaire
   if (role === 'lawyer' || role === 'expat') {
     await createSOSProfile(firebaseUser.uid, newUser, role);
   }
@@ -502,7 +498,6 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
   if (!snap.exists()) return null;
   const data = snap.data() as Partial<User>;
 
-  // Mise à jour légère (non bloquant)
   updateDoc(refUser, {
     lastLoginAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -542,7 +537,6 @@ const writeSosPresence = async (
   try {
     await updateDoc(sosRef, payload);
   } catch {
-    // fallback: créer si absent
     await setDoc(
       sosRef,
       {
@@ -607,6 +601,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const deviceInfo = useMemo(getDeviceInfo, []);
 
+  // Flag déconnexion pour éviter les réinjections via snapshot
+  const signingOutRef = useRef<boolean>(false);
+
   // Synchronise le state local avec Firestore users/{uid}
   const updateUserState = useCallback(async (fbUser: FirebaseUser) => {
     try {
@@ -638,6 +635,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         } else {
           setFirebaseUser(null);
           setUser(null);
+          signingOutRef.current = false;
         }
       } finally {
         setIsLoading(false);
@@ -653,6 +651,10 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     const unsub = onSnapshot(
       doc(db, 'users', firebaseUser.uid),
       (snap) => {
+        if (signingOutRef.current) return;
+        if (!auth.currentUser) return;
+        if (auth.currentUser.uid !== firebaseUser.uid) return;
+
         if (!snap.exists()) return;
         const data = snap.data() as Partial<User>;
         setUser((prev) => {
@@ -674,29 +676,13 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     return () => unsub();
   }, [firebaseUser?.uid, firebaseUser?.emailVerified]);
 
-  // Écoute l'événement global "availabilityChanged"
-  type AvailabilityChangedDetail = { isOnline: boolean };
-  type AvailabilityEventName = 'availabilityChanged' | 'availability:changed';
-  const availabilityHandler = useCallback((e: Event) => {
-    const ce = (e as CustomEvent<AvailabilityChangedDetail>);
-    if (typeof ce.detail?.isOnline === 'boolean') {
-      setUser((prev) => (prev ? { ...prev, isOnline: ce.detail.isOnline } as User : prev));
-    }
-  }, []);
-  useEffect(() => {
-    const names: AvailabilityEventName[] = ['availabilityChanged', 'availability:changed'];
-    names.forEach((n) => window.addEventListener(n, availabilityHandler as EventListener));
-    return () => {
-      names.forEach((n) => window.removeEventListener(n, availabilityHandler as EventListener));
-    };
-  }, [availabilityHandler]);
-
   /* ============================
-     Méthodes d'auth
+     Méthodes d'auth (useCallback)
      ============================ */
+
   const isUserLoggedIn = useCallback(() => !!user || !!firebaseUser, [user, firebaseUser]);
 
-  const login = async (email: string, password: string, rememberMe: boolean = false): Promise<void> => {
+  const login = useCallback(async (email: string, password: string, rememberMe: boolean = false): Promise<void> => {
     setIsLoading(true);
     setError(null);
     setAuthMetrics((m) => ({ ...m, loginAttempts: m.loginAttempts + 1, lastAttempt: new Date() }));
@@ -710,7 +696,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     }
 
     try {
-      // Configurer la persistance avant la connexion
       const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
       await setPersistence(auth, persistenceType);
 
@@ -720,12 +705,12 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         loginPromise,
         new Promise<never>((_, rej) => setTimeout(() => rej(new Error('auth/timeout')), timeout)),
       ]);
-      
-      await logAuthEvent('successful_login', { 
-        userId: cred.user.uid, 
+
+      await logAuthEvent('successful_login', {
+        userId: cred.user.uid,
         provider: 'email',
         rememberMe,
-        deviceInfo 
+        deviceInfo
       });
     } catch (e) {
       const msg =
@@ -734,18 +719,18 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           : 'Email ou mot de passe invalide.';
       setError(msg);
       setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
-      await logAuthEvent('login_failed', { 
+      await logAuthEvent('login_failed', {
         error: e instanceof Error ? e.message : String(e),
         email: normalizeEmail(email),
-        deviceInfo 
+        deviceInfo
       });
       throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [deviceInfo]);
 
-  const loginWithGoogle = async (rememberMe: boolean = false): Promise<void> => {
+  const loginWithGoogle = useCallback(async (rememberMe: boolean = false): Promise<void> => {
     setIsLoading(true);
     setError(null);
     setAuthMetrics((m) => ({
@@ -755,7 +740,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       lastAttempt: new Date(),
     }));
     try {
-      // Configurer la persistance avant la connexion Google
       const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
       await setPersistence(auth, persistenceType);
 
@@ -768,11 +752,10 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         await signInWithRedirect(auth, provider);
         return;
       }
-      
+
       const result = await signInWithPopup(auth, provider);
       const googleUser = result.user;
 
-      // S'il existe déjà
       const userRef = doc(db, 'users', googleUser.uid);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
@@ -786,11 +769,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           }));
           const msg = 'La connexion Google est réservée aux clients.';
           setError(msg);
-          await logAuthEvent('google_login_role_restriction', { 
-            userId: googleUser.uid, 
+          await logAuthEvent('google_login_role_restriction', {
+            userId: googleUser.uid,
             role: existing.role,
             email: googleUser.email,
-            deviceInfo 
+            deviceInfo
           });
           throw new Error('GOOGLE_ROLE_RESTRICTION');
         }
@@ -807,7 +790,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
             }),
         });
       } else {
-        // Création user client
         await createUserDocumentInFirestore(googleUser, {
           role: 'client',
           email: googleUser.email || '',
@@ -823,20 +805,20 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         });
       }
 
-      await logAuthEvent('successful_google_login', { 
-        userId: googleUser.uid, 
+      await logAuthEvent('successful_google_login', {
+        userId: googleUser.uid,
         userEmail: googleUser.email,
         rememberMe,
-        deviceInfo 
+        deviceInfo
       });
     } catch (e) {
       if (!(e instanceof Error && e.message === 'GOOGLE_ROLE_RESTRICTION')) {
         const msg = 'Connexion Google annulée ou impossible.';
         setError(msg);
         setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
-        await logAuthEvent('google_login_failed', { 
+        await logAuthEvent('google_login_failed', {
           error: e instanceof Error ? e.message : String(e),
-          deviceInfo 
+          deviceInfo
         });
         throw new Error(msg);
       } else {
@@ -845,7 +827,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [deviceInfo]);
 
   // Récupération redirect Google en contexte crossOriginIsolated
   const redirectHandledRef = useRef<boolean>(false);
@@ -873,11 +855,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
             }));
             const msg = 'La connexion Google est réservée aux clients.';
             setError(msg);
-            await logAuthEvent('google_login_role_restriction', { 
-              userId: googleUser.uid, 
+            await logAuthEvent('google_login_role_restriction', {
+              userId: googleUser.uid,
               role: existing.role,
               email: googleUser.email,
-              deviceInfo 
+              deviceInfo
             });
             return;
           }
@@ -903,10 +885,10 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           });
         }
 
-        await logAuthEvent('successful_google_login', { 
-          userId: googleUser.uid, 
+        await logAuthEvent('successful_google_login', {
+          userId: googleUser.uid,
           userEmail: googleUser.email,
-          deviceInfo 
+          deviceInfo
         });
       } catch (e) {
         console.warn('[Auth] getRedirectResult error', e);
@@ -914,15 +896,14 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         setIsLoading(false);
       }
     })();
-  }, []);
+  }, [deviceInfo]);
 
-  // REGISTER corrigé (pré-check email + rollback Firestore)
-  const register = async (userData: Partial<User>, password: string): Promise<void> => {
+  // REGISTER
+  const register = useCallback(async (userData: Partial<User>, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Vérifications de base
       if (!userData.role || !['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
         const err = new Error('Rôle utilisateur invalide ou manquant.') as AppError;
         err.code = 'sos/invalid-role';
@@ -939,7 +920,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         throw err;
       }
 
-      // Normalisation + validation email
       const email = normalizeEmail(userData.email);
       if (!isValidEmail(email)) {
         const err = new Error('Adresse email invalide') as AppError;
@@ -947,7 +927,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         throw err;
       }
 
-      // Pré-check Auth
       const methods = await fetchSignInMethodsForEmail(auth, email);
       if (methods.length > 0) {
         if (methods.includes('password')) {
@@ -965,10 +944,8 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         throw err;
       }
 
-      // Création Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Photo de profil finale
       let finalProfilePhotoURL = '/default-avatar.png';
       if (userData.profilePhoto?.startsWith('data:image')) {
         finalProfilePhotoURL = await processProfilePhoto(userData.profilePhoto, cred.user.uid, 'manual');
@@ -976,7 +953,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         finalProfilePhotoURL = userData.profilePhoto;
       }
 
-      // Création Firestore + rollback si échec
       try {
         await createUserDocumentInFirestore(cred.user, {
           ...userData,
@@ -992,7 +968,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         throw docErr;
       }
 
-      // MAJ du profil Auth (non bloquant)
       if (userData.firstName || userData.lastName) {
         const displayName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
         await updateProfile(cred.user, {
@@ -1001,23 +976,21 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         }).catch(() => { /* no-op */ });
       }
 
-      // Email de vérification (non bloquant)
       try {
         await sendEmailVerification(cred.user);
       } catch {
         /* no-op */ void 0;
       }
 
-      await logAuthEvent('registration_success', { 
-        userId: cred.user.uid, 
+      await logAuthEvent('registration_success', {
+        userId: cred.user.uid,
         role: userData.role,
         email,
         hasProfilePhoto: !!finalProfilePhotoURL && finalProfilePhotoURL !== '/default-avatar.png',
-        deviceInfo 
+        deviceInfo
       });
     } catch (err) {
       const e = err as AppError;
-      // Mapping d'erreurs clair
       let msg = 'Inscription impossible. Réessayez.';
       switch (e?.code) {
         case 'auth/email-already-in-use':
@@ -1051,24 +1024,23 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [deviceInfo]);
 
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
+    signingOutRef.current = true;
     try {
       const uid = user?.id || user?.uid;
       const role = user?.role;
-      
-      // Log de déconnexion
-      await logAuthEvent('logout', { 
+
+      await logAuthEvent('logout', {
         userId: uid,
         role,
-        deviceInfo 
+        deviceInfo
       });
 
-      // Mettre à jour la présence si c'est un SOS
       if (uid && (role === 'lawyer' || role === 'expat')) {
         await Promise.allSettled([
-          writeSosPresence(uid, role, false), 
+          writeSosPresence(uid, role, false),
           writeUsersPresenceBestEffort(uid, false)
         ]);
       }
@@ -1091,11 +1063,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     } catch (e) {
       console.error('[Auth] logout error:', e);
     }
-  };
+  }, [user, deviceInfo]);
 
-  const clearError = (): void => setError(null);
+  const clearError = useCallback((): void => setError(null), []);
 
-  const refreshUser = async (): Promise<void> => {
+  const refreshUser = useCallback(async (): Promise<void> => {
     if (!firebaseUser) return;
     try {
       setIsLoading(true);
@@ -1106,7 +1078,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [firebaseUser, updateUserState]);
 
   const getLastLoginInfo = useCallback((): { date: Date | null; device: string | null } => {
     if (!user) return { date: null, device: null };
@@ -1115,34 +1087,30 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     return { date: user.lastLoginAt || null, device: `${deviceType} (${os})` };
   }, [user, deviceInfo]);
 
-  // Nouvelles méthodes pour la gestion complète du profil utilisateur
-  const updateUserProfile = async (updates: Partial<User>): Promise<void> => {
+  const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
     if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
-    
+
     setAuthMetrics((m) => ({ ...m, profileUpdateAttempts: m.profileUpdateAttempts + 1 }));
-    
+
     try {
       const userRef = doc(db, 'users', firebaseUser.uid);
-      
-      // Traiter la photo de profil si nécessaire
-      let finalUpdates = { ...updates };
+
+      const finalUpdates = { ...updates };
       if (updates.profilePhoto && updates.profilePhoto.startsWith('data:image')) {
         finalUpdates.profilePhoto = await processProfilePhoto(
-          updates.profilePhoto, 
-          firebaseUser.uid, 
+          updates.profilePhoto,
+          firebaseUser.uid,
           'manual'
         );
         finalUpdates.photoURL = finalUpdates.profilePhoto;
         finalUpdates.avatar = finalUpdates.profilePhoto;
       }
-      
-      // Mettre à jour Firestore
+
       await updateDoc(userRef, {
         ...finalUpdates,
         updatedAt: serverTimestamp(),
       });
 
-      // Mettre à jour le profil Firebase Auth si nécessaire
       if (updates.firstName || updates.lastName || updates.profilePhoto) {
         const displayName = `${updates.firstName || user.firstName || ''} ${updates.lastName || user.lastName || ''}`.trim();
         await updateProfile(firebaseUser, {
@@ -1151,7 +1119,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         });
       }
 
-      // Mettre à jour le profil SOS si applicable
       if (user.role === 'lawyer' || user.role === 'expat') {
         const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
         await updateDoc(sosRef, {
@@ -1174,29 +1141,26 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [firebaseUser, user, deviceInfo]);
 
-  const updateUserEmail = async (newEmail: string): Promise<void> => {
+  const updateUserEmail = useCallback(async (newEmail: string): Promise<void> => {
     if (!firebaseUser) throw new Error('Utilisateur non connecté');
-    
+
     setAuthMetrics((m) => ({ ...m, emailUpdateAttempts: m.emailUpdateAttempts + 1 }));
-    
+
     try {
       const normalizedEmail = normalizeEmail(newEmail);
       if (!isValidEmail(normalizedEmail)) {
         throw new Error('Adresse email invalide');
       }
 
-      // Vérifier si l'email est déjà utilisé
       const methods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
       if (methods.length > 0) {
         throw new Error('Cette adresse email est déjà utilisée');
       }
 
-      // Mettre à jour Firebase Auth
       await updateEmail(firebaseUser, normalizedEmail);
 
-      // Mettre à jour Firestore
       const userRef = doc(db, 'users', firebaseUser.uid);
       await updateDoc(userRef, {
         email: normalizedEmail,
@@ -1204,7 +1168,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         updatedAt: serverTimestamp(),
       });
 
-      // Envoyer une vérification d'email
       await sendEmailVerification(firebaseUser);
 
       await logAuthEvent('email_updated', {
@@ -1222,11 +1185,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [firebaseUser, user?.email, deviceInfo]);
 
-  const updateUserPassword = async (newPassword: string): Promise<void> => {
+  const updateUserPassword = useCallback(async (newPassword: string): Promise<void> => {
     if (!firebaseUser) throw new Error('Utilisateur non connecté');
-    
+
     if (newPassword.length < 6) {
       throw new Error('Le mot de passe doit contenir au moins 6 caractères');
     }
@@ -1247,9 +1210,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [firebaseUser, deviceInfo]);
 
-  const reauthenticateUser = async (password: string): Promise<void> => {
+  const reauthenticateUser = useCallback(async (password: string): Promise<void> => {
     if (!firebaseUser || !user?.email) throw new Error('Utilisateur non connecté');
 
     try {
@@ -1269,11 +1232,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [firebaseUser, user?.email, deviceInfo]);
 
-  const sendPasswordReset = async (email: string): Promise<void> => {
+  const sendPasswordReset = useCallback(async (email: string): Promise<void> => {
     setAuthMetrics((m) => ({ ...m, passwordResetRequests: m.passwordResetRequests + 1 }));
-    
+
     try {
       const normalizedEmail = normalizeEmail(email);
       if (!isValidEmail(normalizedEmail)) {
@@ -1295,9 +1258,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [deviceInfo]);
 
-  const sendVerificationEmail = async (): Promise<void> => {
+  const sendVerificationEmail = useCallback(async (): Promise<void> => {
     if (!firebaseUser) throw new Error('Utilisateur non connecté');
 
     try {
@@ -1317,17 +1280,16 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [firebaseUser, deviceInfo]);
 
-  const deleteUserAccount = async (): Promise<void> => {
+  const deleteUserAccount = useCallback(async (): Promise<void> => {
     if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
 
     try {
       const userId = firebaseUser.uid;
       const userRole = user.role;
 
-      // Supprimer les documents Firestore associés
-      const promises: Promise<any>[] = [
+      const promises: Promise<unknown>[] = [
         deleteDoc(doc(db, 'users', userId))
       ];
 
@@ -1335,7 +1297,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         promises.push(deleteDoc(doc(db, 'sos_profiles', userId)));
       }
 
-      // Supprimer les photos de profil du storage
       if (user.profilePhoto && user.profilePhoto.includes('firebase')) {
         try {
           const photoRef = ref(storage, user.profilePhoto);
@@ -1353,10 +1314,8 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         deviceInfo
       });
 
-      // Supprimer le compte Firebase Auth en dernier
       await deleteUser(firebaseUser);
 
-      // Reset de l'état
       setUser(null);
       setFirebaseUser(null);
       setError(null);
@@ -1369,9 +1328,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
       throw error;
     }
-  };
+  }, [firebaseUser, user, deviceInfo]);
 
-  const getUsersByRole = async (role: User['role'], limit_count: number = 10): Promise<User[]> => {
+  const getUsersByRole = useCallback(async (role: User['role'], limit_count: number = 10): Promise<User[]> => {
     try {
       const usersQuery = query(
         collection(db, 'users'),
@@ -1380,7 +1339,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         orderBy('createdAt', 'desc'),
         limit(limit_count)
       );
-      
+
       const snapshot = await getDocs(usersQuery);
       return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -1394,29 +1353,45 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       console.error('Erreur récupération utilisateurs:', error);
       return [];
     }
-  };
+  }, []);
 
-  const setUserAvailability = async (availability: 'available' | 'busy' | 'offline'): Promise<void> => {
+  // Version batch atomique pour éviter états intermédiaires
+  const setUserAvailability = useCallback(async (availability: 'available' | 'busy' | 'offline'): Promise<void> => {
     if (!user || !firebaseUser) throw new Error('Utilisateur non connecté');
     if (user.role !== 'lawyer' && user.role !== 'expat') return;
 
     try {
       const isOnline = availability === 'available';
-      
-      // Mettre à jour dans users
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+      const now = serverTimestamp();
+
+      const usersRef = doc(db, 'users', firebaseUser.uid);
+      const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
+
+      const batch = writeBatch(db);
+      batch.update(usersRef, {
         availability,
         isOnline,
-        updatedAt: serverTimestamp(),
+        updatedAt: now,
+        lastStatusChange: now,
       });
+      batch.set(
+        sosRef,
+        {
+          isOnline,
+          availability: isOnline ? 'available' : 'unavailable',
+          updatedAt: now,
+          lastStatusChange: now,
+          isVisible: true,
+          isVisibleOnMap: true,
+          uid: firebaseUser.uid,
+          id: firebaseUser.uid,
+          role: user.role,
+          type: user.role,
+        },
+        { merge: true }
+      );
 
-      // Mettre à jour dans sos_profiles
-      await writeSosPresence(firebaseUser.uid, user.role, isOnline);
-
-      // Dispatcher l'événement pour synchroniser l'UI
-      window.dispatchEvent(new CustomEvent('availabilityChanged', { 
-        detail: { isOnline } 
-      }));
+      await batch.commit();
 
       await logAuthEvent('availability_changed', {
         userId: firebaseUser.uid,
@@ -1429,7 +1404,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       console.error('Erreur mise à jour disponibilité:', error);
       throw error;
     }
-  };
+  }, [firebaseUser, user, deviceInfo]);
 
   const value: AuthContextType = useMemo(() => ({
     user,
@@ -1457,10 +1432,30 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     getUsersByRole,
     setUserAvailability,
   }), [
-    user, firebaseUser, isUserLoggedIn, isLoading, authInitialized, error, authMetrics, deviceInfo,
-    login, loginWithGoogle, register, logout, clearError, refreshUser, getLastLoginInfo,
-    updateUserProfile, updateUserEmail, updateUserPassword, reauthenticateUser,
-    sendPasswordReset, sendVerificationEmail, deleteUserAccount, getUsersByRole, setUserAvailability
+    user,
+    firebaseUser,
+    isUserLoggedIn,
+    isLoading,
+    authInitialized,
+    error,
+    authMetrics,
+    deviceInfo,
+    login,
+    loginWithGoogle,
+    register,
+    logout,
+    clearError,
+    refreshUser,
+    getLastLoginInfo,
+    updateUserProfile,
+    updateUserEmail,
+    updateUserPassword,
+    reauthenticateUser,
+    sendPasswordReset,
+    sendVerificationEmail,
+    deleteUserAccount,
+    getUsersByRole,
+    setUserAvailability
   ]);
 
   return <BaseAuthContext.Provider value={value}>{children}</BaseAuthContext.Provider>;

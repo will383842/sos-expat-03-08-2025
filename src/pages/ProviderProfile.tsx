@@ -45,6 +45,9 @@ import SEOHead from '../components/layout/SEOHead';
 import { Review } from '../types';
 import { formatLanguages } from '@/i18n';
 
+// 👉 Ajout: service pricing (front) pour prix dynamiques
+import { usePricingConfig, detectUserCurrency } from '../services/pricingService';
+
 // Performance & constants
 const IMAGE_SIZES = {
   AVATAR_MOBILE: 112, // w-28 h-28
@@ -110,6 +113,8 @@ const TEXTS = {
     experience: 'Expérience',
     years: 'ans',
     minutes: 'minutes',
+    // 👉 Ajout
+    memberSince: 'Inscrit depuis le',
   },
   en: {
     loading: 'Loading profile...',
@@ -157,6 +162,8 @@ const TEXTS = {
     experience: 'Experience',
     years: 'yrs',
     minutes: 'minutes',
+    // 👉 Ajout
+    memberSince: 'Member since',
   },
 } as const;
 
@@ -363,6 +370,22 @@ const pickDescription = (p: Partial<SosProfile>, preferredLang?: string): string
 const toStringFromAny = (val: unknown, preferred?: string): string | undefined =>
   getFirstString(val, preferred);
 
+// 👉 Ajout: format date (FR/EN) pour "Inscrit depuis le …"
+const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
+  if (!val) return undefined;
+  let d: Date | undefined;
+  const anyVal = val as any;
+  if (anyVal?.toDate && typeof anyVal.toDate === 'function') d = anyVal.toDate();
+  else if (val instanceof Date) d = val;
+  if (!d) return undefined;
+  const fmt = new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-US', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  return fmt.format(d);
+};
+
 // Type guards
 const isUser = (user: unknown): user is AuthUser => {
   return typeof user === 'object' && user !== null && 'id' in user;
@@ -383,7 +406,7 @@ const ProviderProfile: React.FC = () => {
 
   // i18n detection: use app context first, then browser, fallback en
   const detectedLang = useMemo(() => {
-    if (language === 'fr' || language === 'en') return language;
+    if (language === 'fr' || language === 'en') return language as 'fr' | 'en';
     return detectLanguage();
   }, [language]);
 
@@ -397,6 +420,11 @@ const ProviderProfile: React.FC = () => {
   const [realProviderId, setRealProviderId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // 👉 Ajout: pricing dynamique (lu une fois puis mémoïsé)
+  const { pricing, loading: pricingLoading } = usePricingConfig();
+  const currency = detectUserCurrency();
+  const currencySymbol = currency === 'eur' ? '€' : '$';
 
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -413,6 +441,19 @@ const ProviderProfile: React.FC = () => {
     listenerActive: false,
     connectionAttempts: 0
   });
+
+  // 👉 Ajout: résolution des montants (provider override > admin pricing)
+  const priceInfo = useMemo(() => {
+    if (!provider) return { price: undefined as number | undefined, duration: undefined as number | undefined, source: 'unknown' as 'provider' | 'admin' | 'unknown' };
+    if (typeof provider.price === 'number' && typeof provider.duration === 'number') {
+      return { price: provider.price, duration: provider.duration, source: 'provider' as const };
+    }
+    if (!pricingLoading && pricing) {
+      const cfg = provider.type === 'lawyer' ? pricing.lawyer[currency] : pricing.expat[currency];
+      return { price: cfg.totalAmount, duration: cfg.duration, source: 'admin' as const };
+    }
+    return { price: undefined, duration: undefined, source: 'unknown' as const };
+  }, [provider, pricing, pricingLoading, currency]);
 
   // Reviews loader (memoized)
   const realLoadReviews = useCallback(async (providerId: string): Promise<Review[]> => {
@@ -980,6 +1021,14 @@ const ProviderProfile: React.FC = () => {
     return arr.map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
   }, [provider, isLawyer, preferredLangKey]);
 
+  // 👉 Ajout: date d'inscription formatée
+  const joinDateText = useMemo(() => {
+    if (!provider) return undefined;
+    const formatted = formatJoinDate(provider.createdAt || provider.updatedAt || null, detectedLang);
+    if (!formatted) return undefined;
+    return detectedLang === 'fr' ? `${t('memberSince')} ${formatted}` : `${t('memberSince')} ${formatted}`;
+  }, [provider, detectedLang, t]);
+
   // Structured data for SEO (memoized)
   const structuredData = useMemo(() => {
     if (!provider) return null;
@@ -1255,11 +1304,16 @@ const ProviderProfile: React.FC = () => {
                         <Phone size={14} />
                         <span>Appel en ~5 min</span>
                       </div>
-                      <div className="mt-4 text-3xl sm:text-4xl font-black text-gray-900">
-                        {typeof provider.price === 'number' ? `€${provider.price}` : '€--'}
+                      <div
+                        className="mt-4 text-3xl sm:text-4xl font-black text-gray-900"
+                        // 👉 Traçabilité de la source du prix (ne change pas l'UI)
+                        data-price-source={priceInfo.source}
+                        title={`price source: ${priceInfo.source}`}
+                      >
+                        {priceInfo.price != null ? `${currencySymbol}${Math.round(priceInfo.price)}` : `${currencySymbol}--`}
                       </div>
                       <div className="text-gray-600">
-                        {provider.duration ? `${provider.duration} ${t('minutes')}` : '--'}
+                        {priceInfo.duration ? `${priceInfo.duration} ${t('minutes')}` : '--'}
                       </div>
                     </div>
 
@@ -1294,7 +1348,8 @@ const ProviderProfile: React.FC = () => {
                       onClick={handleBookCall}
                       className={`w-full py-4 px-4 rounded-2xl font-bold text-lg transition-all duration-500 flex items-center justify-center gap-3 min-h-[56px] focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                         onlineStatus.isOnline
-                          ? 'bg-gradient-to-r from-red-600 to-orange-500 text-white hover:scale-105 shadow-lg ring-red-600/30'
+                          // 👉 Seul changement de design demandé : bouton VERT quand en ligne
+                          ? 'bg-gradient-to-r from-green-600 to-green-500 text-white hover:scale-105 shadow-lg ring-green-600/30'
                           : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                       }`}
                       disabled={!onlineStatus.isOnline}
@@ -1522,6 +1577,13 @@ const ProviderProfile: React.FC = () => {
                         <LanguagesIcon size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
                         <span>{t('speaks')} {formatLanguages(languagesList, detectedLang)}</span>
                       </div>
+
+                      {/* 👉 Ajout: "Inscrit depuis le / Member since" (contenu seulement, pas de design) */}
+                      {joinDateText && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600">{joinDateText}</span>
+                        </div>
+                      )}
 
                       {/* Online status with enhanced visual feedback */}
                       <div

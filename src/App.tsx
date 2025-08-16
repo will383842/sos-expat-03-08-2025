@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { useDeviceDetection } from './hooks/useDeviceDetection';
 import { registerSW, measurePerformance } from './utils/performance';
+import LoadingSpinner from './components/common/LoadingSpinner';
 import './App.css';
 
 // Interface pour la configuration des routes
@@ -161,18 +162,8 @@ const adminRoutes: RouteConfig[] = [
   { path: '/admin/notifications', component: AdminNotifications, protected: true, role: 'admin' },
 ];
 
-// Spinner de chargement
-const LoadingSpinner: React.FC = () => {
-  const { isMobile } = useDeviceDetection();
-  return (
-    <div className="flex justify-center items-center min-h-screen" role="status" aria-label="Chargement en cours">
-      <div className={`loading-spinner ${isMobile ? 'mobile' : 'desktop'}`}>
-        <div className="spinner-ring" aria-hidden="true"></div>
-        <p className="mt-4 text-gray-600">Chargement...</p>
-      </div>
-    </div>
-  );
-};
+
+
 
 // Métadonnées par défaut
 const DefaultHelmet: React.FC<{ pathname: string }> = ({ pathname }) => {
@@ -285,7 +276,7 @@ const App: React.FC = () => {
     <HelmetProvider>
       <div className={`App ${isMobile ? 'mobile-layout' : 'desktop-layout'}`}>
         <DefaultHelmet pathname={location.pathname} />
-        <Suspense fallback={<LoadingSpinner />}>
+        <Suspense fallback={<LoadingSpinner size="large" color="red" />}>
           <Routes>
             {routeConfigs.map((cfg, i) => renderRoute(cfg, i))}
             {protectedUserRoutes.map((cfg, i) => renderRoute(cfg, i + 1000))}

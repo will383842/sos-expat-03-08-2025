@@ -1,11 +1,10 @@
 // src/pages/CallCheckoutWrapper.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import CallCheckout from './CallCheckout';
 import { AlertCircle } from 'lucide-react';
-import { Provider, normalizeProvider, createDefaultProvider } from '../types/provider'; // ⚠️ casse unifiée: 'provider'
+import { Provider, normalizeProvider, createDefaultProvider } from '../types/provider';
 
-// ✅ PRICING (FRONT) — lit Firestore admin_config/pricing
 import {
   calculateServiceAmounts,
   detectUserCurrency,
@@ -23,6 +22,7 @@ interface ServiceData {
   clientPhone: string;
   commissionAmount: number;
   providerAmount: number;
+  currency?: 'eur' | 'usd';
 }
 
 interface LoadingState {
@@ -68,7 +68,7 @@ interface BookingData {
 }
 
 // —————————————————————————————————————————————————————
-// i18n light (aligné avec ce qu’on a fait côté pages)
+// i18n light
 // —————————————————————————————————————————————————————
 import { useApp } from '../contexts/AppContext';
 
@@ -95,13 +95,13 @@ const useTranslation = () => {
 };
 
 // —————————————————————————————————————————————————————
-// Helpers (typés, sans any)
+// Helpers
 // —————————————————————————————————————————————————————
-const reconstructServiceData = (provider: ProviderLike): ServiceData => {
+const reconstructServiceData = (provider: ProviderLike, currency?: 'eur' | 'usd'): ServiceData => {
   const providerRole: 'lawyer' | 'expat' =
     (provider.role || provider.type || provider.providerType || 'expat') as 'lawyer' | 'expat';
 
-  // Valeurs provisoires (seront écrasées par la config Firestore juste après)
+  // Valeurs provisoires (seront écrasées par la config Firestore)
   const baseAmount =
     typeof provider.price === 'number'
       ? provider.price
@@ -116,7 +116,6 @@ const reconstructServiceData = (provider: ProviderLike): ServiceData => {
       ? 20
       : 30;
 
-  // Commission 20% (provisoire : remplacée par les montants admin s'ils existent)
   const commissionRate = 0.2;
   const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
   const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
@@ -130,6 +129,7 @@ const reconstructServiceData = (provider: ProviderLike): ServiceData => {
     clientPhone: '',
     commissionAmount,
     providerAmount,
+    currency,
   };
 };
 
@@ -180,7 +180,10 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
   });
 };
 
-const reconstructServiceFromBooking = (bookingData: BookingData): ServiceData => {
+const reconstructServiceFromBooking = (
+  bookingData: BookingData,
+  currency?: 'eur' | 'usd'
+): ServiceData => {
   const providerRole: 'lawyer' | 'expat' = (bookingData.providerType as 'lawyer' | 'expat') || 'expat';
   const baseAmount =
     typeof bookingData.price === 'number' ? bookingData.price : providerRole === 'lawyer' ? 49 : 19;
@@ -200,6 +203,7 @@ const reconstructServiceFromBooking = (bookingData: BookingData): ServiceData =>
     clientPhone: bookingData.clientPhone || '',
     commissionAmount,
     providerAmount,
+    currency,
   };
 };
 
@@ -212,6 +216,36 @@ const CallCheckoutWrapper: React.FC = () => {
   const navigate = useNavigate();
   const { providerId } = useParams<{ providerId: string }>();
 
+  // Devise sélectionnée (source d’autorité côté wrapper)
+  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
+    try {
+      const fromSession = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
+      if (fromSession && (fromSession === 'eur' || fromSession === 'usd')) return fromSession;
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('[Wrapper] session selectedCurrency parse error', e);
+    }
+    try {
+      const fromLocal = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
+      if (fromLocal && (fromLocal === 'eur' || fromLocal === 'usd')) return fromLocal;
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('[Wrapper] local preferredCurrency parse error', e);
+    }
+    return detectUserCurrency();
+  });
+
+  // Persistance immédiate
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('selectedCurrency', selectedCurrency);
+      localStorage.setItem('preferredCurrency', selectedCurrency);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('[Wrapper] persist currency error', e);
+    }
+    if (import.meta.env.DEV) {
+      console.log('💱 [Wrapper] currency:', selectedCurrency);
+    }
+  }, [selectedCurrency]);
+
   const [state, setState] = useState<LoadingState>({
     isLoading: true,
     error: null,
@@ -221,30 +255,44 @@ const CallCheckoutWrapper: React.FC = () => {
 
   const locState = useMemo(() => location.state || null, [location.state]);
 
+  const setCurrency = useCallback((cur?: string | null) => {
+    if (!cur) return;
+    const lc = cur.toLowerCase();
+    if (lc === 'eur' || lc === 'usd') {
+      setSelectedCurrency(lc);
+    } else if (import.meta.env.DEV) {
+      console.warn('[Wrapper] Ignoring unsupported currency:', cur);
+    }
+  }, []);
+
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.log('🔍 CallCheckoutWrapper - providerId:', providerId);
         }
 
-        // 1) location.state (plusieurs clés possibles)
+        // 1) location.state
         const stateProvider = locState?.selectedProvider || locState?.providerData || locState?.provider;
         const stateService = locState?.serviceData || locState?.service || locState?.bookingData;
 
+        if (stateService && (stateService as ServiceData).currency) {
+          setCurrency((stateService as ServiceData).currency as string);
+        }
+
         if (stateProvider && (stateProvider as ProviderLike).id) {
-          if (process.env.NODE_ENV === 'development') console.log('✅ Provider via location.state');
+          if (import.meta.env.DEV) console.log('✅ Provider via location.state');
           const normalized = normalizeProvider(stateProvider as Provider);
           const svc =
             (stateService as ServiceData | undefined) && (stateService as ServiceData).amount
-              ? (stateService as ServiceData)
-              : reconstructServiceData(normalized);
+              ? ({ ...(stateService as ServiceData), currency: (stateService as ServiceData).currency ?? selectedCurrency })
+              : reconstructServiceData(normalized, selectedCurrency);
           setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
           return;
         }
 
         // 2) sessionStorage
-        if (process.env.NODE_ENV === 'development') console.log('🔎 sessionStorage…');
+        if (import.meta.env.DEV) console.log('🔎 sessionStorage…');
         let savedProviderData: Provider | null = null;
         let savedServiceData: ServiceData | null = null;
 
@@ -252,19 +300,23 @@ const CallCheckoutWrapper: React.FC = () => {
           const savedProvider = sessionStorage.getItem('selectedProvider');
           if (savedProvider) savedProviderData = JSON.parse(savedProvider) as Provider;
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] parse selectedProvider error', err);
         }
 
         try {
           const savedService = sessionStorage.getItem('serviceData');
-          if (savedService) savedServiceData = JSON.parse(savedService) as ServiceData;
+          if (savedService) {
+            const parsed = JSON.parse(savedService) as ServiceData;
+            savedServiceData = { ...parsed, currency: parsed.currency ?? selectedCurrency };
+            setCurrency(savedServiceData.currency || null);
+          }
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] parse serviceData error', err);
         }
 
         if (savedProviderData && (!providerId || savedProviderData.id === providerId)) {
           const normalized = normalizeProvider(savedProviderData);
-          const svc = savedServiceData ?? reconstructServiceData(normalized);
+          const svc = savedServiceData ?? reconstructServiceData(normalized, selectedCurrency);
           setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
           return;
         }
@@ -276,13 +328,13 @@ const CallCheckoutWrapper: React.FC = () => {
             const bookingData = JSON.parse(savedBookingRequest) as BookingData;
             if (!providerId || bookingData.providerId === providerId) {
               const reconstructedProvider = reconstructProviderFromBooking(bookingData);
-              const reconstructedService = reconstructServiceFromBooking(bookingData);
+              const reconstructedService = reconstructServiceFromBooking(bookingData, selectedCurrency);
               setState({ isLoading: false, error: null, provider: reconstructedProvider, serviceData: reconstructedService });
               return;
             }
           }
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] parse bookingRequest error', err);
         }
 
         // 4) providerProfile
@@ -292,13 +344,13 @@ const CallCheckoutWrapper: React.FC = () => {
             const profileData = JSON.parse(savedProviderProfile) as Provider;
             if (!providerId || profileData.id === providerId) {
               const normalized = normalizeProvider(profileData);
-              const reconstructedService = reconstructServiceData(normalized);
+              const reconstructedService = reconstructServiceData(normalized, selectedCurrency);
               setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructedService });
               return;
             }
           }
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] parse providerProfile error', err);
         }
 
         // 5) autres clés sessionStorage
@@ -310,13 +362,13 @@ const CallCheckoutWrapper: React.FC = () => {
               const parsed = JSON.parse(data) as ProviderLike;
               if (parsed && (parsed.id || parsed.providerId) && (!providerId || parsed.id === providerId || parsed.providerId === providerId)) {
                 const normalized = normalizeProvider(parsed as Provider);
-                const reconstructedService = reconstructServiceData(normalized);
+                const reconstructedService = reconstructServiceData(normalized, selectedCurrency);
                 setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructedService });
                 return;
               }
             }
           } catch (err) {
-            console.error(err);
+            if (import.meta.env.DEV) console.error(`[Wrapper] parse ${key} error`, err);
           }
         }
 
@@ -326,11 +378,11 @@ const CallCheckoutWrapper: React.FC = () => {
           const historyProvider = historyState?.selectedProvider || historyState?.provider || historyState?.providerData;
           if (historyProvider && (historyProvider as ProviderLike).id && (!providerId || (historyProvider as ProviderLike).id === providerId)) {
             const normalized = normalizeProvider(historyProvider as Provider);
-            setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized) });
+            setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized, selectedCurrency) });
             return;
           }
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] read history.state error', err);
         }
 
         // 7) localStorage (backup)
@@ -342,13 +394,13 @@ const CallCheckoutWrapper: React.FC = () => {
               const parsed = JSON.parse(data) as Provider;
               if (parsed && parsed.id && (!providerId || parsed.id === providerId)) {
                 const normalized = normalizeProvider(parsed);
-                setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized) });
+                setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized, selectedCurrency) });
                 return;
               }
             }
           }
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] parse localStorage provider error', err);
         }
 
         // 8) paramètres URL
@@ -356,29 +408,32 @@ const CallCheckoutWrapper: React.FC = () => {
           const urlParams = new URLSearchParams(window.location.search);
           const providerParam = urlParams.get('provider');
           const serviceParam = urlParams.get('service');
+          const currencyParam = urlParams.get('currency'); // ex: ?currency=usd
+          if (currencyParam) setCurrency(currencyParam);
+
           if (providerParam) {
             const providerData = JSON.parse(decodeURIComponent(providerParam)) as Provider;
             if (providerData && providerData.id && (!providerId || providerData.id === providerId)) {
               const normalized = normalizeProvider(providerData);
               const svc = serviceParam
-                ? (JSON.parse(decodeURIComponent(serviceParam)) as ServiceData)
-                : reconstructServiceData(normalized);
+                ? ({ ...(JSON.parse(decodeURIComponent(serviceParam)) as ServiceData), currency: selectedCurrency })
+                : reconstructServiceData(normalized, selectedCurrency);
               setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
               return;
             }
           }
         } catch (err) {
-          console.error(err);
+          if (import.meta.env.DEV) console.error('[Wrapper] parse URL params error', err);
         }
 
-        // 9) fallback avec providerId => default provider
+        // 9) fallback avec providerId
         if (providerId) {
           const defaultProvider = createDefaultProvider(providerId);
           setState({
             isLoading: false,
             error: null,
             provider: defaultProvider,
-            serviceData: reconstructServiceData(defaultProvider),
+            serviceData: reconstructServiceData(defaultProvider, selectedCurrency),
           });
           return;
         }
@@ -391,7 +446,7 @@ const CallCheckoutWrapper: React.FC = () => {
           serviceData: null,
         });
       } catch (err) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ loadData error', err);
+        if (import.meta.env.DEV) console.error('❌ loadData error', err);
         setState({
           isLoading: false,
           error: t('error.body'),
@@ -402,39 +457,50 @@ const CallCheckoutWrapper: React.FC = () => {
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locState, providerId, t]);
 
-  // 🔥 Synchronisation immédiate avec la console d'admin (Firestore)
-  // Dès qu'on connaît le provider, on écrase les montants/durée par ceux d'admin_config/pricing
+  // 🔥 Recalcul admin en fonction de la devise sélectionnée
   useEffect(() => {
     if (!state.provider || !state.serviceData || state.isLoading) return;
     const role = (state.provider.role || state.provider.type || 'expat') as 'lawyer' | 'expat';
-    const currency = detectUserCurrency();
 
     (async () => {
       try {
-        const p = await calculateServiceAmounts(role, currency);
-        setState(prev =>
-          prev && prev.serviceData
-            ? {
-                ...prev,
-                serviceData: {
-                  ...prev.serviceData,
-                  amount: p.totalAmount,
-                  duration: p.duration,
-                  commissionAmount: p.connectionFeeAmount,
-                  providerAmount: p.providerAmount,
-                },
-              }
-            : prev
-        );
-      } catch (e) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[CallCheckoutWrapper] Impossible de charger le pricing admin, on garde le fallback local.', e);
+        if (import.meta.env.DEV) {
+          console.log(`🔄 [Wrapper] Recalcul admin ${role} en ${selectedCurrency.toUpperCase()}`);
         }
+        const p = await calculateServiceAmounts(role, selectedCurrency);
+        setState(prev => ({
+          ...prev,
+          serviceData: prev.serviceData
+            ? {
+                ...prev.serviceData,
+                amount: p.totalAmount,
+                duration: p.duration,
+                commissionAmount: p.connectionFeeAmount,
+                providerAmount: p.providerAmount,
+                currency: (p.currency as 'eur' | 'usd'),
+              }
+            : prev.serviceData,
+        }));
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn('[CallCheckoutWrapper] Pricing admin indisponible, on garde le fallback local.', e);
+        }
+        // On garde la version existante, mais on force la currency si absente
+        setState(prev => ({
+          ...prev,
+          serviceData: prev.serviceData
+            ? {
+                ...prev.serviceData,
+                currency: prev.serviceData.currency ?? selectedCurrency,
+              }
+            : prev.serviceData,
+        }));
       }
     })();
-  }, [state.provider, state.serviceData, state.isLoading]);
+  }, [state.provider, state.serviceData, state.isLoading, selectedCurrency]);
 
   // Sauvegarde session (utile pour CallCheckout et retours)
   useEffect(() => {
@@ -445,7 +511,7 @@ const CallCheckoutWrapper: React.FC = () => {
         localStorage.setItem('lastSelectedProvider', JSON.stringify(state.provider));
         localStorage.setItem('lastServiceData', JSON.stringify(state.serviceData));
       } catch (err) {
-        console.error(err);
+        if (import.meta.env.DEV) console.error('[Wrapper] persist provider/service error', err);
       }
     }
   }, [state.provider, state.serviceData, state.isLoading, state.error]);
@@ -510,6 +576,8 @@ const CallCheckoutWrapper: React.FC = () => {
                 try {
                   sessionStorage.clear();
                   localStorage.clear();
+                } catch (e) {
+                  if (import.meta.env.DEV) console.error('[Wrapper] clear storages error', e);
                 } finally {
                   window.location.reload();
                 }
@@ -528,7 +596,7 @@ const CallCheckoutWrapper: React.FC = () => {
   return (
     <CallCheckout
       selectedProvider={state.provider}
-      serviceData={state.serviceData}
+      serviceData={state.serviceData} // contient currency
       onGoBack={handleGoBack}
     />
   );

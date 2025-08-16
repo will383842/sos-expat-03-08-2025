@@ -47,6 +47,8 @@ import { formatLanguages } from '@/i18n';
 
 // 👉 Ajout: service pricing (front) pour prix dynamiques
 import { usePricingConfig, detectUserCurrency } from '../services/pricingService';
+// 👉 Ajout: sélecteur de devise
+import { CurrencySelector } from '../components/checkout/CurrencySelector';
 
 // Performance & constants
 const IMAGE_SIZES = {
@@ -371,12 +373,19 @@ const toStringFromAny = (val: unknown, preferred?: string): string | undefined =
   getFirstString(val, preferred);
 
 // 👉 Ajout: format date (FR/EN) pour "Inscrit depuis le …"
+const isFsTimestamp = (v: unknown): v is FsTimestamp =>
+  typeof (v as FsTimestamp | null)?.toDate === 'function';
+
 const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
   if (!val) return undefined;
   let d: Date | undefined;
-  const anyVal = val as any;
-  if (anyVal?.toDate && typeof anyVal.toDate === 'function') d = anyVal.toDate();
-  else if (val instanceof Date) d = val;
+
+  if (isFsTimestamp(val)) {
+    d = val.toDate();
+  } else if (val instanceof Date) {
+    d = val;
+  }
+
   if (!d) return undefined;
   const fmt = new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-US', {
     day: '2-digit',
@@ -423,8 +432,33 @@ const ProviderProfile: React.FC = () => {
 
   // 👉 Ajout: pricing dynamique (lu une fois puis mémoïsé)
   const { pricing, loading: pricingLoading } = usePricingConfig();
-  const currency = detectUserCurrency();
-  const currencySymbol = currency === 'eur' ? '€' : '$';
+
+  // Devise sélectionnable + persistée
+  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
+    try {
+      const savedSession = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
+      if (savedSession && ['eur', 'usd'].includes(savedSession)) return savedSession;
+    } catch {
+      /* ignore read errors */
+    }
+    try {
+      const savedLocal = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
+      if (savedLocal && ['eur', 'usd'].includes(savedLocal)) return savedLocal;
+    } catch {
+      /* ignore read errors */
+    }
+    return detectUserCurrency();
+  });
+  const currencySymbol = selectedCurrency === 'eur' ? '€' : '$';
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('selectedCurrency', selectedCurrency);
+      localStorage.setItem('preferredCurrency', selectedCurrency);
+    } catch {
+      /* ignore write errors */
+    }
+  }, [selectedCurrency]);
 
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -449,11 +483,11 @@ const ProviderProfile: React.FC = () => {
       return { price: provider.price, duration: provider.duration, source: 'provider' as const };
     }
     if (!pricingLoading && pricing) {
-      const cfg = provider.type === 'lawyer' ? pricing.lawyer[currency] : pricing.expat[currency];
+      const cfg = provider.type === 'lawyer' ? pricing.lawyer[selectedCurrency] : pricing.expat[selectedCurrency];
       return { price: cfg.totalAmount, duration: cfg.duration, source: 'admin' as const };
     }
     return { price: undefined, duration: undefined, source: 'unknown' as const };
-  }, [provider, pricing, pricingLoading, currency]);
+  }, [provider, pricing, pricingLoading, selectedCurrency]);
 
   // Reviews loader (memoized)
   const realLoadReviews = useCallback(async (providerId: string): Promise<Review[]> => {
@@ -825,13 +859,9 @@ const ProviderProfile: React.FC = () => {
     if (!provider) return;
 
     // Analytics tracking with proper typing
-    interface WindowWithGtag extends Window {
-      gtag?: (command: string, eventName: string, parameters: Record<string, unknown>) => void;
-    }
-
-    const windowWithGtag = window as WindowWithGtag;
-    if (typeof window !== 'undefined' && windowWithGtag.gtag && typeof windowWithGtag.gtag === 'function') {
-      windowWithGtag.gtag('event', 'book_call_click', {
+    const gtag = (window as Window & { gtag?: (...args: unknown[]) => void }).gtag;
+    if (typeof window !== 'undefined' && typeof gtag === 'function') {
+      gtag('event', 'book_call_click', {
         provider_id: provider.id,
         provider_uid: provider.uid,
         provider_type: provider.type,
@@ -993,8 +1023,11 @@ const ProviderProfile: React.FC = () => {
   // Computed values (memoized)
   const isLawyer = provider?.type === 'lawyer';
   const isExpat = provider?.type === 'expat';
+  const languagesList = useMemo<string[]>(
+    () => (provider?.languages?.length ? provider.languages : ['Français']),
+    [provider?.languages]
+  );
   const mainPhoto = (provider?.profilePhoto || provider?.photoURL || provider?.avatar || '/default-avatar.png') as string;
-  const languagesList = provider?.languages?.length ? provider.languages : ['Français'];
 
   const descriptionText = useMemo(
     () => (provider ? pickDescription(provider, preferredLangKey) : ''),
@@ -1030,10 +1063,10 @@ const ProviderProfile: React.FC = () => {
   }, [provider, detectedLang, t]);
 
   // Structured data for SEO (memoized)
-  const structuredData = useMemo(() => {
-    if (!provider) return null;
+  const structuredData = useMemo<Record<string, unknown> | undefined>(() => {
+    if (!provider) return undefined;
 
-    return {
+    const data: Record<string, unknown> = {
       '@context': 'https://schema.org',
       '@type': isLawyer ? 'Attorney' : 'Person',
       '@id': `${window.location.origin}${window.location.pathname}`,
@@ -1067,6 +1100,8 @@ const ProviderProfile: React.FC = () => {
         worstRating: 1
       }
     };
+
+    return data;
   }, [provider, isLawyer, mainPhoto, descriptionText, detectedLang, languagesList, reviews.length]);
 
   // Loading state
@@ -1299,6 +1334,17 @@ const ProviderProfile: React.FC = () => {
                 <div className="group relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-200 transition-all hover:scale-[1.01]">
                   <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-red-500/5 to-orange-500/5 group-hover:from-red-500/10 group-hover:to-orange-500/10 transition-opacity" />
                   <div className="relative z-10">
+
+                    {/* ✅ Nouveau : Sélecteur de devise */}
+                    <div className="mb-6">
+                      <CurrencySelector
+                        serviceType={provider?.type === 'lawyer' ? 'lawyer' : 'expat'}
+                        selectedCurrency={selectedCurrency}
+                        onCurrencyChange={setSelectedCurrency}
+                        className="text-sm"
+                      />
+                    </div>
+
                     <div className="text-center mb-6">
                       <div className="inline-flex items-center gap-2 bg-gray-900 text-white rounded-full px-3 py-1 text-xs font-semibold">
                         <Phone size={14} />
@@ -1308,7 +1354,7 @@ const ProviderProfile: React.FC = () => {
                         className="mt-4 text-3xl sm:text-4xl font-black text-gray-900"
                         // 👉 Traçabilité de la source du prix (ne change pas l'UI)
                         data-price-source={priceInfo.source}
-                        title={`price source: ${priceInfo.source}`}
+                        title={`price source: ${priceInfo.source}, currency: ${selectedCurrency}`}
                       >
                         {priceInfo.price != null ? `${currencySymbol}${Math.round(priceInfo.price)}` : `${currencySymbol}--`}
                       </div>

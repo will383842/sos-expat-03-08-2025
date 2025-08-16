@@ -1,6 +1,20 @@
+// src/pages/admin/AdminDashboard.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Settings, Users, DollarSign, BarChart3, Save, Star, Shield, Trash, Mail, CheckCircle, AlertTriangle } from 'lucide-react';
+import {
+  Phone,
+  Settings,
+  Users,
+  DollarSign,
+  BarChart3,
+  Save,
+  Star,
+  Shield,
+  Trash,
+  Mail,
+  CheckCircle,
+  AlertTriangle
+} from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/common/Button';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,6 +27,7 @@ import { validateDataIntegrity, cleanupObsoleteData } from '../../utils/firestor
 import testNotificationSystem from '../../services/notifications/notificationService';
 import { PricingManagement } from '../../components/admin/PricingManagement';
 import { FinancialAnalytics } from '../../components/admin/FinancialAnalytics';
+import { usePricingConfig } from '../../services/pricingService';
 
 // Interface pour les paramètres admin
 interface AdminSettings {
@@ -23,7 +38,6 @@ interface AdminSettings {
   twilioSettings: {
     maxAttempts: number;
     timeoutSeconds: number;
-    
   };
   createdAt: unknown;
   updatedAt?: unknown;
@@ -56,7 +70,7 @@ interface Stats {
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   // États avec valeurs par défaut
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -66,6 +80,7 @@ const AdminDashboard: React.FC = () => {
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState<boolean>(false);
   const [isCleaningData, setIsCleaningData] = useState<boolean>(false);
   const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
+
   const [stats, setStats] = useState<Stats>({
     totalCalls: 0,
     successfulCalls: 0,
@@ -74,14 +89,64 @@ const AdminDashboard: React.FC = () => {
     providerRevenue: 0
   });
 
+  // Hook pricing
+  const { pricing: pricingConfig, loading: pricingLoading, error: pricingError } = usePricingConfig();
+
+  // ------- helpers -------
+  type TestFn = (id: string) => Promise<unknown>;
+  type TestFns = TestFn | undefined;
+
+  const getCallable = (
+    obj: unknown,
+    key: 'sendTestNotification' | 'testNotification' | 'sendTest' | 'triggerTest'
+  ): TestFns => {
+    if (obj && typeof obj === 'object') {
+      const value = (obj as Record<string, unknown>)[key];
+      if (typeof value === 'function') {
+        return value as TestFn;
+      }
+    }
+    return undefined;
+  };
+
+  const invokeTestNotification = async (providerId: string): Promise<void> => {
+    const candidate = testNotificationSystem as unknown;
+
+    // 1) Si c'est directement une fonction
+    if (typeof candidate === 'function') {
+      const fn = candidate as TestFn;
+      await fn(providerId);
+      return;
+    }
+
+    // 2) Sinon, essayer les méthodes usuelles d'un service
+    const tryOrder: TestFns[] = [
+      getCallable(candidate, 'sendTestNotification'),
+      getCallable(candidate, 'testNotification'),
+      getCallable(candidate, 'sendTest'),
+      getCallable(candidate, 'triggerTest')
+    ];
+
+    for (const fn of tryOrder) {
+      if (fn) {
+        await fn(providerId);
+        return;
+      }
+    }
+
+    throw new Error(
+      "Impossible d'invoquer le test de notification : ni fonction exportée, ni méthode de service connue détectée."
+    );
+  };
+  // -----------------------
+
   // Load platform statistics
   const loadStats = useCallback(async (): Promise<void> => {
     if (!user) return;
-    
+
     try {
-      // Load calls statistics
-      const callsSnapshot = await getDocs(collection(db, "calls"));
-      const paymentsSnapshot = await getDocs(collection(db, "payments"));
+      const callsSnapshot = await getDocs(collection(db, 'calls'));
+      const paymentsSnapshot = await getDocs(collection(db, 'payments'));
 
       let totalCalls = 0;
       let successfulCalls = 0;
@@ -91,15 +156,19 @@ const AdminDashboard: React.FC = () => {
 
       callsSnapshot.forEach((docSnapshot) => {
         totalCalls++;
-        const data = docSnapshot.data();
-        if (data.status === "success") successfulCalls++;
+        const data = docSnapshot.data() as Record<string, unknown>;
+        if ((data.status as string) === 'success') successfulCalls++;
       });
 
       paymentsSnapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        if (typeof data.amount === 'number') totalRevenue += data.amount;
-        if (typeof data.platformFee === 'number') platformRevenue += data.platformFee;
-        if (typeof data.providerAmount === 'number') providerRevenue += data.providerAmount;
+        const data = docSnapshot.data() as Record<string, unknown>;
+        const amount = data.amount;
+        const platformFee = data.platformFee;
+        const providerAmount = data.providerAmount;
+
+        if (typeof amount === 'number') totalRevenue += amount;
+        if (typeof platformFee === 'number') platformRevenue += platformFee;
+        if (typeof providerAmount === 'number') providerRevenue += providerAmount;
       });
 
       setStats({
@@ -117,18 +186,17 @@ const AdminDashboard: React.FC = () => {
   // Load admin settings and statistics
   const loadAdminData = useCallback(async (): Promise<void> => {
     if (!user) return;
-    
+
     try {
-      // Load admin settings
-      const settingsDoc = await getDoc(doc(db, 'admin_settings', 'main'));
+      const settingsRef = doc(db, 'admin_settings', 'main');
+      const settingsDoc = await getDoc(settingsRef);
       if (settingsDoc.exists()) {
         setSettings(settingsDoc.data() as AdminSettings);
       } else {
-        // Create default settings
         const defaultSettings: AdminSettings = {
           sosCommission: {
-            lawyer: { type: "fixed", amount: 9 },
-            expat: { type: "fixed", amount: 5 }
+            lawyer: { type: 'fixed', amount: 9 },
+            expat: { type: 'fixed', amount: 5 }
           },
           twilioSettings: {
             maxAttempts: 3,
@@ -136,11 +204,10 @@ const AdminDashboard: React.FC = () => {
           },
           createdAt: serverTimestamp()
         };
-        await setDoc(doc(db, "admin_settings", "main"), defaultSettings);
+        await setDoc(settingsRef, defaultSettings);
         setSettings(defaultSettings);
       }
 
-      // Load statistics
       await loadStats();
     } catch (error) {
       console.error('Error loading admin data:', error);
@@ -152,17 +219,17 @@ const AdminDashboard: React.FC = () => {
   // Chargement des données au montage du composant
   useEffect(() => {
     if (user) {
-      loadAdminData();
+      void loadAdminData();
     }
   }, [user, loadAdminData]);
 
   // Handle settings change
   const handleSettingsChange = (path: string, value: string | number): void => {
     if (!settings) return;
-    
-    const newSettings = { ...settings };
+
+    const newSettings: AdminSettings = JSON.parse(JSON.stringify(settings));
     const keys = path.split('.');
-    let current: Record<string, unknown> = newSettings as Record<string, unknown>;
+    let current: Record<string, unknown> = newSettings as unknown as Record<string, unknown>;
 
     for (let i = 0; i < keys.length - 1; i++) {
       current = current[keys[i]] as Record<string, unknown>;
@@ -201,7 +268,7 @@ const AdminDashboard: React.FC = () => {
       setShowIntegrityModal(true);
     } catch (error) {
       console.error('Error checking integrity:', error);
-      alert('Erreur lors de la vérification d\'intégrité');
+      alert("Erreur lors de la vérification d'intégrité");
     } finally {
       setIsCheckingIntegrity(false);
     }
@@ -212,7 +279,7 @@ const AdminDashboard: React.FC = () => {
     if (!confirm('Êtes-vous sûr de vouloir nettoyer les données obsolètes ? Cette action est irréversible.')) {
       return;
     }
-    
+
     setIsCleaningData(true);
     try {
       const success = await cleanupObsoleteData();
@@ -231,16 +298,16 @@ const AdminDashboard: React.FC = () => {
 
   // Test notification system
   const handleTestNotifications = async (): Promise<void> => {
-    if (!confirm('Voulez-vous tester le système de notifications ? Cela enverra un email/SMS/WhatsApp de test à un prestataire.')) {
+    if (!confirm("Voulez-vous tester le système de notifications ? Cela enverra un email/SMS/WhatsApp de test à un prestataire.")) {
       return;
     }
-    
+
     setIsTestingNotifications(true);
     try {
-      const testProviderId = prompt('Entrez l\'ID du prestataire pour le test:') || 'test-provider-id';
-      await testNotificationSystem(testProviderId);
+      const testProviderId = prompt("Entrez l'ID du prestataire pour le test:") || 'test-provider-id';
+      await invokeTestNotification(testProviderId);
       alert('Test de notification envoyé avec succès ! Vérifiez les logs de la console pour les détails.');
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Erreur lors du test de notification:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       alert(`Erreur lors du test de notification: ${errorMessage}`);
@@ -266,12 +333,8 @@ const AdminDashboard: React.FC = () => {
       <AdminLayout>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Accès non autorisé
-            </h1>
-            <p className="text-gray-600">
-              Vous devez être administrateur pour accéder à cette page.
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Accès non autorisé</h1>
+            <p className="text-gray-600">Vous devez être administrateur pour accéder à cette page.</p>
           </div>
         </div>
       </AdminLayout>
@@ -309,43 +372,23 @@ const AdminDashboard: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center py-6">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Console d'administration
-                  </h1>
-                  <p className="text-gray-600 mt-1">
-                    Gestion des paramètres et statistiques de la plateforme
-                  </p>
+                  <h1 className="text-3xl font-bold text-gray-900">Console d'administration</h1>
+                  <p className="text-gray-600 mt-1">Gestion des paramètres et statistiques de la plateforme</p>
                 </div>
                 <div className="flex space-x-4">
-                  <Button
-                    onClick={saveSettings}
-                    loading={isSaving}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
+                  <Button onClick={saveSettings} loading={isSaving} className="bg-red-600 hover:bg-red-700">
                     <Save size={20} className="mr-2" />
                     Sauvegarder
                   </Button>
-                  <Button
-                    onClick={handleCheckIntegrity}
-                    loading={isCheckingIntegrity}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
+                  <Button onClick={handleCheckIntegrity} loading={isCheckingIntegrity} className="bg-green-600 hover:bg-green-700">
                     <Shield size={20} className="mr-2" />
                     Vérifier l'intégrité
                   </Button>
-                  <Button
-                    onClick={handleCleanupData}
-                    loading={isCleaningData}
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
+                  <Button onClick={handleCleanupData} loading={isCleaningData} className="bg-orange-600 hover:bg-orange-700">
                     <Trash size={20} className="mr-2" />
                     Nettoyer les données
                   </Button>
-                  <Button
-                    onClick={handleTestNotifications}
-                    loading={isTestingNotifications}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
+                  <Button onClick={handleTestNotifications} loading={isTestingNotifications} className="bg-purple-600 hover:bg-purple-700">
                     <Mail size={20} className="mr-2" />
                     Tester les notifications
                   </Button>
@@ -381,7 +424,9 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Revenus totaux</p>
-                    <p className="text-3xl font-bold text-purple-600">{stats.totalRevenue.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {stats.totalRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                    </p>
                   </div>
                   <DollarSign className="w-8 h-8 text-purple-600" />
                 </div>
@@ -391,7 +436,9 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Commission SOS</p>
-                    <p className="text-3xl font-bold text-red-600">{stats.platformRevenue.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {stats.platformRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                    </p>
                   </div>
                   <Settings className="w-8 h-8 text-red-600" />
                 </div>
@@ -401,7 +448,9 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Revenus prestataires</p>
-                    <p className="text-3xl font-bold text-orange-600">{stats.providerRevenue.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€</p>
+                    <p className="text-3xl font-bold text-orange-600">
+                      {stats.providerRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                    </p>
                   </div>
                   <Users className="w-8 h-8 text-orange-600" />
                 </div>
@@ -411,9 +460,7 @@ const AdminDashboard: React.FC = () => {
             {/* Section Gestion des Prix */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Gestion des Frais de Mise en Relation
-                </h2>
+                <h2 className="text-lg font-semibold text-gray-900">Gestion des Frais de Mise en Relation</h2>
               </div>
               <div className="p-6">
                 <PricingManagement />
@@ -423,9 +470,7 @@ const AdminDashboard: React.FC = () => {
             {/* Section Analytics Financiers */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Analytics Financiers
-                </h2>
+                <h2 className="text-lg font-semibold text-gray-900">Analytics Financiers</h2>
               </div>
               <div className="p-6">
                 <FinancialAnalytics />
@@ -447,9 +492,7 @@ const AdminDashboard: React.FC = () => {
                     <h3 className="font-medium text-gray-900 mb-3">Appels Avocat</h3>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Type de commission
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Type de commission</label>
                         <select
                           value={settings?.sosCommission.lawyer.type || 'fixed'}
                           onChange={(e) => handleSettingsChange('sosCommission.lawyer.type', e.target.value)}
@@ -479,9 +522,7 @@ const AdminDashboard: React.FC = () => {
                     <h3 className="font-medium text-gray-900 mb-3">Appels Expatrié</h3>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Type de commission
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Type de commission</label>
                         <select
                           value={settings?.sosCommission.expat.type || 'fixed'}
                           onChange={(e) => handleSettingsChange('sosCommission.expat.type', e.target.value)}
@@ -518,28 +559,24 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="p-6 space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre maximum de tentatives
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre maximum de tentatives</label>
                     <input
                       type="number"
-                      min="1"
-                      max="5"
+                      min={1}
+                      max={5}
                       value={settings?.twilioSettings.maxAttempts || 3}
-                      onChange={(e) => handleSettingsChange('twilioSettings.maxAttempts', parseInt(e.target.value))}
+                      onChange={(e) => handleSettingsChange('twilioSettings.maxAttempts', parseInt(e.target.value, 10))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Timeout par tentative (secondes)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Timeout par tentative (secondes)</label>
                     <input
                       type="number"
-                      min="10"
-                      max="60"
+                      min={10}
+                      max={60}
                       value={settings?.twilioSettings.timeoutSeconds || 30}
-                      onChange={(e) => handleSettingsChange('twilioSettings.timeoutSeconds', parseInt(e.target.value))}
+                      onChange={(e) => handleSettingsChange('twilioSettings.timeoutSeconds', parseInt(e.target.value, 10))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                   </div>
@@ -547,74 +584,200 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Commission Calculation Preview */}
+            {/* Commission Calculation Preview - VERSION DYNAMIQUE */}
             <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Aperçu des calculs de commission
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2" />
+                  Aperçu des calculs de commission (Prix actuels)
                 </h2>
+                {pricingLoading && <p className="text-sm text-gray-500 mt-1">⏳ Chargement des prix en cours...</p>}
+                {pricingError && (
+                  <p className="text-sm text-red-600 mt-1">⚠️ Erreur: {pricingError} (Utilisation des valeurs par défaut)</p>
+                )}
               </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="font-medium text-blue-900 mb-3">Appel Avocat (49€)</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Prix total:</span>
-                        <span className="font-medium">49.00€</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Commission SOS:</span>
-                        <span className="font-medium text-red-600">
-                          {settings?.sosCommission.lawyer.type === 'percentage' 
-                            ? `${((49 * (settings?.sosCommission.lawyer.amount || 0)) / 100).toFixed(2)}€`
-                            : `${(settings?.sosCommission.lawyer.amount || 0).toFixed(2)}€`
-                          }
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span>Part avocat:</span>
-                        <span className="font-medium text-green-600">
-                          {settings?.sosCommission.lawyer.type === 'percentage' 
-                            ? `${(49 - (49 * (settings?.sosCommission.lawyer.amount || 0)) / 100).toFixed(2)}€`
-                            : `${(49 - (settings?.sosCommission.lawyer.amount || 0)).toFixed(2)}€`
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <h3 className="font-medium text-green-900 mb-3">Appel Expatrié (19€)</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Prix total:</span>
-                        <span className="font-medium">19.00€</span>
+              <div className="p-6">
+                {pricingConfig ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Avocat EUR */}
+                    <div className="bg-blue-50 rounded-lg p-4" data-price-source="admin">
+                      <h3 className="font-medium text-blue-900 mb-3">
+                        👨‍⚖️ Appel Avocat ({pricingConfig.lawyer.eur.totalAmount}€)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-medium">{pricingConfig.lawyer.eur.totalAmount.toFixed(2)}€</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            {pricingConfig.lawyer.eur.connectionFeeAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part avocat:</span>
+                          <span className="font-medium text-green-600">
+                            {pricingConfig.lawyer.eur.providerAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.lawyer.eur.duration} min</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Taux commission:</span>
+                          <span>
+                            {(
+                              (pricingConfig.lawyer.eur.connectionFeeAmount / pricingConfig.lawyer.eur.totalAmount) *
+                              100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Commission SOS:</span>
-                        <span className="font-medium text-red-600">
-                          {settings?.sosCommission.expat.type === 'percentage' 
-                            ? `${((19 * (settings?.sosCommission.expat.amount || 0)) / 100).toFixed(2)}€`
-                            : `${(settings?.sosCommission.expat.amount || 0).toFixed(2)}€`
-                          }
-                        </span>
+                    </div>
+
+                    {/* Avocat USD */}
+                    <div className="bg-blue-50 rounded-lg p-4" data-price-source="admin">
+                      <h3 className="font-medium text-blue-900 mb-3">
+                        👨‍⚖️ Appel Avocat (${pricingConfig.lawyer.usd.totalAmount})
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-medium">${pricingConfig.lawyer.usd.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            ${pricingConfig.lawyer.usd.connectionFeeAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part avocat:</span>
+                          <span className="font-medium text-green-600">
+                            ${pricingConfig.lawyer.usd.providerAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.lawyer.usd.duration} min</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Taux commission:</span>
+                          <span>
+                            {(
+                              (pricingConfig.lawyer.usd.connectionFeeAmount / pricingConfig.lawyer.usd.totalAmount) *
+                              100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span>Part expatrié:</span>
-                        <span className="font-medium text-green-600">
-                          {settings?.sosCommission.expat.type === 'percentage' 
-                            ? `${(19 - (19 * (settings?.sosCommission.expat.amount || 0)) / 100).toFixed(2)}€`
-                            : `${(19 - (settings?.sosCommission.expat.amount || 0)).toFixed(2)}€`
-                          }
-                        </span>
+                    </div>
+
+                    {/* Expatrié EUR */}
+                    <div className="bg-green-50 rounded-lg p-4" data-price-source="admin">
+                      <h3 className="font-medium text-green-900 mb-3">
+                        🌍 Appel Expatrié ({pricingConfig.expat.eur.totalAmount}€)
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-medium">{pricingConfig.expat.eur.totalAmount.toFixed(2)}€</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            {pricingConfig.expat.eur.connectionFeeAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part expatrié:</span>
+                          <span className="font-medium text-green-600">
+                            {pricingConfig.expat.eur.providerAmount.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.expat.eur.duration} min</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Taux commission:</span>
+                          <span>
+                            {(
+                              (pricingConfig.expat.eur.connectionFeeAmount / pricingConfig.expat.eur.totalAmount) *
+                              100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expatrié USD */}
+                    <div className="bg-green-50 rounded-lg p-4" data-price-source="admin">
+                      <h3 className="font-medium text-green-900 mb-3">
+                        🌍 Appel Expatrié (${pricingConfig.expat.usd.totalAmount})
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Prix total:</span>
+                          <span className="font-medium">${pricingConfig.expat.usd.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Commission SOS:</span>
+                          <span className="font-medium text-red-600">
+                            ${pricingConfig.expat.usd.connectionFeeAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Part expatrié:</span>
+                          <span className="font-medium text-green-600">
+                            ${pricingConfig.expat.usd.providerAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Durée:</span>
+                          <span>{pricingConfig.expat.usd.duration} min</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Taux commission:</span>
+                          <span>
+                            {(
+                              (pricingConfig.expat.usd.connectionFeeAmount / pricingConfig.expat.usd.totalAmount) *
+                              100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  // Fallback si pas de pricing config
+                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                    <div className="flex items-center mb-3">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+                      <h3 className="font-medium text-yellow-900">Configuration pricing non disponible</h3>
+                    </div>
+                    <p className="text-sm text-yellow-800 mb-4">
+                      Impossible de charger la configuration des prix depuis admin_config/pricing.
+                      Utilisez la section "Gestion des Frais de Mise en Relation" ci-dessus pour configurer les prix.
+                    </p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition-colors"
+                    >
+                      🔄 Recharger la page
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-            
+
             {/* Reviews Management */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8">
               <div className="px-6 py-4 border-b border-gray-200">
@@ -627,13 +790,11 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-gray-600 mb-4">
                   Gérez les avis clients de la plateforme. Vous pouvez modérer, publier ou masquer les avis.
                 </p>
-                <Button onClick={() => navigate('/admin/reviews')}>
-                  Accéder à la gestion des avis
-                </Button>
+                <Button onClick={() => navigate('/admin/reviews')}>Accéder à la gestion des avis</Button>
               </div>
             </div>
           </div>
-          
+
           {/* Integrity Check Modal */}
           <Modal
             isOpen={showIntegrityModal}
@@ -643,7 +804,11 @@ const AdminDashboard: React.FC = () => {
           >
             {integrityReport && (
               <div className="space-y-4">
-                <div className={`p-4 rounded-lg ${integrityReport.isValid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <div
+                  className={`p-4 rounded-lg ${
+                    integrityReport.isValid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                  }`}
+                >
                   <div className="flex items-center">
                     {integrityReport.isValid ? (
                       <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
@@ -671,10 +836,7 @@ const AdminDashboard: React.FC = () => {
                 )}
 
                 <div className="flex justify-end space-x-3 pt-4">
-                  <Button
-                    onClick={() => setShowIntegrityModal(false)}
-                    variant="outline"
-                  >
+                  <Button onClick={() => setShowIntegrityModal(false)} variant="outline">
                     Fermer
                   </Button>
                 </div>

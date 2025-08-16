@@ -317,9 +317,9 @@ const useIsMobile = () => {
       mq.addEventListener('change', update);
       return () => mq.removeEventListener('change', update);
     } else {
-      // @ts-ignore
+      // @ts-expect-error - Legacy MediaQueryList API (Safari < 14)
       mq.addListener(update);
-      // @ts-ignore
+      // @ts-expect-error - Legacy MediaQueryList API (Safari < 14)
       return () => mq.removeListener(update);
     }
   }, []);
@@ -383,6 +383,16 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     if (Math.abs(amountRounded - total) > 0.01) throw new Error(t('err.amountSplit'));
   }, [stripe, elements, user, provider, service, t, serviceCurrency]);
 
+  // Confirmation avant paiement pour montants élevés
+  const validateCurrencyBeforePayment = useCallback(() => {
+    const confirmMessage =
+      `Confirmer le paiement de ${service.amount.toFixed(2)}${currencySymbol} en ${serviceCurrency.toUpperCase()} ?`;
+    if (service.amount > 100) {
+      return confirm(confirmMessage);
+    }
+    return true;
+  }, [service.amount, currencySymbol, serviceCurrency]);
+
   const persistPaymentDocs = useCallback(
     async (paymentIntentId: string) => {
       const baseDoc = {
@@ -427,9 +437,16 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
   const handlePaymentSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
-    
+
     try {
       setIsProcessing(true);
+
+      // Vérification UX avant validations Stripe
+      if (!validateCurrencyBeforePayment()) {
+        setIsProcessing(false);
+        return;
+      }
+
       validatePaymentData();
 
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
@@ -534,6 +551,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     isProcessing,
     setIsProcessing,
     validatePaymentData,
+    validateCurrencyBeforePayment,
     service,
     provider,
     user,
@@ -743,29 +761,50 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
-  // Configuration pricing
-  const { config: pricingConfig, loading: pricingLoading, error: pricingError } = usePricingConfig();
+  // Configuration pricing - on ne récupère que loading/error (évite l'erreur de propriété .config et la var inutilisée)
+  const { loading: pricingLoading, error: pricingError } = usePricingConfig();
 
-  // État pour la devise sélectionnée
-  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
-    if (serviceData?.currency && ['eur', 'usd'].includes(serviceData.currency)) {
-      return serviceData.currency as 'eur' | 'usd';
-    }
-    
-    try {
-      const saved = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
-      if (saved && ['eur', 'usd'].includes(saved)) return saved;
-    } catch {}
-    
-    return detectUserCurrency();
-  });
+  // 1) Initialisation devise corrigée
+  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>('eur');
 
-  // Sauvegarder la devise sélectionnée
+  useEffect(() => {
+    const initializeCurrency = () => {
+      if (serviceData?.currency && ['eur', 'usd'].includes(serviceData.currency)) {
+        setSelectedCurrency(serviceData.currency as 'eur' | 'usd');
+        return;
+      }
+      try {
+        const saved = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
+        if (saved && ['eur', 'usd'].includes(saved)) {
+          setSelectedCurrency(saved);
+          return;
+        }
+      } catch (e) {
+        console.warn('sessionStorage selectedCurrency read failed', e);
+      }
+      try {
+        const preferred = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
+        if (preferred && ['eur', 'usd'].includes(preferred)) {
+          setSelectedCurrency(preferred);
+          return;
+        }
+      } catch (e) {
+        console.warn('localStorage preferredCurrency read failed', e);
+      }
+      const detected = detectUserCurrency();
+      setSelectedCurrency(detected);
+    };
+    initializeCurrency();
+  }, [serviceData?.currency]);
+
+  // Sauvegarde défensive
   useEffect(() => {
     try {
       sessionStorage.setItem('selectedCurrency', selectedCurrency);
       localStorage.setItem('preferredCurrency', selectedCurrency);
-    } catch {}
+    } catch (e) {
+      console.warn('persist selectedCurrency failed', e);
+    }
   }, [selectedCurrency]);
 
   // Récup provider
@@ -783,20 +822,36 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     return null;
   }, [selectedProvider]);
 
-  // Service recalculé selon la devise
+  // 2) Handler devise + logs
   const [serviceWithPricing, setServiceWithPricing] = useState<ServiceData | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(false);
-  
+
+  const handleCurrencyChange = useCallback((newCurrency: 'eur' | 'usd') => {
+    setSelectedCurrency(newCurrency);
+    try {
+      sessionStorage.setItem('selectedCurrency', newCurrency);
+      localStorage.setItem('preferredCurrency', newCurrency);
+    } catch (e) {
+      console.warn('persist currency after change failed', e);
+    }
+    if (serviceWithPricing) {
+      setLoadingPricing(true);
+    }
+  }, [serviceWithPricing]);
+
+  // Service recalculé selon la devise
   useEffect(() => {
     const loadServicePricing = async () => {
-      if (!provider?.id || pricingLoading || pricingError) return;
-      
+      if (!provider?.id || pricingLoading || pricingError || !selectedCurrency) return;
+
       setLoadingPricing(true);
       try {
         const providerRole: 'lawyer' | 'expat' = (provider.role || provider.type || 'expat') as 'lawyer' | 'expat';
-        
+
+        console.log(`🔄 Recalcul prix: ${providerRole} en ${selectedCurrency.toUpperCase()}`);
+
         const pricingData = await calculateServiceAmounts(providerRole, selectedCurrency);
-        
+
         setServiceWithPricing({
           providerId: provider.id,
           serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
@@ -808,8 +863,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
           providerAmount: pricingData.providerAmount,
           currency: pricingData.currency
         });
+
+        console.log(`✅ Prix calculé: ${pricingData.totalAmount}${pricingData.currency === 'usd' ? '$' : '€'}`);
       } catch (error) {
-        console.error('Erreur calcul pricing:', error);
+        console.error('❌ Erreur calcul pricing:', error);
         setServiceWithPricing(null);
       } finally {
         setLoadingPricing(false);
@@ -824,7 +881,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     try {
       const saved = sessionStorage.getItem('clientPhone');
       return saved ? normalizePhone(saved) : normalizePhone(user?.phone || '');
-    } catch {
+    } catch (e) {
+      console.warn('sessionStorage clientPhone read failed', e);
       return normalizePhone(user?.phone || '');
     }
   });
@@ -832,7 +890,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const [clientWhatsapp, setClientWhatsapp] = useState<string>(() => {
     try {
       return normalizePhone(sessionStorage.getItem('clientWhatsapp') || '');
-    } catch {
+    } catch (e) {
+      console.warn('sessionStorage clientWhatsapp read failed', e);
       return '';
     }
   });
@@ -841,13 +900,24 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     try {
       sessionStorage.setItem('clientPhone', clientPhone);
       sessionStorage.setItem('clientWhatsapp', clientWhatsapp);
-    } catch {}
+    } catch (e) {
+      console.warn('persist phone/whatsapp failed', e);
+    }
   }, [clientPhone, clientWhatsapp]);
 
   const service: ServiceData | null = useMemo(() => {
     if (!serviceWithPricing) return null;
     return { ...serviceWithPricing, clientPhone };
   }, [serviceWithPricing, clientPhone]);
+
+  // Logs debug supplémentaires
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log(`💱 CallCheckout currency changed: ${selectedCurrency}`);
+      console.log(`📊 Service data:`, service);
+      console.log(`💰 Amount: ${service?.amount}${selectedCurrency === 'usd' ? '$' : '€'}`);
+    }
+  }, [selectedCurrency, service]);
 
   const [currentStep, setCurrentStep] = useState<StepType>('payment');
   const [callProgress, setCallProgress] = useState<number>(0);
@@ -941,7 +1011,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   }, [currentStep, callProgress]);
 
   /* ------------------------- Guards ------------------------- */
-  
   if (pricingLoading || loadingPricing) {
     return (
       <Layout>
@@ -1036,6 +1105,29 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     );
   }
 
+  // Garde devise invalide
+  if (selectedCurrency && !['eur', 'usd'].includes(selectedCurrency)) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 text-center max-w-sm mx-auto">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Devise non supportée</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Devise "{selectedCurrency}" non reconnue. Retour à EUR.
+            </p>
+            <button
+              onClick={() => handleCurrencyChange('eur')}
+              className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-red-500 to-red-600 text-white"
+            >
+              Continuer en EUR
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   /* ------------------------------ Render page ---------------------------- */
   return (
     <Layout>
@@ -1101,7 +1193,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
               </div>
 
-              <div className="text-right flex-shrink-0">
+              {/* Marqueurs debug prix */}
+              <div className="text-right flex-shrink-0" data-price-source="admin" data-currency={selectedCurrency}>
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
                   {selectedCurrency === 'usd' ? '$' : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
                 </div>
@@ -1115,7 +1208,8 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             <CurrencySelector
               serviceType={provider?.role === 'lawyer' || provider?.type === 'lawyer' ? 'lawyer' : 'expat'}
               selectedCurrency={selectedCurrency}
-              onCurrencyChange={setSelectedCurrency}
+              onCurrencyChange={handleCurrencyChange}
+              className="mb-4"
             />
           </section>
 

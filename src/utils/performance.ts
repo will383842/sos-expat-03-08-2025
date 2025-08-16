@@ -64,7 +64,7 @@ export const measurePerformance = () => {
   }
 
   const metrics: {
-    navigationTiming: any;
+    navigationTiming: unknown;
     webVitals: {
       LCP: number | null;
       FID: number | null;
@@ -108,6 +108,11 @@ export const measurePerformance = () => {
 
     const safe = (v: number) => (Number.isFinite(v) ? Math.round(v) : null);
 
+    // Vérifier si les propriétés existent avant de les utiliser
+    const navigationStart = (perfData as unknown as { navigationStart?: number }).navigationStart ?? perfData.fetchStart;
+    const domContentLoadedEventEnd = perfData.domContentLoadedEventEnd;
+    const loadEventEnd = perfData.loadEventEnd;
+
     metrics.navigationTiming = {
       dns: safe(perfData.domainLookupEnd - perfData.domainLookupStart),
       tcp: safe(perfData.connectEnd - perfData.connectStart),
@@ -115,9 +120,9 @@ export const measurePerformance = () => {
       ttfb: safe(perfData.responseStart - perfData.requestStart),
       download: safe(perfData.responseEnd - perfData.responseStart),
       domParsing: safe(perfData.domContentLoadedEventStart - perfData.responseEnd),
-      domReady: safe(perfData.domContentLoadedEventEnd - perfData.navigationStart),
-      windowLoad: safe(perfData.loadEventEnd - perfData.navigationStart),
-      totalTime: safe(perfData.loadEventEnd - perfData.navigationStart)
+      domReady: safe(domContentLoadedEventEnd - navigationStart),
+      windowLoad: safe(loadEventEnd - navigationStart),
+      totalTime: safe(loadEventEnd - navigationStart)
     };
   };
 
@@ -139,8 +144,7 @@ export const measurePerformance = () => {
         const fcpObserver = new PerformanceObserver((list) => {
           const entries = list.getEntries();
           for (const entry of entries as PerformanceEntry[]) {
-            // @ts-expect-error name exists on PerformancePaintTiming
-            if ((entry as any).name === 'first-contentful-paint' && typeof entry.startTime === 'number') {
+            if ((entry as { name?: string }).name === 'first-contentful-paint' && typeof entry.startTime === 'number') {
               metrics.webVitals.FCP = Math.round(entry.startTime);
             }
           }
@@ -150,7 +154,7 @@ export const measurePerformance = () => {
         // Cumulative Layout Shift (CLS)
         let clsValue = 0;
         const clsObserver = new PerformanceObserver((list) => {
-          for (const entry of list.getEntries() as any[]) {
+          for (const entry of list.getEntries() as Array<{ hadRecentInput?: boolean; value?: number }>) {
             if (!entry.hadRecentInput) {
               clsValue += entry.value || 0;
             }
@@ -162,7 +166,7 @@ export const measurePerformance = () => {
         // First Input Delay (FID)
         try {
           const fidObserver = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries() as any[]) {
+            for (const entry of list.getEntries() as Array<{ processingStart?: number; startTime?: number }>) {
               if (entry.processingStart && entry.startTime) {
                 const delay = entry.processingStart - entry.startTime;
                 if (Number.isFinite(delay)) {
@@ -171,7 +175,7 @@ export const measurePerformance = () => {
               }
             }
           });
-          fidObserver.observe({ type: 'first-input', buffered: true } as any);
+          fidObserver.observe({ type: 'first-input', buffered: true } as PerformanceObserverInit);
         } catch {
           // Some browsers may not support this combination
         }
@@ -179,7 +183,7 @@ export const measurePerformance = () => {
         // Interaction to Next Paint (INP) – keep worst interaction
         try {
           const inpObserver = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries() as any[]) {
+            for (const entry of list.getEntries() as Array<{ duration?: number; processingStart?: number; startTime?: number }>) {
               // Some browsers expose 'duration' as latency proxy for INP
               const latency =
                 (typeof entry.duration === 'number' && entry.duration) ||
@@ -194,7 +198,7 @@ export const measurePerformance = () => {
               }
             }
           });
-          inpObserver.observe({ type: 'event', buffered: true } as any);
+          inpObserver.observe({ type: 'event', buffered: true } as PerformanceObserverInit);
         } catch {
           // ignore if not supported
         }
@@ -222,13 +226,14 @@ export const measurePerformance = () => {
       | PerformanceNavigationTiming
       | undefined;
     if (document.readyState === 'complete' && navTiming) {
-      const v = navTiming.domContentLoadedEventEnd - navTiming.navigationStart;
+      const navigationStart = (navTiming as unknown as { navigationStart?: number }).navigationStart ?? navTiming.fetchStart;
+      const v = navTiming.domContentLoadedEventEnd - navigationStart;
       metrics.customMetrics.domReady = Number.isFinite(v) ? Math.round(v) : null;
     }
 
     // Memory usage (Chrome only)
-    if ((performance as any).memory) {
-      const mem = (performance as any).memory;
+    if ((performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory) {
+      const mem = (performance as unknown as { memory: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
       metrics.customMetrics.jsHeapSize = {
         used: Math.round(mem.usedJSHeapSize / 1024 / 1024),
         total: Math.round(mem.totalJSHeapSize / 1024 / 1024),
@@ -237,7 +242,7 @@ export const measurePerformance = () => {
     }
 
     // Connection information
-    const anyNav = navigator as any;
+    const anyNav = navigator as unknown as { connection?: { effectiveType: string; downlink: number; rtt: number; saveData: boolean } };
     if (anyNav.connection) {
       const conn = anyNav.connection;
       metrics.customMetrics.connectionType = {
@@ -347,7 +352,7 @@ export const preloadCriticalResources = (customResources: Partial<{
     link.href = href;
     link.as = as;
 
-    if (type) (link as any).type = type;
+    if (type) (link as unknown as { type?: string }).type = type;
     if (crossorigin) link.crossOrigin = crossorigin;
 
     // Add media query for responsive images
@@ -411,14 +416,14 @@ export const setupLazyLoading = () => {
           const img = entry.target as HTMLImageElement;
 
           // Load the image
-          if ((img as any).dataset?.src) {
-            img.src = (img as any).dataset.src;
+          if ((img as unknown as { dataset?: { src?: string } }).dataset?.src) {
+            img.src = (img as unknown as { dataset: { src: string } }).dataset.src;
             img.removeAttribute('data-src');
           }
 
           // Load responsive images
-          if ((img as any).dataset?.srcset) {
-            (img as any).srcset = (img as any).dataset.srcset;
+          if ((img as unknown as { dataset?: { srcset?: string } }).dataset?.srcset) {
+            (img as unknown as { srcset?: string }).srcset = (img as unknown as { dataset: { srcset: string } }).dataset.srcset;
             img.removeAttribute('data-srcset');
           }
 
@@ -450,7 +455,7 @@ export const setupLazyLoading = () => {
 // =============================================================================
 
 export const adaptiveLoading = () => {
-  const anyNav = navigator as any;
+  const anyNav = navigator as unknown as { connection?: { effectiveType: string; saveData: boolean; downlink: number; rtt: number }; hardwareConcurrency?: number };
   if (!anyNav.connection) {
     return { shouldOptimize: false, reason: 'Connection API not supported' };
   }
@@ -459,7 +464,7 @@ export const adaptiveLoading = () => {
   const isSlowConnection =
     connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g';
   const isSaveDataEnabled = connection.saveData;
-  const isLowEndDevice = (navigator as any).hardwareConcurrency && (navigator as any).hardwareConcurrency <= 2;
+  const isLowEndDevice = anyNav.hardwareConcurrency && anyNav.hardwareConcurrency <= 2;
 
   const shouldOptimize = isSlowConnection || isSaveDataEnabled || isLowEndDevice;
 
@@ -509,7 +514,7 @@ export const prefetchNextPageResources = (urls: string[]) => {
 
 export const prioritizeUserInteraction = () => {
   // Use scheduler API if available for better UX
-  const anyScheduler = (window as any).scheduler;
+  const anyScheduler = (window as unknown as { scheduler?: { postTask: (callback: () => void, options?: { priority?: string }) => void } }).scheduler;
   if (anyScheduler && 'postTask' in anyScheduler) {
     return (callback: () => void, priority: 'user-visible' | 'background' = 'user-visible') => {
       anyScheduler.postTask(callback, { priority });
@@ -518,9 +523,7 @@ export const prioritizeUserInteraction = () => {
 
   // Fallback to requestIdleCallback or setTimeout
   return (callback: () => void) => {
-    const ric = (window as any).requestIdleCallback as
-      | ((cb: () => void, opts?: { timeout?: number }) => number)
-      | undefined;
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number }).requestIdleCallback;
     if (ric) {
       ric(callback, { timeout: 2000 });
     } else {
@@ -571,7 +574,7 @@ export const initPerformanceOptimizations = (options: Partial<{
 
   // Preload critical resources
   if (config.enablePreload) {
-    preloadCriticalResources(config.customResources as any);
+    preloadCriticalResources(config.customResources as Parameters<typeof preloadCriticalResources>[0]);
   }
 
   // Setup lazy loading

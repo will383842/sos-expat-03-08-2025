@@ -349,7 +349,7 @@ const Checkout: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        value={user.firstName}
+                        value={user?.firstName || ''}
                         readOnly
                         className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                       />
@@ -360,7 +360,7 @@ const Checkout: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        value={user.lastName}
+                        value={user?.lastName || ''}
                         readOnly
                         className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                       />
@@ -373,7 +373,7 @@ const Checkout: React.FC = () => {
                     </label>
                     <input
                       type="email"
-                      value={user.email}
+                      value={user?.email || ''}
                       readOnly
                       className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                     />
@@ -439,4 +439,3 @@ const Checkout: React.FC = () => {
 };
 
 export default Checkout;
-

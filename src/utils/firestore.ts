@@ -29,36 +29,62 @@ import {
   deleteObject,
 } from 'firebase/storage';
 import { db, storage, auth } from '../config/firebase';
+
+// Import correct du type User depuis contexts/types
+import type { User } from '../contexts/types';
 import type {
-  User,
   CallRecord,
   Payment,
   Review,
   Document as UserDocument,
-  Notification,
   Testimonial,
   CallSession,
   SosProfile,
-  EnhancedSettings,
 } from '../types';
 
+// Interface pour Notification
+interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  read: boolean;
+  createdAt: Date;
+}
+
+// Interface pour EnhancedSettings
+interface EnhancedSettings {
+  theme: 'light' | 'dark' | 'auto';
+  language: string;
+  notifications: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+  privacy: {
+    profileVisible: boolean;
+    showOnMap: boolean;
+  };
+}
+
 // ========================= Utils =========================
-const toDate = (v: any): Date | null => {
+const toDate = (v: unknown): Date | null => {
   try {
     if (!v) return null;
     if (v instanceof Date) return v;
     if (v instanceof Timestamp) return v.toDate();
-    if (typeof v?.toDate === 'function') return v.toDate();
-    const d = new Date(v);
+    if (typeof v?.toDate === 'function') return (v as { toDate(): Date }).toDate();
+    const d = new Date(v as string | number);
     return isNaN(d.getTime()) ? null : d;
   } catch {
     return null;
   }
 };
 
-const truthy = (v: any) => v !== undefined && v !== null;
+const truthy = (v: unknown) => v !== undefined && v !== null;
 
-export const firstString = (val: any, preferredLang: string = 'fr'): string | undefined => {
+export const firstString = (val: unknown, preferredLang: string = 'fr'): string | undefined => {
   if (!val) return;
   if (typeof val === 'string') return val.trim() || undefined;
   if (Array.isArray(val)) {
@@ -69,11 +95,11 @@ export const firstString = (val: any, preferredLang: string = 'fr'): string | un
     return joined || undefined;
   }
   if (typeof val === 'object') {
-    if (typeof val[preferredLang] === 'string' && val[preferredLang].trim()) {
-      return val[preferredLang].trim();
+    if (typeof (val as Record<string, unknown>)[preferredLang] === 'string' && (val as Record<string, unknown>)[preferredLang] && ((val as Record<string, unknown>)[preferredLang] as string).trim()) {
+      return ((val as Record<string, unknown>)[preferredLang] as string).trim();
     }
-    for (const k of Object.keys(val)) {
-      const v = val[k];
+    for (const k of Object.keys(val as Record<string, unknown>)) {
+      const v = (val as Record<string, unknown>)[k];
       if (typeof v === 'string' && v.trim()) return v.trim();
     }
   }
@@ -83,85 +109,85 @@ export const firstString = (val: any, preferredLang: string = 'fr'): string | un
 // ========================= Normalization =========================
 // IMPORTANT FIX: do NOT force uid = docId; keep real uid if present.
 // Also avoid spreading ...userData at the end (prevents overwriting normalized fields).
-export const normalizeUserData = (userData: any, docId: string): User => {
+export const normalizeUserData = (userData: Record<string, unknown>, docId: string): User => {
   return {
     id: docId,
-    uid: userData?.uid || docId, // ✅ keep real UID if provided
-    role: userData?.role || 'client',
-    country: userData?.country || userData?.currentCountry || '',
+    uid: (userData?.uid as string) || docId, // ✅ keep real UID if provided
+    role: (userData?.role as string) || 'client',
+    country: (userData?.country as string) || (userData?.currentCountry as string) || '',
     fullName:
-      userData?.fullName ||
-      `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() ||
+      (userData?.fullName as string) ||
+      `${(userData?.firstName as string) || ''} ${(userData?.lastName as string) || ''}`.trim() ||
       'Utilisateur',
     updatedAt: toDate(userData?.updatedAt) || new Date(),
     lastLoginAt: toDate(userData?.lastLoginAt) || new Date(),
     createdAt: toDate(userData?.createdAt) || new Date(),
-    firstName: userData?.firstName || '',
-    lastName: userData?.lastName || '',
-    email: userData?.email || '',
-    phone: userData?.phone || '',
-    phoneCountryCode: userData?.phoneCountryCode || '+33',
-    currentCountry: userData?.currentCountry || '',
-    preferredLanguage: userData?.preferredLanguage || 'fr',
+    firstName: (userData?.firstName as string) || '',
+    lastName: (userData?.lastName as string) || '',
+    email: (userData?.email as string) || '',
+    phone: (userData?.phone as string) || '',
+    phoneCountryCode: (userData?.phoneCountryCode as string) || '+33',
+    currentCountry: (userData?.currentCountry as string) || '',
+    preferredLanguage: (userData?.preferredLanguage as string) || 'fr',
     profilePhoto:
-      userData?.profilePhoto || userData?.photoURL || userData?.avatar || '/default-avatar.png',
+      (userData?.profilePhoto as string) || (userData?.photoURL as string) || (userData?.avatar as string) || '/default-avatar.png',
     isActive: userData?.isActive !== false,
-    isApproved: !!userData?.isApproved,
-    isVerified: !!userData?.isVerified,
+    isApproved: !!(userData?.isApproved),
+    isVerified: !!(userData?.isVerified),
     isVisibleOnMap: userData?.isVisibleOnMap !== false,
-    isAvailable: !!userData?.isAvailable,
-    isBanned: !!userData?.isBanned,
-    banReason: userData?.banReason || '',
-    profileCompleted: !!userData?.profileCompleted,
-    stripeCustomerId: userData?.stripeCustomerId || '',
-    stripeAccountId: userData?.stripeAccountId || '',
+    isAvailable: !!(userData?.isAvailable),
+    isBanned: !!(userData?.isBanned),
+    banReason: (userData?.banReason as string) || '',
+    profileCompleted: !!(userData?.profileCompleted),
+    stripeCustomerId: (userData?.stripeCustomerId as string) || '',
+    stripeAccountId: (userData?.stripeAccountId as string) || '',
     notificationPreferences:
-      userData?.notificationPreferences || {
+      (userData?.notificationPreferences as { email: boolean; push: boolean; sms: boolean }) || {
         email: true,
         push: true,
         sms: false,
       },
-    deviceTokens: Array.isArray(userData?.deviceTokens) ? userData.deviceTokens : [],
-    marketingConsent: !!userData?.marketingConsent,
+    deviceTokens: Array.isArray(userData?.deviceTokens) ? (userData.deviceTokens as string[]) : [],
+    marketingConsent: !!(userData?.marketingConsent),
     lastActive: toDate(userData?.lastActive) || new Date(),
-    createdByAdmin: !!userData?.createdByAdmin,
-    isTestProfile: !!userData?.isTestProfile,
+    createdByAdmin: !!(userData?.createdByAdmin),
+    isTestProfile: !!(userData?.isTestProfile),
     isCallable: userData?.isCallable !== false,
 
     // Nouveaux champs requis
-    lang: userData?.lang || userData?.preferredLanguage || 'fr',
+    lang: (userData?.lang as string) || (userData?.preferredLanguage as string) || 'fr',
     avatar:
-      userData?.avatar || userData?.profilePhoto || userData?.photoURL || '/default-avatar.png',
-    isSOS: userData?.isSOS || (userData?.role === 'lawyer' || userData?.role === 'expat'),
+      (userData?.avatar as string) || (userData?.profilePhoto as string) || (userData?.photoURL as string) || '/default-avatar.png',
+    isSOS: (userData?.isSOS as boolean) || ((userData?.role as string) === 'lawyer' || (userData?.role as string) === 'expat'),
     points: Number(userData?.points ?? 0),
-    affiliateCode: userData?.affiliateCode || `SOS-${docId.substring(0, 6).toUpperCase()}`,
-    referralBy: truthy(userData?.referralBy) ? userData.referralBy : null,
+    affiliateCode: (userData?.affiliateCode as string) || `SOS-${docId.substring(0, 6).toUpperCase()}`,
+    referralBy: truthy(userData?.referralBy) ? (userData?.referralBy as string) : null,
 
     // Champs pour production
-    bio: userData?.bio || '',
-    hourlyRate: Number(userData?.hourlyRate ?? (userData?.role === 'lawyer' ? 49 : 19)),
-    responseTime: userData?.responseTime || '< 5 minutes',
-    availability: userData?.availability || 'available',
+    bio: (userData?.bio as string) || '',
+    hourlyRate: Number(userData?.hourlyRate ?? ((userData?.role as string) === 'lawyer' ? 49 : 19)),
+    responseTime: (userData?.responseTime as string) || '< 5 minutes',
+    availability: (userData?.availability as string) || 'available',
     totalCalls: Number(userData?.totalCalls ?? 0),
     totalEarnings: Number(userData?.totalEarnings ?? 0),
     averageRating: Number(userData?.averageRating ?? 5.0),
 
     // Champs supplémentaires utilisés ailleurs (laisser tels quels si présents)
-    mainLanguage: userData?.mainLanguage,
-    languages: Array.isArray(userData?.languages) ? userData.languages : [],
-    city: userData?.city || '',
+    mainLanguage: userData?.mainLanguage as string | undefined,
+    languages: Array.isArray(userData?.languages) ? (userData.languages as string[]) : [],
+    city: (userData?.city as string) || '',
     interventionCountries: Array.isArray(userData?.interventionCountries)
-      ? userData.interventionCountries
+      ? (userData.interventionCountries as string[])
       : [],
-    certifications: userData?.certifications,
-    education: userData?.education,
-    lawSchool: userData?.lawSchool,
+    certifications: userData?.certifications as string | undefined,
+    education: userData?.education as string | string[] | undefined,
+    lawSchool: userData?.lawSchool as string | undefined,
     graduationYear: truthy(userData?.graduationYear) ? Number(userData.graduationYear) : undefined,
     successRate: truthy(userData?.successRate) ? Number(userData.successRate) : undefined,
     duration: truthy(userData?.duration) ? Number(userData.duration) : undefined,
     price: truthy(userData?.price)
       ? Number(userData.price)
-      : userData?.role === 'lawyer'
+      : (userData?.role as string) === 'lawyer'
       ? 49
       : 19,
     rating: Number(userData?.rating ?? userData?.averageRating ?? 5),
@@ -169,14 +195,14 @@ export const normalizeUserData = (userData: any, docId: string): User => {
     lastSeen: toDate(userData?.lastSeen),
 
     // champs riches (laisser string/array/objet)
-    description: userData?.description,
-    professionalDescription: userData?.professionalDescription,
-    experienceDescription: userData?.experienceDescription,
-    motivation: userData?.motivation,
-    slug: userData?.slug,
-    countrySlug: userData?.countrySlug,
-    photoURL: userData?.photoURL,
-  } as unknown as User;
+    description: userData?.description as string | undefined,
+    professionalDescription: userData?.professionalDescription as string | undefined,
+    experienceDescription: userData?.experienceDescription as string | undefined,
+    motivation: userData?.motivation as string | undefined,
+    slug: userData?.slug as string | undefined,
+    countrySlug: userData?.countrySlug as string | undefined,
+    photoURL: userData?.photoURL as string | undefined,
+  } as User;
 };
 
 // ========================= Collections bootstrapping =========================
@@ -333,28 +359,28 @@ export const createUserProfile = async (userData: Partial<User>) => {
           isActive: true,
           isOnline: true,
           availability: 'available',
-          motivation: (userData as any).motivation || '',
+          motivation: (userData as unknown as { motivation?: string }).motivation || '',
           isApproved: !!userData.isApproved,
           specialties:
             userData.role === 'lawyer'
-              ? (userData as any).specialties || []
-              : (userData as any).helpTypes || [],
+              ? ((userData as unknown as { specialties?: string[] }).specialties || [])
+              : ((userData as unknown as { helpTypes?: string[] }).helpTypes || []),
           yearsOfExperience:
             userData.role === 'lawyer'
-              ? Number((userData as any).yearsOfExperience ?? 0)
-              : Number((userData as any).yearsAsExpat ?? 0),
+              ? Number((userData as unknown as { yearsOfExperience?: number }).yearsOfExperience ?? 0)
+              : Number((userData as unknown as { yearsAsExpat?: number }).yearsAsExpat ?? 0),
           price: userData.role === 'lawyer' ? 49 : 19,
           graduationYear:
-            truthy((userData as any).graduationYear)
-              ? Number((userData as any).graduationYear)
+            truthy((userData as unknown as { graduationYear?: number }).graduationYear)
+              ? Number((userData as unknown as { graduationYear?: number }).graduationYear)
               : new Date().getFullYear() - 5,
-          certifications: (userData as any).certifications || [],
+          certifications: (userData as unknown as { certifications?: string[] }).certifications || [],
           responseTime: '< 5 minutes',
           successRate: userData.role === 'lawyer' ? 95 : 90,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          interventionCountries: Array.isArray((userData as any).interventionCountries)
-            ? (userData as any).interventionCountries
+          interventionCountries: Array.isArray((userData as unknown as { interventionCountries?: string[] }).interventionCountries)
+            ? (userData as unknown as { interventionCountries: string[] }).interventionCountries
             : country
             ? [country]
             : [],
@@ -534,7 +560,7 @@ export const createReviewRecord = async (reviewData: Partial<Review>) => {
     const sosRef = doc(db, 'sos_profiles', providerId);
     const sosSnap = await getDoc(sosRef);
     if (sosSnap.exists()) {
-      const p = sosSnap.data() as any;
+      const p = sosSnap.data();
       const currentRating = Number(p.rating || 0);
       const currentCount = Number(p.reviewCount || 0);
       const newRating = ((currentRating * currentCount) + Number(reviewData.rating)) / (currentCount + 1);
@@ -589,16 +615,24 @@ export const getAllReviews = async (options?: {
   minRating?: number;
   limit?: number;
 }) => {
-  let reviewsQuery: any = collection(db, 'reviews');
-  if (options?.status) reviewsQuery = query(reviewsQuery, where('status', '==', options.status));
-  if (options?.providerId) reviewsQuery = query(reviewsQuery, where('providerId', '==', options.providerId));
-  if (truthy(options?.minRating)) reviewsQuery = query(reviewsQuery, where('rating', '>=', options?.minRating));
-  reviewsQuery = query(reviewsQuery, orderBy('createdAt', 'desc'));
-  if (truthy(options?.limit)) reviewsQuery = query(reviewsQuery, fsLimit(options!.limit!));
+  let reviewsQuery = collection(db, 'reviews');
+  const constraints = [];
+  
+  if (options?.status) constraints.push(where('status', '==', options.status));
+  if (options?.providerId) constraints.push(where('providerId', '==', options.providerId));
+  if (truthy(options?.minRating)) constraints.push(where('rating', '>=', options?.minRating!));
+  
+  constraints.push(orderBy('createdAt', 'desc'));
+  
+  if (truthy(options?.limit)) constraints.push(fsLimit(options!.limit!));
+
+  if (constraints.length > 0) {
+    reviewsQuery = query(reviewsQuery, ...constraints);
+  }
 
   const snapshot = await getDocs(reviewsQuery);
   return snapshot.docs.map((d) => {
-    const data = d.data() as any;
+    const data = d.data();
     return {
       id: d.id,
       ...data,
@@ -638,7 +672,7 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
         const sub = await getDocs(collection(db, 'sos_profiles', providerIdOrUid, 'reviews'));
         return sub.docs
           .map((d) => {
-            const data = d.data() as any;
+            const data = d.data();
             return {
               id: d.id,
               ...data,
@@ -646,12 +680,18 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
               helpfulVotes: typeof data?.helpfulVotes === 'number' ? data.helpfulVotes : 0,
             } as Review;
           })
-          .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
-      } catch {}
+          .sort((a, b) => {
+            const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+            const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+            return bTime - aTime;
+          });
+      } catch {
+        // ignore error
+      }
     }
 
     return snap.docs.map((d) => {
-      const data = d.data() as any;
+      const data = d.data();
       return {
         id: d.id,
         ...data,
@@ -670,7 +710,7 @@ export const uploadDocument = async (
   userId: string,
   file: File,
   type: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ) => {
   const storageRef = ref(storage, `documents/${userId}/${Date.now()}_${file.name}`);
   const uploadResult = await uploadBytes(storageRef, file);
@@ -720,9 +760,9 @@ export const createCallSession = async (sessionData: Partial<CallSession>) => {
     status: 'initiating',
     timestamp: serverTimestamp(),
     details: {
-      clientId: (sessionData as any).clientId,
-      providerId: (sessionData as any).providerId,
-      providerType: (sessionData as any).providerType,
+      clientId: (sessionData as unknown as { clientId?: string }).clientId,
+      providerId: (sessionData as unknown as { providerId?: string }).providerId,
+      providerType: (sessionData as unknown as { providerType?: string }).providerType,
     },
   });
   return sessionId;
@@ -737,11 +777,11 @@ export const updateCallSession = async (
   await updateDoc(sessionRef, updateWithTimestamp);
 
   // simple log if status changes
-  if ((sessionData as any).status) {
+  if ((sessionData as unknown as { status?: string }).status) {
     await addDoc(collection(db, 'call_logs'), {
       callSessionId: sessionId,
       type: 'status_change',
-      newStatus: (sessionData as any).status,
+      newStatus: (sessionData as unknown as { status: string }).status,
       timestamp: serverTimestamp(),
       details: sessionData,
     });
@@ -751,7 +791,7 @@ export const updateCallSession = async (
 
 export const createCallLog = async (
   callSessionId: string,
-  logData: { type: string; status: string; details?: any }
+  logData: { type: string; status: string; details?: unknown }
 ) => {
   await addDoc(collection(db, 'call_logs'), {
     callSessionId,
@@ -762,7 +802,7 @@ export const createCallLog = async (
 };
 
 // ========================= Booking requests =========================
-export const createBookingRequest = async (requestData: any) => {
+export const createBookingRequest = async (requestData: Record<string, unknown>) => {
   const bookingRequestsRef = collection(db, 'booking_requests');
   const cleanData = Object.fromEntries(Object.entries(requestData).filter(([_, v]) => v !== undefined));
   const finalData = { ...cleanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
@@ -771,7 +811,7 @@ export const createBookingRequest = async (requestData: any) => {
 };
 
 // ========================= Invoices =========================
-export const createInvoiceRecord = async (invoiceData: any) => {
+export const createInvoiceRecord = async (invoiceData: Record<string, unknown>) => {
   const invoicesRef = collection(db, 'invoices');
   const invoiceDoc = await addDoc(invoicesRef, {
     ...invoiceData,
@@ -781,7 +821,7 @@ export const createInvoiceRecord = async (invoiceData: any) => {
   return invoiceDoc.id;
 };
 
-export const getInvoicesForPayment = async (paymentId: string): Promise<any[]> => {
+export const getInvoicesForPayment = async (paymentId: string): Promise<Record<string, unknown>[]> => {
   const invoicesRef = collection(db, 'invoices');
   const q = query(invoicesRef, where('paymentId', '==', paymentId));
   const querySnapshot = await getDocs(q);
@@ -793,7 +833,7 @@ export const getInvoicesForPayment = async (paymentId: string): Promise<any[]> =
 export const logAnalyticsEvent = async (eventData: {
   eventType: string;
   userId?: string;
-  eventData: Record<string, any>;
+  eventData: Record<string, unknown>;
 }) => {
   try {
     const analyticsRef = collection(db, 'analytics');
@@ -813,7 +853,7 @@ export const logAnalyticsEvent = async (eventData: {
 export const logAuditEvent = async (
   userId: string,
   action: string,
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ) => {
   try {
     const logsRef = collection(db, 'logs');
@@ -842,7 +882,7 @@ export const updateExistingProfiles = async () => {
       let batch = writeBatch(db);
       for (const profileDoc of sosSnapshot.docs) {
         const profileData = profileDoc.data();
-        const updates: Record<string, any> = {};
+        const updates: Record<string, unknown> = {};
 
         if (!profileData.language) updates.language = profileData.preferredLanguage || 'fr';
 
@@ -901,7 +941,7 @@ export const updateExistingProfiles = async () => {
       let batch = writeBatch(db);
       for (const userDoc of usersSnapshot.docs) {
         const u = userDoc.data();
-        const updates: Record<string, any> = {};
+        const updates: Record<string, unknown> = {};
 
         if (!u.fullName) updates.fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
         if (!u.lang) updates.lang = u.preferredLanguage || 'fr';
@@ -953,7 +993,7 @@ export const fixAllProfiles = async () => {
 
     for (const profileDoc of sosSnapshot.docs) {
       const profileData = profileDoc.data();
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         isVisible: true,
         isVisibleOnMap: true,
         isActive: true,
@@ -986,7 +1026,7 @@ export const fixAllProfiles = async () => {
 
     for (const userDoc of usersSnapshot.docs) {
       const u = userDoc.data();
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         updatedAt: serverTimestamp(),
       };
       if (u.role === 'lawyer' || u.role === 'expat') {
@@ -1016,23 +1056,24 @@ export const fixAllProfiles = async () => {
 export const validateDataIntegrity = async (): Promise<{
   isValid: boolean;
   issues: string[];
-  fixes: any[];
+  fixes: unknown[];
 }> => {
   try {
     const issues: string[] = [];
-    const fixes: any[] = [];
+    const fixes: unknown[] = [];
 
     const usersSnapshot = await getDocs(collection(db, 'users'));
     const sosProfilesSnapshot = await getDocs(collection(db, 'sos_profiles'));
 
-    const users = new Map<string, any>();
-    const sosProfiles = new Map<string, any>();
+    const users = new Map<string, unknown>();
+    const sosProfiles = new Map<string, unknown>();
 
     usersSnapshot.docs.forEach((d) => users.set(d.id, d.data()));
     sosProfilesSnapshot.docs.forEach((d) => sosProfiles.set(d.id, d.data()));
 
     for (const [uid, userData] of users) {
-      if ((userData.role === 'lawyer' || userData.role === 'expat') && !sosProfiles.has(uid)) {
+      const userDataObj = userData as { role?: string };
+      if ((userDataObj.role === 'lawyer' || userDataObj.role === 'expat') && !sosProfiles.has(uid)) {
         issues.push(`Prestataire ${uid} sans profil SOS`);
         fixes.push({ type: 'create_sos_profile', uid, userData });
       }
@@ -1092,4 +1133,3 @@ export const cleanupObsoleteData = async (): Promise<boolean> => {
     return false;
   }
 };
-

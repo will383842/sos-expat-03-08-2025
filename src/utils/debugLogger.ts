@@ -1,8 +1,8 @@
 interface DebugContext {
   component: string;
   action: string;
-  data?: any;
-  error?: any;
+  data?: unknown;
+  error?: unknown;
   timestamp?: string;
 }
 
@@ -27,8 +27,10 @@ export const debugLog = (context: DebugContext) => {
 };
 
 // Utilisation dans BookingRequest:
-debugLog({
-  component: 'BookingRequest',
-  action: 'Navigation to CallCheckout',
-  data: { providerId, serviceData: serviceInfo }
-});
+export const logBookingNavigation = (providerId: string, serviceInfo: unknown) => {
+  debugLog({
+    component: 'BookingRequest',
+    action: 'Navigation to CallCheckout',
+    data: { providerId, serviceData: serviceInfo }
+  });
+};

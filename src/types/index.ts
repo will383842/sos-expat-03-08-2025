@@ -53,14 +53,17 @@ export interface Report {
   targetId: string
   targetType: 'contact' | 'user' | 'review' | 'call'
   reason: string
-  details: any
+  details: Record<string, unknown>
   status: 'pending' | 'dismissed' | 'resolved'
-  createdAt: any
-  updatedAt: any
-  firstName?: any
-  lastName?: any
-  email?: any
-  priority: any
+  createdAt: Date | { toDate(): Date }
+  updatedAt: Date | { toDate(): Date }
+  firstName?: string
+  lastName?: string
+  email?: string
+  subject?: string
+  category?: string
+  message?: string
+  priority: 'low' | 'normal' | 'high' | 'urgent'
 }
 
 export interface Testimonial {
@@ -71,22 +74,56 @@ export interface Testimonial {
   createdAt?: number | Date
 }
 
+// Interface Payment étendue pour correspondre aux usages dans AdminPayments
 export interface Payment {
   id: string
   amount: number
   currency: string
-  status: 'pending' | 'succeeded' | 'failed' | 'canceled'
+  status: 'pending' | 'succeeded' | 'failed' | 'canceled' | 'authorized' | 'captured' | 'refunded'
   createdAt: number | Date
+  updatedAt?: number | Date
+  paidAt?: number | Date
+  capturedAt?: number | Date
+  canceledAt?: number | Date
+  refundedAt?: number | Date
+  
+  // Client and provider information
+  clientId: string
+  providerId: string
+  clientName?: string
+  providerName?: string
+  clientEmail?: string
+  providerEmail?: string
+  
+  // Payment details
+  platformFee: number
+  providerAmount: number
+  stripePaymentIntentId?: string
+  stripeChargeId?: string
+  description?: string
+  refundReason?: string
+  
+  // Invoice URLs
+  platformInvoiceUrl?: string
+  providerInvoiceUrl?: string
+  
+  // Call association
+  callId?: string
 }
 
+// Interface CallRecord étendue pour correspondre aux usages dans AdminPayments
 export interface CallRecord {
   id: string
   userId: string
   providerId: string
   startedAt: number | Date
   endedAt?: number | Date
+  createdAt?: number | Date
+  updatedAt?: number | Date
   durationSec?: number
-  status?: 'missed' | 'completed' | 'canceled'
+  duration?: number // en minutes
+  status?: 'missed' | 'completed' | 'canceled' | 'pending' | 'in_progress' | 'failed' | 'refunded'
+  serviceType?: 'lawyer_call' | 'expat_call'
 }
 
 export interface CallSession {

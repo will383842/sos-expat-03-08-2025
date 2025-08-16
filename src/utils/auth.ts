@@ -14,8 +14,11 @@
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { User } from '../types';
 import { logError } from './logging';
+import { getErrorMessage, getErrorCode } from './errors';
+
+// Import correct du type User depuis contexts/types
+import type { User } from '../contexts/types';
 
 // Configurations des emails de vérification par langue
 const verificationEmailConfig = {
@@ -39,7 +42,7 @@ const verificationSmsConfig = {
   en: {
     message: 'Your SOS Expats verification code is: {CODE}. Do not share it with anyone.'
   }
-};
+} as const;
 
 // Initialiser reCAPTCHA invisible
 const initRecaptcha = (elementId: string = 'recaptcha-container') => {
@@ -186,7 +189,7 @@ if (userData.role === 'lawyer') {
     console.error('Error registering user:', error);
     logError({
       origin: 'frontend',
-      error: `Registration error: ${error.message}`,
+      error: `Registration error: ${getErrorMessage(error)}`,
       context: { email: userData.email, role: userData.role }
     });
     throw error;
@@ -220,7 +223,7 @@ const loginUser = async (email: string, password: string): Promise<FirebaseUser>
     console.error('Error logging in:', error);
     logError({
       origin: 'frontend',
-      error: `Login error: ${error.message}`,
+      error: `Login error: ${getErrorMessage(error)}`,
       context: { email }
     });
     throw error;
@@ -308,7 +311,7 @@ const loginWithGoogle = async (): Promise<FirebaseUser> => {
     console.error('Error logging in with Google:', error);
     logError({
       origin: 'frontend',
-      error: `Google login error: ${error.message}`,
+      error: `Google login error: ${getErrorMessage(error)}`,
       context: {}
     });
     throw error;
@@ -353,7 +356,7 @@ const logoutUser = async (): Promise<void> => {
     console.error('Error logging out:', error);
     logError({
       origin: 'frontend',
-      error: `Logout error: ${error.message}`,
+      error: `Logout error: ${getErrorMessage(error)}`,
       context: { userId: auth.currentUser?.uid }
     });
     throw error;
@@ -375,7 +378,7 @@ const resetPassword = async (email: string): Promise<void> => {
     console.error('Error resetting password:', error);
     logError({
       origin: 'frontend',
-      error: `Password reset error: ${error.message}`,
+      error: `Password reset error: ${getErrorMessage(error)}`,
       context: { email }
     });
     throw error;
@@ -414,7 +417,7 @@ export const sendVerificationEmail = async (userLanguage?: string) => {
     console.error('Error sending verification email:', error);
     logError({
       origin: 'frontend',
-      error: `Verification email error: ${error.message}`,
+      error: `Verification email error: ${getErrorMessage(error)}`,
       context: { userId: auth.currentUser?.uid }
     });
     throw error;
@@ -422,7 +425,7 @@ export const sendVerificationEmail = async (userLanguage?: string) => {
 };
 
 // Envoyer un SMS de vérification
-const sendVerificationSMS = async (phoneNumber: string, recaptchaVerifier: any, userLanguage?: string) => {
+const sendVerificationSMS = async (phoneNumber: string, recaptchaVerifier: RecaptchaVerifier, userLanguage?: string) => {
   try {
     // Récupérer la langue de l'utilisateur depuis Firestore si non fournie
     if (!userLanguage && auth.currentUser) {
@@ -435,14 +438,13 @@ const sendVerificationSMS = async (phoneNumber: string, recaptchaVerifier: any, 
     }
     
     // Utiliser la configuration correspondant à la langue
-    const smsConfig = verificationSmsConfig[userLanguage || 'fr'];
+    const smsConfig = verificationSmsConfig[userLanguage as keyof typeof verificationSmsConfig || 'fr'];
     
     // Envoyer le SMS de vérification
     const confirmationResult = await signInWithPhoneNumber(
       auth, 
       phoneNumber, 
-      recaptchaVerifier, 
-      { smsTemplate: smsConfig.message }
+      recaptchaVerifier
     );
     
     // Enregistrer l'événement
@@ -461,7 +463,7 @@ const sendVerificationSMS = async (phoneNumber: string, recaptchaVerifier: any, 
     console.error('Error sending verification SMS:', error);
     logError({
       origin: 'frontend',
-      error: `Verification SMS error: ${error.message}`,
+      error: `Verification SMS error: ${getErrorMessage(error)}`,
       context: { phoneNumber, userId: auth.currentUser?.uid }
     });
     throw error;

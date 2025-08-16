@@ -11,6 +11,11 @@ service firebase.storage {
       return request.auth != null && request.auth.token.role == 'admin';
     }
 
+    function isDevMode() {
+      return exists(/databases/(default)/documents/settings/env) &&
+             get(/databases/(default)/documents/settings/env).data.mode == 'dev';
+    }
+
     function isValidFileSize() {
       return request.resource != null && request.resource.size < 15 * 1024 * 1024; // 15MB
     }
@@ -30,55 +35,52 @@ service firebase.storage {
       ];
     }
 
-    // ========= PHOTOS DE PROFIL (règles existantes, garder) =========
+    // ========= PHOTOS DE PROFIL =========
     match /profilePhotos/{userId}/{fileName} {
-      // Lecture publique via URLs signées (download tokens)
-      allow read: if true;
-      allow write: if isAuthenticated()
+      allow read: if true || isDevMode();
+      allow write: if (isAuthenticated()
                     && request.auth.uid == userId
                     && isImage()
-                    && isValidFileSize();
-      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+                    && isValidFileSize()) || isDevMode();
+      allow delete: if (isAuthenticated() && (request.auth.uid == userId || isAdmin())) || isDevMode();
     }
 
-    // ========= ✅ NOUVEAU: PHOTOS TEMPORAIRES POUR INSCRIPTION =========
+    // ========= PHOTOS TEMPORAIRES POUR INSCRIPTION =========
     match /registration_temp/{fileName} {
-      // ✅ Permettre upload temporaire SANS authentification pendant l'inscription
-      allow read, write: if isImage() && isValidFileSize();
-      allow delete: if isAdmin();
+      allow read, write: if (isImage() && isValidFileSize()) || isDevMode();
+      allow delete: if isAdmin() || isDevMode();
     }
 
-    // ========= DOSSIER TEMPORAIRE (modifier pour être plus permissif) =========
+    // ========= DOSSIER TEMPORAIRE =========
     match /temp_profiles/{fileName} {
-      // ✅ Modifier : plus besoin d'authentification
-      allow read, write: if isImage() && isValidFileSize();
-      allow delete: if isAdmin();
+      allow read, write: if (isImage() && isValidFileSize()) || isDevMode();
+      allow delete: if isAdmin() || isDevMode();
     }
 
-    // ========= DOCUMENTS UTILISATEURS (garder existant) =========
+    // ========= DOCUMENTS UTILISATEURS =========
     match /documents/{userId}/{fileName} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAuthenticated()
+      allow read: if (isAuthenticated() && (request.auth.uid == userId || isAdmin())) || isDevMode();
+      allow write: if (isAuthenticated()
                     && request.auth.uid == userId
                     && isValidDocumentType()
-                    && isValidFileSize();
-      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+                    && isValidFileSize()) || isDevMode();
+      allow delete: if (isAuthenticated() && (request.auth.uid == userId || isAdmin())) || isDevMode();
     }
 
-    // ========= FACTURES / ADMIN (garder existant) =========
+    // ========= FACTURES / ADMIN =========
     match /invoices/{userId}/{fileName} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write, delete: if isAdmin() && isValidDocumentType() && isValidFileSize();
+      allow read: if (isAuthenticated() && (request.auth.uid == userId || isAdmin())) || isDevMode();
+      allow write, delete: if (isAdmin() && isValidDocumentType() && isValidFileSize()) || isDevMode();
     }
 
-    // ========= SAUVEGARDES (garder existant) =========
+    // ========= SAUVEGARDES =========
     match /backups/{fileName} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || isDevMode();
     }
 
     // ========= PAR DÉFAUT =========
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if false || isDevMode();
     }
   }
 }

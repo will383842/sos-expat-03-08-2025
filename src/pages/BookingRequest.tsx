@@ -131,7 +131,7 @@ const I18N = {
       title: 'The clearer your title, the better!',
       desc: 'Context, goal, timelines… give us material 🔎',
       phone: 'No spam — ever. Only to connect you to the expert. 📵',
-      whatsapp: 'Optional but handy for real‑time updates. 💬',
+      whatsapp: 'Optional but handy for real-time updates. 💬',
     },
     fields: {
       firstName: 'First name',
@@ -174,7 +174,7 @@ const I18N = {
     },
     labels: {
       compatible: 'Compatible languages',
-      incompatible: 'Non‑compatible languages',
+      incompatible: 'Non-compatible languages',
       communicationImpossible: 'Communication impossible',
       needShared: 'Pick at least one shared language to continue.'
     },
@@ -271,10 +271,12 @@ const SectionHeader = ({ icon, title, subtitle }: { icon: React.ReactNode; title
   </div>
 );
 
+type LangPack = (typeof I18N)[LangKey];
+
 const PreviewCard = ({
   title, country, langs, phone, providerName, priceLabel, duration, langPack,
 }: {
-  title: string; country?: string; langs: string[]; phone?: string; providerName?: string; priceLabel?: string; duration?: number; langPack: typeof I18N['fr'];
+  title: string; country?: string; langs: string[]; phone?: string; providerName?: string; priceLabel?: string; duration?: number; langPack: LangPack;
 }) => (
   <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-5">
     <div className="flex items-center gap-2 text-gray-700">
@@ -325,7 +327,6 @@ const PreviewCard = ({
     </div>
   </div>
 );
-
 
 const countryCodeOptions = [
   { code: '+33', flag: '🇫🇷', country: 'FR' },
@@ -518,35 +519,38 @@ const BookingRequest: React.FC = () => {
   const isLawyer = provider.type === 'lawyer';
   const pricing = isLawyer ? FIXED_PRICING.lawyer : FIXED_PRICING.expat;
 
-   const sanitizeText = (
+  const sanitizeText = (
     input: string,
-     opts: { trim?: boolean } = {}
+    opts: { trim?: boolean } = {}
   ): string => {
     const out = input
-       .replace(/&/g, '&amp;')
+      .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-     .replace(/>/g, '&gt;')
+      .replace(/>/g, '&gt;')
       .replace(/\"/g, '&quot;')
       .replace(/'/g, '&#x27;');
-     return opts.trim ? out.trim() : out;
+    return opts.trim ? out.trim() : out;
   };
 
+  // Alias pratique pour les champs texte « simples »
+  const sanitizeInput = (input: string): string => sanitizeText(input, { trim: true });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, [name]: checked }));
+      setFormData((prev) => ({ ...prev, [name]: checked as unknown as string }));
     } else {
-       let sanitizedValue = value;
+      let sanitizedValue = value;
       if (name === 'phoneNumber' || name === 'whatsappNumber') {
-       sanitizedValue = value.replace(/[^\d\s+()-]/g, '');
-     } else {
-       // Préserver les espaces (y compris doubles), ne pas trim pendant la saisie
+        sanitizedValue = value.replace(/[^\d\s+()-]/g, '');
+      } else {
+        // Préserver les espaces (y compris doubles), ne pas trim pendant la saisie
         sanitizedValue = sanitizeText(value, { trim: false });
       }
-    setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
-    };
+      setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
+    }
+  };
 
   const notifyProviderOfRequest = async (
     targetProviderId: string,
@@ -822,7 +826,7 @@ const BookingRequest: React.FC = () => {
               {!!(provider?.languages?.length) && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {(provider.languages || []).slice(0, 3).map((code, idx) => {
-                    const l = languages.find((x) => x.code === code);
+                    const l = (languages as Language[]).find((x) => x.code === code);
                     return (
                       <span key={`${code}-${idx}`} className="inline-block px-2 py-0.5 bg-blue-50 text-blue-800 text-xs rounded border border-blue-200">
                         {l ? l.name : code}
@@ -847,7 +851,7 @@ const BookingRequest: React.FC = () => {
         <div className="max-w-3xl mx-auto px-4">
           <div>
             {/* PREVIEW */}
-            
+            {/* (affiché via le toggle plus bas) */}
 
             {/* FORM */}
             <div>
@@ -974,19 +978,20 @@ const BookingRequest: React.FC = () => {
 
                     <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
                       <MultiLanguageSelect
-                      value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
-                      onChange={(selected) => {
-                        const selectedLangs = selected
-                          .map((opt: unknown) => languages.find((lang: unknown) => lang.code === opt.value))
-                          .filter(Boolean) as Language[];
-                        setLanguagesSpoken(selectedLangs);
-                        if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });
-                      }}
-                      providerLanguages={provider?.languages || provider?.languagesSpoken || []}
-                      highlightShared
-                      locale={lang}
-                      showLanguageToggle={false}
-                    />
+                        value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
+                        onChange={(selected: any) => {
+                          const options = (selected || []) as Array<{ value: string; label: string }>;
+                          const allLanguages = languages as Language[];
+                          const selectedLangs = options
+                            .map((opt) => allLanguages.find((langItem) => langItem.code === opt.value))
+                            .filter(Boolean) as Language[];
+                          setLanguagesSpoken(selectedLangs);
+                          if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });
+                        }}
+                        providerLanguages={provider?.languages || provider?.languagesSpoken || []}
+                        highlightShared
+                        locale={lang}
+                      />
                     </Suspense>
 
                     {fieldErrors.languages && <p className="mt-2 text-sm text-red-600">{fieldErrors.languages}</p>}
@@ -1149,33 +1154,33 @@ const BookingRequest: React.FC = () => {
                   )}
 
                   {/* Aperçu rapide (toggle, par défaut désactivé) */}
-                    <div className="px-5 sm:px-6">
-                      <button
-                        type="button"
-                        onClick={() => setShowPreview((v) => !v)}
-                        className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50"
-                      >
-                        {showPreview ? 'Masquer l’aperçu' : 'Afficher l’aperçu rapide'}
-                      </button>
+                  <div className="px-5 sm:px-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview((v) => !v)}
+                      className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50"
+                    >
+                      {showPreview ? 'Masquer l’aperçu' : 'Afficher l’aperçu rapide'}
+                    </button>
 
-                      {showPreview && (
-                        <div className="mt-3">
-                          <PreviewCard
-                            title={formData.title}
-                            country={formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry}
-                            langs={languagesSpoken.map((l) => l.code)}
-                            phone={`${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
-                            providerName={provider.name}
-                            priceLabel={`${pricing.EUR}€ / $${pricing.USD}`}
-                            duration={pricing.duration}
-                            langPack={t}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    {showPreview && (
+                      <div className="mt-3">
+                        <PreviewCard
+                          title={formData.title}
+                          country={formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry}
+                          langs={languagesSpoken.map((l) => l.code)}
+                          phone={`${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
+                          providerName={provider.name}
+                          priceLabel={`${pricing.EUR}€ / $${pricing.USD}`}
+                          duration={pricing.duration}
+                          langPack={t}
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                    {/* CTA */}
-                    <div className="p-5 sm:p-6">
+                  {/* CTA */}
+                  <div className="p-5 sm:p-6">
                     <Button
                       type="submit"
                       loading={isLoading}

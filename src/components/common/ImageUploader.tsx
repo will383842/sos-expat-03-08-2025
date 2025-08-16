@@ -458,6 +458,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   }, []);
 
   const uploadImage = useCallback(async (file: File | Blob): Promise<string> => {
+    console.log('🔄 Starting image upload...', {
+      blobSize: file.size,
+      isRegistration,
+      uploadPath: isRegistration ? 'registration_temp' : uploadPath
+    });
+
     const storage = getStorage();
     const processed = await (file instanceof File ? processImage(file) : processImage(new File([file], 'image.jpg', { type: 'image/jpeg' })));
     const ext = (processed.name.split('.').pop() || 'jpg').toLowerCase();
@@ -465,29 +471,52 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     const finalUploadPath = isRegistration ? 'registration_temp' : uploadPath;
     const refObj: StorageReference = storageRef(storage, `${finalUploadPath}/${fileName}`);
 
+    console.log('📁 Upload path:', `${finalUploadPath}/${fileName}`);
+
     return new Promise((resolve, reject) => {
       const task = uploadBytesResumable(refObj, processed);
       task.on('state_changed',
         (snap) => {
           const p = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
           setUploadProgress(p);
+          console.log('📈 Upload progress:', p + '%');
         },
         (err) => {
+          console.error('❌ Upload error:', err);
           setUploadProgress(0);
-          reject(err);
+          
+          // Messages d'erreur spécifiques selon le code
+          let userMessage = t.errors.uploadFailed('Upload failed');
+          if (err.code === 'storage/unauthorized') {
+            userMessage = locale === 'fr' 
+              ? 'Permissions insuffisantes. Réessayez ou contactez le support.'
+              : 'Insufficient permissions. Try again or contact support.';
+          } else if (err.code === 'storage/quota-exceeded') {
+            userMessage = locale === 'fr'
+              ? 'Quota de stockage dépassé. Contactez le support.'
+              : 'Storage quota exceeded. Contact support.';
+          } else if (err.code === 'storage/invalid-format') {
+            userMessage = locale === 'fr'
+              ? 'Format de fichier invalide. Utilisez JPG, PNG ou WEBP.'
+              : 'Invalid file format. Use JPG, PNG or WEBP.';
+          }
+          
+          reject(new Error(userMessage));
         },
         async () => {
           try {
             const url = await getDownloadURL(task.snapshot.ref);
             setUploadProgress(100);
+            console.log('✅ Upload successful:', url);
             resolve(url);
           } catch (e) {
+            console.error('❌ GetDownloadURL error:', e);
             reject(e);
           }
         }
       );
     });
-  }, [uploadPath, processImage, isRegistration]);
+  }, [uploadPath, processImage, isRegistration, t, locale]);
 
   const handleFileSelect = useCallback(async (files: File[]) => {
     const file = files?.[0];
@@ -510,17 +539,25 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   }, [validateFile, disabled, isUploading, locale]);
 
   const handleCropComplete = useCallback(async (croppedBlob: Blob) => {
+    console.log('🔄 Starting image upload...', {
+      blobSize: croppedBlob.size,
+      isRegistration,
+      uploadPath: isRegistration ? 'registration_temp' : uploadPath
+    });
+    
     setShowCropModal(false);
     setIsUploading(true);
     setUploadProgress(0);
     try {
       if (previewUrl) await deleteFromStorage(previewUrl);
       const url = await uploadImage(croppedBlob);
+      console.log('✅ Upload successful:', url);
       setPreviewUrl(url);
       setSuccess(true);
       onImageUploaded(url);
       setTimeout(() => setUploadProgress(0), 1200);
     } catch (e) {
+      console.error('❌ Upload failed:', e);
       const msg = e instanceof Error ? e.message : 'Unknown error';
       setError(I18N[locale].errors.uploadFailed(msg));
       setUploadProgress(0);
@@ -528,7 +565,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setIsUploading(false);
       if (tempImageUrl) { URL.revokeObjectURL(tempImageUrl); setTempImageUrl(null); }
     }
-  }, [previewUrl, deleteFromStorage, uploadImage, onImageUploaded, tempImageUrl, locale]);
+  }, [previewUrl, deleteFromStorage, uploadImage, onImageUploaded, tempImageUrl, locale, isRegistration, uploadPath]);
 
   const handleCropCancel = useCallback(() => {
     setShowCropModal(false);
@@ -841,4 +878,3 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 };
 
 export default ImageUploader;
-

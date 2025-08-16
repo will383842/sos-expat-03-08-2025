@@ -11,7 +11,8 @@
     "preview": "vite preview --strictPort",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "analyze": "vite build --mode analyze"
+    "analyze": "vite build --mode analyze",
+    "gen-env": "node scripts/generate-env-files.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -31,7 +31,14 @@ const firebaseConfig = {
 // Garde-fou env
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
   console.error("❌ Variables d'environnement Firebase manquantes");
+  console.error("Variables présentes:", Object.keys(firebaseConfig));
   throw new Error("Configuration Firebase incomplète");
+}
+
+// Vérification spéciale pour Storage
+if (!firebaseConfig.storageBucket) {
+  console.error("❌ VITE_FIREBASE_STORAGE_BUCKET manquant");
+  throw new Error("Storage bucket non configuré");
 }
 
 /**
@@ -122,6 +129,7 @@ if (USE_EMULATORS && typeof window !== "undefined") {
 console.log("✅ Firebase prêt :", {
   projectId: app.options.projectId,
   authDomain: app.options.authDomain,
+  storageBucket: app.options.storageBucket,
   usingEmulators: USE_EMULATORS,
   functionsRegion: REGION,
 });
@@ -134,4 +142,3 @@ console.log("✅ Firebase prêt :", {
 export const call = <T, R = unknown>(name: string) => httpsCallable<T, R>(functions, name);
 
 export default app;
-

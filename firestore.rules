@@ -13,18 +13,22 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // ✅ Mode développement — à déclencher via doc settings/env
+    function isDevMode() {
+      return exists(/databases/$(database)/documents/settings/env)
+        && get(/databases/$(database)/documents/settings/env).data.mode == 'dev';
+    }
+
     function isNotBanned() {
       return isAuthenticated() &&
         (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
     }
 
-    // Propriétaire basé sur le champ uid du document
     function isDocOwner() {
       return isAuthenticated() && resource.data.uid == request.auth.uid;
     }
 
-    // Pour la création, on valide sur request.resource
     function creatingOwnDoc() {
       return isAuthenticated() && request.resource.data.uid == request.auth.uid;
     }
@@ -43,49 +47,40 @@ service cloud.firestore {
         request.resource.data.lastName is string;
     }
 
-    // Champs sensibles non modifiables par l'utilisateur
     function hasNoSensitiveChanges() {
       return !request.resource.data.diff(resource.data).affectedKeys()
         .hasAny(['role','isAdmin','isApproved','isBanned','uid','email','type','isVerified']);
     }
 
-    // Lecture publique d'une fiche visible (home / carrousel)
     function isPublicProfile() {
       return (resource.data.isVisible == true || resource.data.isVisibleOnMap == true) &&
              (resource.data.type in ['lawyer','expat']);
     }
 
-    // ---- Aides de validation de deltas ----
     function changedKeys() {
       return request.resource.data.diff(resource.data).changedKeys();
     }
 
-    // Photo uniquement (users/providers)
     function onlyPhotoFieldsChanged() {
       return changedKeys().hasOnly(['profilePhoto','photoURL','avatar','updatedAt']);
     }
 
-    // MAJ d'email autorisée UNIQUEMENT si l'email Firestore == email du token Auth
     function emailSelfSynced() {
       return changedKeys().hasOnly(['email','emailLower','updatedAt']) &&
              request.resource.data.email == request.auth.token.email;
     }
 
-    // === Nouveau: set de champs de présence centralisé ===
     function presenceFields() {
-      // NB: ajout de lastActiveAt et ua pour couvrir les mises à jour de présence côté client
       return [
         'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','lastActiveAt',
         'updatedAt','isVisible','isVisibleOnMap','ua'
       ];
     }
 
-    // MAJ "présence" autorisée si TOUS les champs modifiés appartiennent à presenceFields()
     function presenceOnlyUpdate() {
       return changedKeys().hasOnly(presenceFields());
     }
 
-    // MAJ étendue pour sos_profiles (présence + champs standards) — pas de champs sensibles
     function sosProfileUpdate() {
       let allowedFields = [
         'isOnline','availability','lastStatusChange','lastSeen','lastSeenAt','lastActiveAt','updatedAt',
@@ -101,16 +96,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if (isAuthenticated() && request.auth.uid == userId) ||
                    isAdmin() ||
-                   (resource.data.isApproved == true && resource.data.role in ['lawyer','expat']);
+                   (resource.data.isApproved == true && resource.data.role in ['lawyer','expat']) ||
+                   isDevMode();
 
-      // pas d'exigence d'email vérifié
-      allow create: if isAuthenticated() &&
+      allow create: if (isAuthenticated() &&
                      request.auth.uid == userId &&
                      creatingOwnDoc() &&
-                     hasValidUserFields() &&
-                     request.resource.data.email == request.auth.token.email;
+                     hasValidUserFields()) || isDevMode();
 
-      // Autoriser: photo seule, email sync, présence seule, ou MAJ sans champs sensibles
       allow update: if (
                       isAuthenticated() && request.auth.uid == userId && isNotBanned() && (
                         presenceOnlyUpdate() ||
@@ -118,34 +111,32 @@ service cloud.firestore {
                         emailSelfSynced() ||
                         hasNoSensitiveChanges()
                       )
-                    ) || isAdmin();
+                    ) || isAdmin() || isDevMode();
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ====================== SOS_PROFILES ======================
     match /sos_profiles/{profileId} {
       allow read: if true;
 
-      allow create: if isAuthenticated() && (
+      allow create: if (isAuthenticated() && (
                       (request.resource.data.uid == request.auth.uid &&
                        request.resource.data.type in ['lawyer','expat']) ||
                       (profileId == request.auth.uid &&
                        request.resource.data.type in ['lawyer','expat']) ||
                       isAdmin()
-                    );
+                    )) || isDevMode();
 
-      // Propriétaire: MAJ champs autorisés (voir sosProfileUpdate) ou présenceOnly.
-      // Jamais de champs sensibles (role, isApproved, isBanned, etc.).
-      allow update: if isAuthenticated() && (
+      allow update: if (isAuthenticated() && (
                       (resource.data.uid == request.auth.uid && sosProfileUpdate()) ||
                       (profileId == request.auth.uid && sosProfileUpdate()) ||
                       ((resource.data.uid == request.auth.uid || profileId == request.auth.uid) &&
                        presenceOnlyUpdate()) ||
                       isAdmin()
-                    );
+                    )) || isDevMode();
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ================== PROVIDERS ==================
@@ -157,11 +148,10 @@ service cloud.firestore {
                request.resource.data.fullName is string;
       }
 
-      allow read: if isPublicProfile() || isDocOwner() || isAdmin();
+      allow read: if isPublicProfile() || isDocOwner() || isAdmin() || isDevMode();
 
-      // pas d'email vérifié
-      allow create: if (creatingOwnDoc() && isProviderRole() && hasValidProviderFields())
-                    || isAdmin();
+      allow create: if ((creatingOwnDoc() && isProviderRole() && hasValidProviderFields())
+                    || isAdmin()) || isDevMode();
 
       allow update: if isAdmin()
                     || (
@@ -170,28 +160,28 @@ service cloud.firestore {
                            onlyPhotoFieldsChanged() ||
                            hasNoSensitiveChanges()
                          )
-                       );
+                       ) || isDevMode();
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ========= CALLS =========
     match /calls/{callId} {
-      allow read: if isAuthenticated() &&
+      allow read: if (isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
                      request.auth.uid == resource.data.providerId) ||
-                  isAdmin();
+                  isAdmin()) || isDevMode();
 
-      allow create: if isAuthenticated() && isNotBanned() &&
+      allow create: if (isAuthenticated() && isNotBanned() &&
                      request.resource.data.clientId == request.auth.uid &&
-                     request.resource.data.keys().hasAll(['clientId','providerId','serviceType']);
+                     request.resource.data.keys().hasAll(['clientId','providerId','serviceType'])) || isDevMode();
 
-      allow update: if (isAuthenticated() && isNotBanned() &&
+      allow update: if ((isAuthenticated() && isNotBanned() &&
                         (request.auth.uid == resource.data.clientId ||
                          request.auth.uid == resource.data.providerId)) ||
-                     isAdmin();
+                     isAdmin()) || isDevMode();
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ============ PAYMENTS ============
@@ -203,17 +193,17 @@ service cloud.firestore {
                request.resource.data.status in ['pending','authorized','captured','failed','refunded','canceled'];
       }
 
-      allow read: if isAuthenticated() &&
+      allow read: if (isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
                      request.auth.uid == resource.data.providerId) ||
-                  isAdmin();
+                  isAdmin()) || isDevMode();
 
-      allow create: if isAuthenticated() && isNotBanned() &&
+      allow create: if (isAuthenticated() && isNotBanned() &&
                      request.resource.data.clientId == request.auth.uid &&
-                     hasValidPaymentFields();
+                     hasValidPaymentFields()) || isDevMode();
 
-      allow update: if isAdmin() && hasValidPaymentFields();
-      allow delete: if isAdmin();
+      allow update: if (isAdmin() && hasValidPaymentFields()) || isDevMode();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ========== REVIEWS ==========
@@ -229,122 +219,116 @@ service cloud.firestore {
                    (isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
                      request.auth.uid == resource.data.providerId)) ||
-                   isAdmin();
+                   isAdmin() || isDevMode();
 
-      allow create: if isAuthenticated() && isNotBanned() &&
+      allow create: if (isAuthenticated() && isNotBanned() &&
                      request.resource.data.clientId == request.auth.uid &&
-                     hasValidReviewFields();
+                     hasValidReviewFields()) || isDevMode();
 
-      allow update: if (isAuthenticated() && request.auth.uid == resource.data.clientId &&
+      allow update: if ((isAuthenticated() && request.auth.uid == resource.data.clientId &&
                         hasValidReviewFields() &&
                         !request.resource.data.diff(resource.data).affectedKeys()
                           .hasAny(['clientId','providerId','isPublic'])) ||
-                        isAdmin();
+                        isAdmin()) || isDevMode();
 
-      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin();
+      allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin()) || isDevMode();
     }
 
     // ============ DOCUMENTS ============
     match /documents/{documentId} {
-      allow read: if (isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() &&
+      allow read: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
+      allow create: if (isAuthenticated() &&
                      request.resource.data.userId == request.auth.uid &&
-                     request.resource.data.keys().hasAll(['userId','type','filename']);
-      allow update: if isAdmin();
-      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin();
+                     request.resource.data.keys().hasAll(['userId','type','filename'])) || isDevMode();
+      allow update: if isAdmin() || isDevMode();
+      allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
     }
 
     // =============== NOTIFICATIONS ===============
     match /notifications/{notificationId} {
-      allow read: if (isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin();
-      allow create: if isAdmin();
-      allow update: if (isAuthenticated() && request.auth.uid == resource.data.userId &&
+      allow read: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
+      allow create: if isAdmin() || isDevMode();
+      allow update: if ((isAuthenticated() && request.auth.uid == resource.data.userId &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead','readAt'])) ||
-                       isAdmin();
-      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin();
+                       isAdmin()) || isDevMode();
+      allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
     }
 
     // ================= CALL_SESSIONS =================
     match /call_sessions/{sessionId} {
-      allow read: if isAuthenticated() &&
+      allow read: if ((isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
                      request.auth.uid == resource.data.providerId) ||
-                  isAdmin();
+                  isAdmin())) || isDevMode();
 
-      allow create: if isAuthenticated() && isNotBanned() &&
-                     request.resource.data.clientId == request.auth.uid;
+      allow create: if (isAuthenticated() && isNotBanned() &&
+                     request.resource.data.clientId == request.auth.uid) || isDevMode();
 
-      allow update: if (isAuthenticated() && isNotBanned() &&
+      allow update: if ((isAuthenticated() && isNotBanned() &&
                         (request.auth.uid == resource.data.clientId ||
                          request.auth.uid == resource.data.providerId)) ||
-                     isAdmin();
+                     isAdmin()) || isDevMode();
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ================== INVOICE_RECORDS ==================
     match /invoice_records/{invoiceId} {
-      allow read: if isAuthenticated() &&
+      allow read: if ((isAuthenticated() &&
                     (request.auth.uid == resource.data.clientId ||
                      request.auth.uid == resource.data.providerId) ||
-                  isAdmin();
+                  isAdmin())) || isDevMode();
 
-      allow create: if isAuthenticated() &&
-                      (request.auth.uid == request.resource.data.clientId || isAdmin());
+      allow create: if (isAuthenticated() &&
+                      (request.auth.uid == request.resource.data.clientId || isAdmin())) || isDevMode();
 
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update: if isAdmin() || isDevMode();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // =================== NOTIFICATION_LOGS ===================
     match /notification_logs/{logId} {
-      allow read: if isAuthenticated() &&
-                    (request.auth.uid == resource.data.recipientId || isAdmin());
-      allow create: if isAuthenticated() && isNotBanned();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read: if ((isAuthenticated() &&
+                    (request.auth.uid == resource.data.recipientId || isAdmin()))) || isDevMode();
+      allow create: if (isAuthenticated() && isNotBanned()) || isDevMode();
+      allow update: if isAdmin() || isDevMode();
+      allow delete: if isAdmin() || isDevMode();
     }
 
     // ======================= Collections Admin =======================
-    // permettre la création de logs même non authentifié (ex: échecs de login)
     match /logs/{logId} {
       allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin() || isDevMode();
     }
-    match /analytics/{analyticsId} { allow read, write: if isAdmin(); }
-    match /app_settings/{settingId} { allow read, write: if isAdmin(); }
-    match /admin_settings/{settingId} { allow read, write: if isAdmin(); }
-    match /backups/{backupId} { allow read, write: if isAdmin(); }
+    match /analytics/{analyticsId} { allow read, write: if isAdmin() || isDevMode(); }
+    match /app_settings/{settingId} { allow read, write: if isAdmin() || isDevMode(); }
+    match /admin_settings/{settingId} { allow read, write: if isAdmin() || isDevMode(); }
+    match /backups/{backupId} { allow read, write: if isAdmin() || isDevMode(); }
 
-    // Messages de contact
     match /contact_messages/{messageId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isDevMode();
       allow create: if true;
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdmin() || isDevMode();
     }
 
-    // Docs légaux (pied de page): PUBLIC
     match /legal_documents/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isDevMode();
     }
 
-    // Coupons
     match /coupons/{couponId} {
-      allow read: if resource.data.active == true || isAdmin();
-      allow write: if isAdmin();
+      allow read: if resource.data.active == true || isAdmin() || isDevMode();
+      allow write: if isAdmin() || isDevMode();
     }
 
-    // Usage de coupons
     match /coupon_usages/{usageId} {
-      allow read: if (isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow read: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();
+      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid) || isDevMode();
+      allow update, delete: if isAdmin() || isDevMode();
     }
 
-    // Par défaut : refuser
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if false || isDevMode();
     }
   }
 }

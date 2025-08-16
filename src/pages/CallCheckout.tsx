@@ -1103,8 +1103,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
               <div className="text-right flex-shrink-0">
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                  {selectedCurrency === 'usd' ? '
-             : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
+                  {selectedCurrency === 'usd' ? '$' : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
                 </div>
                 <div className="text-xs text-gray-500">{service.duration} min</div>
               </div>
@@ -1292,8 +1291,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                       <div className="flex justify-between">
                         <span>{t('summary.total')}:</span>
                         <span className="font-medium text-green-600">
-                          {selectedCurrency === 'usd' ? '
-             : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
+                           {selectedCurrency === 'usd' ? '$' : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
                         </span>
                       </div>
                       <div className="flex justify-between">

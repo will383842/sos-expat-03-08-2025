@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Phone, Star, MapPin, Search, ChevronDown, Wifi, WifiOff, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
-import { collection, query, limit, onSnapshot, where, DocumentData } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, where, DocumentData, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import Layout from '../components/layout/Layout';
 import SEOHead from '../components/layout/SEOHead';
@@ -39,7 +39,7 @@ interface RawProfile extends DocumentData {
   type?: 'lawyer' | 'expat' | string;
   currentPresenceCountry?: string;
   country?: string;
-  languages?: string[]; // peut contenir codes ISO
+  languages?: string[];
   specialties?: string[];
   rating?: number;
   reviewCount?: number;
@@ -102,8 +102,8 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   hindi: 'Hindi', thai: 'Thaï', thaii: 'Thaï'
 };
 
-const getLanguageLabel = (lang: string): string => {
-  const raw = (lang || '').trim();
+const getLanguageLabel = (language: string): string => {
+  const raw = (language || '').trim();
   if (!raw) return '';
   const key = raw.toLowerCase();
   // iso direct
@@ -217,13 +217,90 @@ const SOSCall: React.FC = () => {
     }
   });
 
-  // Charger providers (logique identique)
+  // Charger providers (logique identique avec DEBUG)
   useEffect(() => {
     const typeParam = searchParams.get('type');
     if (typeParam === 'lawyer' || typeParam === 'expat') {
       setSelectedType(typeParam);
       setSearchParams({ type: typeParam });
     }
+
+    // 🔧 DÉBUT DEBUG SOSCall
+    console.log('\n🔍 DEBUG SOSCALL - DÉBUT');
+    
+    // Test requête simple AVANT la requête principale
+    const debugQueries = async () => {
+      try {
+        console.log('📡 SOSCall - Test requête basique...');
+        const simpleQuery = query(collection(db, 'sos_profiles'));
+        const simpleSnap = await getDocs(simpleQuery);
+        console.log(`📊 SOSCall - Tous les documents: ${simpleSnap.size}`);
+        
+        simpleSnap.docs.forEach((doc, i) => {
+          const data = doc.data();
+          console.log(`SOSCall Doc ${i+1}: ${doc.id}`, {
+            type: data.type,
+            isVisible: data.isVisible,
+            isActive: data.isActive,
+            isApproved: data.isApproved,
+            fullName: data.fullName
+          });
+        });
+
+        console.log('📡 SOSCall - Test avec filtres...');
+        const filteredQuery = query(
+          collection(db, 'sos_profiles'),
+          where('type', 'in', ['lawyer', 'expat']),
+          where('isVisible', '==', true),
+          limit(100)
+        );
+        const filteredSnap = await getDocs(filteredQuery);
+        console.log(`📊 SOSCall - Avec filtres: ${filteredSnap.size}`);
+        
+        filteredSnap.docs.forEach((doc, i) => {
+          const data = doc.data();
+          console.log(`SOSCall Filtered ${i+1}: ${doc.id}`, {
+            type: data.type,
+            isVisible: data.isVisible,
+            name: data.fullName
+          });
+        });
+
+        // 🔍 VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS dans SOSCall
+        console.log('\n🔍 SOSCall - VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS');
+        const targetProfiles = ['expat2', 'expat3', 'avocat1']; // Adaptez les IDs
+        
+        for (const profileId of targetProfiles) {
+          try {
+            const docRef = doc(db, 'sos_profiles', profileId);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              console.log(`✅ SOSCall - ${profileId} existe:`, {
+                type: data.type,
+                isVisible: data.isVisible,
+                isActive: data.isActive,
+                isApproved: data.isApproved,
+                typeCheck: ['lawyer', 'expat'].includes(data.type),
+                visibleCheck: data.isVisible === true,
+                passesFilters: data.isVisible === true && ['lawyer', 'expat'].includes(data.type)
+              });
+            } else {
+              console.log(`❌ SOSCall - ${profileId} N'EXISTE PAS`);
+            }
+          } catch (err) {
+            console.error(`💥 SOSCall - Erreur ${profileId}:`, err);
+          }
+        }
+        
+      } catch (error) {
+        console.error('🔍 Erreur debug SOSCall:', error);
+      }
+    };
+    
+    debugQueries();
+    // 🔧 FIN DEBUG SOSCall
 
     const sosProfilesQuery = query(
       collection(db, 'sos_profiles'),
@@ -235,21 +312,28 @@ const SOSCall: React.FC = () => {
     const unsubscribe = onSnapshot(
       sosProfilesQuery,
       (snapshot) => {
+        console.log(`🔍 SOSCall onSnapshot reçu: ${snapshot.size} documents`);
+        
         if (snapshot.empty) {
+          console.log('⚠️ SOSCall: Snapshot vide - Aucun document trouvé');
           setRealProviders([]);
           setFilteredProviders([]);
           setIsLoadingProviders(false);
           return;
         }
 
-        const allProfiles: Provider[] = snapshot.docs.map((doc) => {
-          const data = doc.data() as RawProfile;
+        const allProfiles: Provider[] = [];
 
-          const fullName =
-            data.fullName ||
-            `${data.firstName || ''} ${data.lastName || ''}`.trim() ||
-            'Expert';
+        snapshot.docs.forEach((doc, index) => {
+          const data = doc.data() as RawProfile;
+          const docId = doc.id;
+
+          console.log(`\n🔄 SOSCall TRAITEMENT ${docId} (${index + 1}/${snapshot.size}):`);
+
+          const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Expert';
           const type: 'lawyer' | 'expat' = data.type === 'lawyer' ? 'lawyer' : 'expat';
+
+          console.log(`1️⃣ SOSCall - Nom: "${fullName}", Type: "${type}"`);
 
           const isApproved = data.isApproved !== false;
           const isActive = data.isActive !== false;
@@ -257,10 +341,17 @@ const SOSCall: React.FC = () => {
           const isVisible = data.isVisible !== false;
 
           const presenceCountry = data.currentPresenceCountry || data.country || '';
-          const hasValidCountry =
-            !!presenceCountry && getCountryCoordinates(presenceCountry) !== null;
+          const hasValidCountry = !!presenceCountry && getCountryCoordinates(presenceCountry) !== null;
 
-          return {
+          console.log(`2️⃣ SOSCall - Validations:`, {
+            isApproved: `${data.isApproved} → ${isApproved}`,
+            isActive: `${data.isActive} → ${isActive}`,
+            isVisible: `${data.isVisible} → ${isVisible}`,
+            hasValidCountry,
+            presenceCountry
+          });
+
+          const provider: Provider = {
             id: doc.id,
             name: fullName,
             firstName: data.firstName,
@@ -288,7 +379,34 @@ const SOSCall: React.FC = () => {
                 ? data.profilePhoto
                 : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&dpr=2',
           };
+
+          // 🔧 VALIDATION SOSCall avec logs détaillés
+          const validations = {
+            typeValid: provider.type === 'lawyer' || provider.type === 'expat',
+            notBanned: provider.isBanned !== true,
+            hasBasicInfo: provider.name && provider.name.trim() !== '',
+            hasCountry: provider.country && provider.country.trim() !== '',
+            isVisible: provider.isVisible !== false,
+            lawyerApproved: provider.type !== 'lawyer' || provider.isApproved !== false
+          };
+
+          const shouldInclude = Object.values(validations).every(Boolean);
+
+          console.log(`3️⃣ SOSCall - Décision finale ${provider.name}:`, {
+            ...validations,
+            shouldInclude
+          });
+
+          if (shouldInclude) {
+            allProfiles.push(provider);
+            console.log(`✅ SOSCall - ${provider.name} (${provider.type}) AJOUTÉ - Total: ${allProfiles.length}`);
+          } else {
+            console.log(`❌ SOSCall - ${provider.name} (${provider.type}) REJETÉ`);
+          }
         });
+
+        console.log(`\n🏁 SOSCall RÉSULTAT FINAL: ${allProfiles.length} profils ajoutés`);
+        console.log('SOSCall Profils finaux:', allProfiles.map(p => ({ id: p.id, name: p.name, type: p.type })));
 
         const onlyProviders = allProfiles.filter(
           (p: Provider) => p.type === 'lawyer' || p.type === 'expat'
@@ -308,7 +426,7 @@ const SOSCall: React.FC = () => {
         setIsLoadingProviders(false);
       },
       (error) => {
-        console.error('Erreur lors de l’écoute des profils:', error);
+        console.error('[SOSCall] Firebase error:', error);
         setRealProviders([]);
         setFilteredProviders([]);
         setIsLoadingProviders(false);
@@ -345,7 +463,7 @@ const SOSCall: React.FC = () => {
     return normalizedProv.some((v) => v === target);
   };
 
-  // Filtrage + tri (conserve la logique d’origine, ajoute statut étendu)
+  // Filtrage + tri (conserve la logique d'origine, ajoute statut étendu)
   useEffect(() => {
     if (realProviders.length === 0) {
       setFilteredProviders([]);
@@ -505,7 +623,7 @@ const SOSCall: React.FC = () => {
           <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
             <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full pl-6 pr-3 py-2.5 border border-white/20 mb-7">
               <Phone className="w-5 h-5 text-red-300" />
-              <span className="text-white font-semibold">SOS — appel d’urgence en &lt; 5 minutes</span>
+              <span className="text-white font-semibold">SOS — appel d'urgence en &lt; 5 minutes</span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             </div>
 

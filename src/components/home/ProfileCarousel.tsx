@@ -1,19 +1,16 @@
-// src/components/home/ProfileCarousel.tsx - VERSION CORRIGÉE
+// src/components/home/ProfileCarousel.tsx - VERSION CORRIGÉE AVEC DEBUG
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { collection, query, where, getDocs, limit as fsLimit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit as fsLimit, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { getDownloadURL, ref } from 'firebase/storage';
 import { storage } from '../../config/firebase';
 import ModernProfileCard from './ModernProfileCard';
 import type { Provider } from '@/types/provider';
 
-
 const DEFAULT_AVATAR = '/default-avatar.png';
-
-
 
 // Props du composant
 interface ProfileCarouselProps {
@@ -125,8 +122,86 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       setIsLoading(true);
       setError(null);
 
+      // 🔧 DÉBUT DEBUG FIREBASE
+      console.log('🔍 DÉMARRAGE DEBUG FIREBASE - ProfileCarousel');
       
-      // Charger depuis Firebase
+      // 🔍 1. REQUÊTE SIMPLE SANS FILTRES
+      console.log('📡 Test requête basique...');
+      const simpleQuery = query(collection(db, 'sos_profiles'));
+      const simpleSnapshot = await getDocs(simpleQuery);
+      
+      console.log(`📊 TOUS LES DOCUMENTS sos_profiles: ${simpleSnapshot.size}`);
+      simpleSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`Doc ${index + 1}: ${doc.id}`, {
+          type: data.type,
+          isVisible: data.isVisible,
+          isActive: data.isActive,
+          isApproved: data.isApproved,
+          fullName: data.fullName || `${data.firstName} ${data.lastName}`,
+          hasRequiredFields: !!(data.fullName || data.firstName) && !!data.type
+        });
+      });
+
+      // 🔍 2. REQUÊTE AVEC FILTRE isVisible = true
+      console.log('\n📡 Test avec filtre isVisible...');
+      const visibleQuery = query(
+        collection(db, 'sos_profiles'),
+        where('isVisible', '==', true)
+      );
+      const visibleSnapshot = await getDocs(visibleQuery);
+      
+      console.log(`📊 Documents isVisible=true: ${visibleSnapshot.size}`);
+      visibleSnapshot.docs.forEach((doc, index) => {
+        console.log(`Visible ${index + 1}: ${doc.id}`);
+      });
+
+      // 🔍 3. REQUÊTE AVEC FILTRE type IN ['lawyer', 'expat']
+      console.log('\n📡 Test avec filtre type...');
+      const typeQuery = query(
+        collection(db, 'sos_profiles'),
+        where('type', 'in', ['lawyer', 'expat'])
+      );
+      const typeSnapshot = await getDocs(typeQuery);
+      
+      console.log(`📊 Documents type in [lawyer,expat]: ${typeSnapshot.size}`);
+      typeSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`Type ${index + 1}: ${doc.id} (${data.type})`);
+      });
+
+      // 🔍 4. VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS
+      console.log('\n🔍 VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS');
+      const potentialIds = ['expat2', 'expat3', 'avocat1', 'EXPAT 3', 'EXPAT3']; // Adaptez selon vos IDs réels
+      
+      for (const profileId of potentialIds) {
+        try {
+          const docRef = doc(db, 'sos_profiles', profileId);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            console.log(`✅ ${profileId} existe:`, {
+              type: data.type,
+              isVisible: data.isVisible,
+              isActive: data.isActive,
+              isApproved: data.isApproved,
+              typeCheck: ['lawyer', 'expat'].includes(data.type),
+              visibleCheck: data.isVisible === true,
+              activeCheck: data.isActive !== false,
+              passesFilters: data.isVisible === true && ['lawyer', 'expat'].includes(data.type)
+            });
+          } else {
+            console.log(`❌ ${profileId} N'EXISTE PAS`);
+          }
+        } catch (err) {
+          console.error(`💥 Erreur ${profileId}:`, err);
+        }
+      }
+      // 🔧 FIN DEBUG FIREBASE
+
+      // Charger depuis Firebase avec la requête finale
+      console.log('\n📡 Requête finale ProfileCarousel...');
       const sosProfilesQuery = query(
         collection(db, 'sos_profiles'),
         where('isVisible', '==', true),
@@ -135,7 +210,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       );
       
       const snapshot = await getDocs(sosProfilesQuery);
-      console.log('📊 Documents avec filtres:', snapshot.size);
+      console.log(`📊 Documents récupérés par requête finale: ${snapshot.size}`);
       
       if (snapshot.empty) {
         console.log('⚠️ Aucun document avec filtres');
@@ -150,12 +225,21 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       for (const doc of snapshot.docs) {
         try {
           const data = doc.data();
+          const docId = doc.id;
+          
+          // 🔍 Log de transformation détaillé
+          console.log(`\n🔄 TRAITEMENT ${docId}:`);
 
           const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Expert';
           const type = data.type || 'expat';
           const country = data.currentPresenceCountry || data.country || '';
 
-          if (!country) continue;
+          console.log(`1️⃣ Données de base: nom="${fullName}", type="${type}", pays="${country}"`);
+
+          if (!country) {
+            console.log(`❌ ${docId}: REJETÉ - Pas de pays`);
+            continue;
+          }
 
           // Gérer l'avatar
           let avatar = data.profilePhoto || data.photoURL || data.avatar || '';
@@ -190,13 +274,44 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             isApproved: data.isApproved === true
           };
 
-          // Validation
+          // 🔧 NOUVELLE LOGIQUE DE VALIDATION CLAIRE
           const isLawyer = provider.type === 'lawyer';
           const isExpat = provider.type === 'expat';
-          const approved = !isLawyer || (isLawyer && provider.isApproved === true);
+          
+          // Vérifications de base
+          const hasValidData = provider.name.trim() !== '' && provider.country.trim() !== '';
+          const isVisible = data.isVisible !== false; // true par défaut
+          const isActive = data.isActive !== false;   // true par défaut
+          const notBanned = data.isBanned !== true;
+          
+          // Logique d'approbation
+          let isApproved = true;
+          if (isLawyer) {
+            // Les avocats doivent être explicitement approuvés
+            isApproved = data.isApproved === true;
+            console.log(`⚖️ Validation avocat ${provider.name}: isApproved=${data.isApproved} → ${isApproved}`);
+          } else if (isExpat) {
+            // Les expats sont approuvés par défaut (sauf si explicitement refusé)
+            isApproved = data.isApproved !== false;
+            console.log(`🌍 Validation expat ${provider.name}: isApproved=${data.isApproved} → ${isApproved}`);
+          }
 
-          if ((isLawyer || isExpat) && approved && provider.name.trim() !== '' && provider.country.trim() !== '') {
+          const shouldInclude = hasValidData && isVisible && isActive && notBanned && isApproved;
+
+          console.log(`🔍 Décision finale ${provider.name}:`, {
+            hasValidData,
+            isVisible: `${data.isVisible} → ${isVisible}`,
+            isActive: `${data.isActive} → ${isActive}`,
+            notBanned,
+            isApproved: `${data.isApproved} → ${isApproved}`,
+            shouldInclude
+          });
+
+          if (shouldInclude) {
             transformedProviders.push(provider);
+            console.log(`✅ ${provider.name} (${provider.type}) AJOUTÉ - Total: ${transformedProviders.length}`);
+          } else {
+            console.log(`❌ ${provider.name} (${provider.type}) REJETÉ`);
           }
 
         } catch (error) {
@@ -204,7 +319,9 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         }
       }
 
-      console.log('✅ Profils transformés:', transformedProviders.length);
+      console.log(`\n🏁 RÉSULTAT FINAL ProfileCarousel: ${transformedProviders.length} profils ajoutés`);
+      console.log('Profils finaux:', transformedProviders.map(p => ({ id: p.id, name: p.name, type: p.type })));
+
       setOnlineProviders(transformedProviders.slice(0, pageSize));
       
       // Sélection initiale intelligente
@@ -212,7 +329,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       setVisibleProviders(initialVisible);
 
     } catch (err) {
-      console.error('❌ Erreur lors du chargement:', err);
+      console.error('❌ Erreur lors du chargement ProfileCarousel:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(`Erreur de chargement: ${errorMessage}`);
       

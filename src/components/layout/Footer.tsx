@@ -122,14 +122,15 @@ const Footer: React.FC = () => {
   }, [resolvedLang]);
 
   // ---------- Liens légaux par défaut (fallback) ----------
-  const defaultLegalLinks = useMemo<LegalLink[]>(() => ([
-    { label: t('footer.legal.privacy'), href: '/politique-confidentialite', order: 10 },
-    { label: t('footer.legal.termsClients'), href: '/cgu-clients', order: 20 },
-    { label: t('footer.legal.termsLawyers'), href: '/cgu-avocats', order: 30 },
-    { label: t('footer.legal.termsExpats'), href: '/cgu-expatries', order: 40 },
-    { label: 'Cookies', href: '/cookies', order: 50 },
-    { label: t('footer.legal.consumers'), href: '/consommateurs', order: 60 }
-  ]), [t]);
+  const defaultLegalLinks = useMemo<LegalLink[]>(() => (
+    [
+      { label: t('footer.legal.privacy'), href: '/politique-confidentialite', order: 10 },
+      { label: t('footer.legal.termsClients'), href: '/cgu-clients', order: 20 },
+      // CGU Avocats et CGU Expatriés supprimés du fallback
+      { label: 'Cookies', href: '/cookies', order: 50 },
+      { label: t('footer.legal.consumers'), href: '/consommateurs', order: 60 }
+    ]
+  ), [t]);
 
   // ---------- Sections ----------
   const footerSections = useMemo<Record<string, FooterSection>>(() => ({
@@ -215,10 +216,9 @@ const Footer: React.FC = () => {
     };
 
     const loadLegalDocuments = async () => {
-      // cache d'abord
       const cached = readCache();
       if (cached && cached.length) {
-        setLegalLinks(cached);
+        setLegalLinks(cached.filter(l => !['CGU Avocats', 'CGU Expatriés', 'Lawyer Terms', 'Expat Terms'].includes(l.label)));
         setIsLoading(false);
       }
 
@@ -234,12 +234,10 @@ const Footer: React.FC = () => {
 
         setIsLoading(!cached);
 
-        // Supporte language OU locale dans ta collection
         const col = collection(db, 'legal_documents');
         const qLang = query(col, where('language', '==', resolvedLang), where('isActive', '==', true));
         const qLocale = query(col, where('locale', '==', resolvedLang), where('isActive', '==', true));
 
-        // On tente d'abord language, sinon locale
         let snapshot = await getDocs(qLang);
         if (snapshot.empty) snapshot = await getDocs(qLocale);
 
@@ -256,7 +254,6 @@ const Footer: React.FC = () => {
               const title = String((data.title || data.type || 'Document') ?? 'Document');
               const order = typeof data.order === 'number' ? (data.order as number) : 999;
 
-              // priorité au slug/path si fourni (meilleure SEO et stabilité URL)
               const slug = typeof data.slug === 'string' ? data.slug : undefined;
               const path = typeof data.path === 'string' ? data.path : undefined;
               const type = typeof data.type === 'string' ? data.type : '';
@@ -275,7 +272,9 @@ const Footer: React.FC = () => {
 
               return { label: title, href, order };
             })
-            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+            // filtre ici aussi
+            .filter(l => !['CGU Avocats', 'CGU Expatriés', 'Lawyer Terms', 'Expat Terms'].includes(l.label));
 
           setLegalLinks(items);
           writeCache(items);
@@ -294,7 +293,7 @@ const Footer: React.FC = () => {
     return () => { isMounted = false; };
   }, [resolvedLang, defaultLegalLinks]);
 
-  // ---------- UX: bouton scroll to top (mobile, safe-area) ----------
+  // ---------- UX: bouton scroll to top ----------
   useEffect(() => {
     let ticking = false;
     const onScroll = () => {
@@ -317,7 +316,6 @@ const Footer: React.FC = () => {
     }
   }, []);
 
-  // ---------- SEO/IA: JSON-LD Organization (aide référencement & IA) ----------
   const jsonLd = useMemo(() => {
     const sameAs: string[] = [SOCIAL.fb, SOCIAL.tw, SOCIAL.li].filter(Boolean);
     return {
@@ -345,20 +343,17 @@ const Footer: React.FC = () => {
       role="contentinfo"
       aria-label={t('footer.ariaLabel')}
     >
-      {/* JSON-LD for SEO / AI */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Subtle Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-blue-500/5" />
         <div className="absolute top-0 right-1/4 w-64 h-64 bg-red-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-blue-500/8 rounded-full blur-2xl animate-pulse delay-1000" />
       </div>
 
-      {/* Floating Back to Top Button */}
       {showTop && (
         <button
           onClick={scrollToTop}
@@ -377,14 +372,9 @@ const Footer: React.FC = () => {
         </button>
       )}
 
-      {/* Main Content */}
       <div className="relative backdrop-blur-sm bg-black/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-          
-          {/* Main Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-12">
-            
-            {/* Brand Section */}
             <div className="lg:col-span-1 space-y-6">
               <div className="group">
                 <div className="flex items-center space-x-3 mb-4">
@@ -407,7 +397,6 @@ const Footer: React.FC = () => {
                 </p>
               </div>
 
-              {/* Social Links */}
               <div className="flex space-x-3" role="list" aria-label={t('footer.social.ariaLabel')}>
                 {socialLinks.map((social) => (
                   <a
@@ -432,7 +421,6 @@ const Footer: React.FC = () => {
               </div>
             </div>
 
-            {/* Services */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 {footerSections.services.title}
@@ -460,7 +448,6 @@ const Footer: React.FC = () => {
               </nav>
             </div>
 
-            {/* Support */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 {footerSections.support.title}
@@ -488,7 +475,6 @@ const Footer: React.FC = () => {
               </nav>
             </div>
 
-            {/* Contact */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 {t('footer.contact.title')}
@@ -526,7 +512,6 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Divider */}
           <div className="relative mb-8">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -538,16 +523,12 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom Section */}
           <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-            
-            {/* Copyright */}
             <div className="text-gray-400 text-sm text-center lg:text-left order-2 lg:order-1">
               <span className="font-medium text-white">© {currentYear} SOS Urgently.</span>
               <span className="ml-1">{t('footer.copyright')}</span>
             </div>
 
-            {/* Legal Links */}
             <nav
               className="order-1 lg:order-2"
               aria-label={t('footer.legal.navAria')}
@@ -589,7 +570,6 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom border */}
         <div className="h-1 bg-gradient-to-r from-red-500/50 via-red-600/80 to-red-500/50" />
       </div>
     </footer>

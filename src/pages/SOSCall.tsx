@@ -658,13 +658,23 @@ const SOSCall: React.FC = () => {
                         id="expert-type"
                         value={selectedType}
                         onChange={(e) => setSelectedType(e.target.value as 'all' | 'lawyer' | 'expat')}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/15 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-transparent transition-all appearance-none text-sm text-white"
+                        className="
+                          w-full px-3 py-2
+                          bg-white text-gray-900
+                          border border-gray-300 rounded-xl
+                          dark:bg-white/10 dark:text-white dark:border-white/20
+                          focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent
+                          transition-all appearance-none text-sm
+                        "
                       >
                         <option value="all">Tous</option>
                         <option value="lawyer">Avocats</option>
                         <option value="expat">Expatriés</option>
                       </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4 pointer-events-none" aria-hidden="true" />
+                      <ChevronDown
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-300 pointer-events-none"
+                        aria-hidden="true"
+                      />
                     </div>
                   </div>
 
@@ -678,7 +688,14 @@ const SOSCall: React.FC = () => {
                         id="country-filter"
                         value={selectedCountry}
                         onChange={(e) => handleCountryChange(e.target.value)}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/15 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-transparent transition-all appearance-none text-sm text-white"
+                        className="
+                          w-full px-3 py-2
+                          bg-white text-gray-900
+                          border border-gray-300 rounded-xl
+                          dark:bg-white/10 dark:text-white dark:border-white/20
+                          focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent
+                          transition-all appearance-none text-sm
+                        "
                       >
                         <option value="all">Tous les pays</option>
                         {countryOptions.map((country) => (
@@ -686,7 +703,10 @@ const SOSCall: React.FC = () => {
                         ))}
                         <option value="Autre">Autre</option>
                       </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4 pointer-events-none" aria-hidden="true" />
+                      <ChevronDown
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-300 pointer-events-none"
+                        aria-hidden="true"
+                      />
                     </div>
                     {showCustomCountry && (
                       <input
@@ -709,7 +729,14 @@ const SOSCall: React.FC = () => {
                         id="language-filter"
                         value={selectedLanguage}
                         onChange={(e) => handleLanguageChange(e.target.value)}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/15 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-transparent transition-all appearance-none text-sm text-white"
+                        className="
+                          w-full px-3 py-2
+                          bg-white text-gray-900
+                          border border-gray-300 rounded-xl
+                          dark:bg-white/10 dark:text-white dark:border-white/20
+                          focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent
+                          transition-all appearance-none text-sm
+                        "
                       >
                         <option value="all">Toutes</option>
                         {languageOptions.map((lang) => (
@@ -717,7 +744,10 @@ const SOSCall: React.FC = () => {
                         ))}
                         <option value="Autre">Autre</option>
                       </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4 pointer-events-none" aria-hidden="true" />
+                      <ChevronDown
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-300 pointer-events-none"
+                        aria-hidden="true"
+                      />
                     </div>
                     {showCustomLanguage && (
                       <input

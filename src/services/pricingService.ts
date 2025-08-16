@@ -1,13 +1,13 @@
-// functions/src/services/pricingService.ts
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps } from 'firebase-admin/app';
+// src/services/pricingService.ts (FRONTEND VERSION)
+// Remplace l'ancienne version qui importait `firebase-admin/*` (backend uniquement)
 
-// Initialiser Firebase Admin si pas déjà fait
-if (!getApps().length) {
-  initializeApp();
-}
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/config/firebase";
+import { useEffect, useState } from "react";
 
-const db = getFirestore();
+/** Types */
+export type Currency = "eur" | "usd";
+export type ServiceType = "lawyer" | "expat";
 
 export interface ServiceConfig {
   totalAmount: number;
@@ -18,165 +18,90 @@ export interface ServiceConfig {
 }
 
 export interface PricingConfig {
-  lawyer: {
-    eur: ServiceConfig;
-    usd: ServiceConfig;
-  };
-  expat: {
-    eur: ServiceConfig;
-    usd: ServiceConfig;
-  };
+  lawyer: { eur: ServiceConfig; usd: ServiceConfig };
+  expat: { eur: ServiceConfig; usd: ServiceConfig };
 }
 
-// Configuration par défaut (fallback)
-const DEFAULT_PRICING_CONFIG: PricingConfig = {
-  lawyer: {
-    eur: { totalAmount: 49, connectionFeeAmount: 19, providerAmount: 30, duration: 25, currency: 'eur' },
-    usd: { totalAmount: 55, connectionFeeAmount: 25, providerAmount: 30, duration: 25, currency: 'usd' }
-  },
-  expat: {
-    eur: { totalAmount: 19, connectionFeeAmount: 9, providerAmount: 10, duration: 35, currency: 'eur' },
-    usd: { totalAmount: 25, connectionFeeAmount: 15, providerAmount: 10, duration: 35, currency: 'usd' }
-  }
-};
+/** Source de vérité Firestore */
+const PRICING_REF = doc(db, "admin_config", "pricing");
 
-/**
- * Récupère la configuration des prix depuis Firebase Admin
- */
-export const getPricingConfig = async (): Promise<PricingConfig> => {
-  try {
-    const configDoc = await db.collection('admin_config').doc('pricing').get();
-    
-    if (configDoc.exists) {
-      const data = configDoc.data() as PricingConfig;
-      
-      // Validation des données
-      if (isValidPricingConfig(data)) {
-        return data;
-      } else {
-        console.warn('Configuration pricing invalide, utilisation du fallback');
-        return DEFAULT_PRICING_CONFIG;
-      }
-    } else {
-      console.warn('Configuration pricing non trouvée, utilisation du fallback');
-      return DEFAULT_PRICING_CONFIG;
-    }
-  } catch (error) {
-    console.error('Erreur lors de la récupération de la configuration pricing:', error);
-    return DEFAULT_PRICING_CONFIG;
-  }
-};
+// Cache mémoire (5 min)
+let _cache: { data: PricingConfig | null; ts: number } = { data: null, ts: 0 };
+const CACHE_MS = 5 * 60 * 1000;
 
-/**
- * Récupère la configuration pour un service spécifique
- */
-export const getServicePricing = async (
-  serviceType: 'lawyer' | 'expat',
-  currency: 'eur' | 'usd' = 'eur'
-): Promise<ServiceConfig> => {
-  const config = await getPricingConfig();
-  return config[serviceType][currency];
-};
+export async function getPricingConfig(): Promise<PricingConfig> {
+  const now = Date.now();
+  if (_cache.data && now - _cache.ts < CACHE_MS) return _cache.data;
 
-/**
- * 🔥 DÉTECTION AUTOMATIQUE DE LA DEVISE selon la localisation
- * Note: Cette fonction est principalement pour le frontend, 
- * dans les Functions elle retournera toujours 'eur' par défaut
- */
-export const detectUserCurrency = (): 'eur' | 'usd' => {
-  try {
-    // Dans l'environnement Functions, on ne peut pas accéder au localStorage ou navigator
-    // On retourne EUR par défaut
-    return 'eur';
-  } catch {
-    return 'eur'; // Fallback sécurisé
-  }
-};
+  const snap = await getDoc(PRICING_REF);
+  if (!snap.exists()) throw new Error("Config pricing absente (admin_config/pricing).");
 
-/**
- * Calcule les montants basés sur la configuration admin + devise
- */
-export const calculateServiceAmounts = async (
-  serviceType: 'lawyer' | 'expat',
-  currency: 'eur' | 'usd' = 'eur'
-): Promise<{
-  totalAmount: number;
-  connectionFeeAmount: number;
-  providerAmount: number;
-  duration: number;
-  currency: string;
-}> => {
-  const config = await getServicePricing(serviceType, currency);
-  
+  const data = snap.data() as PricingConfig;
+  if (!isValidPricingConfig(data)) throw new Error("Config pricing invalide.");
+  _cache = { data, ts: now };
+  return data;
+}
+export function clearPricingCache() { _cache = { data: null, ts: 0 }; }
+
+/** Hook React pratique */
+export function usePricingConfig() {
+  const [pricing, setPricing] = useState<PricingConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = async () => {
+    setLoading(true); setError(null);
+    try { setPricing(await getPricingConfig()); }
+    catch (e: any) { setError(e?.message ?? "Erreur chargement pricing"); setPricing(null); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { reload(); }, []);
+  return { pricing, loading, error, reload };
+}
+
+/** Utilitaires */
+export async function getServicePricing(serviceType: ServiceType, currency: Currency = "eur"): Promise<ServiceConfig> {
+  const cfg = await getPricingConfig();
+  return cfg[serviceType][currency];
+}
+
+export async function calculateServiceAmounts(serviceType: ServiceType, currency: Currency = "eur") {
+  const c = await getServicePricing(serviceType, currency);
   return {
-    totalAmount: config.totalAmount,
-    connectionFeeAmount: config.connectionFeeAmount,
-    providerAmount: config.providerAmount,
-    duration: config.duration,
-    currency: config.currency
+    totalAmount: c.totalAmount,
+    connectionFeeAmount: c.connectionFeeAmount,
+    providerAmount: c.providerAmount,
+    duration: c.duration,
+    currency: c.currency,
   };
-};
-
-/**
- * Validation de la structure de configuration
- */
-const isValidPricingConfig = (config: any): config is PricingConfig => {
-  try {
-    return (
-      config &&
-      typeof config === 'object' &&
-      config.lawyer &&
-      config.expat &&
-      isValidServiceConfig(config.lawyer.eur) &&
-      isValidServiceConfig(config.lawyer.usd) &&
-      isValidServiceConfig(config.expat.eur) &&
-      isValidServiceConfig(config.expat.usd)
-    );
-  } catch {
-    return false;
-  }
-};
-
-const isValidServiceConfig = (config: any): config is ServiceConfig => {
-  return (
-    config &&
-    typeof config === 'object' &&
-    typeof config.totalAmount === 'number' &&
-    typeof config.connectionFeeAmount === 'number' &&
-    typeof config.providerAmount === 'number' &&
-    typeof config.duration === 'number' &&
-    typeof config.currency === 'string' &&
-    config.totalAmount > 0 &&
-    config.connectionFeeAmount >= 0 &&
-    config.providerAmount >= 0 &&
-    config.duration > 0
-  );
-};
-
-/**
- * Cache simple pour éviter les appels répétés
- */
-class PricingCache {
-  private cache: PricingConfig | null = null;
-  private lastFetch: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-  async get(): Promise<PricingConfig> {
-    const now = Date.now();
-    
-    if (this.cache && (now - this.lastFetch) < this.CACHE_DURATION) {
-      return this.cache;
-    }
-
-    this.cache = await getPricingConfig();
-    this.lastFetch = now;
-    return this.cache;
-  }
-
-  clear(): void {
-    this.cache = null;
-    this.lastFetch = 0;
-  }
 }
 
-export const pricingCache = new PricingCache();
+/** Détection devise côté navigateur */
+export function detectUserCurrency(): Currency {
+  try {
+    const saved = localStorage.getItem("preferredCurrency") as Currency | null;
+    if (saved === "eur" || saved === "usd") return saved;
+    const nav = (navigator?.language || "").toLowerCase();
+    return nav.includes("fr") || nav.includes("de") || nav.includes("es") || nav.includes("it") || nav.includes("pt") || nav.includes("nl")
+      ? "eur" : "usd";
+  } catch { return "eur"; }
+}
+
+/** Validation */
+function isValidPricingConfig(cfg: any): cfg is PricingConfig {
+  try {
+    return cfg && cfg.lawyer && cfg.expat &&
+      isValidServiceConfig(cfg.lawyer?.eur) &&
+      isValidServiceConfig(cfg.lawyer?.usd) &&
+      isValidServiceConfig(cfg.expat?.eur) &&
+      isValidServiceConfig(cfg.expat?.usd);
+  } catch { return false; }
+}
+function isValidServiceConfig(c: any): c is ServiceConfig {
+  return c && typeof c.totalAmount === "number" &&
+    typeof c.connectionFeeAmount === "number" &&
+    typeof c.providerAmount === "number" &&
+    typeof c.duration === "number" &&
+    typeof c.currency === "string";
+}

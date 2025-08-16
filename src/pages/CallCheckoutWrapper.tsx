@@ -5,6 +5,12 @@ import CallCheckout from './CallCheckout';
 import { AlertCircle } from 'lucide-react';
 import { Provider, normalizeProvider, createDefaultProvider } from '../types/provider'; // ⚠️ casse unifiée: 'provider'
 
+// ✅ PRICING (FRONT) — lit Firestore admin_config/pricing
+import {
+  calculateServiceAmounts,
+  detectUserCurrency,
+} from '../services/pricingService';
+
 // —————————————————————————————————————————————————————
 // Types
 // —————————————————————————————————————————————————————
@@ -94,10 +100,23 @@ const useTranslation = () => {
 const reconstructServiceData = (provider: ProviderLike): ServiceData => {
   const providerRole: 'lawyer' | 'expat' =
     (provider.role || provider.type || provider.providerType || 'expat') as 'lawyer' | 'expat';
-  const baseAmount = typeof provider.price === 'number' ? provider.price : providerRole === 'lawyer' ? 49 : 19;
-  const duration = typeof provider.duration === 'number' ? provider.duration : providerRole === 'lawyer' ? 20 : 30;
 
-  // Commission 20%
+  // Valeurs provisoires (seront écrasées par la config Firestore juste après)
+  const baseAmount =
+    typeof provider.price === 'number'
+      ? provider.price
+      : providerRole === 'lawyer'
+      ? 49
+      : 19;
+
+  const duration =
+    typeof provider.duration === 'number'
+      ? provider.duration
+      : providerRole === 'lawyer'
+      ? 20
+      : 30;
+
+  // Commission 20% (provisoire : remplacée par les montants admin s'ils existent)
   const commissionRate = 0.2;
   const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
   const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
@@ -135,8 +154,18 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
     languagesSpoken: bookingData.providerLanguages || [],
     languages: bookingData.providerLanguages || [],
     preferredLanguage: 'fr',
-    price: typeof bookingData.price === 'number' ? bookingData.price : bookingData.providerType === 'lawyer' ? 49 : 19,
-    duration: typeof bookingData.duration === 'number' ? bookingData.duration : bookingData.providerType === 'lawyer' ? 20 : 30,
+    price:
+      typeof bookingData.price === 'number'
+        ? bookingData.price
+        : bookingData.providerType === 'lawyer'
+        ? 49
+        : 19,
+    duration:
+      typeof bookingData.duration === 'number'
+        ? bookingData.duration
+        : bookingData.providerType === 'lawyer'
+        ? 20
+        : 30,
     rating: bookingData.providerRating || 4.5,
     reviewCount: bookingData.providerReviewCount || 0,
     specialties: bookingData.providerSpecialties || [],
@@ -153,8 +182,10 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
 
 const reconstructServiceFromBooking = (bookingData: BookingData): ServiceData => {
   const providerRole: 'lawyer' | 'expat' = (bookingData.providerType as 'lawyer' | 'expat') || 'expat';
-  const baseAmount = typeof bookingData.price === 'number' ? bookingData.price : providerRole === 'lawyer' ? 49 : 19;
-  const duration = typeof bookingData.duration === 'number' ? bookingData.duration : providerRole === 'lawyer' ? 20 : 30;
+  const baseAmount =
+    typeof bookingData.price === 'number' ? bookingData.price : providerRole === 'lawyer' ? 49 : 19;
+  const duration =
+    typeof bookingData.duration === 'number' ? bookingData.duration : providerRole === 'lawyer' ? 20 : 30;
 
   const commissionRate = 0.2;
   const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
@@ -220,16 +251,16 @@ const CallCheckoutWrapper: React.FC = () => {
         try {
           const savedProvider = sessionStorage.getItem('selectedProvider');
           if (savedProvider) savedProviderData = JSON.parse(savedProvider) as Provider;
-       } catch (err) {
-  console.error(err);
-}
+        } catch (err) {
+          console.error(err);
+        }
 
         try {
           const savedService = sessionStorage.getItem('serviceData');
           if (savedService) savedServiceData = JSON.parse(savedService) as ServiceData;
         } catch (err) {
-  console.error(err);
-}
+          console.error(err);
+        }
 
         if (savedProviderData && (!providerId || savedProviderData.id === providerId)) {
           const normalized = normalizeProvider(savedProviderData);
@@ -251,8 +282,8 @@ const CallCheckoutWrapper: React.FC = () => {
             }
           }
         } catch (err) {
-  console.error(err);
-}
+          console.error(err);
+        }
 
         // 4) providerProfile
         try {
@@ -267,8 +298,8 @@ const CallCheckoutWrapper: React.FC = () => {
             }
           }
         } catch (err) {
-  console.error(err);
-}
+          console.error(err);
+        }
 
         // 5) autres clés sessionStorage
         const sessionStorageKeys = ['providerData', 'selectedExpert', 'expertData', 'consultationData', 'callData'] as const;
@@ -285,8 +316,8 @@ const CallCheckoutWrapper: React.FC = () => {
               }
             }
           } catch (err) {
-  console.error(err);
-}
+            console.error(err);
+          }
         }
 
         // 6) history.state
@@ -299,8 +330,8 @@ const CallCheckoutWrapper: React.FC = () => {
             return;
           }
         } catch (err) {
-  console.error(err);
-}
+          console.error(err);
+        }
 
         // 7) localStorage (backup)
         try {
@@ -317,8 +348,8 @@ const CallCheckoutWrapper: React.FC = () => {
             }
           }
         } catch (err) {
-  console.error(err);
-}
+          console.error(err);
+        }
 
         // 8) paramètres URL
         try {
@@ -337,8 +368,8 @@ const CallCheckoutWrapper: React.FC = () => {
             }
           }
         } catch (err) {
-  console.error(err);
-}
+          console.error(err);
+        }
 
         // 9) fallback avec providerId => default provider
         if (providerId) {
@@ -373,6 +404,38 @@ const CallCheckoutWrapper: React.FC = () => {
     loadData();
   }, [locState, providerId, t]);
 
+  // 🔥 Synchronisation immédiate avec la console d'admin (Firestore)
+  // Dès qu'on connaît le provider, on écrase les montants/durée par ceux d'admin_config/pricing
+  useEffect(() => {
+    if (!state.provider || !state.serviceData || state.isLoading) return;
+    const role = (state.provider.role || state.provider.type || 'expat') as 'lawyer' | 'expat';
+    const currency = detectUserCurrency();
+
+    (async () => {
+      try {
+        const p = await calculateServiceAmounts(role, currency);
+        setState(prev =>
+          prev && prev.serviceData
+            ? {
+                ...prev,
+                serviceData: {
+                  ...prev.serviceData,
+                  amount: p.totalAmount,
+                  duration: p.duration,
+                  commissionAmount: p.connectionFeeAmount,
+                  providerAmount: p.providerAmount,
+                },
+              }
+            : prev
+        );
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[CallCheckoutWrapper] Impossible de charger le pricing admin, on garde le fallback local.', e);
+        }
+      }
+    })();
+  }, [state.provider, state.serviceData, state.isLoading]);
+
   // Sauvegarde session (utile pour CallCheckout et retours)
   useEffect(() => {
     if (state.provider && state.serviceData && !state.isLoading && !state.error) {
@@ -382,8 +445,8 @@ const CallCheckoutWrapper: React.FC = () => {
         localStorage.setItem('lastSelectedProvider', JSON.stringify(state.provider));
         localStorage.setItem('lastServiceData', JSON.stringify(state.serviceData));
       } catch (err) {
-  console.error(err);
-}
+        console.error(err);
+      }
     }
   }, [state.provider, state.serviceData, state.isLoading, state.error]);
 
@@ -472,5 +535,3 @@ const CallCheckoutWrapper: React.FC = () => {
 };
 
 export default CallCheckoutWrapper;
-
-

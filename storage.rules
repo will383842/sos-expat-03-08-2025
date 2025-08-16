@@ -46,14 +46,18 @@ service firebase.storage {
     }
 
     // ========= PHOTOS TEMPORAIRES POUR INSCRIPTION =========
+    // 🔥 CORRECTION : Autoriser l'upload SANS authentification pour l'inscription
     match /registration_temp/{fileName} {
-      allow read, write: if (isImage() && isValidFileSize()) || isDevMode();
+      allow read: if true || isDevMode();
+      allow write: if (isImage() && isValidFileSize()) || isDevMode();
       allow delete: if isAdmin() || isDevMode();
     }
 
     // ========= DOSSIER TEMPORAIRE =========
+    // 🔥 CORRECTION : Même chose pour temp_profiles
     match /temp_profiles/{fileName} {
-      allow read, write: if (isImage() && isValidFileSize()) || isDevMode();
+      allow read: if true || isDevMode();
+      allow write: if (isImage() && isValidFileSize()) || isDevMode();
       allow delete: if isAdmin() || isDevMode();
     }
 

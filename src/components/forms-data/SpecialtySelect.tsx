@@ -41,7 +41,7 @@ const SpecialtySelect: React.FC<SpecialtySelectProps> = React.memo(({
   const groupedOptions = useMemo<GroupedOptions[]>(() => {
     const q = normalize(inputValue);
     return lawyerSpecialitiesData.map(group => {
-      const glabel = getLocalizedLabel(group, currentLocale, group.code);
+      const glabel = getLocalizedLabel(group, currentLocale, group.groupName);
       const items = group.items
         .filter(item => {
           if (!q) return true;
@@ -77,7 +77,7 @@ const SpecialtySelect: React.FC<SpecialtySelectProps> = React.memo(({
   }, []);
 
   const styles = useMemo(() => makeAdaptiveStyles<SpecialtyOption>(!!highlightShared), [highlightShared]);
-  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale(currentLocale), [currentLocale]);
+  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale[currentLocale], [currentLocale]);
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
       ? (inputValue ? `Aucune spécialité trouvée pour "${inputValue}"` : 'Aucune spécialité disponible')
@@ -108,3 +108,4 @@ const SpecialtySelect: React.FC<SpecialtySelectProps> = React.memo(({
 
 SpecialtySelect.displayName = 'SpecialtySelect';
 export default SpecialtySelect;
+

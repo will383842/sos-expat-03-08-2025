@@ -15,6 +15,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const exportSinglePDF = (invoice: any) => {
+  console.log('Export PDF:', invoice);
+  // TODO: Implémenter l'export PDF réel
+  alert('Fonctionnalité d\'export PDF à implémenter');
+};
+
 interface InvoiceRecord {
   id: string;
   clientId: string;

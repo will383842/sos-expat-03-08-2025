@@ -264,7 +264,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             name: fullName,
             type: type as 'lawyer' | 'expat',
             country,
-            nationality: data.nationality || data.nationalite || undefined,
+            // nationality: data.nationality || data.nationalite || undefined,
             languages: Array.isArray(data.languages) ? data.languages : ['Français'],
             specialties: Array.isArray(data.specialties) ? data.specialties : [],
             rating: typeof data.rating === 'number' && data.rating >= 0 && data.rating <= 5 ? data.rating : 4.5,

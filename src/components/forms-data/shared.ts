@@ -1,78 +1,44 @@
-// src/components/forms-data/shared.ts
-import type { StylesConfig } from 'react-select';
-
-export type Locale = 'fr' | 'en';
+﻿export type Locale = 'fr' | 'en';
 
 export interface SharedOption {
   value: string;
   label: string;
+  isShared?: boolean;
 }
 
-/**
- * Détecte la langue du navigateur (FR/EN) sans dépendance externe.
- */
-export const getDetectedBrowserLanguage = (): Locale => {
-  const nav: any =
-    typeof navigator !== 'undefined' ? navigator : {};
-  const raw: string =
-    (Array.isArray(nav.languages) && nav.languages[0]) ||
-    nav.language ||
-    nav.userLanguage ||
-    'en';
-  return String(raw).toLowerCase().startsWith('fr') ? 'fr' : 'en';
+export const defaultPlaceholderByLocale: Record<Locale, string> = {
+  fr: "Sélectionner...",
+  en: "Select..."
 };
 
-/**
- * Normalise une chaîne pour clé/slug : minuscules, sans accents, alphanum + tirets.
- */
-export const normalize = (s: string): string =>
-  (s ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+export const getDetectedBrowserLanguage = (): Locale => {
+  if (typeof navigator !== 'undefined') {
+    return navigator.language.startsWith('fr') ? 'fr' : 'en';
+  }
+  return 'fr';
+};
 
-/**
- * Retourne le libellé selon la locale.
- */
-export const getLocalizedLabel = (
-  labelFr: string,
-  labelEn: string,
-  locale: Locale
-): string => (locale === 'fr' ? labelFr : labelEn);
+export const normalize = (text: string): string => {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
 
-/**
- * Trie un tableau d’options par libellé selon la locale.
- */
-export const orderByLocale = <T extends SharedOption>(
-  arr: T[],
-  locale: Locale
-): T[] =>
-  [...arr].sort((a, b) =>
-    a.label.localeCompare(
-      b.label,
-      locale === 'fr' ? 'fr' : 'en',
-      { sensitivity: 'base' }
-    )
-  );
+export const getLocalizedLabel = (item: any, locale: Locale, fallback: string): string => {
+  if (typeof item === 'string') return item;
+  if (item && typeof item === 'object') {
+    return item[locale] || item.name || item.label || fallback;
+  }
+  return fallback;
+};
 
-/**
- * Styles de base pour react-select (mono et multi).
- */
-export const makeAdaptiveStyles = ():
-  StylesConfig<SharedOption, boolean> => ({
-  control: (base) => ({
-    ...base,
-    minHeight: 42,
-    borderRadius: 10
-  }),
-  menu: (base) => ({
-    ...base,
-    zIndex: 50
-  }),
-  multiValue: (base) => ({
-    ...base,
-    borderRadius: 6
-  })
-});
+export const makeAdaptiveStyles = <T extends SharedOption = SharedOption>(highlightShared = false) => {
+  return {
+    option: (provided: any, state: any) => ({
+      ...provided,
+      backgroundColor: state.data?.isShared && highlightShared ? '#f3f4f6' : provided.backgroundColor
+    }),
+    control: (provided: any) => ({
+      ...provided,
+      minHeight: '40px'
+    })
+  };
+};

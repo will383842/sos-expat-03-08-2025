@@ -4,7 +4,7 @@ import { getRecipients } from '../../../../serveremails/services/recipientSelect
 import { sendEmail } from '../../../../serveremails/services/emailSender';
 import { newsletter } from '../../templates/newsletter';
 import { logEmail } from '../../../../serveremails/services/emailLogger';
-
+import { getErrorMessage } from '../../../utils/errors';
 const SendToAll: React.FC = () => {
   const [greeting, setGreeting] = useState('Bonjour à tous,');
   const [content, setContent] = useState('');
@@ -24,7 +24,7 @@ const SendToAll: React.FC = () => {
 
       setStatus(`Email envoyé à ${filteredEmails.length} utilisateurs ✅`);
     } catch (err) {
-      setStatus('Erreur ❌ ' + err.message);
+      setStatus('Erreur ❌ ' + getErrorMessage(err));
     }
   };
 

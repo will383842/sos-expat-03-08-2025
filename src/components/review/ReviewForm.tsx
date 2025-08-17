@@ -73,7 +73,10 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       console.log('Submitting review:', reviewData);
       console.log('Provider ID:', providerId);
       
-      await createReviewRecord(reviewData);
+      await createReviewRecord({
+  ...reviewData,
+  status: 'pending' as const
+});
       
       // Scroll to reviews section after submission
       setTimeout(() => {
@@ -88,7 +91,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       }
     } catch (error) {
       console.error('Error submitting review:', error);
-      setError(`Une erreur est survenue lors de l'envoi de votre avis: ${error.message || 'Erreur inconnue'}. Veuillez réessayer.`);
+      setError(`Une erreur est survenue lors de l'envoi de votre avis: ${(error as Error).message || 'Erreur inconnue'}. Veuillez réessayer.`);
     } finally {
       setIsSubmitting(false);
     }

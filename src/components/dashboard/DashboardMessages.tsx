@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { getFirestore, collection, query, where, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,21 +73,38 @@ const DashboardMessages: React.FC = () => {
       )}
 
       {messages.map((msg) => (
-        <Card key={msg.id} className={msg.isRead ? "" : "border-2 border-red-500"}>
-          <CardContent className="p-4 space-y-2">
-            <p className="font-semibold text-sm text-gray-500">
-              Reçu le {new Date(msg.createdAt.seconds * 1000).toLocaleString()}
-            </p>
-            <p><strong>Client :</strong> {msg.metadata?.clientFirstName || "Inconnu"}</p>
-            <p><strong>Pays :</strong> {msg.metadata?.clientCountry || "Non précisé"}</p>
-            <p><strong>Message :</strong> {msg.message}</p>
+        <Card key={msg.id}>
+          <div className={msg.isRead ? "" : "border-2 border-red-500"}>
+            <CardContent>
+              <div className="p-4 space-y-2">
+                <p className="font-semibold text-sm text-gray-500">
+                  Reçu le{" "}
+                  {new Date(msg.createdAt.seconds * 1000).toLocaleString()}
+                </p>
+                <p>
+                  <strong>Client :</strong>{" "}
+                  {msg.metadata?.clientFirstName || "Inconnu"}
+                </p>
+                <p>
+                  <strong>Pays :</strong>{" "}
+                  {msg.metadata?.clientCountry || "Non précisé"}
+                </p>
+                <p>
+                  <strong>Message :</strong> {msg.message}
+                </p>
 
-            {!msg.isRead && (
-              <Button size="sm" variant="outline" onClick={() => markAsRead(msg.id)}>
-                ✅ Marquer comme lu
-              </Button>
-            )}
-          </CardContent>
+                {!msg.isRead && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => markAsRead(msg.id)}
+                  >
+                    ✅ Marquer comme lu
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </div>
         </Card>
       ))}
     </div>
@@ -86,5 +112,3 @@ const DashboardMessages: React.FC = () => {
 };
 
 export default DashboardMessages;
-
-

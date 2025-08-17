@@ -196,7 +196,7 @@ class AnalyticsService {
       // Incrémenter les compteurs de conversion
       await this.incrementCounter(`conversions_${data.conversionType}`);
       if (data.providerType) {
-        await this.incrementCounter(`conversions_${data.conviderType}_${data.providerType}`);
+        await this.incrementCounter(`conversions_${data.providerType}_${data.providerType}`);
       }
 
       // Google Analytics conversion tracking
@@ -339,7 +339,7 @@ class AnalyticsService {
           if (navigation) {
             this.logPerformance({
               metricType: 'page_load',
-              duration: navigation.loadEventEnd - navigation.navigationStart,
+              duration: navigation.loadEventEnd - navigation.fetchStart,
               status: 'success'
             });
           }
@@ -495,3 +495,4 @@ export const configureAnalytics = (userId?: string, enabled: boolean = true) => 
 
 // Export de l'instance pour les cas d'usage avancés
 export default analyticsService;
+

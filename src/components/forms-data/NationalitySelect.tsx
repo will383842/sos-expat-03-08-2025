@@ -4,9 +4,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import Select, { MultiValue } from 'react-select';
 import { nationalitiesData } from '@/data';
-import { Locale, getDetectedBrowserLanguage, normalize, getLocalizedLabel, defaultPlaceholderByLocale, makeAdaptiveStyles, SharedOption } from './shared';
+import { Locale, getDetectedBrowserLanguage, normalize, getLocalizedLabel, makeAdaptiveStyles, SharedOption } from './shared';
 
-export interface NationalityOption extends SharedOption {}
+// Interface étendue avec la propriété isShared manquante
+export interface NationalityOption extends SharedOption {
+  isShared?: boolean;
+}
 
 interface NationalitySelectProps {
   value?: MultiValue<NationalityOption>;
@@ -36,6 +39,7 @@ const NationalitySelect: React.FC<NationalitySelectProps> = React.memo(({
     if (!inputValue) return nationalitiesData.filter(n => !n.disabled);
     const q = normalize(inputValue);
     return nationalitiesData.filter(n => !n.disabled && (
+      // Correction: utiliser la bonne propriété selon la langue actuelle
       normalize(getLocalizedLabel(n, currentLocale, n.code)).includes(q) ||
       normalize(n.code).includes(q)
     ));
@@ -44,6 +48,7 @@ const NationalitySelect: React.FC<NationalitySelectProps> = React.memo(({
   const options = useMemo<NationalityOption[]>(() => {
     return filtered.map(n => ({
       value: n.code,
+      // Correction: utiliser la bonne propriété selon la langue actuelle
       label: getLocalizedLabel(n, currentLocale, n.code),
       isShared: highlightShared && providerLanguages.includes(n.code),
     }));
@@ -59,8 +64,14 @@ const NationalitySelect: React.FC<NationalitySelectProps> = React.memo(({
     return input;
   }, []);
 
-  const styles = useMemo(() => makeAdaptiveStyles<NationalityOption>(!!highlightShared), [highlightShared]);
-  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale(currentLocale), [currentLocale]);
+  // Correction: enlever le paramètre générique qui n'est pas attendu
+  const styles = useMemo(() => makeAdaptiveStyles(!!highlightShared), [highlightShared]);
+  
+  // Fonction utilitaire pour le placeholder par défaut
+  const defaultPlaceholder = useMemo(() => {
+    return currentLocale === 'fr' ? 'Sélectionner des nationalités' : 'Select nationalities';
+  }, [currentLocale]);
+
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
       ? (inputValue ? `Aucune nationalité trouvée pour "${inputValue}"` : 'Aucune nationalité disponible')

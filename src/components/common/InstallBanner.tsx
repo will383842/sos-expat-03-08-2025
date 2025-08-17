@@ -31,7 +31,7 @@ const InstallBanner: React.FC<InstallBannerProps> = ({
   closeForDays = 30,
   className = '',
 }) => {
-  const { canInstall, isInstalled, install, closeForAWhile } = usePWAInstall();
+  const { canPrompt: canInstall, installed: isInstalled, install, closeForAWhile } = usePWAInstall();
   const [closedNow, setClosedNow] = useState(false);
 
   const shouldShow = useMemo(() => {
@@ -45,7 +45,7 @@ const InstallBanner: React.FC<InstallBannerProps> = ({
   };
 
   const handleClose = () => {
-    try { closeForAWhile(closeForDays); } catch {}
+    try { closeForAWhile(); } catch {}
     setClosedNow(true); // masque immédiatement
   };
 

@@ -27,7 +27,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { createBookingRequest } from '../utils/firestore';
 import { logLanguageMismatch } from '../services/analytics';
-import languages from '../data/Languages-spoken';
+import languages from '../data/languages-spoken';
 import { httpsCallable } from 'firebase/functions';
 import { functions, db } from '../config/firebase';
 import type { Provider } from '../types/provider';

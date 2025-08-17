@@ -12,8 +12,10 @@ export interface PhoneValue {
   number: string;
 }
 
+// Interface avec toutes les propriétés requises
 export interface DialOption extends SharedOption {
   phoneCode: string;
+  isShared?: boolean;
 }
 
 interface PhoneInputProps {
@@ -44,6 +46,7 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
     if (!inputValue) return phoneCodesData.filter(r => !r.disabled);
     const q = normalize(inputValue);
     return phoneCodesData.filter(r => !r.disabled).filter(r => {
+      // Correction: utiliser la bonne propriété selon la langue actuelle
       const label = getLocalizedLabel(r, currentLocale, r.code);
       return [label, r.code, r.phoneCode].some(f => normalize(f).includes(q));
     });
@@ -52,6 +55,7 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
   const options = useMemo<DialOption[]>(() => {
     return filtered.map(r => ({
       value: r.code,
+      // Correction: utiliser la bonne propriété selon la langue actuelle
       label: `${getLocalizedLabel(r, currentLocale, r.code)} (${r.phoneCode})`,
       isShared: highlightShared && providerLanguages.includes(r.code),
       phoneCode: r.phoneCode
@@ -66,7 +70,13 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
   const selected = useMemo(() => {
     if (!value?.countryCode) return null;
     const found = options.find(o => o.value === value.countryCode);
-    return found ? { value: found.value, label: found.label, isShared: found.isShared } : null;
+    // Correction: retourner l'objet complet avec toutes les propriétés requises
+    return found ? { 
+      value: found.value, 
+      label: found.label, 
+      isShared: found.isShared,
+      phoneCode: found.phoneCode 
+    } : null;
   }, [options, value?.countryCode]);
 
   const handleSelectChange = useCallback((opt: any) => {
@@ -85,7 +95,8 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
     return input;
   }, []);
 
-  const styles = useMemo(() => makeAdaptiveStyles<DialOption>(!!highlightShared), [highlightShared]);
+  // Correction: enlever le paramètre générique qui n'est pas attendu
+  const styles = useMemo(() => makeAdaptiveStyles(!!highlightShared), [highlightShared]);
 
   const numberPlaceholder = currentLocale === 'fr' ? 'Numéro de téléphone' : 'Phone number';
   const selectPlaceholder = placeholder || (currentLocale === 'fr' ? 'Indicatif' : 'Dial code');

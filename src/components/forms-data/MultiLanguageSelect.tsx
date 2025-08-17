@@ -4,12 +4,13 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Select, { MultiValue, StylesConfig } from 'react-select';
-import { 
-  Language, 
-  getDetectedBrowserLanguage, 
+import {
+  Language,
+  getDetectedBrowserLanguage,
   searchLanguages as searchLanguagesMultilingual,
-  getSortedLanguages 
-} from '../../data/Languages-spoken';
+  getSortedLanguages,
+  languagesData
+} from '../../data/languages-spoken';
 
 interface LanguageOption {
   value: string;
@@ -47,18 +48,18 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
       return locale;
     }
     // Sinon détecter automatiquement
-    return getDetectedBrowserLanguage();
+    return getDetectedBrowserLanguage() as 'fr' | 'en';
   }, [locale]);
 
   // Langues selon la locale
   const currentLanguages = useMemo(() => {
-    return getSortedLanguages(currentLocale);
+    return getSortedLanguages(languagesData);
   }, [currentLocale]);
 
   // Filtrage des langues
   const filteredLanguages = useMemo((): Language[] => {
     if (!inputValue) return currentLanguages;
-    return searchLanguagesMultilingual(inputValue, currentLocale);
+    return searchLanguagesMultilingual(inputValue);
   }, [inputValue, currentLanguages, currentLocale]);
 
   // Options avec compatibilité

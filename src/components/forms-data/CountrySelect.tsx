@@ -65,7 +65,7 @@ const CountrySelect: React.FC<CountrySelectProps> = React.memo(({
   }, []);
 
   const styles = useMemo(() => makeAdaptiveStyles<CountryOption>(!!highlightShared), [highlightShared]);
-  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale(currentLocale), [currentLocale]);
+  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale[currentLocale], [currentLocale]);
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
       ? (inputValue ? `Aucun pays trouvé pour "${inputValue}"` : 'Aucun pays disponible')

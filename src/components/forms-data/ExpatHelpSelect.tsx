@@ -60,7 +60,7 @@ const ExpatHelpSelect: React.FC<ExpatHelpSelectProps> = React.memo(({
   }, []);
 
   const styles = useMemo(() => makeAdaptiveStyles<ExpatHelpOption>(!!highlightShared), [highlightShared]);
-  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale(currentLocale), [currentLocale]);
+  const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale[currentLocale], [currentLocale]);
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
       ? (inputValue ? `Aucune catégorie trouvée pour "${inputValue}"` : 'Aucune catégorie disponible')

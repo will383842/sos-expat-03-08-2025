@@ -442,7 +442,7 @@ const AdminAaaProfiles: React.FC = () => {
       lastLoginAt: new Date(),
       role,
       uid: `test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      isSOS: role !== 'client',
+      isSOS: role === 'lawyer' || role === 'expat',
       points: 0,
       affiliateCode: `TEST${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
       referralBy: null,
@@ -470,7 +470,7 @@ const AdminAaaProfiles: React.FC = () => {
       ];
       
       const numSpecialties = Math.floor(Math.random() * 3) + 2;
-      const specialties = [];
+      const specialties: string[] = [];
       
       for (let i = 0; i < numSpecialties; i++) {
         const randomSpecialty = lawyerSpecialties[Math.floor(Math.random() * lawyerSpecialties.length)];
@@ -501,7 +501,7 @@ const AdminAaaProfiles: React.FC = () => {
       ];
       
       const numSpecialties = Math.floor(Math.random() * 3) + 2;
-      const helpTypes = [];
+      const helpTypes: string[] = [];
       
       for (let i = 0; i < numSpecialties; i++) {
         const randomSpecialty = expatSpecialties[Math.floor(Math.random() * expatSpecialties.length)];
@@ -547,7 +547,7 @@ const AdminAaaProfiles: React.FC = () => {
         firstName: firstName,
         lastName: lastName,
         email: email,
-        phone: formData.customPhone || '+33743331201',
+        phone: (formData as any).customPhone || '+33743331201',
         phoneCountryCode: '+33',
         languages: selectedLanguages,
         country: selectedCountries[Math.floor(Math.random() * selectedCountries.length)],
@@ -575,7 +575,7 @@ const AdminAaaProfiles: React.FC = () => {
         profileCompleted: true,
         createdByAdmin: true,
         isCallable: false, // Par défaut, pas d'appels réels
-        phone: formData.customPhone || '+33743331201',
+        phone: (formData as any).customPhone || '+33743331201',
         isVisible: true,
         isVisibleOnMap: true,
         isApproved: true,

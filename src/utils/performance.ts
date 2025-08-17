@@ -3,85 +3,114 @@
  * Comprehensive performance monitoring, optimization and resource management
  */
 
-// =============================================================================
-// SERVICE WORKER MANAGEMENT
-// =============================================================================
+/* =============================================================================
+   SERVICE WORKER MANAGEMENT
+============================================================================= */
 
-export const registerSW = async () => {
-  if (!('serviceWorker' in navigator)) {
-    console.warn('Service Workers not supported');
+export const registerSW = async (): Promise<ServiceWorkerRegistration | null> => {
+  if (!("serviceWorker" in navigator)) {
+    console.warn("Service Workers not supported");
     return null;
   }
 
   try {
     // Defer SW registration to avoid blocking main thread
     await new Promise<void>((resolve) => {
-      if (document.readyState === 'complete') {
+      if (document.readyState === "complete") {
         resolve();
       } else {
-        window.addEventListener('load', () => resolve(), { once: true });
+        window.addEventListener("load", () => resolve(), { once: true });
       }
     });
 
     // ✅ Évite un second register si déjà contrôlé (StrictMode double-mount en dev)
     if (navigator.serviceWorker.controller) {
-      console.log('SW already controlling this page, skip register');
+      console.log("SW already controlling this page, skip register");
       return null;
     }
 
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/',
-      updateViaCache: 'none' // Always check for updates
+    // Note: updateViaCache accepte "imports" | "all"
+    const registration = await navigator.serviceWorker.register("/sw.js", {
+      scope: "/",
+      updateViaCache: "imports",
     });
 
     // Handle updates
-    registration.addEventListener('updatefound', () => {
+    registration.addEventListener("updatefound", () => {
       const newWorker = registration.installing;
-      newWorker?.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // New content available, notify user
-          dispatchEvent(new CustomEvent('sw-update-available'));
+      newWorker?.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          window.dispatchEvent(new CustomEvent("sw-update-available"));
         }
       });
     });
 
-    console.log('✅ Service Worker registered successfully');
+    console.log("✅ Service Worker registered successfully");
     return registration;
   } catch (error) {
-    console.error('❌ Service Worker registration failed:', error);
+    console.error("❌ Service Worker registration failed:", error);
     return null;
   }
 };
 
-// =============================================================================
-// PERFORMANCE MONITORING & WEB VITALS
-// =============================================================================
+/* =============================================================================
+   PERFORMANCE MONITORING & WEB VITALS
+============================================================================= */
 
-export const measurePerformance = () => {
-  if (!('performance' in window)) {
-    console.warn('Performance API not supported');
+interface NavigationTimingSummary {
+  dns: number | null;
+  tcp: number | null;
+  ssl: number | null;
+  ttfb: number | null;
+  download: number | null;
+  domParsing: number | null;
+  domReady: number | null;
+  windowLoad: number | null;
+  totalTime: number | null;
+}
+
+interface WebVitals {
+  LCP: number | null;
+  FID: number | null;
+  CLS: number | null;
+  FCP: number | null;
+  TTFB: number | null;
+  INP: number | null;
+}
+
+interface JSHeapSize {
+  used: number;
+  total: number;
+  limit: number;
+}
+
+interface ConnectionInfo {
+  effectiveType: string;
+  downlink: number;
+  rtt: number;
+  saveData: boolean;
+}
+
+interface CustomMetrics {
+  domReady: number | null;
+  firstRender: number | null;
+  jsHeapSize: JSHeapSize | null;
+  connectionType: ConnectionInfo | null;
+}
+
+interface Metrics {
+  navigationTiming: NavigationTimingSummary | null;
+  webVitals: WebVitals;
+  customMetrics: CustomMetrics;
+}
+
+export const measurePerformance = (): Metrics | undefined => {
+  if (!("performance" in window)) {
+    console.warn("Performance API not supported");
     return;
   }
 
-  const metrics: {
-    navigationTiming: unknown;
-    webVitals: {
-      LCP: number | null;
-      FID: number | null;
-      CLS: number | null;
-      FCP: number | null;
-      TTFB: number | null;
-      INP: number | null;
-    };
-    customMetrics: {
-      domReady: number | null;
-      firstRender: number | null;
-      jsHeapSize: { used: number; total: number; limit: number } | null;
-      connectionType:
-        | { effectiveType: string; downlink: number; rtt: number; saveData: boolean }
-        | null;
-    };
-  } = {
+  const metrics: Metrics = {
     navigationTiming: null,
     webVitals: {
       LCP: null,
@@ -89,29 +118,23 @@ export const measurePerformance = () => {
       CLS: null,
       FCP: null,
       TTFB: null,
-      INP: null
+      INP: null,
     },
     customMetrics: {
       domReady: null,
       firstRender: null,
       jsHeapSize: null,
-      connectionType: null
-    }
+      connectionType: null,
+    },
   };
 
-  // Navigation Timing API
-  const measureNavigationTiming = () => {
-    const perfData = performance.getEntriesByType('navigation')[0] as
-      | PerformanceNavigationTiming
-      | undefined;
+  const measureNavigationTiming = (): void => {
+    const perfData = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     if (!perfData) return;
 
-    const safe = (v: number) => (Number.isFinite(v) ? Math.round(v) : null);
-
-    // Vérifier si les propriétés existent avant de les utiliser
-    const navigationStart = (perfData as unknown as { navigationStart?: number }).navigationStart ?? perfData.fetchStart;
-    const domContentLoadedEventEnd = perfData.domContentLoadedEventEnd;
-    const loadEventEnd = perfData.loadEventEnd;
+    const safe = (v: number): number | null => (Number.isFinite(v) ? Math.round(v) : null);
+    const navigationStart =
+      (perfData as unknown as { navigationStart?: number }).navigationStart ?? perfData.fetchStart;
 
     metrics.navigationTiming = {
       dns: safe(perfData.domainLookupEnd - perfData.domainLookupStart),
@@ -120,36 +143,33 @@ export const measurePerformance = () => {
       ttfb: safe(perfData.responseStart - perfData.requestStart),
       download: safe(perfData.responseEnd - perfData.responseStart),
       domParsing: safe(perfData.domContentLoadedEventStart - perfData.responseEnd),
-      domReady: safe(domContentLoadedEventEnd - navigationStart),
-      windowLoad: safe(loadEventEnd - navigationStart),
-      totalTime: safe(loadEventEnd - navigationStart)
+      domReady: safe(perfData.domContentLoadedEventEnd - navigationStart),
+      windowLoad: safe(perfData.loadEventEnd - navigationStart),
+      totalTime: safe(perfData.loadEventEnd - navigationStart),
     };
   };
 
-  // Web Vitals measurement using Performance Observer
-  const measureWebVitals = () => {
-    if ('PerformanceObserver' in window) {
+  const measureWebVitals = (): void => {
+    if ("PerformanceObserver" in window) {
       try {
         // Largest Contentful Paint (LCP)
         const lcpObserver = new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          const lastEntry = entries[entries.length - 1] as PerformanceEntry | undefined;
-          if (lastEntry && typeof lastEntry.startTime === 'number') {
+          const lastEntry = list.getEntries().at(-1) as PerformanceEntry | undefined;
+          if (lastEntry && typeof lastEntry.startTime === "number") {
             metrics.webVitals.LCP = Math.round(lastEntry.startTime);
           }
         });
-        lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
+        lcpObserver.observe({ entryTypes: ["largest-contentful-paint"] });
 
         // First Contentful Paint (FCP)
         const fcpObserver = new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          for (const entry of entries as PerformanceEntry[]) {
-            if ((entry as { name?: string }).name === 'first-contentful-paint' && typeof entry.startTime === 'number') {
+          for (const entry of list.getEntries() as PerformanceEntry[]) {
+            if ((entry as { name?: string }).name === "first-contentful-paint" && typeof entry.startTime === "number") {
               metrics.webVitals.FCP = Math.round(entry.startTime);
             }
           }
         });
-        fcpObserver.observe({ entryTypes: ['paint'] });
+        fcpObserver.observe({ entryTypes: ["paint"] });
 
         // Cumulative Layout Shift (CLS)
         let clsValue = 0;
@@ -161,7 +181,7 @@ export const measurePerformance = () => {
           }
           metrics.webVitals.CLS = Math.round(clsValue * 1000) / 1000;
         });
-        clsObserver.observe({ entryTypes: ['layout-shift'] });
+        clsObserver.observe({ entryTypes: ["layout-shift"] });
 
         // First Input Delay (FID)
         try {
@@ -175,21 +195,16 @@ export const measurePerformance = () => {
               }
             }
           });
-          fidObserver.observe({ type: 'first-input', buffered: true } as PerformanceObserverInit);
-        } catch {
-          // Some browsers may not support this combination
-        }
+          fidObserver.observe({ entryTypes: ["first-input"] });
+        } catch {}
 
-        // Interaction to Next Paint (INP) – keep worst interaction
+        // Interaction to Next Paint (INP)
         try {
           const inpObserver = new PerformanceObserver((list) => {
             for (const entry of list.getEntries() as Array<{ duration?: number; processingStart?: number; startTime?: number }>) {
-              // Some browsers expose 'duration' as latency proxy for INP
               const latency =
-                (typeof entry.duration === 'number' && entry.duration) ||
-                (entry.processingStart && entry.startTime
-                  ? entry.processingStart - entry.startTime
-                  : null);
+                (typeof entry.duration === "number" && entry.duration) ||
+                (entry.processingStart && entry.startTime ? entry.processingStart - entry.startTime : null);
               if (latency && Number.isFinite(latency)) {
                 const rounded = Math.round(latency);
                 if (!metrics.webVitals.INP || rounded > metrics.webVitals.INP) {
@@ -198,19 +213,14 @@ export const measurePerformance = () => {
               }
             }
           });
-          inpObserver.observe({ type: 'event', buffered: true } as PerformanceObserverInit);
-        } catch {
-          // ignore if not supported
-        }
+          inpObserver.observe({ entryTypes: ["event"] });
+        } catch {}
       } catch (error) {
-        console.warn('Performance Observer not fully supported:', error);
+        console.warn("Performance Observer not fully supported:", error);
       }
     }
 
-    // TTFB from Navigation Timing
-    const navTiming = performance.getEntriesByType('navigation')[0] as
-      | PerformanceNavigationTiming
-      | undefined;
+    const navTiming = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     if (navTiming) {
       const ttfb = navTiming.responseStart - navTiming.requestStart;
       if (Number.isFinite(ttfb)) {
@@ -219,322 +229,215 @@ export const measurePerformance = () => {
     }
   };
 
-  // Custom metrics
-  const measureCustomMetrics = () => {
-    // DOM Ready time
-    const navTiming = performance.getEntriesByType('navigation')[0] as
-      | PerformanceNavigationTiming
-      | undefined;
-    if (document.readyState === 'complete' && navTiming) {
-      const navigationStart = (navTiming as unknown as { navigationStart?: number }).navigationStart ?? navTiming.fetchStart;
+  const measureCustomMetrics = (): void => {
+    const navTiming = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (document.readyState === "complete" && navTiming) {
+      const navigationStart =
+        (navTiming as unknown as { navigationStart?: number }).navigationStart ?? navTiming.fetchStart;
       const v = navTiming.domContentLoadedEventEnd - navigationStart;
       metrics.customMetrics.domReady = Number.isFinite(v) ? Math.round(v) : null;
     }
 
-    // Memory usage (Chrome only)
-    if ((performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory) {
-      const mem = (performance as unknown as { memory: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+    // Memory usage
+    const perfWithMemory = performance as Performance & {
+      memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
+    };
+    if (perfWithMemory.memory) {
+      const mem = perfWithMemory.memory;
       metrics.customMetrics.jsHeapSize = {
         used: Math.round(mem.usedJSHeapSize / 1024 / 1024),
         total: Math.round(mem.totalJSHeapSize / 1024 / 1024),
-        limit: Math.round(mem.jsHeapSizeLimit / 1024 / 1024)
+        limit: Math.round(mem.jsHeapSizeLimit / 1024 / 1024),
       };
     }
 
-    // Connection information
-    const anyNav = navigator as unknown as { connection?: { effectiveType: string; downlink: number; rtt: number; saveData: boolean } };
-    if (anyNav.connection) {
-      const conn = anyNav.connection;
-      metrics.customMetrics.connectionType = {
-        effectiveType: conn.effectiveType,
-        downlink: conn.downlink,
-        rtt: conn.rtt,
-        saveData: conn.saveData
-      };
+    const navWithConn = navigator as Navigator & {
+      connection?: ConnectionInfo;
+    };
+    if (navWithConn.connection) {
+      metrics.customMetrics.connectionType = navWithConn.connection;
     }
   };
 
-  // Execute measurements
-  const runMeasurements = () => {
+  const runMeasurements = (): Metrics => {
     measureNavigationTiming();
     measureWebVitals();
     measureCustomMetrics();
 
-    // Log comprehensive performance report
-    console.group('📊 Performance Metrics Report');
-    console.log('Navigation Timing:', metrics.navigationTiming);
-    console.log('Web Vitals:', metrics.webVitals);
-    console.log('Custom Metrics:', metrics.customMetrics);
+    console.group("📊 Performance Metrics Report");
+    console.log("Navigation Timing:", metrics.navigationTiming);
+    console.log("Web Vitals:", metrics.webVitals);
+    console.log("Custom Metrics:", metrics.customMetrics);
     console.groupEnd();
 
-    // Dispatch custom event with metrics
-    window.dispatchEvent(
-      new CustomEvent('performance-measured', {
-        detail: metrics
-      })
-    );
-
+    window.dispatchEvent(new CustomEvent("performance-measured", { detail: metrics }));
     return metrics;
   };
 
-  // Run after page load
-  if (document.readyState === 'complete') {
+  if (document.readyState === "complete") {
     setTimeout(runMeasurements, 100);
   } else {
-    window.addEventListener(
-      'load',
-      () => {
-        setTimeout(runMeasurements, 100);
-      },
-      { once: true }
-    );
+    window.addEventListener("load", () => setTimeout(runMeasurements, 100), { once: true });
   }
 
   return metrics;
 };
 
-// =============================================================================
-// CRITICAL RESOURCES PRELOADING
-// =============================================================================
+/* =============================================================================
+   CRITICAL RESOURCES PRELOADING
+============================================================================= */
+
+const checkWebPSupport = (): boolean => {
+  const canvas = document.createElement("canvas");
+  return canvas.toDataURL("image/webp").indexOf("data:image/webp") === 0;
+};
 
 export const preloadCriticalResources = (customResources: Partial<{
   images: string[];
   fonts: string[];
   styles: string[];
   scripts: string[];
-}> = {}) => {
+}> = {}): void => {
   const isMobile = window.innerWidth <= 768;
-  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const hasWebP = checkWebPSupport();
 
-  // Default critical resources optimized for mobile
   const defaultResources = {
     images: [
-      // Mobile-first images
-      isMobile ? '/images/hero-mobile.webp' : '/images/hero-desktop.webp',
-      '/images/logo.svg',
-      ...(isDarkMode ? ['/images/logo-dark.svg'] : []),
-      // Above-the-fold images
-      '/images/critical-icon.webp'
+      isMobile
+        ? hasWebP ? "/images/hero-mobile.webp" : "/images/hero-mobile.jpg"
+        : hasWebP ? "/images/hero-desktop.webp" : "/images/hero-desktop.jpg",
+      "/images/logo.svg",
+      ...(isDarkMode ? ["/images/logo-dark.svg"] : []),
+      hasWebP ? "/images/critical-icon.webp" : "/images/critical-icon.png",
     ],
-    fonts: [
-      // Preload critical fonts with font-display: swap
-      '/fonts/inter-400.woff2',
-      '/fonts/inter-600.woff2'
-    ],
-    styles: [
-      // Critical CSS
-      '/css/critical.css',
-      ...(isMobile ? ['/css/mobile.css'] : ['/css/desktop.css'])
-    ],
-    scripts: [
-      // Essential JS modules
-      '/js/critical.js'
-    ]
+    fonts: ["/fonts/inter-400.woff2", "/fonts/inter-600.woff2"],
+    styles: ["/css/critical.css", ...(isMobile ? ["/css/mobile.css"] : ["/css/desktop.css"])],
+    scripts: ["/js/critical.js"],
   };
 
-  // Merge with custom resources
   const resources = {
     images: [...defaultResources.images, ...(customResources.images || [])],
     fonts: [...defaultResources.fonts, ...(customResources.fonts || [])],
     styles: [...defaultResources.styles, ...(customResources.styles || [])],
-    scripts: [...defaultResources.scripts, ...(customResources.scripts || [])]
+    scripts: [...defaultResources.scripts, ...(customResources.scripts || [])],
   };
 
   const preloadResource = (href: string, as: string, type: string | null = null, crossorigin: string | null = null) => {
-    // Check if already preloaded
-    if (document.querySelector(`link[href="${href}"]`)) {
-      return;
-    }
-
-    const link = document.createElement('link');
-    link.rel = 'preload';
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "preload";
     link.href = href;
     link.as = as;
-
-    if (type) (link as unknown as { type?: string }).type = type;
+    if (type) (link as HTMLLinkElement).type = type;
     if (crossorigin) link.crossOrigin = crossorigin;
-
-    // Add media query for responsive images
-    if (as === 'image' && href.includes('mobile') && !isMobile) {
-      return; // Skip mobile images on desktop
-    }
-
-    // Error handling
-    link.onerror = () => {
-      console.warn(`Failed to preload resource: ${href}`);
-    };
-
     document.head.appendChild(link);
   };
 
-  // Preload images
-  resources.images.forEach((src) => {
-    if (src && src.trim()) {
-      preloadResource(src, 'image');
-    }
-  });
-
-  // Preload fonts
-  resources.fonts.forEach((src) => {
-    if (src && src.trim()) {
-      preloadResource(src, 'font', 'font/woff2', 'anonymous');
-    }
-  });
-
-  // Preload stylesheets
-  resources.styles.forEach((src) => {
-    if (src && src.trim()) {
-      preloadResource(src, 'style', 'text/css');
-    }
-  });
-
-  // Preload scripts
-  resources.scripts.forEach((src) => {
-    if (src && src.trim()) {
-      preloadResource(src, 'script', 'text/javascript');
-    }
-  });
+  resources.images.forEach((src) => src && preloadResource(src, "image"));
+  resources.fonts.forEach((src) => src && preloadResource(src, "font", "font/woff2", "anonymous"));
+  resources.styles.forEach((src) => src && preloadResource(src, "style", "text/css"));
+  resources.scripts.forEach((src) => src && preloadResource(src, "script", "text/javascript"));
 
   console.log(`✅ Preloaded ${Object.values(resources).flat().length} critical resources`);
 };
 
-// =============================================================================
-// LAZY LOADING UTILITIES
-// =============================================================================
+/* =============================================================================
+   LAZY LOADING UTILITIES
+============================================================================= */
 
-export const setupLazyLoading = () => {
-  if (!('IntersectionObserver' in window)) {
-    console.warn('IntersectionObserver not supported, loading all images');
+export const setupLazyLoading = (): IntersectionObserver | void => {
+  if (!("IntersectionObserver" in window)) {
+    console.warn("IntersectionObserver not supported, loading all images");
     return;
   }
 
-  const imageObserver = new IntersectionObserver(
-    (entries, observer) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const img = entry.target as HTMLImageElement;
-
-          // Load the image
-          if ((img as unknown as { dataset?: { src?: string } }).dataset?.src) {
-            img.src = (img as unknown as { dataset: { src: string } }).dataset.src;
-            img.removeAttribute('data-src');
-          }
-
-          // Load responsive images
-          if ((img as unknown as { dataset?: { srcset?: string } }).dataset?.srcset) {
-            (img as unknown as { srcset?: string }).srcset = (img as unknown as { dataset: { srcset: string } }).dataset.srcset;
-            img.removeAttribute('data-srcset');
-          }
-
-          // Remove loading placeholder
-          img.classList.remove('lazy-loading');
-          img.classList.add('lazy-loaded');
-
-          observer.unobserve(img);
+  const imageObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const img = entry.target as HTMLImageElement;
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+          img.removeAttribute("data-src");
         }
-      });
-    },
-    {
-      rootMargin: '50px 0px', // Start loading 50px before entering viewport
-      threshold: 0.01
-    }
-  );
+        if (img.dataset.srcset) {
+          img.srcset = img.dataset.srcset;
+          img.removeAttribute("data-srcset");
+        }
+        img.classList.remove("lazy-loading");
+        img.classList.add("lazy-loaded");
+        observer.unobserve(img);
+      }
+    });
+  }, { rootMargin: "50px 0px", threshold: 0.01 });
 
-  // Observe all lazy images
-  document.querySelectorAll('img[data-src]').forEach((img) => {
-    img.classList.add('lazy-loading');
+  document.querySelectorAll("img[data-src]").forEach((img) => {
+    img.classList.add("lazy-loading");
     imageObserver.observe(img);
   });
 
   return imageObserver;
 };
 
-// =============================================================================
-// ADAPTIVE LOADING BASED ON CONNECTION
-// =============================================================================
+/* =============================================================================
+   ADAPTIVE LOADING BASED ON CONNECTION
+============================================================================= */
 
 export const adaptiveLoading = () => {
-  const anyNav = navigator as unknown as { connection?: { effectiveType: string; saveData: boolean; downlink: number; rtt: number }; hardwareConcurrency?: number };
-  if (!anyNav.connection) {
-    return { shouldOptimize: false, reason: 'Connection API not supported' };
-  }
+  const nav = navigator as Navigator & {
+    connection?: { effectiveType: string; saveData: boolean; downlink: number; rtt: number };
+    hardwareConcurrency?: number;
+  };
+  if (!nav.connection) return { shouldOptimize: false, reason: "Connection API not supported" };
 
-  const connection = anyNav.connection;
-  const isSlowConnection =
-    connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g';
-  const isSaveDataEnabled = connection.saveData;
-  const isLowEndDevice = anyNav.hardwareConcurrency && anyNav.hardwareConcurrency <= 2;
-
-  const shouldOptimize = isSlowConnection || isSaveDataEnabled || isLowEndDevice;
+  const { effectiveType, saveData, downlink, rtt } = nav.connection;
+  const isSlowConnection = effectiveType === "slow-2g" || effectiveType === "2g";
+  const isLowEndDevice = nav.hardwareConcurrency && nav.hardwareConcurrency <= 2;
+  const shouldOptimize = isSlowConnection || saveData || isLowEndDevice;
 
   if (shouldOptimize) {
-    console.log('🚀 Adaptive loading: Optimizing for slow connection/device');
-
-    // Disable non-essential features
-    document.documentElement.classList.add('reduce-motion');
-    document.documentElement.classList.add('optimize-bandwidth');
-
-    // Reduce image quality
-    document.querySelectorAll('img').forEach((img) => {
-      if (img instanceof HTMLImageElement && img.src && !img.src.includes('q=')) {
-        img.src += img.src.includes('?') ? '&q=60' : '?q=60';
+    document.documentElement.classList.add("reduce-motion", "optimize-bandwidth");
+    document.querySelectorAll("img").forEach((img) => {
+      if (img instanceof HTMLImageElement && img.src && !img.src.includes("q=")) {
+        img.src += img.src.includes("?") ? "&q=60" : "?q=60";
       }
     });
   }
 
-  return {
-    shouldOptimize,
-    connectionType: connection.effectiveType,
-    saveData: isSaveDataEnabled,
-    downlink: connection.downlink,
-    rtt: connection.rtt
-  };
+  return { shouldOptimize, connectionType: effectiveType, saveData, downlink, rtt };
 };
 
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
+/* =============================================================================
+   UTILITY FUNCTIONS
+============================================================================= */
 
-const checkWebPSupport = () => {
-  const canvas = document.createElement('canvas');
-  return canvas.toDataURL && canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
-};
-
-export const prefetchNextPageResources = (urls: string[]) => {
-  if (!urls || !Array.isArray(urls)) return;
-
+export const prefetchNextPageResources = (urls: string[]): void => {
+  if (!Array.isArray(urls)) return;
   urls.forEach((url) => {
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
+    const link = document.createElement("link");
+    link.rel = "prefetch";
     link.href = url;
     document.head.appendChild(link);
   });
 };
 
 export const prioritizeUserInteraction = () => {
-  // Use scheduler API if available for better UX
-  const anyScheduler = (window as unknown as { scheduler?: { postTask: (callback: () => void, options?: { priority?: string }) => void } }).scheduler;
-  if (anyScheduler && 'postTask' in anyScheduler) {
-    return (callback: () => void, priority: 'user-visible' | 'background' = 'user-visible') => {
-      anyScheduler.postTask(callback, { priority });
+  const schedulerAPI = (window as unknown as { scheduler?: { postTask: (cb: () => void, opts?: { priority?: string }) => void } }).scheduler;
+  if (schedulerAPI && "postTask" in schedulerAPI) {
+    return (callback: () => void, priority: "user-visible" | "background" = "user-visible") => {
+      schedulerAPI.postTask(callback, { priority });
     };
   }
-
-  // Fallback to requestIdleCallback or setTimeout
   return (callback: () => void) => {
     const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number }).requestIdleCallback;
-    if (ric) {
-      ric(callback, { timeout: 2000 });
-    } else {
-      setTimeout(callback, 0);
-    }
+    if (ric) ric(callback, { timeout: 2000 });
+    else setTimeout(callback, 0);
   };
 };
 
-// =============================================================================
-// INITIALIZATION FUNCTION
-// =============================================================================
+/* =============================================================================
+   INITIALIZATION FUNCTION
+============================================================================= */
 
 export const initPerformanceOptimizations = (options: Partial<{
   enableSW: boolean;
@@ -542,54 +445,22 @@ export const initPerformanceOptimizations = (options: Partial<{
   enablePreload: boolean;
   enableLazyLoad: boolean;
   enableAdaptive: boolean;
-  customResources: {
-    images?: string[];
-    fonts?: string[];
-    styles?: string[];
-    scripts?: string[];
-  };
-}> = {}) => {
-  const defaults = {
-    enableSW: true,
-    enableMetrics: true,
-    enablePreload: true,
-    enableLazyLoad: true,
-    enableAdaptive: true,
-    customResources: {}
-  };
-
+  customResources: { images?: string[]; fonts?: string[]; styles?: string[]; scripts?: string[] };
+}> = {}): void => {
+  const defaults = { enableSW: true, enableMetrics: true, enablePreload: true, enableLazyLoad: true, enableAdaptive: true, customResources: {} };
   const config = { ...defaults, ...options };
 
-  console.log('🚀 Initializing performance optimizations...');
-
-  // Register Service Worker
-  if (config.enableSW) {
-    registerSW();
-  }
-
-  // Setup performance monitoring
-  if (config.enableMetrics) {
-    measurePerformance();
-  }
-
-  // Preload critical resources
-  if (config.enablePreload) {
-    preloadCriticalResources(config.customResources as Parameters<typeof preloadCriticalResources>[0]);
-  }
-
-  // Setup lazy loading
+  if (config.enableSW) registerSW();
+  if (config.enableMetrics) measurePerformance();
+  if (config.enablePreload) preloadCriticalResources(config.customResources);
   if (config.enableLazyLoad) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupLazyLoading, { once: true });
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", setupLazyLoading, { once: true });
     } else {
       setupLazyLoading();
     }
   }
+  if (config.enableAdaptive) adaptiveLoading();
 
-  // Apply adaptive loading
-  if (config.enableAdaptive) {
-    adaptiveLoading();
-  }
-
-  console.log('✅ Performance optimizations initialized');
+  console.log("✅ Performance optimizations initialized");
 };

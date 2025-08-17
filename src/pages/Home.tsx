@@ -529,7 +529,7 @@ const OptimizedHomePage: React.FC = () => {
               </h2>
               {/* H3 - plus fun */}
               <h3 className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed">
-                Un expert local vous répond en moins de 5&nbsp;minutes, partout sur la planète.
+                Un expert local vous répond en moins de 5&nbsp;minutes, partout sur la planète... Et dans votre langue !
               </h3>
 
               <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">

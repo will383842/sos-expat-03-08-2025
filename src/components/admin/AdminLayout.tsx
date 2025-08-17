@@ -225,16 +225,16 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   }
 
   // Vérification si l'utilisateur est banni ou non vérifié
-  if (user.status === 'banned' || user.status === 'pending') {
+  if ((user as any).status === 'banned' || (user as any).status === 'pending') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="bg-white p-8 rounded-lg shadow-md text-center">
           <AlertTriangle className="h-16 w-16 text-orange-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Compte {user.status === 'banned' ? 'suspendu' : 'en attente'}
+            Compte {(user as any).status === 'banned' ? 'suspendu' : 'en attente'}
           </h1>
           <p className="text-gray-600 mb-4">
-            {user.status === 'banned' 
+            {(user as any).status === 'banned'
               ? 'Votre compte a été suspendu. Contactez le support.'
               : 'Votre compte est en cours de validation.'}
           </p>

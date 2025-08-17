@@ -1,29 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   User,
   Search,
-  Eye,
-  Edit,
-  Trash,
-  CheckCircle,
-  XCircle,
   Scale,
   UserCheck,
-  UserX,
-  MoreHorizontal,
-  Calendar,
   Shield,
+  Calendar,
   Clock,
-  Star,
   Phone,
   Mail,
   Ban,
   UserCog,
   MapPin,
-  AlertTriangle
+  AlertTriangle,
 } from 'lucide-react';
 
-import { collection, getDocs, doc, updateDoc, serverTimestamp, deleteDoc, query, where, orderBy, limit, addDoc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  addDoc,
+  getDoc,
+  Timestamp,
+  QueryConstraint,
+} from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useNavigate } from 'react-router-dom';
@@ -31,16 +38,88 @@ import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { logError } from '../../utils/logging';
-import AdminMapVisibilityToggle from '../../components/admin/AdminMapVisibilityToggle';
 
-const AdminUsers = () => {
+type Role = 'client' | 'lawyer' | 'expat' | 'admin';
+type Availability = 'available' | 'offline';
+
+type FirestoreUser = {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  profilePhoto?: string;
+  photoURL?: string;
+  phone?: string;
+  phoneCountryCode?: string;
+  country?: string;
+  currentCountry?: string;
+  role: Role;
+  status?: string;
+  isBanned?: boolean;
+  banReason?: string;
+  isTestProfile?: boolean;
+  isApproved?: boolean;
+  emailVerified?: boolean;
+  isVerifiedEmail?: boolean;
+  isOnline?: boolean;
+  availability?: Availability;
+  isVisibleOnMap?: boolean;
+  isVisible?: boolean;
+  featured?: boolean;
+  createdAt?: Timestamp;
+  lastLoginAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+type AdminUser = {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  profilePhoto?: string;
+  photoURL?: string;
+  phone?: string;
+  phoneCountryCode?: string;
+  country?: string;
+  currentCountry?: string;
+  role: Role;
+  status?: string;
+  isBanned: boolean;
+  banReason?: string;
+  isTestProfile?: boolean;
+  isApproved?: boolean;
+  emailVerified?: boolean;
+  isVerifiedEmail?: boolean;
+  isOnline?: boolean;
+  availability?: Availability;
+  isVisibleOnMap?: boolean;
+  isVisible?: boolean;
+  featured?: boolean;
+  createdAt: Date;
+  lastLoginAt: Date;
+  updatedAt: Date;
+};
+
+type MinimalCurrentUser = {
+  id: string;
+  role: Role;
+};
+
+const USERS_PER_PAGE = 20;
+
+const AdminUsers: React.FC = () => {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<any[]>([]);
+
+  // `useAuth` n’expose pas de types ici : on contraint juste ce qu’on utilise
+  const { user: rawCurrentUser } = useAuth() as { user?: MinimalCurrentUser | null };
+  const currentUser: MinimalCurrentUser | null | undefined = rawCurrentUser;
+
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [selectedRole, setSelectedRole] = useState<'all' | Role>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showUserModal, setShowUserModal] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [showBanModal, setShowBanModal] = useState<boolean>(false);
@@ -48,93 +127,90 @@ const AdminUsers = () => {
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const [hasMore, setHasMore] = useState<boolean>(true);
-  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortField, setSortField] = useState<'createdAt' | 'lastLoginAt' | 'fullName'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [countries, setCountries] = useState<string[]>([]);
-  const USERS_PER_PAGE = 20;
 
   useEffect(() => {
-    // Check if user is admin
+    // Vérification d’accès admin
     if (!currentUser || currentUser.role !== 'admin') {
       navigate('/admin/login');
       return;
     }
-    
+
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        
-        // Construire la requête avec filtres et tri
-        let usersQuery = collection(db, 'users');
-        
-        // Appliquer les filtres
+
+        // Construction sûre des contraintes de requête (sans `any`)
+        const queryConstraints: QueryConstraint[] = [];
+
         if (selectedRole !== 'all') {
-          usersQuery = query(usersQuery, where('role', '==', selectedRole));
+          queryConstraints.push(where('role', '==', selectedRole));
         }
-        
+
         if (selectedCountry !== 'all') {
-          usersQuery = query(usersQuery, where('country', '==', selectedCountry));
+          queryConstraints.push(where('country', '==', selectedCountry));
         }
-        
-        // Appliquer le tri
-        usersQuery = query(usersQuery, orderBy(sortField, sortDirection));
-        
-        // Appliquer la pagination
-        usersQuery = query(usersQuery, limit(page * USERS_PER_PAGE));
-        
+
+        // Tri et pagination
+        queryConstraints.push(orderBy(sortField, sortDirection));
+        queryConstraints.push(limit(page * USERS_PER_PAGE));
+
+        const usersQuery = query(collection(db, 'users'), ...queryConstraints);
         const usersSnapshot = await getDocs(usersQuery);
-        
-        // Extraire les données
-        const usersData = usersSnapshot.docs.map(doc => {
-          const data = doc.data();
+
+        const usersData: AdminUser[] = usersSnapshot.docs.map((d) => {
+          const data = d.data() as FirestoreUser;
           return {
-            id: doc.id,
+            id: d.id,
             ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date()
+            isBanned: Boolean(data.isBanned),
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(0),
+            lastLoginAt: data.lastLoginAt ? data.lastLoginAt.toDate() : new Date(0),
+            updatedAt: data.updatedAt ? data.updatedAt.toDate() : new Date(0),
           };
         });
-        
-        // Extraire les pays uniques pour le filtre
-        const uniqueCountries = Array.from(new Set(usersData.map(user => user.country || user.currentCountry || 'Non spécifié')))
-          .filter(Boolean)
-          .sort();
-        
+
+        const uniqueCountries = Array.from(
+          new Set(
+            usersData.map((u) => u.country ?? u.currentCountry ?? 'Non spécifié')
+          )
+        )
+          .filter((c): c is string => Boolean(c))
+          .sort((a, b) => a.localeCompare(b));
+
         setUsers(usersData);
         setCountries(uniqueCountries);
         setHasMore(usersSnapshot.docs.length === page * USERS_PER_PAGE);
-      } catch (error) {
-        console.error('Erreur lors du chargement des utilisateurs :', error);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // eslint-disable-next-line no-console
+        console.error('Erreur lors du chargement des utilisateurs :', err);
         logError({
           origin: 'frontend',
-          error: `Error loading users: ${error.message}`,
-          context: { component: 'AdminUsers' }
+          error: `Error loading users: ${message}`,
+          context: { component: 'AdminUsers' },
         });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUsers();
-  }, [selectedRole, selectedCountry, sortField, sortDirection, page]);
-
-  const handleViewUser = (user: any) => {
-    setSelectedUser(user);
-    setShowUserModal(true);
-  };
+    void fetchUsers();
+  }, [currentUser, navigate, selectedRole, selectedCountry, sortField, sortDirection, page]);
 
   const handleEditUser = (userId: string) => {
     navigate(`/admin/users/${userId}/edit`);
   };
 
-  const handleDeleteUser = (user: any) => {
+  const handleDeleteUser = (user: AdminUser) => {
     setSelectedUser(user);
     setShowDeleteModal(true);
   };
 
-  const handleBanUser = (user: any) => {
+  const handleBanUser = (user: AdminUser) => {
     setSelectedUser(user);
     setBanReason('');
     setShowBanModal(true);
@@ -142,40 +218,35 @@ const AdminUsers = () => {
 
   const confirmDeleteUser = async () => {
     if (!selectedUser) return;
-    
+
     setIsActionLoading(true);
-    
+
     try {
-      // Supprimer le profil SOS si c'est un prestataire
       if (selectedUser.role === 'lawyer' || selectedUser.role === 'expat') {
         await deleteDoc(doc(db, 'sos_profiles', selectedUser.id));
       }
-      
-      // Supprimer l'utilisateur
+
       await deleteDoc(doc(db, 'users', selectedUser.id));
-      
-      // Mettre à jour la liste
-      setUsers(prev => prev.filter(user => user.id !== selectedUser.id));
-      
-      // Fermer le modal
+
+      setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
+
       setShowDeleteModal(false);
       setSelectedUser(null);
-      
-      // Enregistrer l'action
+
       await addDoc(collection(db, 'logs'), {
         type: 'user_deleted',
         userId: selectedUser.id,
-        deletedBy: currentUser?.id,
-        timestamp: serverTimestamp()
+        deletedBy: currentUser?.id ?? null,
+        timestamp: serverTimestamp(),
       });
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      alert('Erreur lors de la suppression de l\'utilisateur');
-      
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-alert
+      alert("Erreur lors de la suppression de l'utilisateur");
       logError({
         origin: 'frontend',
-        error: `Error deleting user: ${error.message}`,
-        context: { userId: selectedUser.id }
+        error: `Error deleting user: ${message}`,
+        context: { userId: selectedUser.id },
       });
     } finally {
       setIsActionLoading(false);
@@ -184,55 +255,50 @@ const AdminUsers = () => {
 
   const confirmBanUser = async () => {
     if (!selectedUser) return;
-    
+
     setIsActionLoading(true);
-    
+
     try {
-      // Mettre à jour le statut de l'utilisateur
       await updateDoc(doc(db, 'users', selectedUser.id), {
         isBanned: true,
-        banReason: banReason,
-        updatedAt: serverTimestamp()
+        banReason,
+        updatedAt: serverTimestamp(),
       });
-      
-      // Mettre à jour le profil SOS si c'est un prestataire
+
       if (selectedUser.role === 'lawyer' || selectedUser.role === 'expat') {
         await updateDoc(doc(db, 'sos_profiles', selectedUser.id), {
           isBanned: true,
           isVisible: false,
           isVisibleOnMap: false,
           isOnline: false,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
       }
-      
-      // Mettre à jour la liste
-      setUsers(prev => prev.map(user => 
-        user.id === selectedUser.id 
-          ? { ...user, isBanned: true, banReason } 
-          : user
-      ));
-      
-      // Fermer le modal
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === selectedUser.id ? { ...u, isBanned: true, banReason } : u
+        )
+      );
+
       setShowBanModal(false);
       setSelectedUser(null);
-      
-      // Enregistrer l'action
+
       await addDoc(collection(db, 'logs'), {
         type: 'user_banned',
         userId: selectedUser.id,
-        bannedBy: currentUser?.id,
+        bannedBy: currentUser?.id ?? null,
         reason: banReason,
-        timestamp: serverTimestamp()
+        timestamp: serverTimestamp(),
       });
-    } catch (error) {
-      console.error('Error banning user:', error);
-      alert('Erreur lors du bannissement de l\'utilisateur');
-      
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-alert
+      alert("Erreur lors du bannissement de l'utilisateur");
       logError({
         origin: 'frontend',
-        error: `Error banning user: ${error.message}`,
-        context: { userId: selectedUser.id }
+        error: `Error banning user: ${message}`,
+        context: { userId: selectedUser.id },
       });
     } finally {
       setIsActionLoading(false);
@@ -241,48 +307,45 @@ const AdminUsers = () => {
 
   const handleUnbanUser = async (userId: string) => {
     setIsActionLoading(true);
-    
+
     try {
-      // Mettre à jour le statut de l'utilisateur
       await updateDoc(doc(db, 'users', userId), {
         isBanned: false,
         banReason: '',
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
-      // Mettre à jour le profil SOS si c'est un prestataire
+
       const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists() && (userDoc.data().role === 'lawyer' || userDoc.data().role === 'expat')) {
+      const role = (userDoc.data()?.role ?? '') as Role;
+      if (role === 'lawyer' || role === 'expat') {
         await updateDoc(doc(db, 'sos_profiles', userId), {
           isBanned: false,
           isVisible: true,
           isVisibleOnMap: true,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
       }
-      
-      // Mettre à jour la liste
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, isBanned: false, banReason: '' } 
-          : user
-      ));
-      
-      // Enregistrer l'action
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, isBanned: false, banReason: '' } : u
+        )
+      );
+
       await addDoc(collection(db, 'logs'), {
         type: 'user_unbanned',
-        userId: userId,
-        unbannedBy: currentUser?.id,
-        timestamp: serverTimestamp()
+        userId,
+        unbannedBy: currentUser?.id ?? null,
+        timestamp: serverTimestamp(),
       });
-    } catch (error) {
-      console.error('Error unbanning user:', error);
-      alert('Erreur lors de la réactivation de l\'utilisateur');
-      
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-alert
+      alert("Erreur lors de la réactivation de l'utilisateur");
       logError({
         origin: 'frontend',
-        error: `Error unbanning user: ${error.message}`,
-        context: { userId }
+        error: `Error unbanning user: ${message}`,
+        context: { userId },
       });
     } finally {
       setIsActionLoading(false);
@@ -291,47 +354,48 @@ const AdminUsers = () => {
 
   const handleToggleOnlineStatus = async (userId: string, isCurrentlyOnline: boolean) => {
     setIsActionLoading(true);
-    
+
     try {
-      // Mettre à jour le statut en ligne de l'utilisateur
+      const newAvailability: Availability = !isCurrentlyOnline ? 'available' : 'offline';
+
       await updateDoc(doc(db, 'users', userId), {
         isOnline: !isCurrentlyOnline,
-        availability: !isCurrentlyOnline ? 'available' : 'offline',
-        updatedAt: serverTimestamp()
+        availability: newAvailability,
+        updatedAt: serverTimestamp(),
       });
-      
-      // Mettre à jour le profil SOS si c'est un prestataire
+
       const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists() && (userDoc.data().role === 'lawyer' || userDoc.data().role === 'expat')) {
+      const role = (userDoc.data()?.role ?? '') as Role;
+      if (role === 'lawyer' || role === 'expat') {
         await updateDoc(doc(db, 'sos_profiles', userId), {
           isOnline: !isCurrentlyOnline,
-          availability: !isCurrentlyOnline ? 'available' : 'offline',
-          updatedAt: serverTimestamp()
+          availability: newAvailability,
+          updatedAt: serverTimestamp(),
         });
       }
-      
-      // Mettre à jour la liste
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, isOnline: !isCurrentlyOnline, availability: !isCurrentlyOnline ? 'available' : 'offline' } 
-          : user
-      ));
-      
-      // Enregistrer l'action
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? { ...u, isOnline: !isCurrentlyOnline, availability: newAvailability }
+            : u
+        )
+      );
+
       await addDoc(collection(db, 'logs'), {
         type: !isCurrentlyOnline ? 'user_set_online' : 'user_set_offline',
-        userId: userId,
-        changedBy: currentUser?.id,
-        timestamp: serverTimestamp()
+        userId,
+        changedBy: currentUser?.id ?? null,
+        timestamp: serverTimestamp(),
       });
-    } catch (error) {
-      console.error('Error toggling online status:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-alert
       alert('Erreur lors de la modification du statut en ligne');
-      
       logError({
         origin: 'frontend',
-        error: `Error toggling online status: ${error.message}`,
-        context: { userId }
+        error: `Error toggling online status: ${message}`,
+        context: { userId },
       });
     } finally {
       setIsActionLoading(false);
@@ -340,37 +404,36 @@ const AdminUsers = () => {
 
   const handleToggleVisibility = async (userId: string, isCurrentlyVisible: boolean) => {
     setIsActionLoading(true);
-    
+
     try {
-      // Mettre à jour la visibilité du profil SOS
       await updateDoc(doc(db, 'sos_profiles', userId), {
         isVisible: !isCurrentlyVisible,
         isVisibleOnMap: !isCurrentlyVisible,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
-      // Mettre à jour la liste
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, isVisible: !isCurrentlyVisible, isVisibleOnMap: !isCurrentlyVisible } 
-          : user
-      ));
-      
-      // Enregistrer l'action
+
+      setUsers((prev) =>
+        prev.map((u) =>
+            u.id === userId
+              ? { ...u, isVisible: !isCurrentlyVisible, isVisibleOnMap: !isCurrentlyVisible }
+              : u
+        )
+      );
+
       await addDoc(collection(db, 'logs'), {
         type: !isCurrentlyVisible ? 'user_set_visible' : 'user_set_invisible',
-        userId: userId,
-        changedBy: currentUser?.id,
-        timestamp: serverTimestamp()
+        userId,
+        changedBy: currentUser?.id ?? null,
+        timestamp: serverTimestamp(),
       });
-    } catch (error) {
-      console.error('Error toggling visibility:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-alert
       alert('Erreur lors de la modification de la visibilité');
-      
       logError({
         origin: 'frontend',
-        error: `Error toggling visibility: ${error.message}`,
-        context: { userId }
+        error: `Error toggling visibility: ${message}`,
+        context: { userId },
       });
     } finally {
       setIsActionLoading(false);
@@ -379,88 +442,82 @@ const AdminUsers = () => {
 
   const handleToggleFeatured = async (userId: string, isCurrentlyFeatured: boolean) => {
     setIsActionLoading(true);
-    
+
     try {
-      // Mettre à jour le statut "featured" du profil SOS
       await updateDoc(doc(db, 'sos_profiles', userId), {
         featured: !isCurrentlyFeatured,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
-      // Mettre à jour la liste
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, featured: !isCurrentlyFeatured } 
-          : user
-      ));
-      
-      // Enregistrer l'action
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, featured: !isCurrentlyFeatured } : u))
+      );
+
       await addDoc(collection(db, 'logs'), {
         type: !isCurrentlyFeatured ? 'user_set_featured' : 'user_unset_featured',
-        userId: userId,
-        changedBy: currentUser?.id,
-        timestamp: serverTimestamp()
+        userId,
+        changedBy: currentUser?.id ?? null,
+        timestamp: serverTimestamp(),
       });
-    } catch (error) {
-      console.error('Error toggling featured status:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-alert
       alert('Erreur lors de la modification du statut mis en avant');
-      
       logError({
         origin: 'frontend',
-        error: `Error toggling featured status: ${error.message}`,
-        context: { userId }
+        error: `Error toggling featured status: ${message}`,
+        context: { userId },
       });
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const handleLoadMore = () => {
-    setPage(prev => prev + 1);
-  };
+  const handleLoadMore = () => setPage((prev) => prev + 1);
 
-  const handleSortChange = (field: string) => {
+  const handleSortChange = (field: 'createdAt' | 'lastLoginAt' | 'fullName') => {
     if (sortField === field) {
-      // Inverser la direction si on clique sur le même champ
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
-      // Nouveau champ, trier par défaut en descendant
       setSortField(field);
       setSortDirection('desc');
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('fr-FR', {
+  const formatDate = (date: Date) =>
+    new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     }).format(date);
-  };
 
-  // Filtrer les utilisateurs en fonction du rôle sélectionné et du terme de recherche
-  const filteredUsers = users.filter(user => {
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-    const matchesSearch = !searchTerm || 
-      user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesRole && matchesSearch;
-  });
+  const filteredUsers = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return users.filter((u) => {
+      const matchesRole = selectedRole === 'all' || u.role === selectedRole;
+      const matchesSearch =
+        term.length === 0 ||
+        u.firstName?.toLowerCase().includes(term) ||
+        u.lastName?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term);
+      return matchesRole && matchesSearch;
+    });
+  }, [users, selectedRole, searchTerm]);
 
-  // Obtenir le nombre d'utilisateurs par rôle
-  const userCounts = {
-    all: users.length,
-    client: users.filter(user => user.role === 'client').length,
-    lawyer: users.filter(user => user.role === 'lawyer').length,
-    expat: users.filter(user => user.role === 'expat').length,
-    admin: users.filter(user => user.role === 'admin').length
-  };
+  const userCounts = useMemo(
+    () => ({
+      all: users.length,
+      client: users.filter((u) => u.role === 'client').length,
+      lawyer: users.filter((u) => u.role === 'lawyer').length,
+      expat: users.filter((u) => u.role === 'expat').length,
+      admin: users.filter((u) => u.role === 'admin').length,
+    }),
+    [users]
+  );
 
-  if (loading) return <div>Chargement...</div>;
+  if (loading && users.length === 0) return <div>Chargement...</div>;
 
   return (
     <AdminLayout>
@@ -476,26 +533,31 @@ const AdminUsers = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             </div>
-            
+
             <select
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
               className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
             >
               <option value="all">Tous les pays</option>
-              {countries.map(country => (
-                <option key={country} value={country}>{country}</option>
+              {countries.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
               ))}
             </select>
-            
+
             <select
               value={`${sortField}-${sortDirection}`}
               onChange={(e) => {
-                const [field, direction] = e.target.value.split('-');
+                const [field, direction] = e.target.value.split('-') as [
+                  'createdAt' | 'lastLoginAt' | 'fullName',
+                  'asc' | 'desc'
+                ];
                 setSortField(field);
-                setSortDirection(direction as 'asc' | 'desc');
+                setSortDirection(direction);
               }}
               className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
             >
@@ -514,9 +576,7 @@ const AdminUsers = () => {
           <button
             onClick={() => setSelectedRole('all')}
             className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              selectedRole === 'all'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              selectedRole === 'all' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <User size={16} />
@@ -525,9 +585,7 @@ const AdminUsers = () => {
           <button
             onClick={() => setSelectedRole('client')}
             className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              selectedRole === 'client'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              selectedRole === 'client' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <User size={16} />
@@ -536,9 +594,7 @@ const AdminUsers = () => {
           <button
             onClick={() => setSelectedRole('lawyer')}
             className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              selectedRole === 'lawyer'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              selectedRole === 'lawyer' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <Scale size={16} />
@@ -547,9 +603,7 @@ const AdminUsers = () => {
           <button
             onClick={() => setSelectedRole('expat')}
             className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              selectedRole === 'expat'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              selectedRole === 'expat' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <UserCheck size={16} />
@@ -558,9 +612,7 @@ const AdminUsers = () => {
           <button
             onClick={() => setSelectedRole('admin')}
             className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              selectedRole === 'admin'
-                ? 'bg-yellow-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              selectedRole === 'admin' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <Shield size={16} />
@@ -570,104 +622,162 @@ const AdminUsers = () => {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-  <tr>
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Photo
-    </th> {/* ✅ colonne ajoutée */}
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Utilisateur
-    </th>
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Rôle
-    </th>
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Statut
-    </th>
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Pays
-    </th>
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Inscription
-    </th>
-    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-      Actions
-    </th>
-  </tr>
-</thead>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Photo
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Utilisateur
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Rôle
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statut
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pays
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Inscription
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-{loading ? (
-  <tr>
-    <td colSpan={7} className="px-6 py-4 text-center">
-      <div className="flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
-      <p className="mt-2 text-gray-500">Chargement des utilisateurs...</p>
-    </td>
-  </tr>
-) : filteredUsers.length > 0 ? (
-  filteredUsers.map((user) => (
-    <tr key={user.id} className="hover:bg-gray-50">
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden border">
-            <img
-              src={user.photoURL || user.profilePhoto || "/default-avatar.png"}
-              alt={`Photo de ${user.firstName || "utilisateur"}`}
-              className="h-12 w-12 object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.onerror = null;
-                target.src = "/default-avatar.png";
-              }}
-            />
-          </div>
-          <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">
-              {user.firstName} {user.lastName}
-            </div>
-            <div className="text-sm text-gray-500">{user.email}</div>
-          </div>
-        </div>
-      </td>
-
-      {/* Ajoute ici les autres colonnes comme avant : rôle, statut, pays, etc. */}
-      <td className="px-6 py-4 text-sm text-gray-900">{user.role}</td>
-      <td className="px-6 py-4 text-sm text-gray-900">{user.status}</td>
-      <td className="px-6 py-4 text-sm text-gray-900">{user.country}</td>
-      <td className="px-6 py-4 text-sm text-gray-900">{formatDate(user.createdAt)}</td>
-      <td className="px-6 py-4 text-sm text-gray-900">
-        {/* Boutons/actions ici */}
-      </td>
-    </tr>
-  ))
-) : (
-  <tr>
-    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-      Aucun utilisateur trouvé
-    </td>
-  </tr>
-)}
-</tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-4 text-center">
+                      <div className="flex justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" />
+                      </div>
+                      <p className="mt-2 text-gray-500">Chargement des utilisateurs...</p>
+                    </td>
+                  </tr>
+                ) : filteredUsers.length > 0 ? (
+                  filteredUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden border">
+                            <img
+                              src={u.photoURL || u.profilePhoto || '/default-avatar.png'}
+                              alt={`Photo de ${u.firstName || 'utilisateur'}`}
+                              className="h-12 w-12 object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null;
+                                target.src = '/default-avatar.png';
+                              }}
+                            />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {u.firstName} {u.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500">{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{u.role}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{u.status ?? (u.isBanned ? 'Banni' : u.isOnline ? 'En ligne' : 'Hors ligne')}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{u.country ?? u.currentCountry ?? '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{formatDate(u.createdAt)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setShowUserModal(true);
+                            }}
+                          >
+                            Voir
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleEditUser(u.id)}
+                          >
+                            Modifier
+                          </Button>
+                          {u.isBanned ? (
+                            <Button size="sm" onClick={() => void handleUnbanUser(u.id)}>
+                              Réactiver
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="bg-orange-600 hover:bg-orange-700"
+                              onClick={() => handleBanUser(u)}
+                            >
+                              Bannir
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-600 text-red-700"
+                            onClick={() => handleDeleteUser(u)}
+                          >
+                            Supprimer
+                          </Button>
+                          {/* Exemples d’actions directes */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleToggleOnlineStatus(u.id, Boolean(u.isOnline))}
+                          >
+                            {u.isOnline ? 'Mettre hors ligne' : 'Mettre en ligne'}
+                          </Button>
+                          {(u.role === 'lawyer' || u.role === 'expat') && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleToggleVisibility(u.id, Boolean(u.isVisibleOnMap))}
+                              >
+                                {u.isVisibleOnMap ? 'Masquer carte' : 'Montrer carte'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleToggleFeatured(u.id, Boolean(u.featured))}
+                              >
+                                {u.featured ? 'Retirer “à la une”' : 'Mettre “à la une”'}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                      Aucun utilisateur trouvé
+                    </td>
+                  </tr>
+                )}
+              </tbody>
             </table>
           </div>
-          
-          {/* Pagination ou "Charger plus" si nécessaire */}
+
           {hasMore && (
             <div className="px-6 py-4 border-t border-gray-200">
-              <Button
-                onClick={handleLoadMore}
-                disabled={loading}
-                fullWidth
-              >
-                {loading ? 'Chargement...' : 'Charger plus d\'utilisateurs'}
+              <Button onClick={handleLoadMore} disabled={loading} fullWidth>
+                {loading ? 'Chargement...' : "Charger plus d'utilisateurs"}
               </Button>
             </div>
           )}
         </div>
       </div>
-      
+
       {/* Modal de détails utilisateur */}
       <Modal
         isOpen={showUserModal}
@@ -679,10 +789,10 @@ const AdminUsers = () => {
           <div className="space-y-6">
             <div className="flex items-center space-x-4">
               <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium overflow-hidden">
-                {selectedUser.profilePhoto ? (
-                  <img 
-                    src={selectedUser.profilePhoto} 
-                    alt={selectedUser.firstName} 
+                {selectedUser.profilePhoto || selectedUser.photoURL ? (
+                  <img
+                    src={selectedUser.profilePhoto || selectedUser.photoURL || ''}
+                    alt={selectedUser.firstName || 'utilisateur'}
                     className="h-16 w-16 object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -700,9 +810,13 @@ const AdminUsers = () => {
                 </h3>
                 <div className="flex items-center space-x-2 mt-1">
                   <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                    {selectedUser.role === 'lawyer' ? 'Avocat' : 
-                     selectedUser.role === 'expat' ? 'Expatrié' : 
-                     selectedUser.role === 'admin' ? 'Admin' : 'Client'}
+                    {selectedUser.role === 'lawyer'
+                      ? 'Avocat'
+                      : selectedUser.role === 'expat'
+                      ? 'Expatrié'
+                      : selectedUser.role === 'admin'
+                      ? 'Admin'
+                      : 'Client'}
                   </span>
                   {selectedUser.isBanned && (
                     <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
@@ -717,7 +831,7 @@ const AdminUsers = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-2">Informations personnelles</h4>
@@ -726,28 +840,26 @@ const AdminUsers = () => {
                     <Mail className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">{selectedUser.email}</span>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Phone className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">
                       {selectedUser.phoneCountryCode} {selectedUser.phone || 'Non renseigné'}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <MapPin className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">
                       {selectedUser.country || selectedUser.currentCountry || 'Non renseigné'}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-900">
-                      Inscrit le {formatDate(selectedUser.createdAt)}
-                    </span>
+                    <span className="text-gray-900">Inscrit le {formatDate(selectedUser.createdAt)}</span>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Clock className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">
@@ -756,63 +868,65 @@ const AdminUsers = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-2">Paramètres du compte</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700">Email vérifié</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedUser.emailVerified || selectedUser.isVerifiedEmail
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedUser.emailVerified || selectedUser.isVerifiedEmail
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {selectedUser.emailVerified || selectedUser.isVerifiedEmail ? 'Oui' : 'Non'}
                     </span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700">Compte approuvé</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedUser.isApproved
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedUser.isApproved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
                       {selectedUser.isApproved ? 'Oui' : 'En attente'}
                     </span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700">Statut en ligne</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedUser.isOnline
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedUser.isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
                       {selectedUser.isOnline ? 'En ligne' : 'Hors ligne'}
                     </span>
                   </div>
-                  
+
                   {(selectedUser.role === 'lawyer' || selectedUser.role === 'expat') && (
                     <>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-700">Visible sur la carte</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          selectedUser.isVisibleOnMap
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            selectedUser.isVisibleOnMap ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
                           {selectedUser.isVisibleOnMap ? 'Oui' : 'Non'}
                         </span>
                       </div>
-                      
+
                       <div className="flex justify-between items-center">
                         <span className="text-gray-700">Mis en avant</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          selectedUser.featured
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            selectedUser.featured ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
                           {selectedUser.featured ? 'Oui' : 'Non'}
                         </span>
                       </div>
@@ -821,22 +935,19 @@ const AdminUsers = () => {
                 </div>
               </div>
             </div>
-            
+
             {selectedUser.isBanned && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-red-800 mb-2">Raison du bannissement</h4>
                 <p className="text-red-700">{selectedUser.banReason || 'Aucune raison spécifiée'}</p>
               </div>
             )}
-            
+
             <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                onClick={() => setShowUserModal(false)}
-                variant="outline"
-              >
+              <Button onClick={() => setShowUserModal(false)} variant="outline">
                 Fermer
               </Button>
-              
+
               <Button
                 onClick={() => {
                   setShowUserModal(false);
@@ -851,7 +962,7 @@ const AdminUsers = () => {
           </div>
         )}
       </Modal>
-      
+
       {/* Modal de confirmation de suppression */}
       <Modal
         isOpen={showDeleteModal}
@@ -865,43 +976,33 @@ const AdminUsers = () => {
               <div className="flex">
                 <AlertTriangle className="h-5 w-5 text-red-400" />
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Attention : Cette action est irréversible
-                  </h3>
+                  <h3 className="text-sm font-medium text-red-800">Attention : Cette action est irréversible</h3>
                   <div className="mt-2 text-sm text-red-700">
                     <p>
                       Vous êtes sur le point de supprimer définitivement l'utilisateur :
                       <br />
-                      <strong>{selectedUser.firstName} {selectedUser.lastName}</strong>
+                      <strong>
+                        {selectedUser.firstName} {selectedUser.lastName}
+                      </strong>
                     </p>
-                    <p className="mt-1">
-                      Toutes les données associées seront également supprimées.
-                    </p>
+                    <p className="mt-1">Toutes les données associées seront également supprimées.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="flex justify-end space-x-3">
-              <Button
-                onClick={() => setShowDeleteModal(false)}
-                variant="outline"
-                disabled={isActionLoading}
-              >
+              <Button onClick={() => setShowDeleteModal(false)} variant="outline" disabled={isActionLoading}>
                 Annuler
               </Button>
-              <Button
-                onClick={confirmDeleteUser}
-                className="bg-red-600 hover:bg-red-700"
-                loading={isActionLoading}
-              >
+              <Button onClick={confirmDeleteUser} className="bg-red-600 hover:bg-red-700" loading={isActionLoading}>
                 Confirmer la suppression
               </Button>
             </div>
           </div>
         )}
       </Modal>
-      
+
       {/* Modal de bannissement */}
       <Modal
         isOpen={showBanModal}
@@ -915,23 +1016,21 @@ const AdminUsers = () => {
               <div className="flex">
                 <Ban className="h-5 w-5 text-orange-400" />
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-orange-800">
-                    Bannissement d'utilisateur
-                  </h3>
+                  <h3 className="text-sm font-medium text-orange-800">Bannissement d'utilisateur</h3>
                   <div className="mt-2 text-sm text-orange-700">
                     <p>
                       Vous êtes sur le point de bannir l'utilisateur :
                       <br />
-                      <strong>{selectedUser.firstName} {selectedUser.lastName}</strong>
+                      <strong>
+                        {selectedUser.firstName} {selectedUser.lastName}
+                      </strong>
                     </p>
-                    <p className="mt-1">
-                      L'utilisateur ne pourra plus se connecter ni utiliser la plateforme.
-                    </p>
+                    <p className="mt-1">L'utilisateur ne pourra plus se connecter ni utiliser la plateforme.</p>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="banReason" className="block text-sm font-medium text-gray-700 mb-1">
                 Raison du bannissement
@@ -947,18 +1046,10 @@ const AdminUsers = () => {
             </div>
 
             <div className="flex justify-end space-x-3">
-              <Button
-                onClick={() => setShowBanModal(false)}
-                variant="outline"
-                disabled={isActionLoading}
-              >
+              <Button onClick={() => setShowBanModal(false)} variant="outline" disabled={isActionLoading}>
                 Annuler
               </Button>
-              <Button
-                onClick={confirmBanUser}
-                className="bg-orange-600 hover:bg-orange-700"
-                loading={isActionLoading}
-              >
+              <Button onClick={confirmBanUser} className="bg-orange-600 hover:bg-orange-700" loading={isActionLoading}>
                 Bannir l'utilisateur
               </Button>
             </div>
@@ -966,8 +1057,7 @@ const AdminUsers = () => {
         )}
       </Modal>
     </AdminLayout>
-      );
+  );
 };
 
 export default AdminUsers;
-

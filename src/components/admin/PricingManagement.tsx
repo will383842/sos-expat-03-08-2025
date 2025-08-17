@@ -63,8 +63,12 @@ export const PricingManagement: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Erreur chargement config:', error);
-      alert('Erreur lors du chargement de la configuration');
+      console.error('❌ Erreur chargement config:', error);
+      alert(
+        `Erreur lors du chargement de la configuration : ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -125,8 +129,12 @@ export const PricingManagement: React.FC = () => {
       setOriginalConfig(JSON.parse(JSON.stringify(config)));
       alert('✅ Configuration sauvegardée avec succès ! Les nouveaux prix sont actifs immédiatement.');
     } catch (error) {
-      console.error('Erreur sauvegarde:', error);
-      alert('❌ Erreur lors de la sauvegarde');
+      console.error('❌ Erreur sauvegarde:', error);
+      alert(
+        `❌ Erreur lors de la sauvegarde : ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     } finally {
       setSaving(false);
     }

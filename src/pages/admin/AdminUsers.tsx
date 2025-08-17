@@ -690,7 +690,7 @@ const AdminUsers: React.FC = () => {
                       <td className="px-6 py-4 text-sm text-gray-900">
                         <div className="flex flex-wrap gap-2">
                           <Button
-                            size="sm"
+                            size="small"
                             variant="outline"
                             onClick={() => {
                               setSelectedUser(u);
@@ -700,19 +700,19 @@ const AdminUsers: React.FC = () => {
                             Voir
                           </Button>
                           <Button
-                            size="sm"
+                            size="small"
                             className="bg-green-600 hover:bg-green-700"
                             onClick={() => handleEditUser(u.id)}
                           >
                             Modifier
                           </Button>
                           {u.isBanned ? (
-                            <Button size="sm" onClick={() => void handleUnbanUser(u.id)}>
+                            <Button size="small" onClick={() => void handleUnbanUser(u.id)}>
                               Réactiver
                             </Button>
                           ) : (
                             <Button
-                              size="sm"
+                              size="small"
                               className="bg-orange-600 hover:bg-orange-700"
                               onClick={() => handleBanUser(u)}
                             >
@@ -720,7 +720,7 @@ const AdminUsers: React.FC = () => {
                             </Button>
                           )}
                           <Button
-                            size="sm"
+                            size="small"
                             variant="outline"
                             className="border-red-600 text-red-700"
                             onClick={() => handleDeleteUser(u)}
@@ -729,7 +729,7 @@ const AdminUsers: React.FC = () => {
                           </Button>
                           {/* Exemples d’actions directes */}
                           <Button
-                            size="sm"
+                            size="small"
                             variant="outline"
                             onClick={() => void handleToggleOnlineStatus(u.id, Boolean(u.isOnline))}
                           >
@@ -738,14 +738,14 @@ const AdminUsers: React.FC = () => {
                           {(u.role === 'lawyer' || u.role === 'expat') && (
                             <>
                               <Button
-                                size="sm"
+                                size="small"
                                 variant="outline"
                                 onClick={() => void handleToggleVisibility(u.id, Boolean(u.isVisibleOnMap))}
                               >
                                 {u.isVisibleOnMap ? 'Masquer carte' : 'Montrer carte'}
                               </Button>
                               <Button
-                                size="sm"
+                                size="small"
                                 variant="outline"
                                 onClick={() => void handleToggleFeatured(u.id, Boolean(u.featured))}
                               >

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { db } from "@/config/firebase";
 import {
-  getFirestore,
   collection,
   query,
   where,
@@ -36,7 +36,6 @@ const DashboardMessages: React.FC = () => {
   useEffect(() => {
     if (!user?.id) return;
 
-    const db = getFirestore();
     const messagesRef = collection(db, "providerMessageOrderCustomers");
     const q = query(
       messagesRef,
@@ -45,9 +44,9 @@ const DashboardMessages: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched: Message[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Message, "id">),
+      const fetched: Message[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Message, "id">),
       }));
       setMessages(fetched);
       setLoading(false);
@@ -57,7 +56,6 @@ const DashboardMessages: React.FC = () => {
   }, [user]);
 
   const markAsRead = async (messageId: string) => {
-    const db = getFirestore();
     const messageRef = doc(db, "providerMessageOrderCustomers", messageId);
     await updateDoc(messageRef, { isRead: true });
   };

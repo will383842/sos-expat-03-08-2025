@@ -141,4 +141,7 @@ console.log("✅ Firebase prêt :", {
  */
 export const call = <T, R = unknown>(name: string) => httpsCallable<T, R>(functions, name);
 
+// ✅ AJOUTEZ CETTE LIGNE POUR RÉSOUDRE LES ERREURS D'IMPORT
+export { httpsCallable } from 'firebase/functions';
+
 export default app;

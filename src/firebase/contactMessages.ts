@@ -1,7 +1,34 @@
-// 📁 src/emails/services/contactMessages.ts
+// src/firebase/contactMessages.ts
 
 import { doc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { db } from '../config/firebase'; // ✅ Import depuis config/firebase
+
+// ✅ Fonction manquante pour SendToContact.tsx
+export const updateContactMessageStatus = async (
+  messageId: string, 
+  updates: { 
+    status?: string; 
+    processedAt?: Date; 
+    notes?: string;
+    isReplied?: boolean;
+    replyStatus?: 'success' | 'error';
+    replyError?: string | null;
+    adminReply?: string;
+    repliedAt?: any;
+  }
+) => {
+  try {
+    const messageRef = doc(db, 'contact_messages', messageId);
+    await updateDoc(messageRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating contact message status:', error);
+    throw error;
+  }
+};
 
 // Fonction pour enregistrer la réponse à un message de contact
 export const saveContactReply = async ({

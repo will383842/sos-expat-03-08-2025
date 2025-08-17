@@ -1,8 +1,15 @@
 // src/emails/admin/AdminEmails/CampaignsPage.tsx
 import React, { useEffect, useState } from "react";
-import { getAllCampaigns } from "../../../../serveremails/services/campaignManager";
 import { Campaign } from "../../types/emailTypes";
 import { format } from "date-fns";
+
+import { functions } from "@/config/firebase";
+import { httpsCallable } from "firebase/functions";
+
+const getAllCampaigns = httpsCallable<undefined, Campaign[]>(
+  functions,
+  "admin_getAllCampaigns"
+); // ⚠️ À créer côté Firebase Functions
 
 const CampaignsPage: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -11,8 +18,8 @@ const CampaignsPage: React.FC = () => {
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
-        const data = await getAllCampaigns();
-        setCampaigns(data);
+        const { data: campaigns } = await getAllCampaigns(); // ✅ typé directement
+        setCampaigns(campaigns ?? []);
       } catch (error) {
         console.error("Erreur lors du chargement des campagnes :", error);
       } finally {
@@ -20,7 +27,7 @@ const CampaignsPage: React.FC = () => {
       }
     };
 
-    loadCampaigns();
+    void loadCampaigns();
   }, []);
 
   return (
@@ -37,7 +44,7 @@ const CampaignsPage: React.FC = () => {
             <thead>
               <tr className="bg-gray-100 text-left">
                 <th className="px-4 py-2 border">Nom</th>
-                <th className="px-4 py-2 border">Date d'envoi</th>
+                <th className="px-4 py-2 border">Date d&apos;envoi</th>
                 <th className="px-4 py-2 border">Cibles</th>
                 <th className="px-4 py-2 border">Statut</th>
               </tr>
@@ -46,7 +53,9 @@ const CampaignsPage: React.FC = () => {
               {campaigns.map((campaign) => (
                 <tr key={campaign.id} className="border-b">
                   <td className="px-4 py-2">{campaign.name}</td>
-                  <td className="px-4 py-2">{format(new Date(campaign.scheduledAt), "dd/MM/yyyy HH:mm")}</td>
+                  <td className="px-4 py-2">
+                    {format(new Date(campaign.scheduledAt), "dd/MM/yyyy HH:mm")}
+                  </td>
                   <td className="px-4 py-2">{campaign.targets.join(", ")}</td>
                   <td className="px-4 py-2">{campaign.status}</td>
                 </tr>
@@ -60,5 +69,3 @@ const CampaignsPage: React.FC = () => {
 };
 
 export default CampaignsPage;
-
-

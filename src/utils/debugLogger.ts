@@ -1,36 +1,32 @@
-interface DebugContext {
-  component: string;
-  action: string;
-  data?: unknown;
-  error?: unknown;
-  timestamp?: string;
+/* -------------------------------------------------------------------------- */
+/*                            src/utils/debugLogger.ts                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Payload pour les logs de debug service
+ */
+type ServiceDebugPayload = {
+  providerId: string;
+  serviceInfo: Record<string, unknown>;
+};
+
+/**
+ * Fonction générique de log debug
+ */
+export function debugLog(payload: { event: string; data: unknown }) {
+  // Tu peux brancher ici un vrai logger (console, Sentry, Firebase, etc.)
+  console.log("[DEBUG]", payload.event, payload.data);
 }
 
-export const debugLog = (context: DebugContext) => {
-  if (process.env.NODE_ENV !== 'development') return;
-  
-  const timestamp = new Date().toISOString();
-  const prefix = `🐛 [${context.component}] ${context.action}`;
-  
-  console.group(prefix);
-  console.log('⏰ Timestamp:', timestamp);
-  
-  if (context.data) {
-    console.log('📊 Data:', context.data);
-  }
-  
-  if (context.error) {
-    console.error('❌ Error:', context.error);
-  }
-  
-  console.groupEnd();
-};
-
-// Utilisation dans BookingRequest:
-export const logBookingNavigation = (providerId: string, serviceInfo: unknown) => {
+/**
+ * Log spécifique pour les services
+ */
+export function logServiceDebug(payload: ServiceDebugPayload) {
   debugLog({
-    component: 'BookingRequest',
-    action: 'Navigation to CallCheckout',
-    data: { providerId, serviceData: serviceInfo }
+    event: "service_debug",
+    data: {
+      providerId: payload.providerId,
+      serviceData: payload.serviceInfo,
+    },
   });
-};
+}

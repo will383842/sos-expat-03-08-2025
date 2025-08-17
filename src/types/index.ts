@@ -141,6 +141,10 @@ export interface SosProfile {
   language?: string
 }
 
+export * from './user';
+export * from './notification';
+export * from './provider';
+
 // Firestore document-like generic type without using `any`
 export type Document = DocumentData
 

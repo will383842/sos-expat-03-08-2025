@@ -1,4 +1,4 @@
-// src/pages/admin/AdminDashboard.tsx - VERSION CORRIGÉE
+// src/pages/admin/AdminDashboard.tsx - VERSION NETTOYÉE
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -14,7 +14,6 @@ import {
   Mail,
   CheckCircle,
   AlertTriangle,
-  RefreshCw
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/common/Button';
@@ -26,10 +25,6 @@ import { logError } from '../../utils/logging';
 import Modal from '../../components/common/Modal';
 import { validateDataIntegrity, cleanupObsoleteData } from '../../utils/firestore';
 import testNotificationSystem from '../../services/notifications/notificationService';
-import { PricingManagement } from '../../components/admin/PricingManagement';
-import { FinancialAnalytics } from '../../components/admin/FinancialAnalytics';
-import { usePricingConfig, clearPricingCache } from '../../services/pricingService';
-import PricingMigrationPanel from '../../components/admin/PricingMigrationPanel'; // ✅ AJOUT
 
 // Interface pour les paramètres admin (SIMPLIFIÉ - sans commission)
 interface AdminSettings {
@@ -121,9 +116,6 @@ const AdminDashboard: React.FC = () => {
     platformRevenue: 0,
     providerRevenue: 0
   });
-
-  // Hook pricing - VERSION CORRIGÉE avec gestion d'erreur
-  const { pricing: pricingConfig, loading: pricingLoading, error: pricingError, reload: reloadPricing } = usePricingConfig();
 
   // Notification helper (simplifié)
   const invokeTestNotification = async (providerId: string): Promise<void> => {
@@ -278,25 +270,18 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Refresh pricing cache
-  const handleRefreshPricing = async (): Promise<void> => {
-    try {
-      clearPricingCache();
-      await reloadPricing();
-      await loadStats(); // Recharger aussi les stats
-      alert('✅ Cache pricing actualisé !');
-    } catch (error) {
-      console.error('Error refreshing pricing:', error);
-      alert('❌ Erreur lors de l\'actualisation'); // ✅ corrigé apostrophe
-    }
-  };
-
   // Check data integrity
   const handleCheckIntegrity = async (): Promise<void> => {
     setIsCheckingIntegrity(true);
     try {
       const report = await validateDataIntegrity();
-      setIntegrityReport(report);
+      // Type assertion pour corriger le type des fixes
+      const typedReport: IntegrityReport = {
+        isValid: report.isValid,
+        issues: report.issues,
+        fixes: report.fixes as IntegrityFix[]
+      };
+      setIntegrityReport(typedReport);
       setShowIntegrityModal(true);
     } catch (error) {
       console.error('Error checking integrity:', error);
@@ -404,18 +389,18 @@ const AdminDashboard: React.FC = () => {
               <div className="flex justify-between items-center py-6">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">Console d'administration</h1>
-                  <p className="text-gray-600 mt-1">Gestion des paramètres et statistiques de la plateforme</p>
+                  <p className="text-gray-600 mt-1">Vue d'ensemble des statistiques et outils de gestion</p>
                 </div>
                 <div className="flex space-x-4">
-                  <Button onClick={handleRefreshPricing} className="bg-blue-600 hover:bg-blue-700">
-                    <RefreshCw size={20} className="mr-2" />
-                    Actualiser Pricing
+                  <Button onClick={() => navigate('/admin/pricing')} className="bg-green-600 hover:bg-green-700">
+                    <DollarSign size={20} className="mr-2" />
+                    Gestion des Tarifs
                   </Button>
                   <Button onClick={saveSettings} loading={isSaving} className="bg-red-600 hover:bg-red-700">
                     <Save size={20} className="mr-2" />
                     Sauvegarder
                   </Button>
-                  <Button onClick={handleCheckIntegrity} loading={isCheckingIntegrity} className="bg-green-600 hover:bg-green-700">
+                  <Button onClick={handleCheckIntegrity} loading={isCheckingIntegrity} className="bg-blue-600 hover:bg-blue-700">
                     <Shield size={20} className="mr-2" />
                     Vérifier l'intégrité
                   </Button>
@@ -492,210 +477,46 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* 🔥 NOUVEAU: Panel de Migration (à ajouter EN PREMIER) */}
+            {/* Accès rapides vers autres sections */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Shield className="w-5 h-5 mr-2 text-blue-600" />
-                  🔧 Migration & Diagnostic du Système de Pricing
+                  <Settings className="w-5 h-5 mr-2 text-blue-600" />
+                  🚀 Accès rapides
                 </h2>
               </div>
               <div className="p-6">
-                <PricingMigrationPanel />
-              </div>
-            </div>
-
-            {/* 🔥 NOUVEAU: Section Pricing Principale (en haut) */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2 text-green-600" />
-                    💰 Gestion des Prix et Commissions
-                  </h2>
-                  {pricingError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                      <span className="text-red-600 text-sm">⚠️ {pricingError}</span>
-                    </div>
-                  )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Button onClick={() => navigate('/admin/pricing')} className="bg-green-600 hover:bg-green-700 justify-start">
+                    <DollarSign size={20} className="mr-2" />
+                    Gestion des Tarifs
+                  </Button>
+                  <Button onClick={() => navigate('/admin/users')} className="bg-blue-600 hover:bg-blue-700 justify-start">
+                    <Users size={20} className="mr-2" />
+                    Gestion des Utilisateurs
+                  </Button>
+                  <Button onClick={() => navigate('/admin/calls')} className="bg-purple-600 hover:bg-purple-700 justify-start">
+                    <Phone size={20} className="mr-2" />
+                    Gestion des Appels
+                  </Button>
+                  <Button onClick={() => navigate('/admin/payments')} className="bg-orange-600 hover:bg-orange-700 justify-start">
+                    <DollarSign size={20} className="mr-2" />
+                    Gestion des Paiements
+                  </Button>
+                  <Button onClick={() => navigate('/admin/reviews')} className="bg-yellow-600 hover:bg-yellow-700 justify-start">
+                    <Star size={20} className="mr-2" />
+                    Gestion des Avis
+                  </Button>
+                  <Button onClick={() => navigate('/admin/reports')} className="bg-indigo-600 hover:bg-indigo-700 justify-start">
+                    <BarChart3 size={20} className="mr-2" />
+                    Rapports & Analytics
+                  </Button>
                 </div>
-              </div>
-              <div className="p-6">
-                <PricingManagement />
-              </div>
-            </div>
-
-            {/* Section Analytics Financiers */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
-                  📊 Analytics Financiers
-                </h2>
-              </div>
-              <div className="p-6">
-                <FinancialAnalytics />
-              </div>
-            </div>
-
-            {/* Aperçu des Tarifs Actuels */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
-                    📋 Aperçu des Tarifs Actuels
-                  </h2>
-                  {pricingLoading && (
-                    <div className="flex items-center text-sm text-gray-500">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
-                      Chargement...
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-6">
-                {pricingConfig ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Avocat EUR */}
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <h3 className="font-medium text-blue-900 mb-3 flex items-center">
-                        👨‍⚖️ Appel Avocat (EUR)
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-bold">{pricingConfig.lawyer.eur.totalAmount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            {pricingConfig.lawyer.eur.connectionFeeAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part avocat:</span>
-                          <span className="font-medium text-green-600">
-                            {pricingConfig.lawyer.eur.providerAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.lawyer.eur.duration} min</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Avocat USD */}
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <h3 className="font-medium text-blue-900 mb-3 flex items-center">
-                        👨‍⚖️ Appel Avocat (USD)
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-bold">${pricingConfig.lawyer.usd.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            ${pricingConfig.lawyer.usd.connectionFeeAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part avocat:</span>
-                          <span className="font-medium text-green-600">
-                            ${pricingConfig.lawyer.usd.providerAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.lawyer.usd.duration} min</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expatrié EUR */}
-                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                      <h3 className="font-medium text-green-900 mb-3 flex items-center">
-                        🌍 Appel Expatrié (EUR)
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-bold">{pricingConfig.expat.eur.totalAmount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            {pricingConfig.expat.eur.connectionFeeAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part expatrié:</span>
-                          <span className="font-medium text-green-600">
-                            {pricingConfig.expat.eur.providerAmount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.expat.eur.duration} min</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expatrié USD */}
-                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                      <h3 className="font-medium text-green-900 mb-3 flex items-center">
-                        🌍 Appel Expatrié (USD)
-                      </h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Prix total:</span>
-                          <span className="font-bold">${pricingConfig.expat.usd.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Commission SOS:</span>
-                          <span className="font-medium text-red-600">
-                            ${pricingConfig.expat.usd.connectionFeeAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span>Part expatrié:</span>
-                          <span className="font-medium text-green-600">
-                            ${pricingConfig.expat.usd.providerAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Durée:</span>
-                          <span>{pricingConfig.expat.usd.duration} min</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                    <div className="flex items-center mb-3">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
-                      <h3 className="font-medium text-yellow-900">Configuration pricing non disponible</h3>
-                    </div>
-                    <p className="text-sm text-yellow-800 mb-4">
-                      {pricingError || "Impossible de charger la configuration des prix depuis admin_config/pricing."}
-                    </p>
-                    <button
-                      onClick={handleRefreshPricing}
-                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition-colors"
-                    >
-                      🔄 Réessayer
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Paramètres Twilio (SIMPLIFIÉ) */}
+              {/* Paramètres Twilio */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">

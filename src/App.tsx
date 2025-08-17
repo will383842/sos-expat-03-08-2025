@@ -32,7 +32,7 @@ const Register = lazy(() => import('./pages/Register'));
 const RegisterExpat = lazy(() => import('./pages/RegisterExpat'));
 const RegisterLawyer = lazy(() => import('./pages/RegisterLawyer'));
 const RegisterClient = lazy(() => import('./pages/RegisterClient'));
-const PasswordReset = lazy(() => import('./pages/PasswordReset')); // ⬅ garde si tu l’utilises
+const PasswordReset = lazy(() => import('./pages/PasswordReset')); // ⬅ garde si tu l'utilises
 
 // Utilisateur
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -53,6 +53,7 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 // Admin
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminPricing = lazy(() => import('./pages/admin/AdminPricing')); // 🔥 NOUVEAU
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminCalls = lazy(() => import('./pages/admin/AdminCalls'));
 const AdminClientMessages = lazy(() => import('@/pages/admin/AdminClientMessages'));
@@ -68,7 +69,7 @@ const AdminPromoCodes = lazy(() => import('./pages/admin/AdminPromoCodes'));
 const AdminLegalDocuments = lazy(() => import('./pages/admin/AdminLegalDocuments'));
 const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'));
 
-// Pages d’info
+// Pages d'info
 const SEO = lazy(() => import('./pages/SEO'));
 const ServiceStatus = lazy(() => import('./pages/ServiceStatus'));
 const Consumers = lazy(() => import('./pages/Consumers'));
@@ -118,7 +119,7 @@ const routeConfigs: RouteConfig[] = [
   { path: '/statut-service', component: ServiceStatus },
   { path: '/seo', component: SEO, alias: '/referencement' },
 
-  // Services d’appel
+  // Services d'appel
   { path: '/sos-appel', component: SOSCall },
   { path: '/appel-expatrie', component: ExpatCall },
 
@@ -146,6 +147,7 @@ const protectedUserRoutes: RouteConfig[] = [
 const adminRoutes: RouteConfig[] = [
   { path: '/admin/login', component: AdminLogin },
   { path: '/admin/dashboard', component: AdminDashboard, protected: true, role: 'admin' },
+  { path: '/admin/pricing', component: AdminPricing, protected: true, role: 'admin' }, // 🔥 NOUVEAU
   { path: '/admin/users', component: AdminUsers, protected: true, role: 'admin' },
   { path: '/admin/calls', component: AdminCalls, protected: true, role: 'admin' },
   { path: '/admin/messages-clients', component: AdminClientMessages, protected: true, role: 'admin' },
@@ -161,9 +163,6 @@ const adminRoutes: RouteConfig[] = [
   { path: '/admin/legal-documents', component: AdminLegalDocuments, protected: true, role: 'admin' },
   { path: '/admin/notifications', component: AdminNotifications, protected: true, role: 'admin' },
 ];
-
-
-
 
 // Métadonnées par défaut
 const DefaultHelmet: React.FC<{ pathname: string }> = ({ pathname }) => {
@@ -243,11 +242,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isMobile) {
       const preloadableRoutes = [...routeConfigs, ...protectedUserRoutes].filter((r) => r.preload);
-      preloadableRoutes.forEach((route) => {
+      // Préchargement simple sans utiliser la variable route
+      if (preloadableRoutes.length > 0) {
         setTimeout(() => {
-          // (noop) garder simple, certains bundlers n’exposent pas _payload
+          // (noop) garder simple, certains bundlers n'exposent pas _payload
         }, 2000);
-      });
+      }
     }
   }, [isMobile]);
 

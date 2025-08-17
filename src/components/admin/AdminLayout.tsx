@@ -1,5 +1,6 @@
 import React, { ReactNode, useState, useCallback, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { DollarSign } from 'lucide-react'
 import { 
   BarChart3, 
   Users, 
@@ -123,6 +124,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   // Configuration du menu avec i18n-ready
   const menuItems: MenuItem[] = useMemo(() => [
     { path: '/admin/dashboard', label: 'Tableau de bord', icon: BarChart3, ariaLabel: 'Accéder au tableau de bord' },
+    { path: '/admin/pricing', label: 'Tarification', icon: DollarSign, ariaLabel: 'Gérer les tarifs et commissions' },
     { path: '/admin/users', label: 'Utilisateurs', icon: Users, ariaLabel: 'Gérer les utilisateurs' },
     { path: '/admin/aaa-profiles', label: 'Faux profils', icon: Shield, ariaLabel: 'Gérer les faux profils' },
     { path: '/admin/approvals', label: 'Validations', icon: Shield, ariaLabel: 'Gérer les validations' },

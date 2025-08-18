@@ -1,10 +1,10 @@
-import React, { ReactNode, useState, useCallback, useMemo } from 'react';
+import React, { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
 import type { ErrorInfo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Shield, LogOut, Menu, X, Home, AlertTriangle, RefreshCw } from 'lucide-react';
 
-import { adminMenuTree } from '../../config/adminMenu';   // import RELATIF sûr
-import SidebarItem from './sidebar/SidebarItem';          // import RELATIF sûr
+import { adminMenuTree } from '../../config/adminMenu';
+import SidebarItem from './sidebar/SidebarItem';
 
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
@@ -16,6 +16,8 @@ interface AdminLayoutProps {
 }
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
+  console.log("🚨 AdminLayout render");
+
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
@@ -23,8 +25,19 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isUpdatingProfiles, setIsUpdatingProfiles] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState<boolean | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // --- Actions ---
+  // Détection mobile/desktop avec JavaScript - PAS CSS !
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const handleLogout = useCallback(async () => {
     try {
       await logout();
@@ -41,7 +54,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const handleUpdateProfiles = useCallback(async () => {
     const ok = window.confirm(
-      'Êtes-vous sûr de vouloir mettre à jour tous les profils existants avec les nouveaux champs ? Cette opération peut prendre du temps.'
+      'Êtes-vous sûr de vouloir mettre à jour tous les profils existants avec les nouveaux champs ?'
     );
     if (!ok) return;
 
@@ -81,7 +94,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return `${first}${last}`.toUpperCase();
   }, [user?.firstName, user?.lastName]);
 
-  // --- Guards ---
+  // Guards
   if (!user || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -117,7 +130,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   }
 
-  // --- Layout ---
   return (
     <ErrorBoundary
       onError={(error: Error, errorInfo: ErrorInfo) => {
@@ -129,105 +141,32 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       }}
     >
       <div className="h-screen flex overflow-hidden bg-gray-100">
-        {/* Mobile sidebar */}
-        <div className="lg:hidden">
-          {isMobileSidebarOpen && (
-            <div className="fixed inset-0 flex z-40">
-              <div
-                className="fixed inset-0 bg-gray-600 bg-opacity-75"
-                onClick={closeMobileSidebar}
-                aria-hidden="true"
-              />
-              <div className="relative flex-1 flex flex-col max-w-xs w-full bg-gray-900">
-                <div className="flex items-center justify-between h-16 px-4 bg-gray-800">
-                  <div className="flex items-center">
-                    <Shield className="h-8 w-8 text-red-600" aria-hidden="true" />
-                    <span className="ml-2 text-xl font-bold text-white">Admin SOS</span>
-                  </div>
-                  <button
-                    onClick={closeMobileSidebar}
-                    className="text-gray-400 hover:text-white p-2 -m-2 rounded-md"
-                    aria-label="Fermer le menu"
-                  >
-                    <X className="h-6 w-6" aria-hidden="true" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto">
-                  <nav className="px-2 py-4 space-y-1" aria-label="Menu principal">
-                    {adminMenuTree.map((node) => (
-                      <SidebarItem key={node.id} node={node} />
-                    ))}
-
-                    <div className="px-2 pt-3">
-                      <Button
-                        onClick={handleUpdateProfiles}
-                        loading={isUpdatingProfiles}
-                        disabled={isUpdatingProfiles}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <RefreshCw
-                          size={16}
-                          className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
-                        />
-                        Mettre à jour les profils
-                      </Button>
-
-                      {updateSuccess !== null && (
-                        <div
-                          className={`mt-2 text-xs p-2 rounded ${
-                            updateSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}
-                          role="alert"
-                        >
-                          {updateSuccess
-                            ? 'Profils mis à jour avec succès'
-                            : 'Erreur lors de la mise à jour des profils'}
-                        </div>
-                      )}
-                    </div>
-                  </nav>
-                </div>
-
-                <div className="p-4 border-t border-gray-700">
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white"
-                  >
-                    <LogOut className="h-5 w-5 mr-3" /> <span>Déconnexion</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Desktop sidebar */}
-        <div
-          className={`hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${
-            isSidebarOpen ? 'lg:w-64' : 'lg:w-20'
-          }`}
-        >
-          <div className="flex flex-col w-full">
-            <div className="flex flex-col h-0 flex-1 bg-gray-900">
+        
+        {/* MOBILE SIDEBAR - Condition JavaScript STRICTE */}
+        {isMobile && isMobileSidebarOpen && (
+          <div className="fixed inset-0 flex z-40">
+            <div
+              className="fixed inset-0 bg-gray-600 bg-opacity-75"
+              onClick={closeMobileSidebar}
+              aria-hidden="true"
+            />
+            <div className="relative flex-1 flex flex-col max-w-xs w-full bg-gray-900">
               <div className="flex items-center justify-between h-16 px-4 bg-gray-800">
-                <div className="flex items-center min-w-0">
-                  <Shield className="h-8 w-8 text-red-600" aria-hidden="true" />
-                  {isSidebarOpen && (
-                    <span className="ml-2 text-xl font-bold text-white truncate">Admin SOS</span>
-                  )}
+                <div className="flex items-center">
+                  <Shield className="h-8 w-8 text-red-600" />
+                  <span className="ml-2 text-xl font-bold text-white">Admin SOS</span>
                 </div>
                 <button
-                  onClick={toggleSidebar}
+                  onClick={closeMobileSidebar}
                   className="text-gray-400 hover:text-white p-2 -m-2 rounded-md"
-                  aria-label={isSidebarOpen ? 'Réduire' : 'Étendre'}
+                  aria-label="Fermer le menu"
                 >
-                  <Menu className="h-6 w-6" aria-hidden="true" />
+                  <X className="h-6 w-6" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                <nav className="px-2 py-4 space-y-1" aria-label="Menu principal">
+                <nav className="px-2 py-4 space-y-1">
                   {adminMenuTree.map((node) => (
                     <SidebarItem key={node.id} node={node} />
                   ))}
@@ -243,7 +182,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         size={16}
                         className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
                       />
-                      {isSidebarOpen ? 'Mettre à jour les profils' : <span className="sr-only">Mettre à jour les profils</span>}
+                      Mettre à jour les profils
                     </Button>
 
                     {updateSuccess !== null && (
@@ -267,32 +206,109 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   onClick={handleLogout}
                   className="flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white"
                 >
-                  <LogOut className="h-5 w-5 mr-3" />{' '}
-                  {isSidebarOpen ? <span>Déconnexion</span> : <span className="sr-only">Déconnexion</span>}
+                  <LogOut className="h-5 w-5 mr-3" />
+                  <span>Déconnexion</span>
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Main content */}
+        {/* DESKTOP SIDEBAR - Condition JavaScript STRICTE */}
+        {!isMobile && (
+          <div
+            className={`flex flex-shrink-0 transition-all duration-300 ${
+              isSidebarOpen ? 'w-64' : 'w-20'
+            }`}
+          >
+            <div className="flex flex-col w-full">
+              <div className="flex flex-col h-0 flex-1 bg-gray-900">
+                <div className="flex items-center justify-between h-16 px-4 bg-gray-800">
+                  <div className="flex items-center min-w-0">
+                    <Shield className="h-8 w-8 text-red-600" />
+                    {isSidebarOpen && (
+                      <span className="ml-2 text-xl font-bold text-white truncate">Admin SOS</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={toggleSidebar}
+                    className="text-gray-400 hover:text-white p-2 -m-2 rounded-md"
+                    aria-label={isSidebarOpen ? 'Réduire' : 'Étendre'}
+                  >
+                    <Menu className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  <nav className="px-2 py-4 space-y-1">
+                    {adminMenuTree.map((node) => (
+                      <SidebarItem key={node.id} node={node} isSidebarCollapsed={!isSidebarOpen} />
+                    ))}
+
+                    <div className="px-2 pt-3">
+                      <Button
+                        onClick={handleUpdateProfiles}
+                        loading={isUpdatingProfiles}
+                        disabled={isUpdatingProfiles}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <RefreshCw
+                          size={16}
+                          className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
+                        />
+                        {isSidebarOpen ? 'Mettre à jour les profils' : <span className="sr-only">Mettre à jour les profils</span>}
+                      </Button>
+
+                      {updateSuccess !== null && isSidebarOpen && (
+                        <div
+                          className={`mt-2 text-xs p-2 rounded ${
+                            updateSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}
+                          role="alert"
+                        >
+                          {updateSuccess
+                            ? 'Profils mis à jour avec succès'
+                            : 'Erreur lors de la mise à jour des profils'}
+                        </div>
+                      )}
+                    </div>
+                  </nav>
+                </div>
+
+                <div className="p-4 border-t border-gray-700">
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white"
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    {isSidebarOpen ? <span>Déconnexion</span> : <span className="sr-only">Déconnexion</span>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MAIN CONTENT */}
         <div className="flex flex-col w-0 flex-1 overflow-hidden">
           <header className="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-            <button
-              onClick={toggleMobileSidebar}
-              className="lg:hidden px-4 text-gray-500 hover:bg-gray-50"
-              aria-label="Ouvrir le menu"
-            >
-              <Menu className="h-6 w-6" aria-hidden="true" />
-            </button>
+            {isMobile && (
+              <button
+                onClick={toggleMobileSidebar}
+                className="px-4 text-gray-500 hover:bg-gray-50"
+                aria-label="Ouvrir le menu"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            )}
             <div className="flex-1 px-4 flex justify-between items-center">
-              <nav className="flex items-center text-sm" aria-label="Fil d'Ariane">
+              <nav className="flex items-center text-sm">
                 <Link
                   to="/"
                   className="text-gray-500 hover:text-gray-700 p-1 -m-1 rounded-md"
                   aria-label="Retour à l'accueil"
                 >
-                  <Home className="h-5 w-5" aria-hidden="true" />
+                  <Home className="h-5 w-5" />
                 </Link>
                 <span className="mx-2 text-gray-400">/</span>
                 <span className="text-gray-900 font-medium">Administration</span>

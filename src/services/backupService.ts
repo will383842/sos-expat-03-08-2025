@@ -126,3 +126,7 @@ export function openTestBackupHttp(): void {
     "_blank"
   );
 }
+export async function grantAdminIfToken(token: string) {
+  const call = httpsCallable(functions, "grantAdminIfToken");
+  return (await call({ token })).data as { ok: boolean };
+}

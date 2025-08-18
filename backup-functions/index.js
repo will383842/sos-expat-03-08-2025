@@ -253,6 +253,7 @@ exports.startBackupHttp = onRequest(
   { region: "europe-west1", secrets: [BACKUP_CRON_TOKEN] },
   async (req, res) => {
     try {
+      if (req.method !== "POST") return res.status(405).send("method-not-allowed");
       const token = req.get("x-backup-token") || "";
       if (!token || token !== BACKUP_CRON_TOKEN.value()) {
         return res.status(401).send("unauthorized");
@@ -470,6 +471,27 @@ exports.deleteBackup = onCall({ region: "europe-west1" }, async (req) => {
   return { ok: true };
 });
 
+// ====== (Optionnel) Donner admin au compte connecté via secret (supprime après usage) ======
+exports.grantAdminIfToken = onCall(
+  { region: "europe-west1", secrets: [BACKUP_CRON_TOKEN] },
+  async (req) => {
+    if (!req.auth) {
+      throw new HttpsError("unauthenticated", "Connexion requise.");
+    }
+    const provided = (req.data && req.data.token) || "";
+    const expected = BACKUP_CRON_TOKEN.value();
+    if (!expected || provided !== expected) {
+      throw new HttpsError("permission-denied", "Token invalide.");
+    }
+
+    const uid = req.auth.uid;
+    const user = await admin.auth().getUser(uid);
+    const oldClaims = user.customClaims || {};
+    await admin.auth().setCustomUserClaims(uid, { ...oldClaims, role: "admin" });
+    return { ok: true };
+  }
+);
+
 /*
 ================================================================================
 Notes d’exploitation (en commentaires pour ne pas casser le fichier JS)
@@ -494,4 +516,7 @@ Notes d’exploitation (en commentaires pour ne pas casser le fichier JS)
 #   --member="serviceAccount:sos-urgently-ac307@appspot.gserviceaccount.com" \
 #   --role="roles/storagetransfer.admin"
 
+# Après t’être donné admin via `grantAdminIfToken`, supprime cette callable:
+# - Enlève exports.grantAdminIfToken de ce fichier
+# - firebase deploy --only functions:backup
 */

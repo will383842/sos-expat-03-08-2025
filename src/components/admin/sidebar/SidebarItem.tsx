@@ -34,6 +34,9 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   const isSecondLevel = level === 1;
   const isThirdLevel = level === 2;
 
+  // DEBUG: Tracer les rendus
+  console.log(`🔍 SidebarItem rendu: ${node.label} (level: ${level}, collapsed: ${isSidebarCollapsed})`);
+
   // Vérifier si cet élément ou un de ses enfants est actif
   const isActiveOrHasActiveChild = useMemo(() => {
     if (node.path && location.pathname === node.path) {
@@ -279,12 +282,12 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           {renderTooltip()}
         </button>
 
-        {/* Enfants */}
-        {isExpanded && !isSidebarCollapsed && (
+        {/* Enfants - ATTENTION: Condition stricte pour éviter double rendu */}
+        {isExpanded && !isSidebarCollapsed && node.children && (
           <div className={`mt-1 space-y-0.5 transition-all duration-200 ${
             isRootLevel ? 'border-l-2 border-gray-700 ml-4 pl-2' : ''
           }`}>
-            {node.children!.map((child) => (
+            {node.children.map((child) => (
               <SidebarItem 
                 key={child.id} 
                 node={child} 
@@ -296,7 +299,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           </div>
         )}
 
-        {/* Menu contextuel pour sidebar collapsed */}
+        {/* SUPPRESSION TEMPORAIRE DU MENU CONTEXTUEL - CAUSE POTENTIELLE DU DOUBLE RENDU
         {isSidebarCollapsed && isRootLevel && isExpanded && (
           <div className="absolute left-full top-0 ml-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 min-w-64">
             <div className="p-2 space-y-1">
@@ -315,6 +318,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
             </div>
           </div>
         )}
+        */}
       </div>
     );
   }
@@ -337,86 +341,6 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
         {renderTooltip()}
       </NavLink>
     </div>
-  );
-};
-
-// Hook personnalisé pour gérer l'état de la sidebar
-export const useSidebarState = (defaultCollapsed = false) => {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
-  const [activeItem, setActiveItem] = useState<MenuNode | null>(null);
-
-  const toggleCollapsed = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-
-  const handleItemClick = (node: MenuNode) => {
-    setActiveItem(node);
-    
-    // Analytics ou logging si nécessaire
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Menu item clicked:', node.id, node.label);
-    }
-  };
-
-  return {
-    isCollapsed,
-    toggleCollapsed,
-    activeItem,
-    handleItemClick,
-    setIsCollapsed
-  };
-};
-
-// Composant wrapper pour la sidebar complète
-export const AdminSidebar: React.FC<{
-  menuItems: MenuNode[];
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
-  onItemClick?: (node: MenuNode) => void;
-  className?: string;
-}> = ({ 
-  menuItems, 
-  isCollapsed = false, 
-  onToggleCollapse,
-  onItemClick,
-  className = ""
-}) => {
-  return (
-    <nav 
-      className={`space-y-1 ${className}`} 
-      aria-label="Menu principal d'administration"
-      role="navigation"
-    >
-      {menuItems.map((node) => (
-        <SidebarItem 
-          key={node.id} 
-          node={node} 
-          level={0}
-          isSidebarCollapsed={isCollapsed}
-          onItemClick={onItemClick}
-        />
-      ))}
-      
-      {/* Toggle button pour mobile */}
-      {onToggleCollapse && (
-        <div className="pt-4 border-t border-gray-700">
-          <button
-            onClick={onToggleCollapse}
-            className="w-full flex items-center justify-center px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
-            aria-label={isCollapsed ? "Étendre le menu" : "Réduire le menu"}
-          >
-            {isCollapsed ? (
-              <ChevronRight size={16} />
-            ) : (
-              <>
-                <ChevronDown size={16} className="mr-2" />
-                Réduire le menu
-              </>
-            )}
-          </button>
-        </div>
-      )}
-    </nav>
   );
 };
 

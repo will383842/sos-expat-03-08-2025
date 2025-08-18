@@ -11,15 +11,22 @@ import Button from '../common/Button';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { logError } from '../../utils/logging';
 
+// Typage fort du user
+interface AdminUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  status?: 'banned' | 'pending' | 'active';
+}
+
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  console.log("🚨 AdminLayout render");
-
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth() as { user: AdminUser | null; logout: () => Promise<void> };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -122,7 +129,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   }
 
-  const accountStatus = (user as any)?.status as 'banned' | 'pending' | undefined;
+  const accountStatus: 'banned' | 'pending' | 'active' | undefined = user?.status;
   if (accountStatus === 'banned' || accountStatus === 'pending') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -156,7 +163,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     >
       <div className="h-screen flex overflow-hidden bg-gray-100">
         
-        {/* MOBILE SIDEBAR - Condition JavaScript STRICTE */}
+        {/* MOBILE SIDEBAR */}
         {isMobile && isMobileSidebarOpen && (
           <div className="fixed inset-0 flex z-40">
             <div
@@ -228,7 +235,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </div>
         )}
 
-        {/* DESKTOP SIDEBAR - Condition JavaScript STRICTE */}
+        {/* DESKTOP SIDEBAR */}
         {!isMobile && (
           <div
             className={`flex flex-shrink-0 transition-all duration-300 ease-in-out ${
@@ -236,7 +243,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             }`}
           >
             <div className="flex flex-col w-full relative">
-              {/* Bouton de toggle en overlay sur la sidebar */}
+              {/* Bouton toggle */}
               <button
                 onClick={toggleSidebar}
                 className={`absolute top-4 z-10 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-full shadow-lg transition-all duration-300 ${

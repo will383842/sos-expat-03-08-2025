@@ -18,6 +18,8 @@ import {
   increment,
   writeBatch,
   onSnapshot,
+  DocumentData,
+  QueryConstraint,
 } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../config/firebase';
@@ -26,16 +28,39 @@ import { db, storage, auth } from '../config/firebase';
 import type { User } from '../contexts/types';
 import type { CallRecord, Payment, Review, CallSession } from '../types';
 
+// ========================= Helpers (type-safe) =========================
+type Dict = Record<string, unknown>;
+
+const asDict = (v: unknown): Dict => (v && typeof v === 'object' ? (v as Dict) : {});
+
+const getStr = (v: unknown, fallback = ''): string =>
+  typeof v === 'string' ? v : fallback;
+
+const getBool = (v: unknown, fallback = false): boolean =>
+  typeof v === 'boolean' ? v : fallback;
+
+const getNum = (v: unknown, fallback = 0): number => {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  return fallback;
+};
+
+const getArr = <T = unknown>(v: unknown, fallback: T[] = []): T[] =>
+  Array.isArray(v) ? (v as T[]) : fallback;
+
 // ========================= Utils =========================
 const toDate = (v: unknown): Date | null => {
   try {
     if (!v) return null;
     if (v instanceof Date) return v;
     if (v instanceof Timestamp) return v.toDate();
-    const maybe = (v as any);
+    const maybe = v as { toDate?: () => Date };
     if (typeof maybe?.toDate === 'function') return maybe.toDate();
     const d = new Date(v as string | number);
-    return isNaN(d.getTime()) ? null : d;
+    return Number.isNaN(d.getTime()) ? null : d;
   } catch {
     return null;
   }
@@ -47,14 +72,14 @@ export const firstString = (val: unknown, preferredLang: string = 'fr'): string 
   if (!val) return;
   if (typeof val === 'string') return val.trim() || undefined;
   if (Array.isArray(val)) {
-    const joined = val
+    const joined = (val as unknown[])
       .map((x) => firstString(x, preferredLang))
       .filter(Boolean)
       .join(', ');
     return joined || undefined;
   }
   if (typeof val === 'object') {
-    const obj = val as Record<string, unknown>;
+    const obj = asDict(val);
     const byLang = obj[preferredLang];
     if (typeof byLang === 'string' && byLang.trim()) return byLang.trim();
     for (const k of Object.keys(obj)) {
@@ -66,7 +91,7 @@ export const firstString = (val: unknown, preferredLang: string = 'fr'): string 
 };
 
 // ========================= Normalization =========================
-export const normalizeUserData = (userData: Record<string, any>, docId: string): User => {
+export const normalizeUserData = (userData: Record<string, unknown>, docId: string): User => {
   return {
     id: docId,
     uid: (userData?.uid as string) || docId,
@@ -294,6 +319,8 @@ export const createUserProfile = async (userData: Partial<User>) => {
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9]/g, '-');
 
+      const extra = asDict(userData);
+
       await setDoc(
         sosProfileRef,
         {
@@ -313,7 +340,7 @@ export const createUserProfile = async (userData: Partial<User>) => {
           phoneCountryCode: userData.phoneCountryCode || '+33',
           languages: Array.isArray(userData.languages) ? userData.languages : ['Français'],
           country,
-          city: (userData as any).city || '',
+          city: getStr(extra.city, ''),
           description: userData.bio || '',
           profilePhoto: finalProfilePhoto,
           photoURL: finalProfilePhoto,
@@ -321,28 +348,27 @@ export const createUserProfile = async (userData: Partial<User>) => {
           isActive: true,
           isOnline: true,
           availability: 'available',
-          motivation: (userData as any).motivation || '',
+          motivation: getStr(extra.motivation, ''),
           isApproved: !!userData.isApproved,
           specialties:
             userData.role === 'lawyer'
-              ? ((userData as any).specialties || [])
-              : ((userData as any).helpTypes || []),
+              ? (getArr<string>(extra.specialties) || [])
+              : (getArr<string>(extra.helpTypes) || []),
           yearsOfExperience:
             userData.role === 'lawyer'
-              ? Number((userData as any).yearsOfExperience ?? 0)
-              : Number((userData as any).yearsAsExpat ?? 0),
+              ? getNum(extra.yearsOfExperience, 0)
+              : getNum(extra.yearsAsExpat, 0),
           price: userData.role === 'lawyer' ? 49 : 19,
-          graduationYear:
-            truthy((userData as any).graduationYear)
-              ? Number((userData as any).graduationYear)
-              : new Date().getFullYear() - 5,
-          certifications: (userData as any).certifications || [],
+          graduationYear: truthy(extra.graduationYear)
+            ? getNum(extra.graduationYear)
+            : new Date().getFullYear() - 5,
+          certifications: getArr<string>(extra.certifications, []),
           responseTime: '< 5 minutes',
           successRate: userData.role === 'lawyer' ? 95 : 90,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          interventionCountries: Array.isArray((userData as any).interventionCountries)
-            ? (userData as any).interventionCountries
+          interventionCountries: Array.isArray(extra.interventionCountries)
+            ? (extra.interventionCountries as string[])
             : country
             ? [country]
             : [],
@@ -394,7 +420,7 @@ export const getUserProfile = async (userId: string) => {
   try {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) return normalizeUserData(userDoc.data(), userDoc.id);
+    if (userDoc.exists()) return normalizeUserData(userDoc.data() as DocumentData, userDoc.id);
     return null;
   } catch (error) {
     console.error('Error getting user profile:', error);
@@ -426,25 +452,29 @@ export const updateUserOnlineStatus = async (userId: string, isOnline: boolean) 
         updatedAt: serverTimestamp(),
       });
     } else {
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const u = userDoc.data() as any;
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const u = asDict(userSnap.data());
         await setDoc(sosProfileRef, {
           uid: userId,
-          type: u.role || 'expat',
-          fullName: u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Expert',
-          firstName: u.firstName || '',
-          lastName: u.lastName || '',
-          email: u.email || '',
-          phone: u.phone || '',
-          phoneCountryCode: u.phoneCountryCode || '+33',
-          languages: Array.isArray(u.languages) ? u.languages : ['Français'],
-          country: u.currentCountry || u.country || '',
-          description: u.bio || '',
-          profilePhoto: u.profilePhoto || u.photoURL || u.avatar || '/default-avatar.png',
+          type: getStr(u.role, '') || 'expat',
+          fullName:
+            getStr(u.fullName) ||
+            `${getStr(u.firstName) || ''} ${getStr(u.lastName) || ''}`.trim() ||
+            'Expert',
+          firstName: getStr(u.firstName),
+          lastName: getStr(u.lastName),
+          email: getStr(u.email),
+          phone: getStr(u.phone),
+          phoneCountryCode: getStr(u.phoneCountryCode, '+33'),
+          languages: getArr<string>(u.languages, ['Français']),
+          country: getStr(u.currentCountry) || getStr(u.country),
+          description: getStr(u.bio),
+          profilePhoto:
+            getStr(u.profilePhoto) || getStr(u.photoURL) || getStr(u.avatar, '/default-avatar.png'),
           isActive: true,
-          isApproved: !!u.isApproved,
-          isVerified: !!u.isVerified,
+          isApproved: getBool(u.isApproved, false),
+          isVerified: getBool(u.isVerified, false),
           isVisible: true,
           isVisibleOnMap: true,
           isOnline,
@@ -473,7 +503,8 @@ export const listenToUserOnlineStatus = (
   const userRef = doc(db, 'users', userId);
   return onSnapshot(userRef, (snap) => {
     if (snap.exists()) {
-      callback(!!(snap.data() as any).isOnline);
+      const data = asDict(snap.data());
+      callback(!!data.isOnline);
     }
   });
 };
@@ -513,23 +544,35 @@ export const updatePaymentRecord = async (paymentId: string, paymentData: Partia
 };
 
 // ========================= Reviews =========================
+// A) Remplacement complet de createReviewRecord (AUTO-PUBLISH ≥4★ + synchro)
 export const createReviewRecord = async (reviewData: Partial<Review>) => {
-  const reviewsRef = collection(db, 'reviews');
-  const reviewDoc = await addDoc(reviewsRef, {
-    ...reviewData,
-    createdAt: serverTimestamp(),
-  });
+  // Auto-publication si note >= 4
+  const auto = (Number(reviewData.rating) || 0) >= 4;
 
-  // Update provider rating (both sos_profiles and users)
+  const payload: Dict = {
+    ...(reviewData as Dict),
+    // IMPORTANT: c'est ici que l'on force le statut et la visibilité
+    status: auto ? 'published' : 'pending',
+    isPublic: auto,
+    createdAt: serverTimestamp(),
+    ...(auto ? { publishedAt: serverTimestamp() } : {}),
+  };
+
+  // Création du document dans "reviews"
+  const reviewsRef = collection(db, 'reviews');
+  const reviewDoc = await addDoc(reviewsRef, payload as DocumentData);
+
+  // Mise à jour des agrégats prestataire
   if (reviewData.providerId && truthy(reviewData.rating)) {
     const providerId = reviewData.providerId as string;
     const sosRef = doc(db, 'sos_profiles', providerId);
     const sosSnap = await getDoc(sosRef);
     if (sosSnap.exists()) {
-      const p = sosSnap.data() as any;
-      const currentRating = Number(p.rating || 0);
-      const currentCount = Number(p.reviewCount || 0);
-      const newRating = (currentRating * currentCount + Number(reviewData.rating)) / (currentCount + 1);
+      const p = asDict(sosSnap.data());
+      const currentRating = getNum(p.rating, 0);
+      const currentCount = getNum(p.reviewCount, 0);
+      const newRating =
+        (currentRating * currentCount + Number(reviewData.rating)) / (currentCount + 1);
       await updateDoc(sosRef, {
         rating: newRating,
         reviewCount: increment(1),
@@ -547,12 +590,18 @@ export const createReviewRecord = async (reviewData: Partial<Review>) => {
   return reviewDoc.id;
 };
 
+// B) Remplacement complet de updateReviewStatus (synchronise status <-> isPublic)
 export const updateReviewStatus = async (
   reviewId: string,
   status: 'published' | 'pending' | 'hidden'
 ) => {
   const reviewRef = doc(db, 'reviews', reviewId);
-  await updateDoc(reviewRef, { status, moderatedAt: serverTimestamp() });
+  await updateDoc(reviewRef, {
+    status,
+    isPublic: status === 'published',
+    moderatedAt: serverTimestamp(),
+    ...(status === 'published' ? { publishedAt: serverTimestamp() } : {}),
+  });
   return true;
 };
 
@@ -582,7 +631,7 @@ export const getAllReviews = async (options?: {
   limit?: number;
 }) => {
   const base = collection(db, 'reviews');
-  const constraints: any[] = [];
+  const constraints: QueryConstraint[] = [];
 
   if (options?.status) constraints.push(where('status', '==', options.status));
   if (options?.providerId) constraints.push(where('providerId', '==', options.providerId));
@@ -596,10 +645,10 @@ export const getAllReviews = async (options?: {
 
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => {
-    const data = d.data() as any;
+    const data = asDict(d.data());
     return {
       id: d.id,
-      ...data,
+      ...(data as Dict),
       createdAt: toDate(data?.createdAt) || new Date(),
     } as Review;
   });
@@ -636,12 +685,12 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
         const sub = await getDocs(collection(db, 'sos_profiles', providerIdOrUid, 'reviews'));
         return sub.docs
           .map((d) => {
-            const data = d.data() as any;
+            const data = asDict(d.data());
             return {
               id: d.id,
-              ...data,
+              ...(data as Dict),
               createdAt: toDate(data?.createdAt) || new Date(0),
-              helpfulVotes: typeof data?.helpfulVotes === 'number' ? data.helpfulVotes : 0,
+              helpfulVotes: typeof data?.helpfulVotes === 'number' ? (data.helpfulVotes as number) : 0,
             } as Review;
           })
           .sort((a, b) => {
@@ -655,12 +704,12 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
     }
 
     return snap.docs.map((d) => {
-      const data = d.data() as any;
+      const data = asDict(d.data());
       return {
         id: d.id,
-        ...data,
+        ...(data as Dict),
         createdAt: toDate(data?.createdAt) || new Date(0),
-        helpfulVotes: typeof data?.helpfulVotes === 'number' ? data.helpfulVotes : 0,
+        helpfulVotes: typeof data?.helpfulVotes === 'number' ? (data.helpfulVotes as number) : 0,
       } as Review;
     });
   } catch (error) {
@@ -727,9 +776,9 @@ export const createCallSession = async (sessionData: Partial<CallSession>) => {
     status: 'initiating',
     timestamp: serverTimestamp(),
     details: {
-      clientId: (sessionData as any).clientId,
-      providerId: (sessionData as any).providerId,
-      providerType: (sessionData as any).providerType,
+      clientId: (sessionData as Dict).clientId,
+      providerId: (sessionData as Dict).providerId,
+      providerType: (sessionData as Dict).providerType,
     },
   });
   return sessionId;
@@ -741,11 +790,11 @@ export const updateCallSession = async (sessionId: string, sessionData: Partial<
   await updateDoc(sessionRef, updateWithTimestamp);
 
   // simple log if status changes
-  if ((sessionData as any).status) {
+  if ((sessionData as Dict).status) {
     await addDoc(collection(db, 'call_logs'), {
       callSessionId: sessionId,
       type: 'status_change',
-      newStatus: (sessionData as any).status,
+      newStatus: (sessionData as Dict).status,
       timestamp: serverTimestamp(),
       details: sessionData,
     });
@@ -768,7 +817,9 @@ export const createCallLog = async (
 // ========================= Booking requests =========================
 export const createBookingRequest = async (requestData: Record<string, unknown>) => {
   const bookingRequestsRef = collection(db, 'booking_requests');
-  const cleanData = Object.fromEntries(Object.entries(requestData).filter(([_, v]) => v !== undefined));
+  const cleanData = Object.fromEntries(
+    Object.entries(requestData).filter(([, v]) => v !== undefined)
+  );
   const finalData = { ...cleanData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
   const requestDoc = await addDoc(bookingRequestsRef, finalData);
   return requestDoc.id;
@@ -847,12 +898,13 @@ export const updateExistingProfiles = async () => {
       let count = 0;
       let batch = writeBatch(db);
       for (const profileDoc of sosSnapshot.docs) {
-        const profileData = profileDoc.data() as any;
+        const profileData = asDict(profileDoc.data());
         const updates: Record<string, unknown> = {};
 
-        if (!profileData.language) updates.language = profileData.preferredLanguage || 'fr';
+        if (!('language' in profileData))
+          updates.language = (profileData.preferredLanguage as string) || 'fr';
 
-        if (!profileData.countrySlug && profileData.country) {
+        if (!('countrySlug' in profileData) && profileData.country) {
           updates.countrySlug = String(profileData.country)
             .toLowerCase()
             .normalize('NFD')
@@ -860,32 +912,38 @@ export const updateExistingProfiles = async () => {
             .replace(/[^a-z0-9]/g, '-');
         }
 
-        if (!profileData.mainLanguage && Array.isArray(profileData.languages) && profileData.languages.length) {
-          updates.mainLanguage = String(profileData.languages[0])
+        if (
+          !('mainLanguage' in profileData) &&
+          Array.isArray(profileData.languages) &&
+          (profileData.languages as unknown[]).length
+        ) {
+          const first = String((profileData.languages as string[])[0] ?? '');
+          updates.mainLanguage = first
             .toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9]/g, '-');
         }
 
-        if (!profileData.slug && profileData.firstName && profileData.lastName) {
-          updates.slug = `${profileData.firstName}-${profileData.lastName}`
+        if (!('slug' in profileData) && profileData.firstName && profileData.lastName) {
+          const s = `${String(profileData.firstName)}-${String(profileData.lastName)}`
             .toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9]/g, '-');
+          updates.slug = s;
         }
 
-        if (!profileData.uid) updates.uid = profileDoc.id;
+        if (!('uid' in profileData)) updates.uid = profileDoc.id;
 
-        const rating = Number(profileData.rating);
+        const rating = getNum(profileData.rating, NaN);
         if (!Number.isFinite(rating) || rating < 0 || rating > 5) updates.rating = 5.0;
 
         if (!truthy(profileData.reviewCount)) updates.reviewCount = 0;
-        if (!truthy(profileData.price)) updates.price = profileData.type === 'lawyer' ? 49 : 19;
-        if (!truthy(profileData.duration)) updates.duration = profileData.type === 'lawyer' ? 20 : 30;
-        if (profileData.isApproved === undefined) {
-          updates.isApproved = profileData.type === 'lawyer' ? !!profileData.isVerified : true;
+        if (!truthy(profileData.price)) updates.price = (profileData.type as string) === 'lawyer' ? 49 : 19;
+        if (!truthy(profileData.duration)) updates.duration = (profileData.type as string) === 'lawyer' ? 20 : 30;
+        if (!('isApproved' in profileData)) {
+          updates.isApproved = (profileData.type as string) === 'lawyer' ? !!profileData.isVerified : true;
         }
 
         if (Object.keys(updates).length) {
@@ -907,17 +965,19 @@ export const updateExistingProfiles = async () => {
       let count = 0;
       let batch = writeBatch(db);
       for (const userDoc of usersSnapshot.docs) {
-        const u = userDoc.data() as any;
+        const u = asDict(userDoc.data());
         const updates: Record<string, unknown> = {};
 
-        if (!u.fullName) updates.fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
-        if (!u.lang) updates.lang = u.preferredLanguage || 'fr';
-        if (!u.language) updates.language = u.preferredLanguage || 'fr';
-        if (!u.country) updates.country = u.currentCountry || '';
-        if (!u.avatar && u.profilePhoto) updates.avatar = u.profilePhoto;
-        updates.isSOS = u.role === 'lawyer' || u.role === 'expat';
+        if (!u.fullName)
+          updates.fullName = `${getStr(u.firstName) || ''} ${getStr(u.lastName) || ''}`.trim();
+        if (!u.lang) updates.lang = getStr(u.preferredLanguage, 'fr');
+        if (!u.language) updates.language = getStr(u.preferredLanguage, 'fr');
+        if (!u.country) updates.country = getStr(u.currentCountry, '');
+        if (!u.avatar && u.profilePhoto) updates.avatar = getStr(u.profilePhoto);
+        (updates as Dict).isSOS = getStr(u.role) === 'lawyer' || getStr(u.role) === 'expat';
         if (!truthy(u.points)) updates.points = 0;
-        if (!u.affiliateCode) updates.affiliateCode = `ULIX-${userDoc.id.substring(0, 6).toUpperCase()}`;
+        if (!u.affiliateCode)
+          updates.affiliateCode = `ULIX-${userDoc.id.substring(0, 6).toUpperCase()}`;
 
         if (Object.keys(updates).length) {
           batch.update(userDoc.ref, { ...updates, updatedAt: serverTimestamp() });
@@ -944,7 +1004,7 @@ export const fixAllProfiles = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Utilisateur non authentifié');
     const adminDoc = await getDoc(doc(db, 'users', currentUser.uid));
-    if (!adminDoc.exists() || (adminDoc.data() as any).role !== 'admin') {
+    if (!adminDoc.exists() || (asDict(adminDoc.data()).role as string) !== 'admin') {
       throw new Error('Accès non autorisé - Admin requis');
     }
 
@@ -959,8 +1019,8 @@ export const fixAllProfiles = async () => {
     let count = 0;
 
     for (const profileDoc of sosSnapshot.docs) {
-      const profileData = profileDoc.data() as any;
-      const updates: Record<string, any> = {
+      const profileData = asDict(profileDoc.data());
+      const updates: Record<string, unknown> = {
         isVisible: true,
         isVisibleOnMap: true,
         isActive: true,
@@ -969,20 +1029,21 @@ export const fixAllProfiles = async () => {
 
       if (!profileData.type) {
         const pair = usersSnapshot.docs.find((d) => d.id === profileDoc.id);
-        updates.type = pair ? ((pair.data() as any).role === 'lawyer' ? 'lawyer' : 'expat') : 'expat';
+        const pairData = pair ? asDict(pair.data()) : {};
+        updates.type = (getStr(pairData.role) === 'lawyer' ? 'lawyer' : 'expat') as string;
       }
       if (!profileData.uid) updates.uid = profileDoc.id;
 
-      const rating = Number(profileData.rating);
+      const rating = getNum(profileData.rating, NaN);
       if (!Number.isFinite(rating) || rating < 0 || rating > 5) updates.rating = 5.0;
 
       if (!truthy(profileData.reviewCount)) updates.reviewCount = 0;
       if (!truthy(profileData.price))
-        updates.price = updates.type === 'lawyer' ? 49 : 19;
+        updates.price = (updates.type as string) === 'lawyer' ? 49 : 19;
       if (!truthy(profileData.duration))
-        updates.duration = updates.type === 'lawyer' ? 20 : 30;
-      if (profileData.isApproved === undefined) {
-        updates.isApproved = updates.type === 'lawyer' ? !!profileData.isVerified : true;
+        updates.duration = (updates.type as string) === 'lawyer' ? 20 : 30;
+      if (!('isApproved' in profileData)) {
+        updates.isApproved = (updates.type as string) === 'lawyer' ? !!profileData.isVerified : true;
       }
 
       batch.update(profileDoc.ref, updates);
@@ -995,16 +1056,18 @@ export const fixAllProfiles = async () => {
     }
 
     for (const userDoc of usersSnapshot.docs) {
-      const u = userDoc.data() as any;
+      const u = asDict(userDoc.data());
       const updates: Record<string, unknown> = {
         updatedAt: serverTimestamp(),
       };
-      if (u.role === 'lawyer' || u.role === 'expat') {
-        (updates as any).isVisible = true;
-        (updates as any).isVisibleOnMap = true;
-        (updates as any).isActive = true;
-        if (u.role === 'lawyer' && u.isApproved === undefined) (updates as any).isApproved = !!u.isVerified;
-        if (u.role === 'expat' && u.isApproved === undefined) (updates as any).isApproved = true;
+      const role = getStr(u.role);
+      if (role === 'lawyer' || role === 'expat') {
+        (updates as Dict).isVisible = true;
+        (updates as Dict).isVisibleOnMap = true;
+        (updates as Dict).isActive = true;
+        if (role === 'lawyer' && u.isApproved === undefined)
+          (updates as Dict).isApproved = !!u.isVerified;
+        if (role === 'expat' && u.isApproved === undefined) (updates as Dict).isApproved = true;
       }
       batch.update(userDoc.ref, updates);
       count++;
@@ -1043,7 +1106,10 @@ export const validateDataIntegrity = async (): Promise<{
 
     for (const [uid, userData] of users) {
       const userDataObj = userData as { role?: string };
-      if ((userDataObj.role === 'lawyer' || userDataObj.role === 'expat') && !sosProfiles.has(uid)) {
+      if (
+        (userDataObj.role === 'lawyer' || userDataObj.role === 'expat') &&
+        !sosProfiles.has(uid)
+      ) {
         issues.push(`Prestataire ${uid} sans profil SOS`);
         fixes.push({ type: 'create_sos_profile', uid, userData });
       }
@@ -1069,7 +1135,7 @@ export const cleanupObsoleteData = async (): Promise<boolean> => {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Utilisateur non authentifié');
     const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-    if (!userDoc.exists() || (userDoc.data() as any).role !== 'admin') {
+    if (!userDoc.exists() || (asDict(userDoc.data()).role as string) !== 'admin') {
       throw new Error('Accès non autorisé - Admin requis');
     }
 

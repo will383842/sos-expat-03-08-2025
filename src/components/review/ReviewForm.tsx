@@ -6,7 +6,7 @@ import { createReviewRecord } from '../../utils/firestore';
 
 interface ReviewFormProps {
   providerId: string;
-  providerName: string;
+  providerName?: string; // optionnel, utilisé dans le titre si fourni
   callId: string;
   serviceType: 'lawyer_call' | 'expat_call';
   onSuccess?: () => void;
@@ -19,79 +19,66 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   callId,
   serviceType,
   onSuccess,
-  onCancel
+  onCancel,
 }) => {
   const { user } = useAuth();
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rating, setRating] = useState<number>(5);
+  const [comment, setComment] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
   const isLawyer = serviceType === 'lawyer_call';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     if (!comment.trim()) {
       setError('Veuillez entrer un commentaire');
       setIsSubmitting(false);
       return;
     }
-    
+
     if (!user) {
       setError('Vous devez être connecté pour laisser un avis');
       setIsSubmitting(false);
       return;
     }
-    
+
     if (rating < 1) {
       setError('Veuillez sélectionner une note');
       setIsSubmitting(false);
       return;
     }
-    
+
     try {
-      const reviewData = {
+      // ✅ NE PAS forcer status ni isPublic : la logique est dans createReviewRecord
+      await createReviewRecord({
         clientId: user.id,
+        clientName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+        clientCountry: user.currentCountry || '',
         providerId,
         callId,
         rating,
         comment,
-        isPublic: true,
-        createdAt: new Date(),
-        clientName: `${user.firstName} ${user.lastName}`,
-        clientCountry: user.currentCountry || '',
         serviceType,
-        status: 'published', // Auto-publish for now, can be changed to 'pending' for moderation
         helpfulVotes: 0,
-        reportedCount: 0
-      };
-      
-      // Log the review data for debugging
-      console.log('Submitting review:', reviewData);
-      console.log('Provider ID:', providerId);
-      
-      await createReviewRecord({
-  ...reviewData,
-  status: 'pending' as const
-});
-      
-      // Scroll to reviews section after submission
-      setTimeout(() => {
-        const reviewsSection = document.getElementById('reviews-section');
-        if (reviewsSection) {
-          reviewsSection.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 500);
-      
-      if (onSuccess) {
-        onSuccess();
+        reportedCount: 0,
+      });
+
+      // Scroll vers la section des avis
+      const reviewsSection = document.getElementById('reviews-section');
+      if (reviewsSection) {
+        reviewsSection.scrollIntoView({ behavior: 'smooth' });
       }
-    } catch (error) {
-      console.error('Error submitting review:', error);
-      setError(`Une erreur est survenue lors de l'envoi de votre avis: ${(error as Error).message || 'Erreur inconnue'}. Veuillez réessayer.`);
+
+      onSuccess?.();
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Erreur inconnue";
+      setError(`Une erreur est survenue lors de l'envoi de votre avis: ${message}. Veuillez réessayer.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -100,15 +87,16 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   return (
     <div className="bg-white rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-900 mb-4">
-        Évaluer {isLawyer ? 'Avocat' : 'Expatrié'}
+        Évaluer {isLawyer ? "l'Avocat" : "l'Expatrié"}
+        {providerName ? ` — ${providerName}` : ''}
       </h3>
-      
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -121,6 +109,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                 type="button"
                 onClick={() => setRating(star)}
                 className="focus:outline-none"
+                aria-label={`Donner ${star} étoile${star > 1 ? 's' : ''}`}
               >
                 <Star
                   size={32}
@@ -130,7 +119,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             ))}
           </div>
         </div>
-        
+
         <div>
           <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
             Votre commentaire
@@ -138,13 +127,13 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           <textarea
             id="comment"
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setComment(e.target.value)}
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
             placeholder="Partagez votre expérience avec ce prestataire..."
           />
         </div>
-        
+
         <div className="flex justify-end space-x-3">
           {onCancel && (
             <Button
@@ -155,7 +144,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               Annuler
             </Button>
           )}
-          
+
           <Button
             type="submit"
             loading={isSubmitting}
@@ -170,4 +159,3 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 };
 
 export default ReviewForm;
-

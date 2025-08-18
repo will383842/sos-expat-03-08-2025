@@ -81,20 +81,12 @@ const ROLE = {
   defaultHeader: 'bg-gradient-to-r from-red-500 via-orange-500 to-purple-600 text-white'
 } as const;
 
-type RoleKey = 'admin' | 'lawyer' | 'expat' | 'client';
 const getHeaderClassForRole = (role?: string): string => {
   if (role === 'admin') return ROLE.admin.header;
   if (role === 'lawyer') return ROLE.lawyer.header;
   if (role === 'expat') return ROLE.expat.header;
   if (role === 'client') return ROLE.client.header;
   return ROLE.defaultHeader;
-};
-const getChipClassForRole = (role?: string): string => {
-  if (role === 'admin') return ROLE.admin.chip;
-  if (role === 'lawyer') return ROLE.lawyer.chip;
-  if (role === 'expat') return ROLE.expat.chip;
-  if (role === 'client') return ROLE.client.chip;
-  return 'bg-white/20';
 };
 
 // ===============================
@@ -345,7 +337,6 @@ const Dashboard: React.FC = () => {
   // data
   const [currentStatus, setCurrentStatus] = useState<boolean>(user?.isOnline ?? false);
   const [calls, setCalls] = useState<Call[]>([]);
-  const [invoices] = useState<Invoice[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [favorites, setFavorites] = useState<
     Array<{ id: string; type: 'lawyer' | 'expat'; name: string; country?: string; photo?: string }>
@@ -390,7 +381,6 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!user) navigate('/login');
   }, [user, navigate]);
-
 
   // Status en temps réel (priorité = sos_profiles, fallback = users)
   useEffect(() => {
@@ -556,7 +546,7 @@ const Dashboard: React.FC = () => {
 
         setSuccessMessage(language === 'fr' ? 'Photo mise à jour ✅' : 'Photo updated ✅');
         setTimeout(() => setSuccessMessage(null), 2000);
-      } catch (e) {
+      } catch {
         setErrorMessage(
           language === 'fr' ? 'Erreur lors de la mise à jour de la photo' : 'Error updating photo'
         );
@@ -676,7 +666,7 @@ const Dashboard: React.FC = () => {
 
       setSuccessMessage(language === 'fr' ? 'Paramètres mis à jour ✔️' : 'Settings updated ✔️');
       setTimeout(() => setSuccessMessage(null), 2500);
-    } catch (error) {
+    } catch {
       setErrorMessage(
         language === 'fr' ? 'Erreur lors de la mise à jour des paramètres' : 'Error updating settings'
       );

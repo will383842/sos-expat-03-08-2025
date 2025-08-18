@@ -734,3 +734,4 @@ export const useAdminRouteValidation = () => {
 };
 
 export default AdminRoutesV2;
+

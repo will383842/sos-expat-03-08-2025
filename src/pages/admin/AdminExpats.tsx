@@ -1,11 +1,37 @@
-// src/pages/admin/Users/AdminExpats.tsx
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
-import { Globe, Search, Filter, Download, Mail, Phone, MapPin, Calendar, Eye, Edit, Star, Award, CheckCircle, XCircle, Clock, AlertTriangle, Users } from 'lucide-react';
-import Button from '../../components/common/Button';
-import AdminLayout from '../../components/admin/AdminLayout';
-import AdminMapVisibilityToggle from '../../components/admin/AdminMapVisibilityToggle';
+// src/pages/admin/AdminExpats.tsx
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
+  updateDoc,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../../config/firebase";
+import {
+  Globe,
+  Search,
+  Filter,
+  Download,
+  MapPin,
+  Eye,
+  Edit,
+  Star,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
+import Button from "../../components/common/Button";
+import AdminLayout from "../../components/admin/AdminLayout";
+import AdminMapVisibilityToggle from "../../components/admin/AdminMapVisibilityToggle";
+
+type ExpatStatus = "active" | "suspended" | "pending" | "banned";
+type ValidationStatus = "pending" | "approved" | "rejected";
 
 interface Expat {
   id: string;
@@ -16,8 +42,8 @@ interface Expat {
   country: string;
   city?: string;
   originCountry?: string;
-  status: 'active' | 'suspended' | 'pending' | 'banned';
-  validationStatus: 'pending' | 'approved' | 'rejected';
+  status: ExpatStatus;
+  validationStatus: ValidationStatus;
   createdAt: Date;
   lastLoginAt?: Date;
   callsCount: number;
@@ -36,16 +62,57 @@ interface Expat {
 }
 
 interface FilterOptions {
-  status: string;
-  validationStatus: string;
+  status: "all" | ExpatStatus;
+  validationStatus: "all" | ValidationStatus;
   country: string;
   originCountry: string;
   helpDomain: string;
-  dateRange: string;
+  dateRange: "all" | "today" | "week" | "month";
   searchTerm: string;
-  minRating: string;
-  minYearsInCountry: string;
+  minRating: "all" | string;
+  minYearsInCountry: "all" | string;
 }
+
+type FirestoreExpatDoc = {
+  serviceType?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  currentCountry?: string;
+  city?: string;
+  originCountry?: string;
+  countryOfOrigin?: string;
+  nationalite?: string;
+  status?: ExpatStatus;
+  validationStatus?: ValidationStatus;
+  createdAt?: Timestamp;
+  lastLoginAt?: Timestamp;
+  callsCount?: number;
+  completedCalls?: number;
+  totalEarned?: number;
+  earnings?: number;
+  averageRating?: number;
+  rating?: number;
+  reviewsCount?: number;
+  totalReviews?: number;
+  specialities?: string[];
+  expertise?: string[];
+  languages?: string[];
+  spokenLanguages?: string[];
+  expatSince?: Timestamp;
+  movedToCountryAt?: Timestamp;
+  yearsInCountry?: number;
+  isVisibleOnMap?: boolean;
+  helpDomains?: string[];
+  expertiseDomains?: string[];
+  servicesOffered?: string[];
+  description?: string;
+  bio?: string;
+  hourlyRate?: number;
+  pricePerHour?: number;
+};
 
 const AdminExpats: React.FC = () => {
   const [expats, setExpats] = useState<Expat[]>([]);
@@ -53,15 +120,15 @@ const AdminExpats: React.FC = () => {
   const [selectedExpats, setSelectedExpats] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
-    status: 'all',
-    validationStatus: 'all',
-    country: 'all',
-    originCountry: 'all',
-    helpDomain: 'all',
-    dateRange: 'all',
-    searchTerm: '',
-    minRating: 'all',
-    minYearsInCountry: 'all'
+    status: "all",
+    validationStatus: "all",
+    country: "all",
+    originCountry: "all",
+    helpDomain: "all",
+    dateRange: "all",
+    searchTerm: "",
+    minRating: "all",
+    minYearsInCountry: "all",
   });
 
   const [stats, setStats] = useState({
@@ -72,84 +139,8 @@ const AdminExpats: React.FC = () => {
     pendingValidation: 0,
     avgRating: 0,
     thisMonth: 0,
-    avgYearsInCountry: 0
+    avgYearsInCountry: 0,
   });
-
-  useEffect(() => {
-    loadExpats();
-  }, [filters]);
-
-  const loadExpats = async () => {
-    try {
-      setLoading(true);
-      
-      // Requête pour récupérer les profils SOS (expatriés)
-      let expatsQuery = query(
-        collection(db, 'sos_profiles'),
-        where('serviceType', '==', 'expat_call'),
-        orderBy('createdAt', 'desc'),
-        limit(100)
-      );
-
-      if (filters.status !== 'all') {
-        expatsQuery = query(
-          collection(db, 'sos_profiles'),
-          where('serviceType', '==', 'expat_call'),
-          where('status', '==', filters.status),
-          orderBy('createdAt', 'desc'),
-          limit(100)
-        );
-      }
-
-      const snapshot = await getDocs(expatsQuery);
-      
-      let expatsData: Expat[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const expatSince = data.expatSince?.toDate() || data.movedToCountryAt?.toDate();
-        const yearsInCountry = expatSince ? calculateYearsInCountry(expatSince) : (data.yearsInCountry || 0);
-        
-        return {
-          id: doc.id,
-          email: data.email || '',
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          phone: data.phone || '',
-          country: data.country || data.currentCountry || '',
-          city: data.city || '',
-          originCountry: data.originCountry || data.countryOfOrigin || data.nationalite || '',
-          status: data.status || 'pending',
-          validationStatus: data.validationStatus || 'pending',
-          createdAt: data.createdAt?.toDate() || new Date(),
-          lastLoginAt: data.lastLoginAt?.toDate(),
-          callsCount: data.callsCount || data.completedCalls || 0,
-          totalEarned: data.totalEarned || data.earnings || 0,
-          rating: data.averageRating || data.rating || 0,
-          reviewsCount: data.reviewsCount || data.totalReviews || 0,
-          specialities: data.specialities || data.expertise || [],
-          languages: data.languages || data.spokenLanguages || [],
-          expatSince: expatSince,
-          yearsInCountry: yearsInCountry,
-          isVisibleOnMap: data.isVisibleOnMap ?? true,
-          profileComplete: calculateProfileCompleteness(data),
-          helpDomains: data.helpDomains || data.expertiseDomains || data.servicesOffered || [],
-          description: data.description || data.bio || '',
-          hourlyRate: data.hourlyRate || data.pricePerHour
-        };
-      });
-
-      // Filtres côté client
-      expatsData = applyClientSideFilters(expatsData);
-
-      setExpats(expatsData);
-      calculateStats(expatsData);
-      
-    } catch (error) {
-      console.error('Erreur chargement expatriés:', error);
-      alert('❌ Erreur lors du chargement des expatriés');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const calculateYearsInCountry = (expatSince: Date): number => {
     const now = new Date();
@@ -158,161 +149,286 @@ const AdminExpats: React.FC = () => {
     return Math.floor(diffYears);
   };
 
-  const calculateProfileCompleteness = (data: any): number => {
-    const fields = [
-      'firstName', 'lastName', 'email', 'phone', 'country', 'city', 
-      'originCountry', 'helpDomains', 'languages', 'description'
+  const calculateProfileCompleteness = (data: FirestoreExpatDoc): number => {
+    const fields: (keyof FirestoreExpatDoc)[] = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "country",
+      "city",
+      "originCountry",
+      "helpDomains",
+      "languages",
+      "description",
     ];
-    
-    const completedFields = fields.filter(field => {
-      const value = data[field];
+
+    const completedFields = fields.filter((field) => {
+      const value = (data as Record<string, unknown>)[field as string];
       if (Array.isArray(value)) return value.length > 0;
-      return value && value.toString().trim() !== '';
+      return value !== undefined && String(value).trim() !== "";
     }).length;
-    
+
     return Math.round((completedFields / fields.length) * 100);
   };
 
-  const applyClientSideFilters = (expatsData: Expat[]): Expat[] => {
-    let filtered = [...expatsData];
+  // ✅ Mémoïse les filtres côté client (corrige l'avertissement ESLint)
+  const applyClientSideFilters = useCallback(
+    (expatsData: Expat[]): Expat[] => {
+      let filtered = [...expatsData];
 
-    if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(expat => 
-        expat.firstName.toLowerCase().includes(searchLower) ||
-        expat.lastName.toLowerCase().includes(searchLower) ||
-        expat.email.toLowerCase().includes(searchLower) ||
-        expat.country.toLowerCase().includes(searchLower) ||
-        expat.originCountry?.toLowerCase().includes(searchLower)
-      );
-    }
-
-    if (filters.validationStatus !== 'all') {
-      filtered = filtered.filter(expat => expat.validationStatus === filters.validationStatus);
-    }
-
-    if (filters.country !== 'all') {
-      filtered = filtered.filter(expat => expat.country.toLowerCase() === filters.country.toLowerCase());
-    }
-
-    if (filters.originCountry !== 'all') {
-      filtered = filtered.filter(expat => expat.originCountry?.toLowerCase() === filters.originCountry.toLowerCase());
-    }
-
-    if (filters.helpDomain !== 'all') {
-      filtered = filtered.filter(expat => 
-        expat.helpDomains.some(domain => 
-          domain.toLowerCase().includes(filters.helpDomain.toLowerCase())
-        )
-      );
-    }
-
-    if (filters.minRating !== 'all') {
-      const minRating = parseFloat(filters.minRating);
-      filtered = filtered.filter(expat => expat.rating >= minRating);
-    }
-
-    if (filters.minYearsInCountry !== 'all') {
-      const minYears = parseInt(filters.minYearsInCountry);
-      filtered = filtered.filter(expat => expat.yearsInCountry >= minYears);
-    }
-
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      const filterDate = new Date();
-      
-      switch (filters.dateRange) {
-        case 'today':
-          filterDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          filterDate.setDate(now.getDate() - 7);
-          break;
-        case 'month':
-          filterDate.setMonth(now.getMonth() - 1);
-          break;
+      if (filters.searchTerm) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        filtered = filtered.filter(
+          (expat) =>
+            expat.firstName.toLowerCase().includes(searchLower) ||
+            expat.lastName.toLowerCase().includes(searchLower) ||
+            expat.email.toLowerCase().includes(searchLower) ||
+            expat.country.toLowerCase().includes(searchLower) ||
+            expat.originCountry?.toLowerCase().includes(searchLower)
+        );
       }
-      
-      filtered = filtered.filter(expat => expat.createdAt >= filterDate);
-    }
 
-    return filtered;
-  };
+      if (filters.validationStatus !== "all") {
+        filtered = filtered.filter(
+          (expat) => expat.validationStatus === filters.validationStatus
+        );
+      }
 
-  const calculateStats = (expatsData: Expat[]) => {
+      if (filters.country !== "all") {
+        filtered = filtered.filter(
+          (expat) =>
+            expat.country.toLowerCase() === filters.country.toLowerCase()
+        );
+      }
+
+      if (filters.originCountry !== "all") {
+        filtered = filtered.filter(
+          (expat) =>
+            expat.originCountry?.toLowerCase() ===
+            filters.originCountry.toLowerCase()
+        );
+      }
+
+      if (filters.helpDomain !== "all") {
+        filtered = filtered.filter((expat) =>
+          expat.helpDomains.some((domain) =>
+            domain.toLowerCase().includes(filters.helpDomain.toLowerCase())
+          )
+        );
+      }
+
+      if (filters.minRating !== "all") {
+        const minRating = parseFloat(filters.minRating);
+        filtered = filtered.filter((expat) => expat.rating >= minRating);
+      }
+
+      if (filters.minYearsInCountry !== "all") {
+        const minYears = parseInt(filters.minYearsInCountry, 10);
+        filtered = filtered.filter((expat) => expat.yearsInCountry >= minYears);
+      }
+
+      if (filters.dateRange !== "all") {
+        const now = new Date();
+        const filterDate = new Date();
+
+        switch (filters.dateRange) {
+          case "today":
+            filterDate.setHours(0, 0, 0, 0);
+            break;
+          case "week":
+            filterDate.setDate(now.getDate() - 7);
+            break;
+          case "month":
+            filterDate.setMonth(now.getMonth() - 1);
+            break;
+        }
+
+        filtered = filtered.filter((expat) => expat.createdAt >= filterDate);
+      }
+
+      return filtered;
+    },
+    [filters]
+  );
+
+  const calculateStats = useCallback((expatsData: Expat[]) => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const totalRating = expatsData.reduce((sum, expat) => sum + expat.rating, 0);
     const avgRating = expatsData.length > 0 ? totalRating / expatsData.length : 0;
-    
-    const totalYears = expatsData.reduce((sum, expat) => sum + expat.yearsInCountry, 0);
-    const avgYearsInCountry = expatsData.length > 0 ? totalYears / expatsData.length : 0;
-    
+
+    const totalYears = expatsData.reduce(
+      (sum, expat) => sum + expat.yearsInCountry,
+      0
+    );
+    const avgYearsInCountry =
+      expatsData.length > 0 ? totalYears / expatsData.length : 0;
+
     setStats({
       total: expatsData.length,
-      active: expatsData.filter(e => e.status === 'active').length,
-      pending: expatsData.filter(e => e.status === 'pending').length,
-      suspended: expatsData.filter(e => e.status === 'suspended').length,
-      pendingValidation: expatsData.filter(e => e.validationStatus === 'pending').length,
-      avgRating: avgRating,
-      thisMonth: expatsData.filter(e => e.createdAt >= startOfMonth).length,
-      avgYearsInCountry: avgYearsInCountry
+      active: expatsData.filter((e) => e.status === "active").length,
+      pending: expatsData.filter((e) => e.status === "pending").length,
+      suspended: expatsData.filter((e) => e.status === "suspended").length,
+      pendingValidation: expatsData.filter((e) => e.validationStatus === "pending")
+        .length,
+      avgRating,
+      thisMonth: expatsData.filter((e) => e.createdAt >= startOfMonth).length,
+      avgYearsInCountry,
     });
-  };
+  }, []);
 
-  const handleStatusChange = async (expatId: string, newStatus: string) => {
+  const loadExpats = useCallback(async () => {
     try {
-      await updateDoc(doc(db, 'sos_profiles', expatId), {
-        status: newStatus,
-        updatedAt: new Date()
+      setLoading(true);
+
+      // Requête pour récupérer les profils SOS (expatriés)
+      const baseRef = collection(db, "sos_profiles");
+      let expatsQuery = query(
+        baseRef,
+        where("serviceType", "==", "expat_call"),
+        orderBy("createdAt", "desc"),
+        limit(100)
+      );
+
+      if (filters.status !== "all") {
+        expatsQuery = query(
+          baseRef,
+          where("serviceType", "==", "expat_call"),
+          where("status", "==", filters.status),
+          orderBy("createdAt", "desc"),
+          limit(100)
+        );
+      }
+
+      const snapshot = await getDocs(expatsQuery);
+
+      let expatsData: Expat[] = snapshot.docs.map((d) => {
+        const data = d.data() as unknown as FirestoreExpatDoc;
+        const expatSince =
+          data.expatSince?.toDate() || data.movedToCountryAt?.toDate();
+        const yearsInCountry = expatSince
+          ? calculateYearsInCountry(expatSince)
+          : data.yearsInCountry || 0;
+
+        return {
+          id: d.id,
+          email: data.email || "",
+          firstName: data.firstName || "",
+          lastName: data.lastName || "",
+          phone: data.phone || "",
+          country: data.country || data.currentCountry || "",
+          city: data.city || "",
+          originCountry:
+            data.originCountry || data.countryOfOrigin || data.nationalite || "",
+          status: (data.status || "pending") as ExpatStatus,
+          validationStatus: (data.validationStatus || "pending") as ValidationStatus,
+          createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+          lastLoginAt: data.lastLoginAt ? data.lastLoginAt.toDate() : undefined,
+          callsCount: data.callsCount || data.completedCalls || 0,
+          totalEarned: data.totalEarned || data.earnings || 0,
+          rating: data.averageRating || data.rating || 0,
+          reviewsCount: data.reviewsCount || data.totalReviews || 0,
+          specialities: data.specialities || data.expertise || [],
+          languages: data.languages || data.spokenLanguages || [],
+          expatSince,
+          yearsInCountry,
+          isVisibleOnMap: data.isVisibleOnMap ?? true,
+          profileComplete: calculateProfileCompleteness(data),
+          helpDomains:
+            data.helpDomains || data.expertiseDomains || data.servicesOffered || [],
+          description: data.description || data.bio || "",
+          hourlyRate: data.hourlyRate || data.pricePerHour,
+        };
       });
-      
-      setExpats(expats.map(expat => 
-        expat.id === expatId ? { ...expat, status: newStatus as any } : expat
-      ));
-      
+
+      // ✅ utilise la version mémoïsée
+      expatsData = applyClientSideFilters(expatsData);
+
+      setExpats(expatsData);
+      calculateStats(expatsData);
+    } catch (error) {
+      console.error("Erreur chargement expatriés:", error);
+      alert("❌ Erreur lors du chargement des expatriés");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, calculateStats, applyClientSideFilters]);
+
+  useEffect(() => {
+    void loadExpats();
+  }, [loadExpats]);
+
+  const handleStatusChange = async (
+    expatId: string,
+    newStatus: ExpatStatus
+  ) => {
+    try {
+      await updateDoc(doc(db, "sos_profiles", expatId), {
+        status: newStatus,
+        updatedAt: new Date(),
+      });
+
+      setExpats((prev) =>
+        prev.map((expat) =>
+          expat.id === expatId ? { ...expat, status: newStatus } : expat
+        )
+      );
+
       alert(`✅ Statut expatrié mis à jour vers "${newStatus}"`);
     } catch (error) {
-      console.error('Erreur mise à jour statut:', error);
-      alert('❌ Erreur lors de la mise à jour du statut');
+      console.error("Erreur mise à jour statut:", error);
+      alert("❌ Erreur lors de la mise à jour du statut");
     }
   };
 
-  const handleValidationStatusChange = async (expatId: string, newValidationStatus: string) => {
+  const handleValidationStatusChange = async (
+    expatId: string,
+    newValidationStatus: ValidationStatus
+  ) => {
     try {
-      const updates: any = {
+      const updates: Partial<{
+        validationStatus: ValidationStatus;
+        status: ExpatStatus;
+        approvedAt: Date;
+        updatedAt: Date;
+      }> = {
         validationStatus: newValidationStatus,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
-      if (newValidationStatus === 'approved') {
-        updates.status = 'active';
+      if (newValidationStatus === "approved") {
+        updates.status = "active";
         updates.approvedAt = new Date();
       }
 
-      await updateDoc(doc(db, 'sos_profiles', expatId), updates);
-      
-      setExpats(expats.map(expat => 
-        expat.id === expatId 
-          ? { 
-              ...expat, 
-              validationStatus: newValidationStatus as any,
-              status: newValidationStatus === 'approved' ? 'active' : expat.status
-            } 
-          : expat
-      ));
-      
+      await updateDoc(doc(db, "sos_profiles", expatId), updates);
+
+      setExpats((prev) =>
+        prev.map((expat) =>
+          expat.id === expatId
+            ? {
+                ...expat,
+                validationStatus: newValidationStatus,
+                status: newValidationStatus === "approved" ? "active" : expat.status,
+              }
+            : expat
+        )
+      );
+
       alert(`✅ Statut de validation mis à jour vers "${newValidationStatus}"`);
     } catch (error) {
-      console.error('Erreur mise à jour validation:', error);
-      alert('❌ Erreur lors de la mise à jour de la validation');
+      console.error("Erreur mise à jour validation:", error);
+      alert("❌ Erreur lors de la mise à jour de la validation");
     }
   };
 
-  const handleBulkAction = async (action: string) => {
+  const handleBulkAction = async (
+    action: "approuver" | "rejeter" | "suspendre" | "activer"
+  ) => {
     if (selectedExpats.length === 0) {
-      alert('Veuillez sélectionner au moins un expatrié');
+      alert("Veuillez sélectionner au moins un expatrié");
       return;
     }
 
@@ -320,141 +436,157 @@ const AdminExpats: React.FC = () => {
     if (!confirm(confirmMessage)) return;
 
     try {
-      const promises = selectedExpats.map(async expatId => {
-        const updates: any = { updatedAt: new Date() };
-        
+      const promises = selectedExpats.map(async (expatId) => {
+        const updates: Partial<{
+          validationStatus: ValidationStatus;
+          status: ExpatStatus;
+          approvedAt: Date;
+          updatedAt: Date;
+        }> = { updatedAt: new Date() };
+
         switch (action) {
-          case 'approuver':
-            updates.validationStatus = 'approved';
-            updates.status = 'active';
+          case "approuver":
+            updates.validationStatus = "approved";
+            updates.status = "active";
             updates.approvedAt = new Date();
             break;
-          case 'rejeter':
-            updates.validationStatus = 'rejected';
-            updates.status = 'suspended';
+          case "rejeter":
+            updates.validationStatus = "rejected";
+            updates.status = "suspended";
             break;
-          case 'suspendre':
-            updates.status = 'suspended';
+          case "suspendre":
+            updates.status = "suspended";
             break;
-          case 'activer':
-            updates.status = 'active';
+          case "activer":
+            updates.status = "active";
             break;
-          default:
-            return Promise.resolve();
         }
-        
-        return updateDoc(doc(db, 'sos_profiles', expatId), updates);
+
+        return updateDoc(doc(db, "sos_profiles", expatId), updates);
       });
 
       await Promise.all(promises);
-      
-      // Recharger les données
+
       await loadExpats();
       setSelectedExpats([]);
       alert(`✅ Action "${action}" appliquée à ${selectedExpats.length} expatrié(s)`);
-      
     } catch (error) {
-      console.error('Erreur action en lot:', error);
-      alert('❌ Erreur lors de l\'action en lot');
+      console.error("Erreur action en lot:", error);
+      alert("❌ Erreur lors de l'action en lot");
     }
   };
 
   const exportExpats = () => {
     if (expats.length === 0) {
-      alert('Aucune donnée à exporter');
+      alert("Aucune donnée à exporter");
       return;
     }
 
-    const csvData = expats.map(expat => ({
+    const csvData = expats.map((expat) => ({
       ID: expat.id,
       Email: expat.email,
       Prénom: expat.firstName,
       Nom: expat.lastName,
-      Téléphone: expat.phone || '',
-      'Pays de résidence': expat.country,
-      'Ville': expat.city || '',
-      'Pays d\'origine': expat.originCountry || '',
+      Téléphone: expat.phone ?? "",
+      "Pays de résidence": expat.country,
+      Ville: expat.city ?? "",
+      "Pays d'origine": expat.originCountry ?? "",
       Statut: expat.status,
-      'Statut validation': expat.validationStatus,
-      'Date inscription': expat.createdAt.toLocaleDateString('fr-FR'),
-      'Dernière connexion': expat.lastLoginAt?.toLocaleDateString('fr-FR') || 'Jamais',
-      'Expatrié depuis': expat.expatSince?.toLocaleDateString('fr-FR') || 'Non renseigné',
-      'Années dans le pays': expat.yearsInCountry,
-      'Nb appels': expat.callsCount,
-      'Total gagné': `${expat.totalEarned.toFixed(2)}€`,
-      'Note moyenne': expat.rating.toFixed(1),
-      'Nb avis': expat.reviewsCount,
-      'Domaines d\'aide': expat.helpDomains.join(', '),
-      'Langues': expat.languages.join(', '),
-      'Profil complet': `${expat.profileComplete}%`,
-      'Visible sur carte': expat.isVisibleOnMap ? 'Oui' : 'Non',
-      'Tarif horaire': expat.hourlyRate ? `${expat.hourlyRate}€` : 'Non renseigné'
+      "Statut validation": expat.validationStatus,
+      "Date inscription": expat.createdAt.toLocaleDateString("fr-FR"),
+      "Dernière connexion": expat.lastLoginAt?.toLocaleDateString("fr-FR") || "Jamais",
+      "Expatrié depuis": expat.expatSince?.toLocaleDateString("fr-FR") || "Non renseigné",
+      "Années dans le pays": expat.yearsInCountry,
+      "Nb appels": expat.callsCount,
+      "Total gagné": `${expat.totalEarned.toFixed(2)}€`,
+      "Note moyenne": expat.rating.toFixed(1),
+      "Nb avis": expat.reviewsCount,
+      "Domaines d'aide": expat.helpDomains.join(", "),
+      Langues: expat.languages.join(", "),
+      "Profil complet": `${expat.profileComplete}%`,
+      "Visible sur carte": expat.isVisibleOnMap ? "Oui" : "Non",
+      "Tarif horaire": expat.hourlyRate ? `${expat.hourlyRate}€` : "Non renseigné",
     }));
 
-    const csvContent = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).map(val => 
-        typeof val === 'string' && val.includes(',') ? `"${val}"` : val
-      ).join(','))
-    ].join('\n');
+    const headers = Object.keys(csvData[0]).join(",");
+    const rows = csvData.map((row) =>
+      Object.values(row)
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csvContent = [headers, ...rows].join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `expatries-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `expatries-${new Date().toISOString().split("T")[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: ExpatStatus) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'suspended': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'banned': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "suspended":
+        return "bg-red-100 text-red-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "banned":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  const getValidationStatusColor = (status: string) => {
+  const getValidationStatusColor = (status: ValidationStatus) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: ExpatStatus) => {
     switch (status) {
-      case 'active': return <CheckCircle size={16} />;
-      case 'suspended': return <XCircle size={16} />;
-      case 'pending': return <Clock size={16} />;
-      case 'banned': return <AlertTriangle size={16} />;
-      default: return null;
+      case "active":
+        return <CheckCircle size={16} />;
+      case "suspended":
+        return <XCircle size={16} />;
+      case "pending":
+        return <Clock size={16} />;
+      case "banned":
+        return <AlertTriangle size={16} />;
+      default:
+        return null;
     }
   };
 
   const getProfileCompleteColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+    if (percentage >= 80) return "text-green-600";
+    if (percentage >= 60) return "text-yellow-600";
+    return "text-red-600";
+    };
 
   const clearFilters = () => {
     setFilters({
-      status: 'all',
-      validationStatus: 'all',
-      country: 'all',
-      originCountry: 'all',
-      helpDomain: 'all',
-      dateRange: 'all',
-      searchTerm: '',
-      minRating: 'all',
-      minYearsInCountry: 'all'
+      status: "all",
+      validationStatus: "all",
+      country: "all",
+      originCountry: "all",
+      helpDomain: "all",
+      dateRange: "all",
+      searchTerm: "",
+      minRating: "all",
+      minYearsInCountry: "all",
     });
   };
 
@@ -472,7 +604,7 @@ const AdminExpats: React.FC = () => {
               {stats.total} expatriés • {stats.active} actifs • {stats.pendingValidation} en attente de validation
             </p>
           </div>
-          
+
           <div className="flex flex-wrap gap-3">
             <Button
               onClick={() => setShowFilters(!showFilters)}
@@ -480,9 +612,9 @@ const AdminExpats: React.FC = () => {
               className="flex items-center"
             >
               <Filter size={16} className="mr-2" />
-              Filtres {Object.values(filters).some(f => f !== 'all' && f !== '') && '●'}
+              Filtres {Object.values(filters).some((f) => f !== "all" && f !== "") && "●"}
             </Button>
-            
+
             <Button
               onClick={exportExpats}
               variant="outline"
@@ -551,40 +683,54 @@ const AdminExpats: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Filtres de recherche</h3>
-              <Button
-                onClick={clearFilters}
-                variant="outline"
-                className="text-sm"
-              >
+              <Button onClick={clearFilters} variant="outline" className="text-sm">
                 Effacer les filtres
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recherche
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
                     type="text"
                     placeholder="Nom, email, pays..."
                     value={filters.searchTerm}
-                    onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
+                    onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
                     className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Statut
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Statut</label>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value as ExpatStatus | "all" })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
+                >
+                  <option value="all">Tous les statuts</option>
+                  <option value="active">Actif</option>
+                  <option value="pending">En attente</option>
+                  <option value="suspended">Suspendu</option>
+                  <option value="banned">Banni</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Validation</label>
+                <select
+                  value={filters.validationStatus}
+                  onChange={(e) =>
+                    setFilters({ ...filters, validationStatus: e.target.value as ValidationStatus | "all" })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="all">Toutes validations</option>
+                  <option value="pending">En attente</option>
+                  <option value="approved">Approuvé</option>
+                  <option value="rejected">Rejeté</option>
+                </select>
               </div>
             </div>
           </div>
@@ -598,28 +744,16 @@ const AdminExpats: React.FC = () => {
                 <strong>{selectedExpats.length}</strong> expatrié(s) sélectionné(s)
               </p>
               <div className="flex space-x-3">
-                <Button
-                  onClick={() => handleBulkAction('approuver')}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
+                <Button onClick={() => void handleBulkAction("approuver")} className="bg-green-600 hover:bg-green-700 text-white">
                   Approuver
                 </Button>
-                <Button
-                  onClick={() => handleBulkAction('rejeter')}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
+                <Button onClick={() => void handleBulkAction("rejeter")} className="bg-red-600 hover:bg-red-700 text-white">
                   Rejeter
                 </Button>
-                <Button
-                  onClick={() => handleBulkAction('activer')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
+                <Button onClick={() => void handleBulkAction("activer")} className="bg-blue-600 hover:bg-blue-700 text-white">
                   Activer
                 </Button>
-                <Button
-                  onClick={() => handleBulkAction('suspendre')}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                >
+                <Button onClick={() => void handleBulkAction("suspendre")} className="bg-yellow-600 hover:bg-yellow-700 text-white">
                   Suspendre
                 </Button>
               </div>
@@ -644,39 +778,20 @@ const AdminExpats: React.FC = () => {
                         type="checkbox"
                         checked={selectedExpats.length === expats.length && expats.length > 0}
                         onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedExpats(expats.map(e => e.id));
-                          } else {
-                            setSelectedExpats([]);
-                          }
+                          if (e.target.checked) setSelectedExpats(expats.map((e) => e.id));
+                          else setSelectedExpats([]);
                         }}
                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expatrié
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Localisation
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statuts
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Performance
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expérience
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Profil
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Carte
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expatrié</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Localisation</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statuts</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expérience</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profil</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carte</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -687,11 +802,8 @@ const AdminExpats: React.FC = () => {
                           type="checkbox"
                           checked={selectedExpats.includes(expat.id)}
                           onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedExpats([...selectedExpats, expat.id]);
-                            } else {
-                              setSelectedExpats(selectedExpats.filter(id => id !== expat.id));
-                            }
+                            if (e.target.checked) setSelectedExpats((prev) => [...prev, expat.id]);
+                            else setSelectedExpats((prev) => prev.filter((id) => id !== expat.id));
                           }}
                           className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                         />
@@ -700,7 +812,8 @@ const AdminExpats: React.FC = () => {
                         <div className="flex items-center">
                           <div className="h-10 w-10 flex-shrink-0">
                             <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center text-white font-medium">
-                              {expat.firstName.charAt(0)}{expat.lastName.charAt(0)}
+                              {expat.firstName.charAt(0)}
+                              {expat.lastName.charAt(0)}
                             </div>
                           </div>
                           <div className="ml-4">
@@ -708,9 +821,7 @@ const AdminExpats: React.FC = () => {
                               {expat.firstName} {expat.lastName}
                             </div>
                             <div className="text-sm text-gray-500">{expat.email}</div>
-                            {expat.phone && (
-                              <div className="text-xs text-green-600">{expat.phone}</div>
-                            )}
+                            {expat.phone && <div className="text-xs text-green-600">{expat.phone}</div>}
                           </div>
                         </div>
                       </td>
@@ -718,7 +829,10 @@ const AdminExpats: React.FC = () => {
                         <div className="space-y-1">
                           <div className="flex items-center">
                             <MapPin size={14} className="mr-2 text-gray-400" />
-                            <span className="font-medium">{expat.city ? `${expat.city}, ` : ''}{expat.country}</span>
+                            <span className="font-medium">
+                              {expat.city ? `${expat.city}, ` : ""}
+                              {expat.country}
+                            </span>
                           </div>
                           {expat.originCountry && (
                             <div className="flex items-center text-gray-500">
@@ -736,9 +850,9 @@ const AdminExpats: React.FC = () => {
                           </span>
                           <br />
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getValidationStatusColor(expat.validationStatus)}`}>
-                            {expat.validationStatus === 'approved' && <CheckCircle size={12} />}
-                            {expat.validationStatus === 'rejected' && <XCircle size={12} />}
-                            {expat.validationStatus === 'pending' && <Clock size={12} />}
+                            {expat.validationStatus === "approved" && <CheckCircle size={12} />}
+                            {expat.validationStatus === "rejected" && <XCircle size={12} />}
+                            {expat.validationStatus === "pending" && <Clock size={12} />}
                             <span className="ml-1 capitalize">{expat.validationStatus}</span>
                           </span>
                         </div>
@@ -747,7 +861,7 @@ const AdminExpats: React.FC = () => {
                         <div className="space-y-1">
                           <div className="flex items-center">
                             <Star size={14} className="mr-1 text-yellow-400" />
-                            <span>{expat.rating > 0 ? expat.rating.toFixed(1) : 'N/A'} ({expat.reviewsCount})</span>
+                            <span>{expat.rating > 0 ? expat.rating.toFixed(1) : "N/A"} ({expat.reviewsCount})</span>
                           </div>
                           <div>{expat.callsCount} appel(s)</div>
                           <div className="text-green-600 font-medium">{expat.totalEarned.toFixed(2)}€</div>
@@ -756,17 +870,15 @@ const AdminExpats: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="space-y-1">
                           <div className="font-medium text-blue-600">
-                            {expat.yearsInCountry > 0 ? `${expat.yearsInCountry} an${expat.yearsInCountry > 1 ? 's' : ''}` : 'Nouveau'}
+                            {expat.yearsInCountry > 0 ? `${expat.yearsInCountry} an${expat.yearsInCountry > 1 ? "s" : ""}` : "Nouveau"}
                           </div>
                           {expat.expatSince && (
                             <div className="text-xs text-gray-500">
-                              Depuis {expat.expatSince.toLocaleDateString('fr-FR')}
+                              Depuis {expat.expatSince.toLocaleDateString("fr-FR")}
                             </div>
                           )}
                           {expat.hourlyRate && (
-                            <div className="text-xs text-green-600 font-medium">
-                              {expat.hourlyRate}€/h
-                            </div>
+                            <div className="text-xs text-green-600 font-medium">{expat.hourlyRate}€/h</div>
                           )}
                         </div>
                       </td>
@@ -777,42 +889,33 @@ const AdminExpats: React.FC = () => {
                           </div>
                           {expat.helpDomains.length > 0 && (
                             <div className="text-xs text-gray-500">
-                              {expat.helpDomains.slice(0, 2).join(', ')}
-                              {expat.helpDomains.length > 2 && '...'}
+                              {expat.helpDomains.slice(0, 2).join(", ")}
+                              {expat.helpDomains.length > 2 && "..."}
                             </div>
                           )}
                           {expat.languages.length > 0 && (
                             <div className="text-xs text-gray-500">
-                              {expat.languages.slice(0, 2).join(', ')}
+                              {expat.languages.slice(0, 2).join(", ")}
                               {expat.languages.length > 2 && ` +${expat.languages.length - 2}`}
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <AdminMapVisibilityToggle 
-                          userId={expat.id}
-                          className="text-xs"
-                        />
+                        <AdminMapVisibilityToggle userId={expat.id} className="text-xs" />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <button 
-                            className="text-green-600 hover:text-green-900"
-                            title="Voir le profil"
-                          >
+                          <button className="text-green-600 hover:text-green-900" title="Voir le profil">
                             <Eye size={16} />
                           </button>
-                          <button 
-                            className="text-gray-600 hover:text-gray-900"
-                            title="Modifier"
-                          >
+                          <button className="text-gray-600 hover:text-gray-900" title="Modifier">
                             <Edit size={16} />
                           </button>
                           <div className="flex flex-col space-y-1">
                             <select
                               value={expat.status}
-                              onChange={(e) => handleStatusChange(expat.id, e.target.value)}
+                              onChange={(e) => void handleStatusChange(expat.id, e.target.value as ExpatStatus)}
                               className="text-xs border border-gray-300 rounded px-1 py-1 min-w-20"
                             >
                               <option value="active">Actif</option>
@@ -822,7 +925,7 @@ const AdminExpats: React.FC = () => {
                             </select>
                             <select
                               value={expat.validationStatus}
-                              onChange={(e) => handleValidationStatusChange(expat.id, e.target.value)}
+                              onChange={(e) => void handleValidationStatusChange(expat.id, e.target.value as ValidationStatus)}
                               className="text-xs border border-gray-300 rounded px-1 py-1 min-w-20"
                             >
                               <option value="pending">En validation</option>
@@ -846,17 +949,12 @@ const AdminExpats: React.FC = () => {
             <Globe className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun expatrié trouvé</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {Object.values(filters).some(f => f !== 'all' && f !== '') 
-                ? 'Aucun expatrié ne correspond aux critères de recherche. Essayez de modifier les filtres.'
-                : 'Aucun expatrié inscrit pour le moment.'
-              }
+              {Object.values(filters).some((f) => f !== "all" && f !== "")
+                ? "Aucun expatrié ne correspond aux critères de recherche. Essayez de modifier les filtres."
+                : "Aucun expatrié inscrit pour le moment."}
             </p>
-            {Object.values(filters).some(f => f !== 'all' && f !== '') && (
-              <Button
-                onClick={clearFilters}
-                className="mt-4"
-                variant="outline"
-              >
+            {Object.values(filters).some((f) => f !== "all" && f !== "") && (
+              <Button onClick={clearFilters} className="mt-4" variant="outline">
                 Effacer les filtres
               </Button>
             )}
@@ -869,11 +967,9 @@ const AdminExpats: React.FC = () => {
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-700">
                 Affichage de <span className="font-medium">{expats.length}</span> expatrié(s)
-                {Object.values(filters).some(f => f !== 'all' && f !== '') && ' (filtrés)'}
+                {Object.values(filters).some((f) => f !== "all" && f !== "") && " (filtrés)"}
               </div>
-              <div className="text-sm text-gray-500">
-                Mis à jour il y a quelques secondes
-              </div>
+              <div className="text-sm text-gray-500">Mis à jour il y a quelques secondes</div>
             </div>
           </div>
         )}

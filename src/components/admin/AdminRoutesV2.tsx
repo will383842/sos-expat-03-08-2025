@@ -14,56 +14,31 @@ const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Chargement.
 );
 
 // ===== LAZY IMPORTS - DASHBOARD =====
-const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
+const AdminDashboard = lazy(() => import("../../pages/admin/AdminDashboard"));
 
 // ===== LAZY IMPORTS - FINANCE =====
-const AdminPayments = lazy(() => import("@/pages/admin/AdminPayments"));
-const AdminInvoices = lazy(() => import("@/pages/admin/AdminInvoices"));
-const AdminFinanceTaxes = lazy(() => import("@/pages/admin/Finance/Taxes"));
-const AdminFinanceTaxesByCountry = lazy(() => import("@/pages/admin/Finance/TaxesByCountry"));
-const AdminFinanceReconciliation = lazy(() => import("@/pages/admin/AdminFinanceReconciliation"));
-const AdminFinanceDisputes = lazy(() => import("@/pages/admin/AdminFinanceDisputes"));
-const AdminFinanceRefunds = lazy(() => import("@/pages/admin/AdminFinanceRefunds"));
-const AdminFinancePayouts = lazy(() => import("@/pages/admin/AdminFinancePayouts"));
-const AdminFinanceExports = lazy(() => import("@/pages/admin/Finance/Exports"));
-const AdminFinanceLedger = lazy(() => import("@/pages/admin/AdminFinanceLedger"));
+const AdminPayments = lazy(() => import("../../pages/admin/AdminPayments"));
+const AdminInvoices = lazy(() => import("../../pages/admin/AdminInvoices"));
+const AdminFinanceTaxes = lazy(() => import("../../pages/admin/Finance/Taxes"));
+const AdminFinanceTaxesByCountry = lazy(() => import("../../pages/admin/Finance/TaxesByCountry"));
+const AdminFinanceReconciliation = lazy(() => import("../../pages/admin/AdminFinanceReconciliation"));
+const AdminFinanceDisputes = lazy(() => import("../../pages/admin/AdminFinanceDisputes"));
+const AdminFinanceRefunds = lazy(() => import("../../pages/admin/AdminFinanceRefunds"));
+const AdminFinancePayouts = lazy(() => import("../../pages/admin/AdminFinancePayouts"));
+const AdminFinanceExports = lazy(() => import("../../pages/admin/Finance/Exports"));
+const AdminFinanceLedger = lazy(() => import("../../pages/admin/AdminFinanceLedger"));
 
-// ===== LAZY IMPORTS - USERS & PROVIDERS - NOUVELLE ORGANISATION =====
-const AdminUsers = lazy(() => import("@/pages/admin/AdminUsers"));
-const AdminClients = lazy(() => import("@/pages/admin/Users/AdminClients"));
-const AdminLawyers = lazy(() => import("@/pages/admin/Users/AdminLawyers"));
-const AdminExpats = lazy(() => import("@/pages/admin/Users/AdminExpats"));
-const AdminAaaProfiles = lazy(() => import("@/pages/admin/AdminAaaProfiles"));
-const AdminLawyerApprovals = lazy(() => import("@/pages/admin/Users/AdminLawyerApprovals"));
-const AdminKYCProviders = lazy(() => import("@/pages/admin/Users/AdminKYCProviders"));
-const AdminReviews = lazy(() => import("@/pages/admin/AdminReviews"));
-
-// Fallback pour pages non encore créées
-const AdminUsersFallback = lazy(() =>
-  Promise.resolve({
-    default: ({ title, type }: { title: string; type: string }) => (
-      <div className="p-6">
-        <h1 className="text-2xl font-semibold mb-2">{title}</h1>
-        <p className="text-sm opacity-80 mb-4">Gestion des {type}</p>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-800">
-            📋 Cette page affichera la liste filtrée des {type.toLowerCase()} avec :
-          </p>
-          <ul className="mt-2 text-blue-700 text-sm space-y-1">
-            <li>• Tableau avec filtres avancés</li>
-            <li>• Actions en lot (validation, suspension, etc.)</li>
-            <li>• Export des données</li>
-            <li>• Statistiques en temps réel</li>
-          </ul>
-        </div>
-      </div>
-    ),
-  })
-);
+// ===== LAZY IMPORTS - USERS & PROVIDERS =====
+const AdminClients = lazy(() => import("../../pages/admin/AdminClients"));
+const AdminLawyers = lazy(() => import("../../pages/admin/AdminLawyers"));
+const AdminExpats = lazy(() => import("../../pages/admin/AdminExpats"));
+const AdminAaaProfiles = lazy(() => import("../../pages/admin/AdminAaaProfiles"));
+const AdminLawyerApprovals = lazy(() => import("../../pages/admin/AdminApprovals"));
+const AdminKYCProviders = lazy(() => import("../../pages/admin/AdminKYCProviders"));
+const AdminReviews = lazy(() => import("../../pages/admin/AdminReviews"));
 
 // ===== LAZY IMPORTS - CALLS =====
-const AdminCalls = lazy(() => import("@/pages/admin/AdminCalls"));
-// Placeholders temporaires
+const AdminCalls = lazy(() => import("../../pages/admin/AdminCalls"));
 const AdminCallsSessions = lazy(() =>
   Promise.resolve({
     default: () => (
@@ -86,18 +61,17 @@ const AdminCallsRecordings = lazy(() =>
 );
 
 // ===== LAZY IMPORTS - COMMUNICATIONS =====
-const AdminCommsCampaigns = lazy(() => import("@/pages/admin/AdminCommsCampaigns"));
-const AdminCommsAutomations = lazy(() => import("@/pages/admin/AdminCommsAutomations"));
-const AdminCommsSegments = lazy(() => import("@/pages/admin/AdminCommsSegments"));
-const AdminCommsTemplates = lazy(() => import("@/pages/admin/AdminCommsTemplates"));
-const AdminCommsDeliverability = lazy(() => import("@/pages/admin/AdminCommsDeliverability"));
-const AdminCommsSuppression = lazy(() => import("@/pages/admin/AdminCommsSuppression"));
-const AdminCommsABTests = lazy(() => import("@/pages/admin/AdminCommsABTests"));
-const AdminClientMessages = lazy(() => import("@/pages/admin/AdminClientMessages"));
-const AdminNotifications = lazy(() => import("@/pages/admin/AdminNotifications"));
+const AdminCommsCampaigns = lazy(() => import("../../pages/admin/AdminCommsCampaigns"));
+const AdminCommsAutomations = lazy(() => import("../../pages/admin/AdminCommsAutomations"));
+const AdminCommsSegments = lazy(() => import("../../pages/admin/AdminCommsSegments"));
+const AdminCommsTemplates = lazy(() => import("../../pages/admin/AdminCommsTemplates"));
+const AdminCommsDeliverability = lazy(() => import("../../pages/admin/AdminCommsDeliverability"));
+const AdminCommsSuppression = lazy(() => import("../../pages/admin/AdminCommsSuppression"));
+const AdminCommsABTests = lazy(() => import("../../pages/admin/AdminCommsABTests"));
+const AdminClientMessages = lazy(() => import("../../pages/admin/AdminClientMessages"));
+const AdminNotifications = lazy(() => import("../../pages/admin/AdminNotifications"));
 
 // ===== LAZY IMPORTS - AFFILIATION =====
-// Placeholders temporaires
 const AdminAffiliates = lazy(() =>
   Promise.resolve({
     default: () => (
@@ -108,7 +82,7 @@ const AdminAffiliates = lazy(() =>
     ),
   })
 );
-const AdminCommissionRules = lazy(() => import("@/pages/admin/AdminCommissionRules"));
+const AdminCommissionRules = lazy(() => import("../../pages/admin/AdminCommissionRules"));
 const AdminAffiliatePayouts = lazy(() =>
   Promise.resolve({
     default: () => (
@@ -131,19 +105,19 @@ const AdminAmbassadors = lazy(() =>
 );
 
 // ===== LAZY IMPORTS - B2B =====
-const AdminB2BAccounts = lazy(() => import("@/pages/admin/AdminB2BAccounts"));
-const AdminB2BMembers = lazy(() => import("@/pages/admin/AdminB2BMembers"));
-const AdminB2BPricing = lazy(() => import("@/pages/admin/AdminB2BPricing"));
-const AdminB2BBilling = lazy(() => import("@/pages/admin/AdminB2BBilling"));
-const AdminB2BInvoices = lazy(() => import("@/pages/admin/AdminB2BInvoices"));
-const AdminB2BReports = lazy(() => import("@/pages/admin/AdminB2BReports"));
+const AdminB2BAccounts = lazy(() => import("../../pages/admin/AdminB2BAccounts"));
+const AdminB2BMembers = lazy(() => import("../../pages/admin/AdminB2BMembers"));
+const AdminB2BPricing = lazy(() => import("../../pages/admin/AdminB2BPricing"));
+const AdminB2BBilling = lazy(() => import("../../pages/admin/AdminB2BBilling"));
+const AdminB2BInvoices = lazy(() => import("../../pages/admin/AdminB2BInvoices"));
+const AdminB2BReports = lazy(() => import("../../pages/admin/AdminB2BReports"));
 
 // ===== LAZY IMPORTS - SETTINGS & TOOLS =====
-const AdminPricing = lazy(() => import("@/pages/admin/AdminPricing"));
-const AdminCountries = lazy(() => import("@/pages/admin/AdminCountries"));
-const AdminLegalDocuments = lazy(() => import("@/pages/admin/AdminLegalDocuments"));
-const AdminBackups = lazy(() => import("@/pages/admin/AdminBackups"));
-const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
+const AdminPricing = lazy(() => import("../../pages/admin/AdminPricing"));
+const AdminCountries = lazy(() => import("../../pages/admin/AdminCountries"));
+const AdminLegalDocuments = lazy(() => import("../../pages/admin/AdminLegalDocuments"));
+const AdminBackups = lazy(() => import("../../pages/admin/AdminBackups"));
+const AdminSettings = lazy(() => import("../../pages/admin/AdminSettings"));
 
 // ===== LAZY IMPORTS - ANALYTICS & REPORTS =====
 const AdminFinancialReports = lazy(() =>
@@ -188,10 +162,10 @@ const AdminDataExports = lazy(() =>
 );
 
 // ===== LAZY IMPORTS - AUTRES PAGES =====
-const AdminPromoCodes = lazy(() => import("@/pages/admin/AdminPromoCodes"));
-const AdminDocuments = lazy(() => import("@/pages/admin/AdminDocuments"));
-const AdminContactMessages = lazy(() => import("@/pages/admin/AdminContactMessages"));
-const AdminEmails = lazy(() => import("@/pages/admin/AdminEmails"));
+const AdminPromoCodes = lazy(() => import("../../pages/admin/AdminPromoCodes"));
+const AdminDocuments = lazy(() => import("../../pages/admin/AdminDocuments"));
+const AdminContactMessages = lazy(() => import("../../pages/admin/AdminContactMessages"));
+const AdminEmails = lazy(() => import("../../pages/admin/AdminEmails"));
 
 // ===== COMPOSANT PRINCIPAL =====
 const AdminRoutesV2: React.FC = () => {
@@ -212,39 +186,31 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
 
-        {/* ===== 👥 UTILISATEURS & PRESTATAIRES - NOUVELLE ORGANISATION ===== */}
-        
-        {/* Clients */}
+        {/* ===== 👥 UTILISATEURS & PRESTATAIRES ===== */}
         <Route
           path="/admin/users/clients"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des clients..." />}>
-              <AdminUsersFallback title="Clients" type="Clients" />
+              <AdminClients />
             </Suspense>
           }
         />
-
-        {/* Prestataires - Avocats */}
         <Route
           path="/admin/users/providers/lawyers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des avocats..." />}>
-              <AdminUsersFallback title="Avocats" type="Avocats partenaires" />
+              <AdminLawyers />
             </Suspense>
           }
         />
-
-        {/* Prestataires - Expatriés */}
         <Route
           path="/admin/users/providers/expats"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des expatriés..." />}>
-              <AdminUsersFallback title="Expatriés" type="Expatriés conseillers" />
+              <AdminExpats />
             </Suspense>
           }
         />
-
-        {/* AAA Profiles */}
         <Route
           path="/admin/aaaprofiles"
           element={
@@ -253,28 +219,22 @@ const AdminRoutesV2: React.FC = () => {
             </Suspense>
           }
         />
-
-        {/* Validation Avocats */}
         <Route
           path="/admin/approvals/lawyers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des validations d'avocats..." />}>
-              <AdminUsersFallback title="Validation Avocats" type="Validations d'avocats en attente" />
+              <AdminLawyerApprovals />
             </Suspense>
           }
         />
-
-        {/* KYC Prestataires */}
         <Route
           path="/admin/kyc/providers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du KYC prestataires..." />}>
-              <AdminUsersFallback title="KYC Prestataires" type="Vérifications KYC en cours" />
+              <AdminKYCProviders />
             </Suspense>
           }
         />
-
-        {/* Avis et Notation */}
         <Route
           path="/admin/reviews"
           element={
@@ -631,7 +591,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
 
-        {/* ===== ROUTES HISTORIQUES / LEGACY (pour compatibilité) ===== */}
+        {/* ===== ROUTES HISTORIQUES / LEGACY ===== */}
         <Route path="/admin/users" element={<Navigate to="/admin/users/clients" replace />} />
         <Route path="/admin/providers" element={<Navigate to="/admin/users/providers/lawyers" replace />} />
         <Route path="/admin/payments" element={<Navigate to="/admin/finance/payments" replace />} />
@@ -713,6 +673,7 @@ const AdminRoutesV2: React.FC = () => {
 };
 
 // ===== HOOK UTILITAIRE POUR VALIDATION DES ROUTES =====
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAdminRouteValidation = () => {
   const validateRoute = (path: string): boolean => {
     const validPaths = [
@@ -766,7 +727,6 @@ export const useAdminRouteValidation = () => {
       "/admin/reports/performance",
       "/admin/reports/exports",
     ];
-
     return validPaths.includes(path);
   };
 

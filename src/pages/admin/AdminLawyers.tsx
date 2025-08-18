@@ -1,11 +1,40 @@
-// src/pages/admin/Users/AdminLawyers.tsx
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, getDocs, doc, updateDoc } from 'firebase/firestore';
+// src/pages/admin/AdminLawyers.tsx
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  doc as fsDoc,
+  updateDoc,
+  type DocumentData,
+  type QueryConstraint,
+} from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Shield, Search, Filter, Download, Mail, Phone, MapPin, Calendar, Eye, Edit, Star, Award, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import {
+  Shield,
+  Search,
+  Filter,
+  Download,
+  Mail,
+  Phone,
+  MapPin,
+  Eye,
+  Edit,
+  Star,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
 import Button from '../../components/common/Button';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminMapVisibilityToggle from '../../components/admin/AdminMapVisibilityToggle';
+
+type LawyerStatus = 'active' | 'suspended' | 'pending' | 'banned';
+type LawyerValidationStatus = 'pending' | 'approved' | 'rejected';
 
 interface Lawyer {
   id: string;
@@ -15,8 +44,8 @@ interface Lawyer {
   phone?: string;
   country: string;
   city?: string;
-  status: 'active' | 'suspended' | 'pending' | 'banned';
-  validationStatus: 'pending' | 'approved' | 'rejected';
+  status: LawyerStatus;
+  validationStatus: LawyerValidationStatus;
   createdAt: Date;
   lastLoginAt?: Date;
   callsCount: number;
@@ -31,21 +60,56 @@ interface Lawyer {
   profileComplete: number;
 }
 
+interface FirestoreLawyerRaw extends DocumentData {
+  serviceType?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  city?: string;
+  status?: LawyerStatus;
+  validationStatus?: LawyerValidationStatus;
+  createdAt?: { toDate: () => Date };
+  lastLoginAt?: { toDate: () => Date };
+  callsCount?: number;
+  totalEarned?: number;
+  averageRating?: number;
+  reviewsCount?: number;
+  specialities?: string[];
+  languages?: string[];
+  barNumber?: string;
+  experienceYears?: number;
+  isVisibleOnMap?: boolean;
+  education?: unknown;
+  description?: unknown;
+}
+
 interface FilterOptions {
-  status: string;
-  validationStatus: string;
-  country: string;
-  speciality: string;
-  dateRange: string;
+  status: 'all' | LawyerStatus;
+  validationStatus: 'all' | LawyerValidationStatus;
+  country: 'all' | string;
+  speciality: 'all' | string;
+  dateRange: 'all' | 'today' | 'week' | 'month';
   searchTerm: string;
-  minRating: string;
+  minRating: 'all' | string;
+}
+
+interface Stats {
+  total: number;
+  active: number;
+  pending: number;
+  suspended: number;
+  pendingValidation: number;
+  avgRating: number;
+  thisMonth: number;
 }
 
 const AdminLawyers: React.FC = () => {
   const [lawyers, setLawyers] = useState<Lawyer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [selectedLawyers, setSelectedLawyers] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
   const [filters, setFilters] = useState<FilterOptions>({
     status: 'all',
     validationStatus: 'all',
@@ -53,108 +117,147 @@ const AdminLawyers: React.FC = () => {
     speciality: 'all',
     dateRange: 'all',
     searchTerm: '',
-    minRating: 'all'
+    minRating: 'all',
   });
 
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<Stats>({
     total: 0,
     active: 0,
     pending: 0,
     suspended: 0,
     pendingValidation: 0,
     avgRating: 0,
-    thisMonth: 0
+    thisMonth: 0,
   });
 
-  useEffect(() => {
-    loadLawyers();
-  }, [filters]);
+  const calculateProfileCompleteness = useCallback((data: FirestoreLawyerRaw): number => {
+    const fields = [
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'country',
+      'city',
+      'specialities',
+      'languages',
+      'barNumber',
+      'experienceYears',
+      'education',
+      'description',
+    ] as const;
 
-  const loadLawyers = async () => {
+    const completedFields = fields.filter((field) => {
+      const value = data[field];
+      if (Array.isArray(value)) return value.length > 0;
+      if (value === null || value === undefined) return false;
+      return String(value).trim() !== '';
+    }).length;
+
+    return Math.round((completedFields / fields.length) * 100);
+  }, []);
+
+  const calculateStats = useCallback((lawyersData: Lawyer[]) => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const totalRating = lawyersData.reduce((sum, lawyer) => sum + (lawyer.rating || 0), 0);
+    const avgRating = lawyersData.length > 0 ? totalRating / lawyersData.length : 0;
+
+    setStats({
+      total: lawyersData.length,
+      active: lawyersData.filter((l) => l.status === 'active').length,
+      pending: lawyersData.filter((l) => l.status === 'pending').length,
+      suspended: lawyersData.filter((l) => l.status === 'suspended').length,
+      pendingValidation: lawyersData.filter((l) => l.validationStatus === 'pending').length,
+      avgRating,
+      thisMonth: lawyersData.filter((l) => l.createdAt >= startOfMonth).length,
+    });
+  }, []);
+
+  const loadLawyers = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Requête pour récupérer les profils SOS (avocats)
-      let lawyersQuery = query(
-        collection(db, 'sos_profiles'),
+
+      const constraints: QueryConstraint[] = [
         where('serviceType', '==', 'lawyer_call'),
         orderBy('createdAt', 'desc'),
-        limit(100)
-      );
+        limit(100),
+      ];
 
       if (filters.status !== 'all') {
-        lawyersQuery = query(
-          collection(db, 'sos_profiles'),
-          where('serviceType', '==', 'lawyer_call'),
-          where('status', '==', filters.status),
-          orderBy('createdAt', 'desc'),
-          limit(100)
-        );
+        constraints.splice(1, 0, where('status', '==', filters.status));
       }
 
+      const lawyersQuery = query(collection(db, 'sos_profiles'), ...constraints);
+
       const snapshot = await getDocs(lawyersQuery);
-      
-      let lawyersData: Lawyer[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
+
+      let lawyersData: Lawyer[] = snapshot.docs.map((snap) => {
+        const data = snap.data() as FirestoreLawyerRaw;
+
+        const base: Lawyer = {
+          id: snap.id,
           email: data.email || '',
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           phone: data.phone || '',
           country: data.country || '',
           city: data.city || '',
-          status: data.status || 'pending',
-          validationStatus: data.validationStatus || 'pending',
-          createdAt: data.createdAt?.toDate() || new Date(),
+          status: data.status ?? 'pending',
+          validationStatus: data.validationStatus ?? 'pending',
+          createdAt: data.createdAt?.toDate() ?? new Date(),
           lastLoginAt: data.lastLoginAt?.toDate(),
-          callsCount: data.callsCount || 0,
-          totalEarned: data.totalEarned || 0,
-          rating: data.averageRating || 0,
-          reviewsCount: data.reviewsCount || 0,
-          specialities: data.specialities || [],
-          languages: data.languages || [],
+          callsCount: data.callsCount ?? 0,
+          totalEarned: data.totalEarned ?? 0,
+          rating: data.averageRating ?? 0,
+          reviewsCount: data.reviewsCount ?? 0,
+          specialities: data.specialities ?? [],
+          languages: data.languages ?? [],
           barNumber: data.barNumber || '',
-          experience: data.experienceYears || 0,
+          experience: data.experienceYears ?? 0,
           isVisibleOnMap: data.isVisibleOnMap ?? true,
-          profileComplete: calculateProfileCompleteness(data)
+          profileComplete: calculateProfileCompleteness(data),
         };
+        return base;
       });
 
-      // Filtres côté client
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
-        lawyersData = lawyersData.filter(lawyer => 
-          lawyer.firstName.toLowerCase().includes(searchLower) ||
-          lawyer.lastName.toLowerCase().includes(searchLower) ||
-          lawyer.email.toLowerCase().includes(searchLower) ||
-          lawyer.barNumber?.toLowerCase().includes(searchLower)
+        lawyersData = lawyersData.filter(
+          (lawyer) =>
+            lawyer.firstName.toLowerCase().includes(searchLower) ||
+            lawyer.lastName.toLowerCase().includes(searchLower) ||
+            lawyer.email.toLowerCase().includes(searchLower) ||
+            (lawyer.barNumber ? lawyer.barNumber.toLowerCase().includes(searchLower) : false),
         );
       }
 
       if (filters.validationStatus !== 'all') {
-        lawyersData = lawyersData.filter(lawyer => lawyer.validationStatus === filters.validationStatus);
+        lawyersData = lawyersData.filter((lawyer) => lawyer.validationStatus === filters.validationStatus);
       }
 
       if (filters.country !== 'all') {
-        lawyersData = lawyersData.filter(lawyer => lawyer.country === filters.country);
+        lawyersData = lawyersData.filter((lawyer) => lawyer.country === filters.country);
       }
 
       if (filters.speciality !== 'all') {
-        lawyersData = lawyersData.filter(lawyer => 
-          lawyer.specialities.some(spec => spec.toLowerCase().includes(filters.speciality.toLowerCase()))
+        const s = String(filters.speciality).toLowerCase();
+        lawyersData = lawyersData.filter((lawyer) =>
+          lawyer.specialities.some((spec) => spec.toLowerCase().includes(s)),
         );
       }
 
       if (filters.minRating !== 'all') {
         const minRating = parseFloat(filters.minRating);
-        lawyersData = lawyersData.filter(lawyer => lawyer.rating >= minRating);
+        if (!Number.isNaN(minRating)) {
+          lawyersData = lawyersData.filter((lawyer) => lawyer.rating >= minRating);
+        }
       }
 
       if (filters.dateRange !== 'all') {
         const now = new Date();
         const filterDate = new Date();
-        
+
         switch (filters.dateRange) {
           case 'today':
             filterDate.setHours(0, 0, 0, 0);
@@ -166,65 +269,34 @@ const AdminLawyers: React.FC = () => {
             filterDate.setMonth(now.getMonth() - 1);
             break;
         }
-        
-        lawyersData = lawyersData.filter(lawyer => lawyer.createdAt >= filterDate);
+
+        lawyersData = lawyersData.filter((lawyer) => lawyer.createdAt >= filterDate);
       }
 
       setLawyers(lawyersData);
       calculateStats(lawyersData);
-      
     } catch (error) {
       console.error('Erreur chargement avocats:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [calculateProfileCompleteness, calculateStats, filters]);
 
-  const calculateProfileCompleteness = (data: any): number => {
-    const fields = [
-      'firstName', 'lastName', 'email', 'phone', 'country', 'city',
-      'specialities', 'languages', 'barNumber', 'experienceYears',
-      'education', 'description'
-    ];
-    
-    const completedFields = fields.filter(field => {
-      const value = data[field];
-      if (Array.isArray(value)) return value.length > 0;
-      return value && value.toString().trim() !== '';
-    }).length;
-    
-    return Math.round((completedFields / fields.length) * 100);
-  };
+  useEffect(() => {
+    void loadLawyers();
+  }, [loadLawyers]);
 
-  const calculateStats = (lawyersData: Lawyer[]) => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    const totalRating = lawyersData.reduce((sum, lawyer) => sum + lawyer.rating, 0);
-    const avgRating = lawyersData.length > 0 ? totalRating / lawyersData.length : 0;
-    
-    setStats({
-      total: lawyersData.length,
-      active: lawyersData.filter(l => l.status === 'active').length,
-      pending: lawyersData.filter(l => l.status === 'pending').length,
-      suspended: lawyersData.filter(l => l.status === 'suspended').length,
-      pendingValidation: lawyersData.filter(l => l.validationStatus === 'pending').length,
-      avgRating: avgRating,
-      thisMonth: lawyersData.filter(l => l.createdAt >= startOfMonth).length
-    });
-  };
-
-  const handleStatusChange = async (lawyerId: string, newStatus: string) => {
+  const handleStatusChange = async (lawyerId: string, newStatus: LawyerStatus) => {
     try {
-      await updateDoc(doc(db, 'sos_profiles', lawyerId), {
+      await updateDoc(fsDoc(db, 'sos_profiles', lawyerId), {
         status: newStatus,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
-      
-      setLawyers(lawyers.map(lawyer => 
-        lawyer.id === lawyerId ? { ...lawyer, status: newStatus as any } : lawyer
-      ));
-      
+
+      setLawyers((prev) =>
+        prev.map((lawyer) => (lawyer.id === lawyerId ? { ...lawyer, status: newStatus } : lawyer)),
+      );
+
       alert(`✅ Statut avocat mis à jour vers "${newStatus}"`);
     } catch (error) {
       console.error('Erreur mise à jour statut:', error);
@@ -232,31 +304,35 @@ const AdminLawyers: React.FC = () => {
     }
   };
 
-  const handleValidationStatusChange = async (lawyerId: string, newValidationStatus: string) => {
+  const handleValidationStatusChange = async (
+    lawyerId: string,
+    newValidationStatus: LawyerValidationStatus,
+  ) => {
     try {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         validationStatus: newValidationStatus,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
-      // Si approuvé, mettre automatiquement le statut à actif
       if (newValidationStatus === 'approved') {
         updates.status = 'active';
         updates.approvedAt = new Date();
       }
 
-      await updateDoc(doc(db, 'sos_profiles', lawyerId), updates);
-      
-      setLawyers(lawyers.map(lawyer => 
-        lawyer.id === lawyerId 
-          ? { 
-              ...lawyer, 
-              validationStatus: newValidationStatus as any,
-              status: newValidationStatus === 'approved' ? 'active' : lawyer.status
-            } 
-          : lawyer
-      ));
-      
+      await updateDoc(fsDoc(db, 'sos_profiles', lawyerId), updates);
+
+      setLawyers((prev) =>
+        prev.map((lawyer) =>
+          lawyer.id === lawyerId
+            ? {
+                ...lawyer,
+                validationStatus: newValidationStatus,
+                status: newValidationStatus === 'approved' ? 'active' : lawyer.status,
+              }
+            : lawyer,
+        ),
+      );
+
       alert(`✅ Statut de validation mis à jour vers "${newValidationStatus}"`);
     } catch (error) {
       console.error('Erreur mise à jour validation:', error);
@@ -264,7 +340,9 @@ const AdminLawyers: React.FC = () => {
     }
   };
 
-  const handleBulkAction = async (action: string) => {
+  const handleBulkAction = async (
+    action: 'approuver' | 'rejeter' | 'suspendre' | 'activer',
+  ) => {
     if (selectedLawyers.length === 0) {
       alert('Veuillez sélectionner au moins un avocat');
       return;
@@ -274,9 +352,9 @@ const AdminLawyers: React.FC = () => {
     if (!confirm(confirmMessage)) return;
 
     try {
-      const promises = selectedLawyers.map(async lawyerId => {
-        const updates: any = { updatedAt: new Date() };
-        
+      const promises = selectedLawyers.map(async (lawyerId) => {
+        const updates: Record<string, unknown> = { updatedAt: new Date() };
+
         switch (action) {
           case 'approuver':
             updates.validationStatus = 'approved';
@@ -296,25 +374,28 @@ const AdminLawyers: React.FC = () => {
           default:
             return;
         }
-        
-        return updateDoc(doc(db, 'sos_profiles', lawyerId), updates);
+
+        return updateDoc(fsDoc(db, 'sos_profiles', lawyerId), updates);
       });
 
       await Promise.all(promises);
-      
-      // Recharger les données
-      loadLawyers();
+
+      void loadLawyers();
       setSelectedLawyers([]);
       alert(`✅ Action "${action}" appliquée à ${selectedLawyers.length} avocat(s)`);
-      
     } catch (error) {
-      console.error('Erreur action en lot:', error);
-      alert('❌ Erreur lors de l\'action en lot');
+      console.error("Erreur action en lot:", error);
+      alert("❌ Erreur lors de l'action en lot");
     }
   };
 
   const exportLawyers = () => {
-    const csvData = lawyers.map(lawyer => ({
+    if (lawyers.length === 0) {
+      alert('Aucune donnée à exporter.');
+      return;
+    }
+
+    const csvData = lawyers.map((lawyer) => ({
       ID: lawyer.id,
       Email: lawyer.email,
       Prénom: lawyer.firstName,
@@ -335,13 +416,24 @@ const AdminLawyers: React.FC = () => {
       'Langues': lawyer.languages.join(', '),
       'Expérience': `${lawyer.experience} ans`,
       'Profil complet': `${lawyer.profileComplete}%`,
-      'Visible sur carte': lawyer.isVisibleOnMap ? 'Oui' : 'Non'
+      'Visible sur carte': lawyer.isVisibleOnMap ? 'Oui' : 'Non',
     }));
 
-    const csvContent = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
-    ].join('\n');
+    const headers = Object.keys(csvData[0]);
+    const rows = csvData.map((row) =>
+      headers
+        .map((key) => {
+          const value = (row as Record<string, unknown>)[key];
+          const s = value != null ? String(value) : '';
+          if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return `"${s.replace(/"/g, '""')}"`;
+          }
+          return s;
+        })
+        .join(','),
+    );
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -352,32 +444,46 @@ const AdminLawyers: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: LawyerStatus) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'suspended': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'banned': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'suspended':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'banned':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getValidationStatusColor = (status: string) => {
+  const getValidationStatusColor = (status: LawyerValidationStatus) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: LawyerStatus) => {
     switch (status) {
-      case 'active': return <CheckCircle size={16} />;
-      case 'suspended': return <XCircle size={16} />;
-      case 'pending': return <Clock size={16} />;
-      case 'banned': return <AlertTriangle size={16} />;
-      default: return null;
+      case 'active':
+        return <CheckCircle size={16} />;
+      case 'suspended':
+        return <XCircle size={16} />;
+      case 'pending':
+        return <Clock size={16} />;
+      case 'banned':
+        return <AlertTriangle size={16} />;
+      default:
+        return null;
     }
   };
 
@@ -398,25 +504,18 @@ const AdminLawyers: React.FC = () => {
               Gestion des Avocats
             </h1>
             <p className="text-gray-600 mt-1">
-              {stats.total} avocats • {stats.active} actifs • {stats.pendingValidation} en attente de validation
+              {stats.total} avocats • {stats.active} actifs • {stats.pendingValidation} en attente de
+              validation
             </p>
           </div>
-          
+
           <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              className="flex items-center"
-            >
+            <Button onClick={() => setShowFilters(!showFilters)} variant="outline" className="flex items-center">
               <Filter size={16} className="mr-2" />
               Filtres
             </Button>
-            
-            <Button
-              onClick={exportLawyers}
-              variant="outline"
-              className="flex items-center"
-            >
+
+            <Button onClick={exportLawyers} variant="outline" className="flex items-center">
               <Download size={16} className="mr-2" />
               Exporter CSV
             </Button>
@@ -480,28 +579,27 @@ const AdminLawyers: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">Filtres de recherche</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recherche
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <Search
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    size={16}
+                  />
                   <input
                     type="text"
                     placeholder="Nom, email, n° barreau..."
                     value={filters.searchTerm}
-                    onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
+                    onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
                     className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Statut
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Statut</label>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value as FilterOptions['status'] })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Tous les statuts</option>
@@ -513,12 +611,15 @@ const AdminLawyers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Validation
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Validation</label>
                 <select
                   value={filters.validationStatus}
-                  onChange={(e) => setFilters({...filters, validationStatus: e.target.value})}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      validationStatus: e.target.value as FilterOptions['validationStatus'],
+                    })
+                  }
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Toutes validations</option>
@@ -529,12 +630,10 @@ const AdminLawyers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pays
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pays</label>
                 <select
                   value={filters.country}
-                  onChange={(e) => setFilters({...filters, country: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, country: e.target.value })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Tous les pays</option>
@@ -546,12 +645,10 @@ const AdminLawyers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Note minimum
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Note minimum</label>
                 <select
                   value={filters.minRating}
-                  onChange={(e) => setFilters({...filters, minRating: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, minRating: e.target.value })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Toutes les notes</option>
@@ -563,16 +660,14 @@ const AdminLawyers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Période d'inscription
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Période d'inscription</label>
                 <select
                   value={filters.dateRange}
-                  onChange={(e) => setFilters({...filters, dateRange: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, dateRange: e.target.value as FilterOptions['dateRange'] })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Toutes les périodes</option>
-                  <option value="today">Aujourd'hui</option>
+                  <option value="today">Aujourd&apos;hui</option>
                   <option value="week">Cette semaine</option>
                   <option value="month">Ce mois</option>
                 </select>
@@ -589,28 +684,16 @@ const AdminLawyers: React.FC = () => {
                 <strong>{selectedLawyers.length}</strong> avocat(s) sélectionné(s)
               </p>
               <div className="flex space-x-3">
-                <Button
-                  onClick={() => handleBulkAction('approuver')}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
+                <Button onClick={() => handleBulkAction('approuver')} className="bg-green-600 hover:bg-green-700 text-white">
                   Approuver
                 </Button>
-                <Button
-                  onClick={() => handleBulkAction('rejeter')}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
+                <Button onClick={() => handleBulkAction('rejeter')} className="bg-red-600 hover:bg-red-700 text-white">
                   Rejeter
                 </Button>
-                <Button
-                  onClick={() => handleBulkAction('activer')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
+                <Button onClick={() => handleBulkAction('activer')} className="bg-blue-600 hover:bg-blue-700 text-white">
                   Activer
                 </Button>
-                <Button
-                  onClick={() => handleBulkAction('suspendre')}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                >
+                <Button onClick={() => handleBulkAction('suspendre')} className="bg-yellow-600 hover:bg-yellow-700 text-white">
                   Suspendre
                 </Button>
               </div>
@@ -623,7 +706,7 @@ const AdminLawyers: React.FC = () => {
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex justify-center items-center h-48">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                 <span className="ml-2 text-gray-600">Chargement des avocats...</span>
               </div>
             ) : (
@@ -636,7 +719,7 @@ const AdminLawyers: React.FC = () => {
                         checked={selectedLawyers.length === lawyers.length && lawyers.length > 0}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedLawyers(lawyers.map(l => l.id));
+                            setSelectedLawyers(lawyers.map((l) => l.id));
                           } else {
                             setSelectedLawyers([]);
                           }
@@ -679,9 +762,9 @@ const AdminLawyers: React.FC = () => {
                           checked={selectedLawyers.includes(lawyer.id)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedLawyers([...selectedLawyers, lawyer.id]);
+                              setSelectedLawyers((prev) => [...prev, lawyer.id]);
                             } else {
-                              setSelectedLawyers(selectedLawyers.filter(id => id !== lawyer.id));
+                              setSelectedLawyers((prev) => prev.filter((id) => id !== lawyer.id));
                             }
                           }}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -691,7 +774,8 @@ const AdminLawyers: React.FC = () => {
                         <div className="flex items-center">
                           <div className="h-10 w-10 flex-shrink-0">
                             <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                              {lawyer.firstName.charAt(0)}{lawyer.lastName.charAt(0)}
+                              {lawyer.firstName.charAt(0)}
+                              {lawyer.lastName.charAt(0)}
                             </div>
                           </div>
                           <div className="ml-4">
@@ -699,9 +783,7 @@ const AdminLawyers: React.FC = () => {
                               {lawyer.firstName} {lawyer.lastName}
                             </div>
                             <div className="text-sm text-gray-500">{lawyer.email}</div>
-                            {lawyer.barNumber && (
-                              <div className="text-xs text-blue-600">N° {lawyer.barNumber}</div>
-                            )}
+                            {lawyer.barNumber && <div className="text-xs text-blue-600">N° {lawyer.barNumber}</div>}
                           </div>
                         </div>
                       </td>
@@ -722,17 +804,28 @@ const AdminLawyers: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="flex items-center">
                           <MapPin size={14} className="mr-2 text-gray-400" />
-                          <span>{lawyer.city ? `${lawyer.city}, ` : ''}{lawyer.country}</span>
+                          <span>
+                            {lawyer.city ? `${lawyer.city}, ` : ''}
+                            {lawyer.country}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="space-y-1">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(lawyer.status)}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                              lawyer.status,
+                            )}`}
+                          >
                             {getStatusIcon(lawyer.status)}
                             <span className="ml-1 capitalize">{lawyer.status}</span>
                           </span>
                           <br />
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getValidationStatusColor(lawyer.validationStatus)}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getValidationStatusColor(
+                              lawyer.validationStatus,
+                            )}`}
+                          >
                             {lawyer.validationStatus === 'approved' && <CheckCircle size={12} />}
                             {lawyer.validationStatus === 'rejected' && <XCircle size={12} />}
                             {lawyer.validationStatus === 'pending' && <Clock size={12} />}
@@ -744,7 +837,9 @@ const AdminLawyers: React.FC = () => {
                         <div className="space-y-1">
                           <div className="flex items-center">
                             <Star size={14} className="mr-1 text-yellow-400" />
-                            <span>{lawyer.rating.toFixed(1)} ({lawyer.reviewsCount})</span>
+                            <span>
+                              {lawyer.rating.toFixed(1)} ({lawyer.reviewsCount})
+                            </span>
                           </div>
                           <div>{lawyer.callsCount} appel(s)</div>
                           <div className="text-green-600 font-medium">{lawyer.totalEarned.toFixed(2)}€</div>
@@ -755,9 +850,7 @@ const AdminLawyers: React.FC = () => {
                           <div className={`font-medium ${getProfileCompleteColor(lawyer.profileComplete)}`}>
                             {lawyer.profileComplete}% complet
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {lawyer.experience} ans d'exp.
-                          </div>
+                          <div className="text-xs text-gray-500">{lawyer.experience} ans d&apos;exp.</div>
                           {lawyer.specialities.length > 0 && (
                             <div className="text-xs text-gray-500">
                               {lawyer.specialities.slice(0, 2).join(', ')}
@@ -767,23 +860,20 @@ const AdminLawyers: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <AdminMapVisibilityToggle 
-                          userId={lawyer.id}
-                          className="text-xs"
-                        />
+                        <AdminMapVisibilityToggle userId={lawyer.id} className="text-xs" />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
+                          <button className="text-blue-600 hover:text-blue-900" title="Voir">
                             <Eye size={16} />
                           </button>
-                          <button className="text-gray-600 hover:text-gray-900">
+                          <button className="text-gray-600 hover:text-gray-900" title="Éditer">
                             <Edit size={16} />
                           </button>
                           <div className="flex flex-col space-y-1">
                             <select
                               value={lawyer.status}
-                              onChange={(e) => handleStatusChange(lawyer.id, e.target.value)}
+                              onChange={(e) => handleStatusChange(lawyer.id, e.target.value as LawyerStatus)}
                               className="text-xs border border-gray-300 rounded px-1 py-1"
                             >
                               <option value="active">Actif</option>
@@ -793,7 +883,12 @@ const AdminLawyers: React.FC = () => {
                             </select>
                             <select
                               value={lawyer.validationStatus}
-                              onChange={(e) => handleValidationStatusChange(lawyer.id, e.target.value)}
+                              onChange={(e) =>
+                                handleValidationStatusChange(
+                                  lawyer.id,
+                                  e.target.value as LawyerValidationStatus,
+                                )
+                              }
                               className="text-xs border border-gray-300 rounded px-1 py-1"
                             >
                               <option value="pending">En validation</option>
@@ -815,9 +910,7 @@ const AdminLawyers: React.FC = () => {
           <div className="text-center py-12">
             <Shield className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun avocat trouvé</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Aucun avocat ne correspond aux critères de recherche.
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Aucun avocat ne correspond aux critères de recherche.</p>
           </div>
         )}
       </div>

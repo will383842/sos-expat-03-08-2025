@@ -4,7 +4,6 @@ import {
   DollarSign,
   Users,
   Phone,
-  Mail,
   Handshake,
   Building,
   Settings,
@@ -47,13 +46,6 @@ import {
   BarChart,
   Download,
   Zap,
-  UserX,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Eye,
-  Search,
-  Filter
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

@@ -1,7 +1,7 @@
 import React, { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
 import type { ErrorInfo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, LogOut, Menu, X, Home, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Shield, LogOut, Menu, X, Home, AlertTriangle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { adminMenuTree } from '../../config/adminMenu';
 import SidebarItem from './sidebar/SidebarItem';
@@ -36,6 +36,14 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Sauvegarder la préférence de largeur de sidebar dans localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('admin-sidebar-open');
+    if (saved !== null) {
+      setIsSidebarOpen(JSON.parse(saved));
+    }
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -84,7 +92,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
   }, [user?.id, user?.role]);
 
-  const toggleSidebar = useCallback(() => setIsSidebarOpen((s) => !s), []);
+  const toggleSidebar = useCallback(() => {
+    const newState = !isSidebarOpen;
+    setIsSidebarOpen(newState);
+    // Sauvegarder la préférence
+    localStorage.setItem('admin-sidebar-open', JSON.stringify(newState));
+  }, [isSidebarOpen]);
+
   const toggleMobileSidebar = useCallback(() => setIsMobileSidebarOpen((s) => !s), []);
   const closeMobileSidebar = useCallback(() => setIsMobileSidebarOpen(false), []);
 
@@ -217,26 +231,35 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         {/* DESKTOP SIDEBAR - Condition JavaScript STRICTE */}
         {!isMobile && (
           <div
-            className={`flex flex-shrink-0 transition-all duration-300 ${
-              isSidebarOpen ? 'w-64' : 'w-20'
+            className={`flex flex-shrink-0 transition-all duration-300 ease-in-out ${
+              isSidebarOpen ? 'w-80' : 'w-20'
             }`}
           >
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full relative">
+              {/* Bouton de toggle en overlay sur la sidebar */}
+              <button
+                onClick={toggleSidebar}
+                className={`absolute top-4 z-10 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-full shadow-lg transition-all duration-300 ${
+                  isSidebarOpen ? 'right-4' : 'right-2'
+                }`}
+                aria-label={isSidebarOpen ? 'Réduire la sidebar' : 'Étendre la sidebar'}
+                title={isSidebarOpen ? 'Réduire la sidebar' : 'Étendre la sidebar'}
+              >
+                {isSidebarOpen ? (
+                  <ChevronLeft className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+
               <div className="flex flex-col h-0 flex-1 bg-gray-900">
-                <div className="flex items-center justify-between h-16 px-4 bg-gray-800">
+                <div className="flex items-center h-16 px-4 bg-gray-800">
                   <div className="flex items-center min-w-0">
-                    <Shield className="h-8 w-8 text-red-600" />
+                    <Shield className="h-8 w-8 text-red-600 flex-shrink-0" />
                     {isSidebarOpen && (
-                      <span className="ml-2 text-xl font-bold text-white truncate">Admin SOS</span>
+                      <span className="ml-2 text-xl font-bold text-white truncate">Admin SOS Expats</span>
                     )}
                   </div>
-                  <button
-                    onClick={toggleSidebar}
-                    className="text-gray-400 hover:text-white p-2 -m-2 rounded-md"
-                    aria-label={isSidebarOpen ? 'Réduire' : 'Étendre'}
-                  >
-                    <Menu className="h-6 w-6" />
-                  </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -245,43 +268,48 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       <SidebarItem key={node.id} node={node} isSidebarCollapsed={!isSidebarOpen} />
                     ))}
 
-                    <div className="px-2 pt-3">
-                      <Button
-                        onClick={handleUpdateProfiles}
-                        loading={isUpdatingProfiles}
-                        disabled={isUpdatingProfiles}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <RefreshCw
-                          size={16}
-                          className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
-                        />
-                        {isSidebarOpen ? 'Mettre à jour les profils' : <span className="sr-only">Mettre à jour les profils</span>}
-                      </Button>
-
-                      {updateSuccess !== null && isSidebarOpen && (
-                        <div
-                          className={`mt-2 text-xs p-2 rounded ${
-                            updateSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}
-                          role="alert"
+                    {isSidebarOpen && (
+                      <div className="px-2 pt-3">
+                        <Button
+                          onClick={handleUpdateProfiles}
+                          loading={isUpdatingProfiles}
+                          disabled={isUpdatingProfiles}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm"
                         >
-                          {updateSuccess
-                            ? 'Profils mis à jour avec succès'
-                            : 'Erreur lors de la mise à jour des profils'}
-                        </div>
-                      )}
-                    </div>
+                          <RefreshCw
+                            size={14}
+                            className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
+                          />
+                          Mettre à jour les profils
+                        </Button>
+
+                        {updateSuccess !== null && (
+                          <div
+                            className={`mt-2 text-xs p-2 rounded ${
+                              updateSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}
+                            role="alert"
+                          >
+                            {updateSuccess
+                              ? 'Profils mis à jour avec succès'
+                              : 'Erreur lors de la mise à jour des profils'}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </nav>
                 </div>
 
                 <div className="p-4 border-t border-gray-700">
                   <button
                     onClick={handleLogout}
-                    className="flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white"
+                    className={`flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white ${
+                      !isSidebarOpen ? 'justify-center' : ''
+                    }`}
+                    title={!isSidebarOpen ? 'Déconnexion' : ''}
                   >
-                    <LogOut className="h-5 w-5 mr-3" />
-                    {isSidebarOpen ? <span>Déconnexion</span> : <span className="sr-only">Déconnexion</span>}
+                    <LogOut className="h-5 w-5 flex-shrink-0" />
+                    {isSidebarOpen && <span className="ml-3">Déconnexion</span>}
                   </button>
                 </div>
               </div>

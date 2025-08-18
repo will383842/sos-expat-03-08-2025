@@ -54,65 +54,6 @@ const ProviderProfile = lazy(() => import('./pages/ProviderProfile'));
 const Providers = lazy(() => import('./pages/Providers'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 
-// Admin (de base)
-const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminPricing = lazy(() => import('./pages/admin/AdminPricing'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
-const AdminCalls = lazy(() => import('./pages/admin/AdminCalls'));
-const AdminClientMessages = lazy(() => import('@/pages/admin/AdminClientMessages'));
-const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
-const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
-const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
-const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
-const AdminBackups = lazy(() => import('./pages/admin/AdminBackups'));
-const AdminApprovals = lazy(() => import('./pages/admin/AdminApprovals'));
-const AdminCountries = lazy(() => import('./pages/admin/AdminCountries'));
-const AdminDocuments = lazy(() => import('./pages/admin/AdminDocuments'));
-const AdminPromoCodes = lazy(() => import('./pages/admin/AdminPromoCodes'));
-const AdminLegalDocuments = lazy(() => import('./pages/admin/AdminLegalDocuments'));
-const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'));
-
-// --------------------------------------------
-// AJOUTS : Admin avancé
-// --------------------------------------------
-
-// Finance avancée
-const AdminFinanceReconciliation = lazy(() => import('./pages/admin/AdminFinanceReconciliation'));
-const AdminFinanceDisputes       = lazy(() => import('./pages/admin/AdminFinanceDisputes'));
-const AdminFinanceRefunds        = lazy(() => import('./pages/admin/AdminFinanceRefunds'));
-const AdminFinanceLedger         = lazy(() => import('./pages/admin/AdminFinanceLedger'));
-
-// Comms avancées
-const AdminCommsCampaigns        = lazy(() => import('./pages/admin/AdminCommsCampaigns'));
-const AdminCommsCampaignEditor   = lazy(() => import('./pages/admin/AdminCommsCampaignEditor'));
-const AdminCommsCampaignOverview = lazy(() => import('./pages/admin/AdminCommsCampaignOverview'));
-const AdminCommsSegments         = lazy(() => import('./pages/admin/AdminCommsSegments'));
-const AdminCommsAutomations      = lazy(() => import('./pages/admin/AdminCommsAutomations'));
-const AdminCommsTemplates        = lazy(() => import('./pages/admin/AdminCommsTemplates'));
-const AdminCommsDeliverability   = lazy(() => import('./pages/admin/AdminCommsDeliverability'));
-const AdminCommsSuppression      = lazy(() => import('./pages/admin/AdminCommsSuppression'));
-const AdminCommsABTests          = lazy(() => import('./pages/admin/AdminCommsABTests'));
-
-// Affiliés / Ambassadeurs
-const AdminAffiliatesList        = lazy(() => import('./pages/admin/AdminAffiliatesList'));
-const AdminAffiliateDetail       = lazy(() => import('./pages/admin/AdminAffiliateDetail'));
-const AdminCommissionRules       = lazy(() => import('./pages/admin/AdminCommissionRules'));
-const AdminAffiliatePayouts      = lazy(() => import('./pages/admin/AdminAffiliatePayouts'));
-const AdminAmbassadorsList       = lazy(() => import('./pages/admin/AdminAmbassadorsList'));
-const AdminAmbassadorDetail      = lazy(() => import('./pages/admin/AdminAmbassadorDetail'));
-
-// B2B
-const AdminB2BAccounts           = lazy(() => import('./pages/admin/AdminB2BAccounts'));
-const AdminB2BMembers            = lazy(() => import('./pages/admin/AdminB2BMembers'));
-const AdminB2BPricing            = lazy(() => import('./pages/admin/AdminB2BPricing'));
-const AdminB2BBilling            = lazy(() => import('./pages/admin/AdminB2BBilling'));
-const AdminB2BInvoices           = lazy(() => import('./pages/admin/AdminB2BInvoices'));
-const AdminB2BReports            = lazy(() => import('./pages/admin/AdminB2BReports'));
-
-// (alias AAAPROFILES si tu as déjà une page)
-const AdminAaaProfiles           = lazy(() => import('./pages/admin/AdminAaaProfiles'));
-
 // Pages d'info
 const SEO = lazy(() => import('./pages/SEO'));
 const ServiceStatus = lazy(() => import('./pages/ServiceStatus'));
@@ -189,64 +130,6 @@ const protectedUserRoutes: RouteConfig[] = [
   { path: '/booking-request', component: BookingRequest, protected: true },
   { path: '/payment-success', component: PaymentSuccess, protected: true },
   { path: '/dashboard/messages', component: DashboardMessages, protected: true },
-];
-
-// Admin (y compris avancé)
-const adminRoutes: RouteConfig[] = [
-  // Base
-  { path: '/admin/login', component: AdminLogin },
-  { path: '/admin/dashboard', component: AdminDashboard, protected: true, role: 'admin' },
-  { path: '/admin/pricing', component: AdminPricing, protected: true, role: 'admin' },
-  { path: '/admin/users', component: AdminUsers, protected: true, role: 'admin' },
-  { path: '/admin/calls', component: AdminCalls, protected: true, role: 'admin' },
-  { path: '/admin/messages-clients', component: AdminClientMessages, protected: true, role: 'admin' },
-  { path: '/admin/payments', component: AdminPayments, protected: true, role: 'admin' },
-  { path: '/admin/reviews', component: AdminReviews, protected: true, role: 'admin' },
-  { path: '/admin/reports', component: AdminReports, protected: true, role: 'admin' },
-  { path: '/admin/settings', component: AdminSettings, protected: true, role: 'admin' },
-  { path: '/admin/backups', component: AdminBackups, protected: true, role: 'admin' },
-  { path: '/admin/approvals', component: AdminApprovals, protected: true, role: 'admin' },
-  { path: '/admin/countries', component: AdminCountries, protected: true, role: 'admin' },
-  { path: '/admin/documents', component: AdminDocuments, protected: true, role: 'admin' },
-  { path: '/admin/promo-codes', component: AdminPromoCodes, protected: true, role: 'admin' },
-  { path: '/admin/legal-documents', component: AdminLegalDocuments, protected: true, role: 'admin' },
-  { path: '/admin/notifications', component: AdminNotifications, protected: true, role: 'admin' },
-
-  // Finance avancée
-  { path: '/admin/finance/reconciliation', component: AdminFinanceReconciliation, protected: true, role: 'admin' },
-  { path: '/admin/finance/disputes',       component: AdminFinanceDisputes,       protected: true, role: 'admin' },
-  { path: '/admin/finance/refunds',        component: AdminFinanceRefunds,        protected: true, role: 'admin' },
-  { path: '/admin/finance/ledger',         component: AdminFinanceLedger,         protected: true, role: 'admin' },
-
-  // Comms avancées
-  { path: '/admin/comms/campaigns',        component: AdminCommsCampaigns,        protected: true, role: 'admin' },
-  { path: '/admin/comms/campaigns/new',    component: AdminCommsCampaignEditor,   protected: true, role: 'admin' },
-  { path: '/admin/comms/campaigns/:id',    component: AdminCommsCampaignOverview, protected: true, role: 'admin' },
-  { path: '/admin/comms/segments',         component: AdminCommsSegments,         protected: true, role: 'admin' },
-  { path: '/admin/comms/automations',      component: AdminCommsAutomations,      protected: true, role: 'admin' },
-  { path: '/admin/comms/templates',        component: AdminCommsTemplates,        protected: true, role: 'admin' },
-  { path: '/admin/comms/deliverability',   component: AdminCommsDeliverability,   protected: true, role: 'admin' },
-  { path: '/admin/comms/suppression',      component: AdminCommsSuppression,      protected: true, role: 'admin' },
-  { path: '/admin/comms/ab',               component: AdminCommsABTests,          protected: true, role: 'admin' },
-
-  // Affiliés / Ambassadeurs
-  { path: '/admin/affiliates',             component: AdminAffiliatesList,        protected: true, role: 'admin' },
-  { path: '/admin/affiliates/:id',         component: AdminAffiliateDetail,       protected: true, role: 'admin' },
-  { path: '/admin/affiliates/commissions', component: AdminCommissionRules,       protected: true, role: 'admin' },
-  { path: '/admin/affiliates/payouts',     component: AdminAffiliatePayouts,      protected: true, role: 'admin' },
-  { path: '/admin/ambassadors',            component: AdminAmbassadorsList,       protected: true, role: 'admin' },
-  { path: '/admin/ambassadors/:id',        component: AdminAmbassadorDetail,      protected: true, role: 'admin' },
-
-  // B2B
-  { path: '/admin/b2b/accounts',           component: AdminB2BAccounts,           protected: true, role: 'admin' },
-  { path: '/admin/b2b/members',            component: AdminB2BMembers,            protected: true, role: 'admin' },
-  { path: '/admin/b2b/pricing',            component: AdminB2BPricing,            protected: true, role: 'admin' },
-  { path: '/admin/b2b/billing',            component: AdminB2BBilling,            protected: true, role: 'admin' },
-  { path: '/admin/b2b/invoices',           component: AdminB2BInvoices,           protected: true, role: 'admin' },
-  { path: '/admin/b2b/reports',            component: AdminB2BReports,            protected: true, role: 'admin' },
-
-  // AAA Profiles (alias)
-  { path: '/admin/aaaprofiles',            component: AdminAaaProfiles,           protected: true, role: 'admin', alias: '/admin/aaa-profiles' },
 ];
 
 // --------------------------------------------
@@ -366,14 +249,13 @@ const App: React.FC = () => {
       <div className={`App ${isMobile ? 'mobile-layout' : 'desktop-layout'}`}>
         <DefaultHelmet pathname={location.pathname} />
         <Suspense fallback={<LoadingSpinner size="large" color="red" />}>
-          {/* Routes de l’app */}
+          {/* Routes de l'app */}
           <Routes>
             {routeConfigs.map((cfg, i) => renderRoute(cfg, i))}
             {protectedUserRoutes.map((cfg, i) => renderRoute(cfg, i + 1000))}
-            {adminRoutes.map((cfg, i) => renderRoute(cfg, i + 2000))}
           </Routes>
 
-          {/* Alias / compléments admin V2 */}
+          {/* Routes admin gérées par AdminRoutesV2 */}
           <AdminRoutesV2 />
         </Suspense>
       </div>

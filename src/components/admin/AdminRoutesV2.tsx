@@ -39,8 +39,26 @@ const AdminReviews = lazy(() => import("@/pages/admin/AdminReviews"));
 // ===== LAZY IMPORTS - CALLS =====
 const AdminCalls = lazy(() => import("@/pages/admin/AdminCalls"));
 // Placeholders temporaires
-const AdminCallsSessions = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Sessions d'appels</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
-const AdminCallsRecordings = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Enregistrements</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
+const AdminCallsSessions = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Sessions d'appels</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
+const AdminCallsRecordings = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Enregistrements</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
 
 // ===== LAZY IMPORTS - COMMUNICATIONS =====
 const AdminCommsCampaigns = lazy(() => import("@/pages/admin/AdminCommsCampaigns"));
@@ -55,10 +73,37 @@ const AdminNotifications = lazy(() => import("@/pages/admin/AdminNotifications")
 
 // ===== LAZY IMPORTS - AFFILIATION =====
 // Placeholders temporaires
-const AdminAffiliates = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Affiliés</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
+const AdminAffiliates = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Affiliés</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
 const AdminCommissionRules = lazy(() => import("@/pages/admin/AdminCommissionRules"));
-const AdminAffiliatePayouts = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Payouts Affiliés</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
-const AdminAmbassadors = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Ambassadeurs</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
+const AdminAffiliatePayouts = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Payouts Affiliés</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
+const AdminAmbassadors = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Ambassadeurs</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
 
 // ===== LAZY IMPORTS - B2B =====
 const AdminB2BAccounts = lazy(() => import("@/pages/admin/AdminB2BAccounts"));
@@ -83,10 +128,46 @@ const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
 // const AdminDataExports = lazy(() => import("@/pages/admin/AdminDataExports"));
 
 // Placeholders temporaires
-const AdminFinancialReports = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Rapports Financiers</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
-const AdminUserAnalytics = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Analytics Utilisateurs</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
-const AdminPlatformPerformance = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Performance Plateforme</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
-const AdminDataExports = lazy(() => Promise.resolve({ default: () => <div className="p-6"><h1 className="text-2xl font-semibold mb-2">Exports de Données</h1><p className="text-sm opacity-80">Page en cours de développement</p></div> }));
+const AdminFinancialReports = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Rapports Financiers</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
+const AdminUserAnalytics = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Analytics Utilisateurs</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
+const AdminPlatformPerformance = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Performance Plateforme</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
+const AdminDataExports = lazy(() =>
+  Promise.resolve({
+    default: () => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">Exports de Données</h1>
+        <p className="text-sm opacity-80">Page en cours de développement</p>
+      </div>
+    ),
+  })
+);
 
 // ===== LAZY IMPORTS - AUTRES PAGES =====
 const AdminPromoCodes = lazy(() => import("@/pages/admin/AdminPromoCodes"));
@@ -104,397 +185,397 @@ const AdminRoutesV2: React.FC = () => {
         <Route path="/admin/" element={<Navigate to="/admin/dashboard" replace />} />
 
         {/* ===== 📊 DASHBOARD ===== */}
-        <Route 
-          path="/admin/dashboard" 
+        <Route
+          path="/admin/dashboard"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du tableau de bord..." />}>
               <AdminDashboard />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 💰 FINANCES & FACTURATION ===== */}
-        <Route 
-          path="/admin/finance/payments" 
+        <Route
+          path="/admin/finance/payments"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des paiements..." />}>
               <AdminPayments />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/invoices" 
+        <Route
+          path="/admin/finance/invoices"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des factures..." />}>
               <AdminInvoices />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/taxes" 
+        <Route
+          path="/admin/finance/taxes"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la gestion TVA..." />}>
               <AdminFinanceTaxes />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/taxes/by-country" 
+        <Route
+          path="/admin/finance/taxes/by-country"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la TVA par pays..." />}>
               <AdminFinanceTaxesByCountry />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/reconciliation" 
+        <Route
+          path="/admin/finance/reconciliation"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des rapprochements..." />}>
               <AdminFinanceReconciliation />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/disputes" 
+        <Route
+          path="/admin/finance/disputes"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des litiges..." />}>
               <AdminFinanceDisputes />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/refunds" 
+        <Route
+          path="/admin/finance/refunds"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des remboursements..." />}>
               <AdminFinanceRefunds />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/payouts" 
+        <Route
+          path="/admin/finance/payouts"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des payouts..." />}>
               <AdminFinancePayouts />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/exports" 
+        <Route
+          path="/admin/finance/exports"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
               <AdminFinanceExports />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/finance/ledger" 
+        <Route
+          path="/admin/finance/ledger"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du grand livre..." />}>
               <AdminFinanceLedger />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 👥 UTILISATEURS & PRESTATAIRES ===== */}
-        <Route 
-          path="/admin/users/list" 
+        <Route
+          path="/admin/users/list"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des utilisateurs..." />}>
               <AdminUsers />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/users/providers" 
+        <Route
+          path="/admin/users/providers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des prestataires..." />}>
               <AdminProviders />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/approvals" 
+        <Route
+          path="/admin/approvals"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des validations..." />}>
               <AdminApprovals />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/aaaprofiles" 
+        <Route
+          path="/admin/aaaprofiles"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des profils de test..." />}>
               <AdminAaaProfiles />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/reviews" 
+        <Route
+          path="/admin/reviews"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des avis..." />}>
               <AdminReviews />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 📞 APPELS & PLANIFICATION ===== */}
-        <Route 
-          path="/admin/calls" 
+        <Route
+          path="/admin/calls"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du monitoring des appels..." />}>
               <AdminCalls />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/calls/sessions" 
+        <Route
+          path="/admin/calls/sessions"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des sessions..." />}>
               <AdminCallsSessions />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/calls/recordings" 
+        <Route
+          path="/admin/calls/recordings"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des enregistrements..." />}>
               <AdminCallsRecordings />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 💌 COMMUNICATIONS ===== */}
-        <Route 
-          path="/admin/comms/campaigns" 
+        <Route
+          path="/admin/comms/campaigns"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des campagnes..." />}>
               <AdminCommsCampaigns />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/automations" 
+        <Route
+          path="/admin/comms/automations"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des automations..." />}>
               <AdminCommsAutomations />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/segments" 
+        <Route
+          path="/admin/comms/segments"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des segments..." />}>
               <AdminCommsSegments />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/templates" 
+        <Route
+          path="/admin/comms/templates"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des templates..." />}>
               <AdminCommsTemplates />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/deliverability" 
+        <Route
+          path="/admin/comms/deliverability"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la délivrabilité..." />}>
               <AdminCommsDeliverability />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/suppression" 
+        <Route
+          path="/admin/comms/suppression"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des listes de suppression..." />}>
               <AdminCommsSuppression />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/ab" 
+        <Route
+          path="/admin/comms/ab"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des tests A/B..." />}>
               <AdminCommsABTests />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/messages" 
+        <Route
+          path="/admin/comms/messages"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des messages..." />}>
               <AdminClientMessages />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/comms/notifications" 
+        <Route
+          path="/admin/comms/notifications"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des notifications..." />}>
               <AdminNotifications />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 🤝 AFFILIATION & AMBASSADEURS ===== */}
-        <Route 
-          path="/admin/affiliates" 
+        <Route
+          path="/admin/affiliates"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des affiliés..." />}>
               <AdminAffiliates />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/affiliates/commissions" 
+        <Route
+          path="/admin/affiliates/commissions"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des règles de commission..." />}>
               <AdminCommissionRules />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/affiliates/payouts" 
+        <Route
+          path="/admin/affiliates/payouts"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des payouts affiliés..." />}>
               <AdminAffiliatePayouts />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/ambassadors" 
+        <Route
+          path="/admin/ambassadors"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des ambassadeurs..." />}>
               <AdminAmbassadors />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 🏢 ENTREPRISES (B2B) ===== */}
-        <Route 
-          path="/admin/b2b/accounts" 
+        <Route
+          path="/admin/b2b/accounts"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des comptes B2B..." />}>
               <AdminB2BAccounts />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/b2b/members" 
+        <Route
+          path="/admin/b2b/members"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des membres B2B..." />}>
               <AdminB2BMembers />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/b2b/pricing" 
+        <Route
+          path="/admin/b2b/pricing"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des tarifs B2B..." />}>
               <AdminB2BPricing />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/b2b/billing" 
+        <Route
+          path="/admin/b2b/billing"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la facturation B2B..." />}>
               <AdminB2BBilling />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/b2b/invoices" 
+        <Route
+          path="/admin/b2b/invoices"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des factures B2B..." />}>
               <AdminB2BInvoices />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/b2b/reports" 
+        <Route
+          path="/admin/b2b/reports"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des rapports B2B..." />}>
               <AdminB2BReports />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== ⚙️ CONFIGURATION & OUTILS ===== */}
-        <Route 
-          path="/admin/pricing" 
+        <Route
+          path="/admin/pricing"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des tarifs..." />}>
               <AdminPricing />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/countries" 
+        <Route
+          path="/admin/countries"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des pays..." />}>
               <AdminCountries />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/documents" 
+        <Route
+          path="/admin/documents"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des documents légaux..." />}>
               <AdminLegalDocuments />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/backups" 
+        <Route
+          path="/admin/backups"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des sauvegardes..." />}>
               <AdminBackups />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/settings" 
+        <Route
+          path="/admin/settings"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des paramètres..." />}>
               <AdminSettings />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== 📊 RAPPORTS & ANALYTICS ===== */}
-        <Route 
-          path="/admin/reports/financial" 
+        <Route
+          path="/admin/reports/financial"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des rapports financiers..." />}>
               <AdminFinancialReports />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/reports/users" 
+        <Route
+          path="/admin/reports/users"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des analytics utilisateurs..." />}>
               <AdminUserAnalytics />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/reports/performance" 
+        <Route
+          path="/admin/reports/performance"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des performances..." />}>
               <AdminPlatformPerformance />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/reports/exports" 
+        <Route
+          path="/admin/reports/exports"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
               <AdminDataExports />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== ROUTES HISTORIQUES / LEGACY (pour compatibilité) ===== */}
@@ -507,37 +588,37 @@ const AdminRoutesV2: React.FC = () => {
         <Route path="/admin/messages" element={<Navigate to="/admin/comms/messages" replace />} />
 
         {/* ===== ROUTES SUPPLÉMENTAIRES EXISTANTES ===== */}
-        <Route 
-          path="/admin/promo-codes" 
+        <Route
+          path="/admin/promo-codes"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des codes promo..." />}>
               <AdminPromoCodes />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/documents-old" 
+        <Route
+          path="/admin/documents-old"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des documents..." />}>
               <AdminDocuments />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/contact-messages" 
+        <Route
+          path="/admin/contact-messages"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des messages de contact..." />}>
               <AdminContactMessages />
             </Suspense>
-          } 
+          }
         />
-        <Route 
-          path="/admin/emails" 
+        <Route
+          path="/admin/emails"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des emails..." />}>
               <AdminEmails />
             </Suspense>
-          } 
+          }
         />
 
         {/* ===== ROUTES ALIAS SPÉCIFIQUES ===== */}
@@ -556,8 +637,8 @@ const AdminRoutesV2: React.FC = () => {
         <Route path="/admin/comms" element={<Navigate to="/admin/comms/campaigns" replace />} />
 
         {/* ===== PAGE 404 POUR L'ADMIN ===== */}
-        <Route 
-          path="/admin/*" 
+        <Route
+          path="/admin/*"
           element={
             <div className="flex items-center justify-center min-h-[400px] bg-gray-50">
               <div className="text-center">
@@ -572,14 +653,14 @@ const AdminRoutesV2: React.FC = () => {
                   Retour
                 </button>
                 <button
-                  onClick={() => window.location.href = '/admin/dashboard'}
+                  onClick={() => (window.location.href = "/admin/dashboard")}
                   className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                 >
                   Tableau de bord
                 </button>
               </div>
             </div>
-          } 
+          }
         />
       </Routes>
     </Suspense>
@@ -590,55 +671,55 @@ const AdminRoutesV2: React.FC = () => {
 export const useAdminRouteValidation = () => {
   const validateRoute = (path: string): boolean => {
     const validPaths = [
-      '/admin/dashboard',
-      '/admin/finance/payments',
-      '/admin/finance/invoices',
-      '/admin/finance/taxes',
-      '/admin/finance/taxes/by-country',
-      '/admin/finance/reconciliation',
-      '/admin/finance/disputes',
-      '/admin/finance/refunds',
-      '/admin/finance/payouts',
-      '/admin/finance/exports',
-      '/admin/finance/ledger',
-      '/admin/users/list',
-      '/admin/users/providers',
-      '/admin/approvals',
-      '/admin/aaaprofiles',
-      '/admin/reviews',
-      '/admin/calls',
-      '/admin/calls/sessions',
-      '/admin/calls/recordings',
-      '/admin/comms/campaigns',
-      '/admin/comms/automations',
-      '/admin/comms/segments',
-      '/admin/comms/templates',
-      '/admin/comms/deliverability',
-      '/admin/comms/suppression',
-      '/admin/comms/ab',
-      '/admin/comms/messages',
-      '/admin/comms/notifications',
-      '/admin/affiliates',
-      '/admin/affiliates/commissions',
-      '/admin/affiliates/payouts',
-      '/admin/ambassadors',
-      '/admin/b2b/accounts',
-      '/admin/b2b/members',
-      '/admin/b2b/pricing',
-      '/admin/b2b/billing',
-      '/admin/b2b/invoices',
-      '/admin/b2b/reports',
-      '/admin/pricing',
-      '/admin/countries',
-      '/admin/documents',
-      '/admin/backups',
-      '/admin/settings',
-      '/admin/reports/financial',
-      '/admin/reports/users',
-      '/admin/reports/performance',
-      '/admin/reports/exports'
+      "/admin/dashboard",
+      "/admin/finance/payments",
+      "/admin/finance/invoices",
+      "/admin/finance/taxes",
+      "/admin/finance/taxes/by-country",
+      "/admin/finance/reconciliation",
+      "/admin/finance/disputes",
+      "/admin/finance/refunds",
+      "/admin/finance/payouts",
+      "/admin/finance/exports",
+      "/admin/finance/ledger",
+      "/admin/users/list",
+      "/admin/users/providers",
+      "/admin/approvals",
+      "/admin/aaaprofiles",
+      "/admin/reviews",
+      "/admin/calls",
+      "/admin/calls/sessions",
+      "/admin/calls/recordings",
+      "/admin/comms/campaigns",
+      "/admin/comms/automations",
+      "/admin/comms/segments",
+      "/admin/comms/templates",
+      "/admin/comms/deliverability",
+      "/admin/comms/suppression",
+      "/admin/comms/ab",
+      "/admin/comms/messages",
+      "/admin/comms/notifications",
+      "/admin/affiliates",
+      "/admin/affiliates/commissions",
+      "/admin/affiliates/payouts",
+      "/admin/ambassadors",
+      "/admin/b2b/accounts",
+      "/admin/b2b/members",
+      "/admin/b2b/pricing",
+      "/admin/b2b/billing",
+      "/admin/b2b/invoices",
+      "/admin/b2b/reports",
+      "/admin/pricing",
+      "/admin/countries",
+      "/admin/documents",
+      "/admin/backups",
+      "/admin/settings",
+      "/admin/reports/financial",
+      "/admin/reports/users",
+      "/admin/reports/performance",
+      "/admin/reports/exports",
     ];
-    
+
     return validPaths.includes(path);
   };
 

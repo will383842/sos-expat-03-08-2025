@@ -20,7 +20,8 @@ const PROJECT_ID =
   process.env.FUNCTIONS_PROJECT_ID;
 
 const BACKUP_BUCKET = process.env.BACKUP_BUCKET || "sos-expat-backup"; // bucket Europe (europe-west1)
-const STORAGE_SOURCE_BUCKET = `${PROJECT_ID}.appspot.com`; // bucket Storage par défaut (us-central1)
+// index.js
+const STORAGE_SOURCE_BUCKET = "sos-urgently-ac307.firebasestorage.app";
 const RETENTION_COUNT = 6; // garder 6 sauvegardes
 
 // ====== Scheduler (config) ======

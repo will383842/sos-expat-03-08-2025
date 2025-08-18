@@ -6,12 +6,25 @@ import {
   getBackupSchedule,
   updateBackupSchedule,
   restoreFromBackup,
-  deleteBackupDoc,
+  deleteBackup,
   openTestBackupHttp,
+  grantAdminIfToken,
 } from "@/services/backupService";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Button from "@/components/common/Button";
-import { Clock, CheckCircle, AlertTriangle, RefreshCw, Save, Trash, Database, Play } from "lucide-react";
+import {
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
+  Save,
+  Trash,
+  Database,
+  Play,
+} from "lucide-react";
+import { getAuth } from "firebase/auth";
+
+// Types
 
 type Row = {
   id: string;
@@ -25,6 +38,23 @@ type Row = {
   prefix?: string;
 };
 
+// Utils
+
+async function isAdminNow(): Promise<boolean> {
+  const auth = getAuth();
+  // Attendre que Firebase connaisse l'état d'auth
+  await new Promise<void>((res) => {
+    const off = auth.onAuthStateChanged(() => {
+      off();
+      res();
+    });
+  });
+  // Forcer un token frais
+  await auth.currentUser?.getIdToken(true);
+  const t = await auth.currentUser?.getIdTokenResult();
+  return t?.claims?.role === "admin";
+}
+
 const AdminBackups: React.FC = () => {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,22 +62,29 @@ const AdminBackups: React.FC = () => {
   const [cron, setCron] = useState("0 3 * * *");
   const [timeZone, setTimeZone] = useState("Europe/Paris");
   const [restorePrefix, setRestorePrefix] = useState("");
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [secretToken, setSecretToken] = useState("");
+  const [granting, setGranting] = useState(false);
 
+  // --- Init ---
   useEffect(() => {
-    // Souscription Firestore (typée, pas de any)
-    const unsub = subscribeBackups((list) => {
-      // Les données proviennent de Firestore; on accepte le shape attendu Row
-      setRows(list as unknown as Row[]);
-    });
+    const unsub = subscribeBackups((list) => setRows(list as unknown as Row[]));
 
     (async () => {
+      const ok = await isAdminNow();
+      setIsAdmin(ok);
+      if (!ok) {
+        console.debug(
+          "Skip getBackupSchedule: rôle 'admin' absent. Utilise le bloc 'Devenir admin'."
+        );
+        return;
+      }
       try {
         const s = await getBackupSchedule();
         if (s?.schedule) setCron(s.schedule);
         if (s?.timeZone) setTimeZone(s.timeZone);
       } catch (e) {
-        // Pas bloquant côté UI; on log en debug pour éviter le no-empty
-        console.debug("getBackupSchedule failed (non-bloquant):", e);
+        console.debug("getBackupSchedule (non-bloquant):", e);
       }
     })();
 
@@ -56,17 +93,20 @@ const AdminBackups: React.FC = () => {
     };
   }, []);
 
-  // ----- Helpers UI -----
+  // --- Helpers ---
   const fmtDate = (v: unknown) => {
     try {
-      // Supporte Firestore Timestamp (toDate), Date, ou { _seconds }
       const d =
-        typeof v === "object" && v !== null && "toDate" in (v as Record<string, unknown>) &&
+        typeof v === "object" &&
+        v !== null &&
+        "toDate" in (v as Record<string, unknown>) &&
         typeof (v as { toDate?: () => Date }).toDate === "function"
           ? (v as { toDate: () => Date }).toDate()
           : v instanceof Date
           ? v
-          : typeof v === "object" && v !== null && "_seconds" in (v as Record<string, unknown>)
+          : typeof v === "object" &&
+            v !== null &&
+            "_seconds" in (v as Record<string, unknown>)
           ? new Date(Number((v as { _seconds: number })._seconds) * 1000)
           : undefined;
 
@@ -130,30 +170,47 @@ const AdminBackups: React.FC = () => {
     );
   };
 
-  // ----- 3.4 Latest prefix -----
   const latestPrefix = useMemo(() => {
     const completed = rows.filter((r) => r.status === "completed");
     if (completed.length === 0) return "";
     for (const r of completed) if (r.prefix) return r.prefix as string;
     for (const r of completed) {
       const a = r.artifacts || {};
-      const anyVal = a.firestore || a.auth || a.functions;
+      const anyVal = (a as any).firestore || (a as any).auth || (a as any).functions;
       if (typeof anyVal === "string" && anyVal.includes("/app/")) {
-        const m = anyVal.match(/app\/([^/]+\/[^/]+)/);
+        const m = anyVal.match(/app\/(^[^/]+\/[^/]+)/);
         if (m) return m[1];
       }
     }
     return "";
   }, [rows]);
 
-  // ----- 3.3 Actions -----
-  async function onTest() {
-    openTestBackupHttp(); // ouvre la fonction HTTP dans un onglet → pas de CORS
+  // ---- Actions ----
+  async function ensureAdminOrExplain() {
+    const ok = await isAdminNow();
+    setIsAdmin(ok);
+    if (!ok) {
+      alert(
+        "Ton jeton n'a pas encore le rôle admin. Utilise le bloc 'Devenir admin', puis recharge la page."
+      );
+    }
+    return ok;
   }
 
-  const getErrMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+  function getErrMsg(e: unknown) {
+    return e instanceof Error ? e.message : String(e);
+  }
+
+  async function onTest() {
+    try {
+      await openTestBackupHttp();
+    } catch (e) {
+      alert(getErrMsg(e));
+    }
+  }
 
   async function onStartBackup() {
+    if (!(await ensureAdminOrExplain())) return;
     setLoading(true);
     try {
       await startBackup();
@@ -166,6 +223,7 @@ const AdminBackups: React.FC = () => {
   }
 
   async function onSaveSchedule() {
+    if (!(await ensureAdminOrExplain())) return;
     setLoading(true);
     try {
       await updateBackupSchedule(cron, timeZone);
@@ -178,6 +236,7 @@ const AdminBackups: React.FC = () => {
   }
 
   async function onRestore(prefix: string) {
+    if (!(await ensureAdminOrExplain())) return;
     const p = prefix || latestPrefix;
     if (!p) {
       alert("Renseigne un prefix AAAA-MM-JJ/HHMMSS");
@@ -196,15 +255,37 @@ const AdminBackups: React.FC = () => {
   }
 
   async function onDelete(id: string) {
+    if (!(await ensureAdminOrExplain())) return;
     if (!confirm("Supprimer cette sauvegarde ? Les fichiers seront effacés du bucket.")) return;
     setLoading(true);
     try {
-      await deleteBackupDoc(id);
+      await deleteBackup(id);
       alert("Sauvegarde supprimée.");
     } catch (e: unknown) {
       alert(getErrMsg(e) || "Erreur suppression");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // --- Devenir admin ---
+  async function onGrantAdmin() {
+    if (!secretToken) {
+      alert("Colle d'abord BACKUP_CRON_TOKEN");
+      return;
+    }
+    setGranting(true);
+    try {
+      await grantAdminIfToken(secretToken);
+      const auth = getAuth();
+      await auth.currentUser?.getIdToken(true);
+      const t = await auth.currentUser?.getIdTokenResult();
+      console.log("Claims:", t?.claims); // on s'attend à { role: "admin", ... }
+      alert("OK: rôle admin accordé. Recharge la page.");
+    } catch (e: any) {
+      alert(e?.message || "Erreur grantAdminIfToken");
+    } finally {
+      setGranting(false);
     }
   }
 
@@ -224,6 +305,27 @@ const AdminBackups: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Devenir admin (setup temporaire) */}
+        {isAdmin === false && (
+          <div className="mt-4 p-3 border rounded bg-white mb-6">
+            <h4 className="font-medium mb-2">Devenir admin (setup)</h4>
+            <input
+              value={secretToken}
+              onChange={(e) => setSecretToken(e.target.value)}
+              placeholder="Colle BACKUP_CRON_TOKEN"
+              className="border px-2 py-1 rounded w-full mb-2"
+              type="password"
+            />
+            <button
+              onClick={onGrantAdmin}
+              disabled={granting || !secretToken}
+              className="px-3 py-1 rounded bg-black text-white disabled:opacity-50"
+            >
+              {granting ? "Validation..." : "Valider et devenir admin"}
+            </button>
+          </div>
+        )}
 
         {/* Planification */}
         <div className="bg-white border rounded-lg p-4 mb-6">

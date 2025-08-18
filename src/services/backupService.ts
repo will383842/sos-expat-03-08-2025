@@ -1,131 +1,107 @@
-import { db, functions } from "@/config/firebase";
+// src/services/backupService.ts
+import { getApp } from "firebase/app";
 import {
+  getFirestore,
   collection,
   onSnapshot,
-  orderBy,
-  limit,
   query,
-  Timestamp,
+  orderBy,
+  DocumentData,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { functions } from "@/config/firebase";
 
-/** Données d’un document "backups" (sans l’id Firestore) */
-type BackupDoc = {
-  type: "manual" | "automatic" | "scheduled-http";
+export type BackupRow = {
+  id: string;
+  type: string;
   status: "pending" | "completed" | "failed";
-  createdAt?: Timestamp;
-  completedAt?: Timestamp;
+  createdAt?: unknown;
+  completedAt?: unknown;
   createdBy?: string;
-  artifacts?: {
-    firestore?: string;
-    auth?: string;
-    functions?: string;
-    storageJob?: string;
-    [k: string]: string | undefined;
-  };
-  prefix?: string;
+  artifacts?: Record<string, string>;
   error?: string;
-};
-
-/** Ligne envoyée au composant (inclut l’id) */
-export type BackupRow = BackupDoc & { id: string };
-
-type StartBackupResponse = {
-  ok: boolean;
-  artifacts?: Record<string, unknown>;
   prefix?: string;
 };
 
-type GetScheduleResponse = {
-  schedule: string | null;
+export type BackupSchedule = {
+  schedule: string;
   timeZone: string;
-  uri: string | null;
 };
-
-type UpdateScheduleResponse = { ok: boolean };
 
 export type RestoreParts = {
   firestore?: boolean;
   storage?: boolean;
-  auth?: "basic";
+  auth?: "none" | "basic" | "full";
 };
 
-type RestoreResponse = {
-  ok: boolean;
-  firestore?: unknown;
-  storageJob?: string;
-  auth?: { restored: number; mode: "basic" };
-};
-
-type DeleteBackupResponse = { ok: boolean };
-
+// ---- Firestore subscription ----
 export function subscribeBackups(cb: (rows: BackupRow[]) => void): () => void {
-  const q = query(
-    collection(db, "backups"),
-    orderBy("createdAt", "desc"),
-    limit(50)
-  );
-  return onSnapshot(q, (snap) => {
-    const rows: BackupRow[] = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as BackupDoc),
-    }));
-    cb(rows);
+  const db = getFirestore();
+  const col = collection(db, "backups");
+  const q = query(col, orderBy("createdAt", "desc"));
+  const unsub = onSnapshot(q, (snap) => {
+    const list: BackupRow[] = snap.docs.map((d) => {
+      const data = d.data() as DocumentData;
+      return {
+        id: d.id,
+        type: data.type ?? "manual",
+        status: data.status ?? "pending",
+        createdAt: data.createdAt,
+        completedAt: data.completedAt,
+        createdBy: data.createdBy,
+        artifacts: data.artifacts ?? {},
+        error: data.error,
+        prefix: data.prefix,
+      };
+    });
+    cb(list);
   });
+  return unsub;
 }
 
-export async function startBackup(): Promise<StartBackupResponse> {
-  const call = httpsCallable<void, StartBackupResponse>(functions, "startBackup");
-  return (await call(undefined)).data;
+// ---- Callables ----
+export async function startBackup() {
+  const call = httpsCallable(functions, "startBackup");
+  return (await call()).data as { ok: boolean };
 }
 
-export async function getBackupSchedule(): Promise<GetScheduleResponse> {
-  const call = httpsCallable<void, GetScheduleResponse>(
-    functions,
-    "getBackupSchedule"
-  );
-  return (await call(undefined)).data;
+export async function getBackupSchedule() {
+  const call = httpsCallable(functions, "getBackupSchedule");
+  return (await call()).data as Partial<BackupSchedule> & { uri?: string | null };
 }
 
-export async function updateBackupSchedule(
-  cron: string,
-  timeZone = "Europe/Paris"
-): Promise<UpdateScheduleResponse> {
-  const call = httpsCallable<{ cron: string; timeZone: string }, UpdateScheduleResponse>(
-    functions,
-    "updateBackupSchedule"
-  );
-  return (await call({ cron, timeZone })).data;
+export async function updateBackupSchedule(cron: string, timeZone: string) {
+  // backend attend { cron, timeZone }
+  const call = httpsCallable(functions, "updateBackupSchedule");
+  return (await call({ cron, timeZone })).data as { ok: boolean };
 }
 
-export async function restoreFromBackup(
-  prefix: string,
-  parts: RestoreParts
-): Promise<RestoreResponse> {
-  const call = httpsCallable<{ prefix: string; parts: RestoreParts }, RestoreResponse>(
-    functions,
-    "restoreFromBackup"
-  );
-  return (await call({ prefix, parts })).data;
+export async function restoreFromBackup(prefix: string, parts: RestoreParts) {
+  // backend attend { prefix, parts } (pas "options")
+  const call = httpsCallable(functions, "restoreFromBackup");
+  return (await call({ prefix, parts })).data as { ok: boolean };
 }
 
-export async function deleteBackupDoc(docId: string): Promise<DeleteBackupResponse> {
-  const call = httpsCallable<{ docId: string }, DeleteBackupResponse>(
-    functions,
-    "deleteBackup"
-  );
-  return (await call({ docId })).data;
+export async function deleteBackup(id: string) {
+  // backend exporte "deleteBackup" et attend { docId }
+  const call = httpsCallable(functions, "deleteBackup");
+  return (await call({ docId: id })).data as { ok: boolean };
 }
 
-// Pour le bouton "Test" (HTTP GET) : ouvre la page (évite CORS)
-export function openTestBackupHttp(): void {
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  const region = import.meta.env.VITE_FUNCTIONS_REGION || "europe-west1";
-  window.open(
-    `https://${region}-${projectId}.cloudfunctions.net/testBackup`,
-    "_blank"
-  );
+export function openTestBackupHttp() {
+  if (typeof window === "undefined") return;
+  // backend expose "testBackup" (pas "backupTest")
+  const app = getApp();
+  const projectId =
+    ((app.options as any)?.projectId as string | undefined) ||
+    (import.meta as any)?.env?.VITE_FIREBASE_PROJECT_ID ||
+    "demo-project";
+  const region = (import.meta as any)?.env?.VITE_FUNCTIONS_REGION || "europe-west1";
+  const url = `https://${region}-${projectId}.cloudfunctions.net/testBackup`;
+  window.open(url, "_blank", "noopener,noreferrer");
 }
+
+// ---- Admin elevation ----
 export async function grantAdminIfToken(token: string) {
   const call = httpsCallable(functions, "grantAdminIfToken");
   return (await call({ token })).data as { ok: boolean };

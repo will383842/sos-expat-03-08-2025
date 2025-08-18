@@ -1,12 +1,12 @@
 import React from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 
-const AdminAffiliatePayouts: React.FC = () => {
+const AdminPerformanceReports: React.FC = () => {
   return (
     <AdminLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Payouts Affiliés</h1>
-        <p className="text-gray-600">Gestion des paiements aux affiliés</p>
+        <h1 className="text-2xl font-bold mb-4">Performance Plateforme</h1>
+        <p className="text-gray-600">Métriques de performance et disponibilité</p>
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-blue-700">🚧 Page en cours de développement</p>
         </div>
@@ -15,4 +15,4 @@ const AdminAffiliatePayouts: React.FC = () => {
   );
 };
 
-export default AdminAffiliatePayouts;
+export default AdminPerformanceReports;

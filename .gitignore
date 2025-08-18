@@ -1,20 +1,48 @@
-# --- Dépendances ---
+# ================================
+# Dépendances
+# ================================
 node_modules/
 **/node_modules/
 
-# --- Builds / artefacts ---
+# ================================
+# Builds / artefacts
+# ================================
 /dist/
 /dist-ssr/
 /build/
 /.vite/
 coverage/
 
-# --- Environnements & secrets ---
+# ================================
+# Environnements & secrets
+# ================================
 .env
 .env.*
 !.env.example
 
-# --- Logs (racine) ---
+# fichiers de clés & credentials sensibles
+**/serviceAccount.json
+**/service-account.json
+**/serviceAccount*.json
+**/*-adminsdk-*.json
+**/*.p12
+**/*.pem
+**/*.p8
+**/*.key
+**/google-application-credentials.json
+
+# Config runtime Firebase Functions
+functions/.runtimeconfig.json
+backup-functions/.runtimeconfig.json
+
+# Sauvegardes/export locaux éventuels
+/backups/
+*.backup.json
+*.export.json
+
+# ================================
+# Logs
+# ================================
 /logs/
 /*.log
 npm-debug.log*
@@ -22,23 +50,38 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-# --- Firebase ---
 firebase-debug.log
+
+# ================================
+# Firebase
+# ================================
 .firebase/            # état local émulateur
+
 # Garder en repo (utile CI/CD & config projet)
 !.firebaserc
 !firebase.json
 !firestore.rules
 !storage.rules
 
-# --- Firebase Functions (si tu en as) ---
+# ================================
+# Firebase Functions
+# ================================
 functions/lib/
 functions/node_modules/
 functions/.env
 functions/.env.*
 
-# --- Éditeurs & OS ---
+# ================================
+# Backup Functions
+# ================================
+backup-functions/lib/
+backup-functions/node_modules/
+backup-functions/.env
+backup-functions/.env.*
+
+# ================================
+# Editeurs & OS
+# ================================
 /.vscode/*
 !/.vscode/extensions.json
 .idea/
@@ -50,13 +93,11 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
-# === secrets & env ===
-.env
-.env.*
-!.env.example
-firebase-debug.log
-serveremails/.env
-firebase/functions/.env
-# Firebase SW config réelle (non versionnée)
+
+# ================================
+# Firebase config frontend
+# ================================
+# fichier réel de config Firebase (ne doit pas être versionné)
 public/firebase-config.js
+# exemple de config Firebase (gardé pour doc)
 !public/firebase-config.example.js

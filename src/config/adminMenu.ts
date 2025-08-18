@@ -1,4 +1,4 @@
-// src/config/adminMenu.ts - VERSION OPTIMISÉE
+// src/config/adminMenu.ts - VERSION MISE À JOUR AVEC NOUVELLE ORGANISATION
 import {
   BarChart3,
   DollarSign,
@@ -46,7 +46,14 @@ import {
   Cog,
   BarChart,
   Download,
-  Zap
+  Zap,
+  UserX,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Eye,
+  Search,
+  Filter
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -70,48 +77,84 @@ export const adminMenuTree: AdminMenuItem[] = [
     description: 'Vue d\'ensemble et KPIs en temps réel'
   },
 
-  // ===== 👥 UTILISATEURS (Priorité 2 - Usage quotidien) =====
+  // ===== 👥 UTILISATEURS & PRESTATAIRES (Priorité 2 - Usage quotidien) =====
   {
     id: 'users',
-    label: 'Utilisateurs & Prestataires',
+    label: 'Users et prestataires',
     icon: Users,
     description: 'Gestion complète des utilisateurs',
     children: [
+      // Sous-section : TOUS LES UTILISATEURS
       {
-        id: 'users-list',
+        id: 'all-users',
         label: 'Tous les utilisateurs',
-        path: '/admin/users/list',
         icon: UsersIcon,
-        description: 'Liste complète des utilisateurs'
+        description: 'Vue globale de tous les utilisateurs',
+        children: [
+          {
+            id: 'clients',
+            label: 'Clients',
+            path: '/admin/users/clients',
+            icon: Users,
+            description: 'Utilisateurs clients'
+          },
+          {
+            id: 'prestataires-section',
+            label: 'Prestataires',
+            icon: UserCheck,
+            description: 'Tous les prestataires',
+            children: [
+              {
+                id: 'avocats',
+                label: 'Avocat',
+                path: '/admin/users/providers/lawyers',
+                icon: Shield,
+                description: 'Avocats partenaires'
+              },
+              {
+                id: 'expats',
+                label: 'Expats',
+                path: '/admin/users/providers/expats',
+                icon: Globe,
+                description: 'Expatriés conseillers'
+              }
+            ]
+          }
+        ]
       },
-      {
-        id: 'providers-list',
-        label: 'Prestataires',
-        path: '/admin/users/providers',
-        icon: UserCheck,
-        description: 'Avocats et expatriés actifs'
-      },
-      {
-        id: 'validation-kyc',
-        label: 'Validation & KYC',
-        path: '/admin/approvals',
-        icon: Shield,
-        badge: '3',
-        description: 'Validation des comptes et vérifications'
-      },
-      {
-        id: 'reviews-ratings',
-        label: 'Avis & Notations',
-        path: '/admin/reviews',
-        icon: Star,
-        description: 'Modération des avis clients'
-      },
+      // Sous-section : AAA PROFILES
       {
         id: 'aaa-profiles',
-        label: 'Profils de test (AAA)',
+        label: 'AAA Profiles',
         path: '/admin/aaaprofiles',
         icon: TestTube,
         description: 'Profils de démonstration et test'
+      },
+      // Sous-section : VALIDATION AVOCATS
+      {
+        id: 'validation-avocats',
+        label: 'Validation avocats',
+        path: '/admin/approvals/lawyers',
+        icon: UserCheck,
+        badge: '3',
+        description: 'Validation et KYC des avocats'
+      },
+      // Sous-section : KYC PRESTATAIRES
+      {
+        id: 'kyc-prestataires',
+        label: 'KYC prestataires',
+        path: '/admin/kyc/providers',
+        icon: Shield,
+        badge: '2',
+        description: 'Vérification d\'identité des prestataires'
+      },
+      // Sous-section : AVIS ET NOTATION
+      {
+        id: 'avis-notation',
+        label: 'Avis et notation',
+        path: '/admin/reviews',
+        icon: Star,
+        description: 'Modération des avis clients'
       }
     ]
   },
@@ -599,10 +642,11 @@ export function getMenuBadges(): Record<string, string> {
   // Cette fonction devrait être connectée à votre store Redux/Zustand
   // ou récupérer les données depuis une API
   return {
-    'validation-kyc': '3',      // 3 validations en attente
-    'calls-monitor': 'LIVE',    // Appels en cours  
-    'disputes': '2',            // 2 litiges à traiter
-    'campaigns': 'NEW',         // Nouvelle fonctionnalité
+    'validation-avocats': '3',     // 3 validations d'avocats en attente
+    'kyc-prestataires': '2',       // 2 KYC de prestataires en attente
+    'calls-monitor': 'LIVE',       // Appels en cours  
+    'disputes': '2',               // 2 litiges à traiter
+    'campaigns': 'NEW',            // Nouvelle fonctionnalité
   };
 }
 

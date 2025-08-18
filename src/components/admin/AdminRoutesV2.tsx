@@ -28,13 +28,38 @@ const AdminFinancePayouts = lazy(() => import("@/pages/admin/AdminFinancePayouts
 const AdminFinanceExports = lazy(() => import("@/pages/admin/Finance/Exports"));
 const AdminFinanceLedger = lazy(() => import("@/pages/admin/AdminFinanceLedger"));
 
-// ===== LAZY IMPORTS - USERS & PROVIDERS =====
+// ===== LAZY IMPORTS - USERS & PROVIDERS - NOUVELLE ORGANISATION =====
 const AdminUsers = lazy(() => import("@/pages/admin/AdminUsers"));
-// Réutiliser AdminUsers pour les prestataires en attendant
-const AdminProviders = lazy(() => import("@/pages/admin/AdminUsers"));
-const AdminApprovals = lazy(() => import("@/pages/admin/AdminApprovals"));
+const AdminClients = lazy(() => import("@/pages/admin/Users/AdminClients"));
+const AdminLawyers = lazy(() => import("@/pages/admin/Users/AdminLawyers"));
+const AdminExpats = lazy(() => import("@/pages/admin/Users/AdminExpats"));
 const AdminAaaProfiles = lazy(() => import("@/pages/admin/AdminAaaProfiles"));
+const AdminLawyerApprovals = lazy(() => import("@/pages/admin/Users/AdminLawyerApprovals"));
+const AdminKYCProviders = lazy(() => import("@/pages/admin/Users/AdminKYCProviders"));
 const AdminReviews = lazy(() => import("@/pages/admin/AdminReviews"));
+
+// Fallback pour pages non encore créées
+const AdminUsersFallback = lazy(() =>
+  Promise.resolve({
+    default: ({ title, type }: { title: string; type: string }) => (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-2">{title}</h1>
+        <p className="text-sm opacity-80 mb-4">Gestion des {type}</p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-800">
+            📋 Cette page affichera la liste filtrée des {type.toLowerCase()} avec :
+          </p>
+          <ul className="mt-2 text-blue-700 text-sm space-y-1">
+            <li>• Tableau avec filtres avancés</li>
+            <li>• Actions en lot (validation, suspension, etc.)</li>
+            <li>• Export des données</li>
+            <li>• Statistiques en temps réel</li>
+          </ul>
+        </div>
+      </div>
+    ),
+  })
+);
 
 // ===== LAZY IMPORTS - CALLS =====
 const AdminCalls = lazy(() => import("@/pages/admin/AdminCalls"));
@@ -121,13 +146,6 @@ const AdminBackups = lazy(() => import("@/pages/admin/AdminBackups"));
 const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
 
 // ===== LAZY IMPORTS - ANALYTICS & REPORTS =====
-// TODO: Créer ces pages plus tard
-// const AdminFinancialReports = lazy(() => import("@/pages/admin/AdminFinancialReports"));
-// const AdminUserAnalytics = lazy(() => import("@/pages/admin/AdminUserAnalytics"));
-// const AdminPlatformPerformance = lazy(() => import("@/pages/admin/AdminPlatformPerformance"));
-// const AdminDataExports = lazy(() => import("@/pages/admin/AdminDataExports"));
-
-// Placeholders temporaires
 const AdminFinancialReports = lazy(() =>
   Promise.resolve({
     default: () => (
@@ -193,6 +211,83 @@ const AdminRoutesV2: React.FC = () => {
             </Suspense>
           }
         />
+
+        {/* ===== 👥 UTILISATEURS & PRESTATAIRES - NOUVELLE ORGANISATION ===== */}
+        
+        {/* Clients */}
+        <Route
+          path="/admin/users/clients"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement des clients..." />}>
+              <AdminUsersFallback title="Clients" type="Clients" />
+            </Suspense>
+          }
+        />
+
+        {/* Prestataires - Avocats */}
+        <Route
+          path="/admin/users/providers/lawyers"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement des avocats..." />}>
+              <AdminUsersFallback title="Avocats" type="Avocats partenaires" />
+            </Suspense>
+          }
+        />
+
+        {/* Prestataires - Expatriés */}
+        <Route
+          path="/admin/users/providers/expats"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement des expatriés..." />}>
+              <AdminUsersFallback title="Expatriés" type="Expatriés conseillers" />
+            </Suspense>
+          }
+        />
+
+        {/* AAA Profiles */}
+        <Route
+          path="/admin/aaaprofiles"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement des profils de test..." />}>
+              <AdminAaaProfiles />
+            </Suspense>
+          }
+        />
+
+        {/* Validation Avocats */}
+        <Route
+          path="/admin/approvals/lawyers"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement des validations d'avocats..." />}>
+              <AdminUsersFallback title="Validation Avocats" type="Validations d'avocats en attente" />
+            </Suspense>
+          }
+        />
+
+        {/* KYC Prestataires */}
+        <Route
+          path="/admin/kyc/providers"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement du KYC prestataires..." />}>
+              <AdminUsersFallback title="KYC Prestataires" type="Vérifications KYC en cours" />
+            </Suspense>
+          }
+        />
+
+        {/* Avis et Notation */}
+        <Route
+          path="/admin/reviews"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement des avis..." />}>
+              <AdminReviews />
+            </Suspense>
+          }
+        />
+
+        {/* ===== ROUTES DE COMPATIBILITÉ ANCIENNES ===== */}
+        <Route path="/admin/users/list" element={<Navigate to="/admin/users/clients" replace />} />
+        <Route path="/admin/users/providers" element={<Navigate to="/admin/users/providers/lawyers" replace />} />
+        <Route path="/admin/approvals" element={<Navigate to="/admin/approvals/lawyers" replace />} />
 
         {/* ===== 💰 FINANCES & FACTURATION ===== */}
         <Route
@@ -272,48 +367,6 @@ const AdminRoutesV2: React.FC = () => {
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du grand livre..." />}>
               <AdminFinanceLedger />
-            </Suspense>
-          }
-        />
-
-        {/* ===== 👥 UTILISATEURS & PRESTATAIRES ===== */}
-        <Route
-          path="/admin/users/list"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des utilisateurs..." />}>
-              <AdminUsers />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin/users/providers"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des prestataires..." />}>
-              <AdminProviders />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin/approvals"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des validations..." />}>
-              <AdminApprovals />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin/aaaprofiles"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des profils de test..." />}>
-              <AdminAaaProfiles />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin/reviews"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des avis..." />}>
-              <AdminReviews />
             </Suspense>
           }
         />
@@ -579,9 +632,8 @@ const AdminRoutesV2: React.FC = () => {
         />
 
         {/* ===== ROUTES HISTORIQUES / LEGACY (pour compatibilité) ===== */}
-        {/* Redirections des anciennes URLs vers les nouvelles */}
-        <Route path="/admin/users" element={<Navigate to="/admin/users/list" replace />} />
-        <Route path="/admin/providers" element={<Navigate to="/admin/users/providers" replace />} />
+        <Route path="/admin/users" element={<Navigate to="/admin/users/clients" replace />} />
+        <Route path="/admin/providers" element={<Navigate to="/admin/users/providers/lawyers" replace />} />
         <Route path="/admin/payments" element={<Navigate to="/admin/finance/payments" replace />} />
         <Route path="/admin/invoices" element={<Navigate to="/admin/finance/invoices" replace />} />
         <Route path="/admin/notifications" element={<Navigate to="/admin/comms/notifications" replace />} />
@@ -622,18 +674,11 @@ const AdminRoutesV2: React.FC = () => {
         />
 
         {/* ===== ROUTES ALIAS SPÉCIFIQUES ===== */}
-        {/* Alias pour le dashboard */}
         <Route path="/admin/dashboard/global" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/dashboard/alerts" element={<Navigate to="/admin/reports/performance" replace />} />
         <Route path="/admin/dashboard/reports" element={<Navigate to="/admin/reports/financial" replace />} />
-
-        {/* Alias pour les finances */}
         <Route path="/admin/finance" element={<Navigate to="/admin/finance/payments" replace />} />
-
-        {/* Alias pour les utilisateurs */}
-        <Route path="/admin/users/all" element={<Navigate to="/admin/users/list" replace />} />
-
-        {/* Alias pour les communications */}
+        <Route path="/admin/users/all" element={<Navigate to="/admin/users/clients" replace />} />
         <Route path="/admin/comms" element={<Navigate to="/admin/comms/campaigns" replace />} />
 
         {/* ===== PAGE 404 POUR L'ADMIN ===== */}
@@ -672,6 +717,13 @@ export const useAdminRouteValidation = () => {
   const validateRoute = (path: string): boolean => {
     const validPaths = [
       "/admin/dashboard",
+      "/admin/users/clients",
+      "/admin/users/providers/lawyers",
+      "/admin/users/providers/expats",
+      "/admin/aaaprofiles",
+      "/admin/approvals/lawyers",
+      "/admin/kyc/providers",
+      "/admin/reviews",
       "/admin/finance/payments",
       "/admin/finance/invoices",
       "/admin/finance/taxes",
@@ -682,11 +734,6 @@ export const useAdminRouteValidation = () => {
       "/admin/finance/payouts",
       "/admin/finance/exports",
       "/admin/finance/ledger",
-      "/admin/users/list",
-      "/admin/users/providers",
-      "/admin/approvals",
-      "/admin/aaaprofiles",
-      "/admin/reviews",
       "/admin/calls",
       "/admin/calls/sessions",
       "/admin/calls/recordings",

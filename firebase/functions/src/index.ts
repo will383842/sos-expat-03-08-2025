@@ -7,7 +7,8 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 setGlobalOptions({
   region: 'europe-west1',
-  });
+});
+
 // Export des webhooks modernisés (remplace les anciens)
 export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
 
@@ -33,10 +34,10 @@ export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 export { createAndScheduleCallHTTPS as createAndScheduleCall } from './createAndScheduleCallFunction';
 export { createPaymentIntent } from './createPaymentIntent';
 
-
 // ====== IMPORTS POUR FONCTIONS RESTANTES ======
 
 import { onRequest } from 'firebase-functions/v2/https';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import * as functions from "firebase-functions";
@@ -65,7 +66,6 @@ try {
 } catch (error) {
   console.log('ℹ️ Firestore déjà configuré');
 }
-console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
 
 // ========================================
 // FONCTIONS ADMIN
@@ -133,6 +133,254 @@ export const adminBulkUpdateStatus = functions.https.onCall(async (data, ctx) =>
   });
   return { ok: true };
 });
+
+// ========================================
+// FONCTIONS ADMIN POUR MONITORING DES APPELS
+// ========================================
+
+export const adminForceDisconnectCall = onCall(
+  { 
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30 
+  },
+  async (request) => {
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { sessionId, reason } = request.data;
+    
+    if (!sessionId) {
+      throw new HttpsError('invalid-argument', 'sessionId is required');
+    }
+
+    try {
+      const { twilioCallManager } = await import('./TwilioCallManager');
+      const success = await twilioCallManager.cancelCallSession(
+        sessionId, 
+        reason || 'admin_force_disconnect', 
+        request.auth.uid
+      );
+
+      // Log l'action admin
+      await db.collection("adminLogs").add({
+        action: "forceDisconnectCall",
+        sessionId,
+        reason: reason || 'admin_force_disconnect',
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { 
+        success, 
+        message: `Call ${sessionId} disconnected successfully` 
+      };
+    } catch (error) {
+      console.error('Error force disconnecting call:', error);
+      throw new HttpsError('internal', 'Failed to disconnect call');
+    }
+  }
+);
+
+export const adminJoinCall = onCall(
+  { 
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30 
+  },
+  async (request) => {
+    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { sessionId } = request.data;
+    
+    if (!sessionId) {
+      throw new HttpsError('invalid-argument', 'sessionId is required');
+    }
+
+    try {
+      const { twilioCallManager } = await import('./TwilioCallManager');
+      const session = await twilioCallManager.getCallSession(sessionId);
+      
+      if (!session || session.status !== 'active') {
+        throw new HttpsError('failed-precondition', 'Call is not active');
+      }
+
+      // Générer un lien vers la console Twilio pour rejoindre la conférence
+      const conferenceUrl = `https://console.twilio.com/us1/develop/voice/manage/conferences/${session.conference.sid}`;
+      const accessToken = `admin_${request.auth.uid}_${Date.now()}`;
+
+      // Log l'action admin
+      await db.collection("adminLogs").add({
+        action: "joinCall",
+        sessionId,
+        conferenceSid: session.conference.sid,
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        conferenceUrl,
+        accessToken,
+        conferenceSid: session.conference.sid,
+        conferenceName: session.conference.name,
+        message: 'Open Twilio Console to join the conference'
+      };
+    } catch (error) {
+      console.error('Error joining call:', error);
+      throw new HttpsError('internal', 'Failed to join call');
+    }
+  }
+);
+
+export const adminTransferCall = onCall(
+  { 
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30 
+  },
+  async (request) => {
+    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { sessionId, newProviderId } = request.data;
+    
+    if (!sessionId || !newProviderId) {
+      throw new HttpsError('invalid-argument', 'sessionId and newProviderId are required');
+    }
+
+    try {
+      // Vérifier que le nouveau prestataire existe
+      const newProviderDoc = await db.collection('users').doc(newProviderId).get();
+
+      if (!newProviderDoc.exists) {
+        throw new HttpsError('not-found', 'New provider not found');
+      }
+
+      const newProvider = newProviderDoc.data();
+      if (!newProvider?.phone) {
+        throw new HttpsError('failed-precondition', 'New provider has no phone number');
+      }
+
+      // Vérifier que c'est bien un prestataire
+      if (!['lawyer', 'expat'].includes(newProvider.role)) {
+        throw new HttpsError('failed-precondition', 'User is not a provider');
+      }
+
+      // Mettre à jour la session avec le nouveau prestataire
+      await db.collection('call_sessions').doc(sessionId).update({
+        'metadata.originalProviderId': admin.firestore.FieldValue.arrayUnion(newProvider.id),
+        'metadata.providerId': newProviderId,
+        'metadata.providerName': `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
+        'metadata.providerType': newProvider.role,
+        'participants.provider.phone': newProvider.phone,
+        'metadata.updatedAt': admin.firestore.Timestamp.now(),
+        transferHistory: admin.firestore.FieldValue.arrayUnion({
+          transferredBy: request.auth.uid,
+          transferredAt: admin.firestore.Timestamp.now(),
+          newProviderId,
+          newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
+          reason: 'admin_transfer'
+        })
+      });
+
+      // Log l'action admin
+      await db.collection("adminLogs").add({
+        action: "transferCall",
+        sessionId,
+        newProviderId,
+        newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { 
+        success: true, 
+        message: `Call transferred to provider ${newProviderId}`,
+        newProviderId,
+        newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim()
+      };
+    } catch (error) {
+      console.error('Error transferring call:', error);
+      throw new HttpsError('internal', 'Failed to transfer call');
+    }
+  }
+);
+
+export const adminMuteParticipant = onCall(
+  { 
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30 
+  },
+  async (request) => {
+    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { sessionId, participantType, mute = true } = request.data;
+    
+    if (!sessionId || !participantType) {
+      throw new HttpsError('invalid-argument', 'sessionId and participantType are required');
+    }
+
+    if (!['provider', 'client'].includes(participantType)) {
+      throw new HttpsError('invalid-argument', 'participantType must be provider or client');
+    }
+
+    try {
+      const { twilioCallManager } = await import('./TwilioCallManager');
+      const session = await twilioCallManager.getCallSession(sessionId);
+      
+      if (!session || session.status !== 'active') {
+        throw new HttpsError('failed-precondition', 'Call is not active');
+      }
+
+      const participant = session.participants[participantType as 'provider' | 'client'];
+      
+      if (!participant.callSid) {
+        throw new HttpsError('failed-precondition', 'Participant call SID not found');
+      }
+
+      // Mettre à jour le statut de mute dans la session
+      await db.collection('call_sessions').doc(sessionId).update({
+        [`participants.${participantType}.isMuted`]: mute,
+        'metadata.updatedAt': admin.firestore.Timestamp.now(),
+        adminActions: admin.firestore.FieldValue.arrayUnion({
+          action: mute ? 'mute' : 'unmute',
+          participantType,
+          performedBy: request.auth.uid,
+          performedAt: admin.firestore.Timestamp.now()
+        })
+      });
+
+      // Log l'action admin
+      await db.collection("adminLogs").add({
+        action: mute ? "muteParticipant" : "unmuteParticipant",
+        sessionId,
+        participantType,
+        callSid: participant.callSid,
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { 
+        success: true, 
+        message: `Participant ${participantType} ${mute ? 'muted' : 'unmuted'}`,
+        participantType,
+        muted: mute,
+        note: 'Action recorded in session - Twilio Conference API integration required for actual mute/unmute'
+      };
+    } catch (error) {
+      console.error('Error muting participant:', error);
+      throw new HttpsError('internal', 'Failed to mute participant');
+    }
+  }
+);
 
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES

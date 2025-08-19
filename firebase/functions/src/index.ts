@@ -1,4 +1,4 @@
-
+// functions/src/index.ts
 
 // ====== EXPORTS PRINCIPAUX ======
 
@@ -33,11 +33,13 @@ export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 export { createAndScheduleCallHTTPS as createAndScheduleCall } from './createAndScheduleCallFunction';
 export { createPaymentIntent } from './createPaymentIntent';
 
+
 // ====== IMPORTS POUR FONCTIONS RESTANTES ======
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
+import * as functions from "firebase-functions";
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
 
@@ -64,6 +66,73 @@ try {
   console.log('ℹ️ Firestore déjà configuré');
 }
 console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
+
+// ========================================
+// FONCTIONS ADMIN
+// ========================================
+
+function assertAdmin(ctx: functions.https.CallableContext) {
+  if (!ctx.auth || (ctx.auth.token as any)?.role !== "admin") {
+    throw new functions.https.HttpsError("permission-denied", "Admins only");
+  }
+}
+
+export const adminUpdateStatus = functions.https.onCall(async (data, ctx) => {
+  assertAdmin(ctx);
+  const { userId, status, reason } = data as { userId: string; status: "active"|"pending"|"blocked"|"suspended"; reason?: string };
+  await db.collection("users").doc(userId).update({
+    status,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await db.collection("adminLogs").add({
+    action: "updateStatus",
+    userId,
+    status,
+    reason: reason || null,
+    adminId: ctx.auth!.uid,
+    ts: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
+
+export const adminSoftDeleteUser = functions.https.onCall(async (data, ctx) => {
+  assertAdmin(ctx);
+  const { userId, reason } = data as { userId: string; reason?: string };
+  await db.collection("users").doc(userId).update({
+    isDeleted: true,
+    deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    deletedBy: ctx.auth!.uid,
+    deletedReason: reason || null,
+  });
+  await db.collection("adminLogs").add({
+    action: "softDelete",
+    userId,
+    reason: reason || null,
+    adminId: ctx.auth!.uid,
+    ts: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
+
+export const adminBulkUpdateStatus = functions.https.onCall(async (data, ctx) => {
+  assertAdmin(ctx);
+  const { ids, status, reason } = data as { ids: string[]; status: "active"|"pending"|"blocked"|"suspended"; reason?: string };
+  const batch = db.batch();
+  ids.forEach((id) => batch.update(db.collection("users").doc(id), {
+    status,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }));
+  await batch.commit();
+  await db.collection("adminLogs").add({
+    action: "bulkUpdateStatus",
+    ids,
+    status,
+    reason: reason || null,
+    adminId: ctx.auth!.uid,
+    ts: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
 
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES

@@ -1,8 +1,8 @@
 // src/pages/admin/AdminClients.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   collection,
-  query,
+  query as fsQuery,
   where,
   orderBy,
   limit,
@@ -11,28 +11,193 @@ import {
   updateDoc,
   deleteDoc,
   Timestamp,
+  startAfter,
+  getCountFromServer,
+  QueryDocumentSnapshot,
+  DocumentData,
+  QueryConstraint,
+  Query as FSQuery,
+  CollectionReference,
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import {
   Users,
   Search,
   Filter,
-  Download,
+  CheckCircle,
+  XCircle,
   Mail,
   Phone,
   MapPin,
   Calendar,
-  Eye,
-  Edit,
-  CheckCircle,
-  XCircle,
+  MoreVertical,
+  Download,
+  Trash2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCopy,
+  ExternalLink,
 } from "lucide-react";
-import Button from "../../components/common/Button";
 import AdminLayout from "../../components/admin/AdminLayout";
+import Button from "../../components/common/Button";
+import Modal from "../../components/common/Modal";
 
-type ClientStatus = "active" | "suspended" | "pending";
+/* ---------------------- i18n léger (aligné AdminReviews) ---------------------- */
+type Lang = "fr" | "en";
+const detectLang = (): Lang => {
+  const ls = (localStorage.getItem("admin_lang") || "").toLowerCase();
+  if (ls === "fr" || ls === "en") return ls as Lang;
+  return navigator.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
+};
+const STRINGS: Record<Lang, Record<string, string>> = {
+  fr: {
+    title: "Clients",
+    subtitle: "Gestion des clients",
+    search: "Nom, email…",
+    filters: "Filtres",
+    export: "Exporter CSV",
+    exportAll: "Exporter (tous filtres)",
+    totalExact: "Total (exact)",
+    active: "Actifs",
+    suspended: "Suspendus",
+    pending: "En attente",
+    newThisMonth: "Nouveaux (mois)",
+    status: "Statut",
+    all: "Tous",
+    blocked: "Bloqué",
+    emailVerified: "Email vérifié",
+    verified: "Vérifié",
+    unverified: "Non vérifié",
+    period: "Période d'inscription",
+    today: "Aujourd'hui",
+    week: "Cette semaine",
+    month: "Ce mois",
+    country: "Pays",
+    tableClient: "Client",
+    tableContact: "Contact",
+    tableLocation: "Localisation",
+    tableStatus: "Statut",
+    tableActivity: "Activité",
+    tableActions: "Actions",
+    lastLogin: "Dernière connexion",
+    callsSpend: "appels • €",
+    activate: "Activer",
+    suspend: "Suspendre",
+    delete: "Supprimer",
+    bulkActivate: "Activer",
+    bulkSuspend: "Suspendre",
+    bulkDelete: "Supprimer",
+    selected: "sélectionné(s)",
+    noneTitle: "Aucun client trouvé",
+    noneBody: "Aucun client ne correspond aux critères de recherche.",
+    loading: "Chargement…",
+    rowsPerPage: "Lignes / page",
+    page: "Page",
+    of: "sur",
+    confirmBulk: "Confirmer l'action",
+    confirmDeleteOne: "Supprimer définitivement ce client ?",
+    successUpdate: "Mise à jour réussie.",
+    errorUpdate: "Erreur lors de la mise à jour.",
+    retry: "Réessayer",
+    signedUpOn: "Inscrit le",
+    lang: "Langue",
+    reasonTitleSuspend: "Raison de suspension",
+    reasonTitleDelete: "Confirmer la suppression",
+    reasonLabel: "Raison (obligatoire)",
+    reasonPlaceholder: "Ex: Abus, fraude, demande RGPD…",
+    cancel: "Annuler",
+    confirm: "Confirmer",
+    copied: "Copié ✅",
+    exportAllRunning: "Export en cours…",
+    exportAllDone: "Export terminé ✅",
+    exportAllCap: "Limite atteinte (5000 lignes). Affinez vos filtres.",
+    contact: "Contacter",
+    copyEmail: "Copier email",
+    copyId: "Copier ID",
+  },
+  en: {
+    title: "Clients",
+    subtitle: "Customer management",
+    search: "Name, email…",
+    filters: "Filters",
+    export: "Export CSV",
+    exportAll: "Export (all filters)",
+    totalExact: "Total (exact)",
+    active: "Active",
+    suspended: "Suspended",
+    pending: "Pending",
+    newThisMonth: "New (month)",
+    status: "Status",
+    all: "All",
+    blocked: "Blocked",
+    emailVerified: "Email verified",
+    verified: "Verified",
+    unverified: "Unverified",
+    period: "Sign-up period",
+    today: "Today",
+    week: "This week",
+    month: "This month",
+    country: "Country",
+    tableClient: "Client",
+    tableContact: "Contact",
+    tableLocation: "Location",
+    tableStatus: "Status",
+    tableActivity: "Activity",
+    tableActions: "Actions",
+    lastLogin: "Last login",
+    callsSpend: "calls • €",
+    activate: "Activate",
+    suspend: "Suspend",
+    delete: "Delete",
+    bulkActivate: "Activate",
+    bulkSuspend: "Suspend",
+    bulkDelete: "Delete",
+    selected: "selected",
+    noneTitle: "No clients found",
+    noneBody: "No clients match your filters.",
+    loading: "Loading…",
+    rowsPerPage: "Rows / page",
+    page: "Page",
+    of: "of",
+    confirmBulk: "Confirm action",
+    confirmDeleteOne: "Permanently delete this client?",
+    successUpdate: "Update successful.",
+    errorUpdate: "Update failed.",
+    retry: "Retry",
+    signedUpOn: "Signed up on",
+    lang: "Language",
+    reasonTitleSuspend: "Suspension reason",
+    reasonTitleDelete: "Confirm deletion",
+    reasonLabel: "Reason (required)",
+    reasonPlaceholder: "Eg: Abuse, fraud, GDPR request…",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    copied: "Copied ✅",
+    exportAllRunning: "Export running…",
+    exportAllDone: "Export finished ✅",
+    exportAllCap: "Cap reached (5000 rows). Refine filters.",
+    contact: "Contact",
+    copyEmail: "Copy email",
+    copyId: "Copy ID",
+  },
+};
+const useI18n = () => {
+  const [lang, setLang] = useState<Lang>(detectLang());
+  useEffect(() => {
+    localStorage.setItem("admin_lang", lang);
+  }, [lang]);
+  const t = useCallback(
+    (k: keyof typeof STRINGS["fr"]) => STRINGS[lang][k] ?? (k as string),
+    [lang]
+  );
+  return { t, lang, setLang };
+};
+/* ----------------------------------------------------------------------------- */
 
-interface Client {
+type ClientStatus = "active" | "pending" | "blocked" | "suspended";
+
+type Client = {
   id: string;
   email: string;
   firstName: string;
@@ -46,39 +211,45 @@ interface Client {
   callsCount: number;
   totalSpent: number;
   emailVerified: boolean;
-  phoneVerified: boolean;
-}
+  phoneVerified?: boolean;
+};
 
-interface FilterOptions {
+type FilterOptions = {
   status: "all" | ClientStatus;
-  country: string;
+  country: "all" | string;
   emailVerified: "all" | "verified" | "unverified";
   dateRange: "all" | "today" | "week" | "month";
   searchTerm: string;
-}
+};
 
 type FirestoreClientDoc = {
-  role?: string;
   email?: string;
   firstName?: string;
   lastName?: string;
   phone?: string;
   country?: string;
   city?: string;
-  status?: ClientStatus;
+  status?: string;
   createdAt?: Timestamp;
   lastLoginAt?: Timestamp;
   callsCount?: number;
   totalSpent?: number;
   emailVerified?: boolean;
   phoneVerified?: boolean;
+  suspendedReason?: string;
+  suspendedAt?: Timestamp;
 };
 
 const AdminClients: React.FC = () => {
+  const { t, lang, setLang } = useI18n();
+
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   const [filters, setFilters] = useState<FilterOptions>({
     status: "all",
     country: "all",
@@ -86,6 +257,17 @@ const AdminClients: React.FC = () => {
     dateRange: "all",
     searchTerm: "",
   });
+
+  // ✅ Pagination à curseur & compteur exact
+  const [pageSize, setPageSize] = useState<number>(
+    Number(localStorage.getItem("admin.clients.pageSize")) || 25
+  );
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const pageCursors = useRef<Record<number, QueryDocumentSnapshot<DocumentData> | null>>({
+    1: null,
+  });
+  const [hasNext, setHasNext] = useState<boolean>(false);
+  const [totalExact, setTotalExact] = useState<number | null>(null);
 
   const [stats, setStats] = useState({
     total: 0,
@@ -95,46 +277,100 @@ const AdminClients: React.FC = () => {
     thisMonth: 0,
   });
 
-  const calculateStats = useCallback((clientsData: Client[]) => {
+  useEffect(() => {
+    localStorage.setItem("admin.clients.pageSize", String(pageSize));
+  }, [pageSize]);
+
+  const calculateStats = useCallback((rows: Client[]) => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
     setStats({
-      total: clientsData.length,
-      active: clientsData.filter((c) => c.status === "active").length,
-      suspended: clientsData.filter((c) => c.status === "suspended").length,
-      pending: clientsData.filter((c) => c.status === "pending").length,
-      thisMonth: clientsData.filter((c) => c.createdAt >= startOfMonth).length,
+      total: rows.length,
+      active: rows.filter((c: Client) => c.status === "active").length,
+      suspended: rows.filter((c: Client) => c.status === "suspended").length,
+      pending: rows.filter((c: Client) => c.status === "pending").length,
+      thisMonth: rows.filter((c: Client) => c.createdAt >= startOfMonth).length,
     });
   }, []);
 
-  const loadClients = useCallback(async () => {
+  // 🔎 Compteur exact côté serveur (indépendant de la pagination)
+  const fetchExactCount = useCallback(async () => {
     try {
-      setLoading(true);
+      const base = collection(db, "users") as CollectionReference<DocumentData>;
+      const constraints: QueryConstraint[] = [where("role", "==", "client")];
 
-      // Construire la requête avec filtres
-      const baseRef = collection(db, "users");
-      let clientsQuery = query(
-        baseRef,
-        where("role", "==", "client"),
-        orderBy("createdAt", "desc"),
-        limit(100)
-      );
-
-      if (filters.status !== "all") {
-        clientsQuery = query(
-          baseRef,
-          where("role", "==", "client"),
-          where("status", "==", filters.status),
-          orderBy("createdAt", "desc"),
-          limit(100)
-        );
+      if (filters.status !== "all") constraints.push(where("status", "==", filters.status));
+      if (filters.emailVerified !== "all")
+        constraints.push(where("emailVerified", "==", filters.emailVerified === "verified"));
+      if (filters.country !== "all" && filters.country.trim() !== "")
+        constraints.push(where("country", "==", filters.country.trim()));
+      if (filters.dateRange !== "all") {
+        const now = new Date();
+        let cutoff = new Date(now);
+        if (filters.dateRange === "today") cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (filters.dateRange === "week") {
+          const day = now.getDay();
+          const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+          cutoff = new Date(now.setDate(diff));
+          cutoff.setHours(0, 0, 0, 0);
+        }
+        if (filters.dateRange === "month") cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+        constraints.push(where("createdAt", ">=", Timestamp.fromDate(cutoff)));
       }
 
-      const snapshot = await getDocs(clientsQuery);
+      const q: FSQuery<DocumentData> = fsQuery(base, ...constraints);
+      const snap = await getCountFromServer(q);
+      setTotalExact(snap.data().count);
+    } catch (e: unknown) {
+      console.error("[AdminClients] count error", e);
+      setTotalExact(null);
+    }
+  }, [filters]);
 
-      let clientsData: Client[] = snapshot.docs.map((d) => {
-        const data = d.data() as unknown as FirestoreClientDoc;
+  // ⏬ Chargement d’une page par curseur
+  const loadPage = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const base = collection(db, "users") as CollectionReference<DocumentData>;
+      const constraints: QueryConstraint[] = [
+        where("role", "==", "client"),
+        orderBy("createdAt", "desc"),
+        limit(pageSize + 1),
+      ];
+
+      if (filters.status !== "all") constraints.splice(1, 0, where("status", "==", filters.status));
+      if (filters.emailVerified !== "all")
+        constraints.splice(1, 0, where("emailVerified", "==", filters.emailVerified === "verified"));
+      if (filters.country !== "all" && filters.country.trim() !== "")
+        constraints.splice(1, 0, where("country", "==", filters.country.trim()));
+      if (filters.dateRange !== "all") {
+        const now = new Date();
+        let cutoff = new Date(now);
+        if (filters.dateRange === "today") cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (filters.dateRange === "week") {
+          const day = now.getDay();
+          const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+          cutoff = new Date(now.setDate(diff));
+          cutoff.setHours(0, 0, 0, 0);
+        }
+        if (filters.dateRange === "month") cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+        constraints.splice(1, 0, where("createdAt", ">=", Timestamp.fromDate(cutoff)));
+      }
+
+      const cursor: QueryDocumentSnapshot<DocumentData> | null = pageCursors.current[pageIndex];
+      const q: FSQuery<DocumentData> = cursor
+        ? fsQuery(base, ...constraints, startAfter(cursor))
+        : fsQuery(base, ...constraints);
+
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs;
+      const pageDocs = docs.slice(0, pageSize);
+      setHasNext(docs.length > pageSize);
+      pageCursors.current[pageIndex + 1] = docs.length > pageSize ? pageDocs[pageDocs.length - 1] : null;
+
+      let rows: Client[] = pageDocs.map((d: QueryDocumentSnapshot<DocumentData>) => {
+        const data = d.data() as FirestoreClientDoc;
         return {
           id: d.id,
           email: data.email ?? "",
@@ -148,240 +384,286 @@ const AdminClients: React.FC = () => {
           lastLoginAt: data.lastLoginAt ? data.lastLoginAt.toDate() : undefined,
           callsCount: data.callsCount ?? 0,
           totalSpent: data.totalSpent ?? 0,
-          emailVerified: data.emailVerified ?? false,
-          phoneVerified: data.phoneVerified ?? false,
+          emailVerified: !!data.emailVerified,
+          phoneVerified: !!data.phoneVerified,
         };
       });
 
-      // Filtres côté client
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        clientsData = clientsData.filter(
-          (client) =>
-            client.firstName.toLowerCase().includes(searchLower) ||
-            client.lastName.toLowerCase().includes(searchLower) ||
-            client.email.toLowerCase().includes(searchLower)
+      // 🔍 Recherche locale (page courante)
+      if (filters.searchTerm.trim()) {
+        const term = filters.searchTerm.trim().toLowerCase();
+        rows = rows.filter(
+          (c: Client) =>
+            `${c.firstName} ${c.lastName}`.toLowerCase().includes(term) ||
+            c.email.toLowerCase().includes(term) ||
+            (c.phone || "").toLowerCase().includes(term)
         );
       }
 
-      if (filters.country !== "all") {
-        clientsData = clientsData.filter(
-          (client) => client.country === filters.country
-        );
-      }
-
-      if (filters.emailVerified !== "all") {
-        const isVerified = filters.emailVerified === "verified";
-        clientsData = clientsData.filter(
-          (client) => client.emailVerified === isVerified
-        );
-      }
-
-      if (filters.dateRange !== "all") {
-        const now = new Date();
-        const filterDate = new Date();
-
-        switch (filters.dateRange) {
-          case "today":
-            filterDate.setHours(0, 0, 0, 0);
-            break;
-          case "week":
-            filterDate.setDate(now.getDate() - 7);
-            break;
-          case "month":
-            filterDate.setMonth(now.getMonth() - 1);
-            break;
-        }
-
-        clientsData = clientsData.filter(
-          (client) => client.createdAt >= filterDate
-        );
-      }
-
-      setClients(clientsData);
-      calculateStats(clientsData);
-    } catch (error) {
-      console.error("Erreur chargement clients:", error);
+      setClients(rows);
+      calculateStats(rows);
+    } catch (e: unknown) {
+      console.error("[AdminClients] load error", e);
+      setErrorMsg((e as Error)?.message || "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [filters, calculateStats]);
+  }, [filters, pageIndex, pageSize, calculateStats]);
 
+  // Compteur exact quand les filtres changent
   useEffect(() => {
-    void loadClients();
-  }, [loadClients]);
+    fetchExactCount();
+  }, [fetchExactCount]);
 
-  const handleStatusChange = async (
-    clientId: string,
-    newStatus: ClientStatus
-  ) => {
+  // Reset curseurs quand filtres changent
+  useEffect(() => {
+    pageCursors.current = { 1: null };
+    setPageIndex(1);
+  }, [filters.status, filters.emailVerified, filters.country, filters.dateRange]);
+
+  // (Re)chargement de la page
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
+
+  const toggleSelectClient = (id: string) => {
+    setSelectedClients((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // --------- Modales raison ----------
+  const [reasonOpen, setReasonOpen] = useState<null | { type: "suspend" | "delete"; ids: string[] }>(null);
+  const [reasonText, setReasonText] = useState("");
+
+  // --------- Actions ----------
+  const updateClientStatus = async (clientId: string, newStatus: ClientStatus, reason?: string) => {
     try {
-      await updateDoc(doc(db, "users", clientId), {
-        status: newStatus,
-        updatedAt: new Date(),
-      });
-
+      const payload: Record<string, unknown> = { status: newStatus, updatedAt: new Date() };
+      if (newStatus === "suspended") {
+        payload.suspendedReason = reason || null;
+        payload.suspendedAt = new Date();
+      }
+      await updateDoc(doc(db, "users", clientId), payload);
       setClients((prev) =>
-        prev.map((client) =>
-          client.id === clientId ? { ...client, status: newStatus } : client
-        )
+        prev.map((c: Client) => (c.id === clientId ? { ...c, status: newStatus } : c))
       );
-
-      alert(`✅ Statut client mis à jour vers "${newStatus}"`);
+      alert(t("successUpdate"));
     } catch (error) {
-      console.error("Erreur mise à jour statut:", error);
-      alert("❌ Erreur lors de la mise à jour du statut");
+      console.error("Erreur de mise à jour du statut:", error);
+      alert(t("errorUpdate"));
     }
   };
 
   const handleBulkAction = async (action: "activer" | "suspendre" | "supprimer") => {
     if (selectedClients.length === 0) {
-      alert("Veuillez sélectionner au moins un client");
+      alert("Veuillez sélectionner au moins un client.");
       return;
     }
-
-    const confirmMessage = `Êtes-vous sûr de vouloir ${action} ${selectedClients.length} client(s) ?`;
-    if (!confirm(confirmMessage)) return;
+    if (action === "suspendre" || action === "supprimer") {
+      setReasonOpen({ type: action === "suspendre" ? "suspend" : "delete", ids: selectedClients });
+      setReasonText("");
+      return;
+    }
+    if (!confirm(`${t("confirmBulk")} "${action}" (${selectedClients.length}) ?`)) return;
 
     try {
-      const promises = selectedClients.map(async (clientId) => {
-        const updates: { status?: ClientStatus; updatedAt: Date } = {
+      const jobs = selectedClients.map(async (clientId: string) =>
+        updateDoc(doc(db, "users", clientId), {
+          status: action === "activer" ? "active" : "suspended",
           updatedAt: new Date(),
-        };
-
-        switch (action) {
-          case "activer":
-            updates.status = "active";
-            await updateDoc(doc(db, "users", clientId), updates);
-            return;
-          case "suspendre":
-            updates.status = "suspended";
-            await updateDoc(doc(db, "users", clientId), updates);
-            return;
-          case "supprimer":
-            await deleteDoc(doc(db, "users", clientId));
-            return;
-        }
-      });
-
-      await Promise.all(promises);
-
-      if (action === "supprimer") {
-        setClients((prev) =>
-          prev.filter((client) => !selectedClients.includes(client.id))
-        );
-      } else {
-        await loadClients();
-      }
-
+        })
+      );
+      await Promise.all(jobs);
       setSelectedClients([]);
-      alert(`✅ Action "${action}" appliquée à ${selectedClients.length} client(s)`);
+      await loadPage();
+      alert(t("successUpdate"));
     } catch (error) {
       console.error("Erreur action en lot:", error);
-      alert("❌ Erreur lors de l'action en lot");
+      alert(t("errorUpdate"));
     }
   };
 
-  const exportClients = () => {
+  const exportPageCsv = () => {
     if (clients.length === 0) {
       alert("Aucun client à exporter.");
       return;
     }
-
-    const csvData = clients.map((client) => ({
-      ID: client.id,
-      Email: client.email,
-      Prénom: client.firstName,
-      Nom: client.lastName,
-      Téléphone: client.phone ?? "",
-      Pays: client.country ?? "",
-      Ville: client.city ?? "",
-      Statut: client.status,
-      "Date inscription": client.createdAt.toLocaleDateString("fr-FR"),
-      "Dernière connexion":
-        client.lastLoginAt?.toLocaleDateString("fr-FR") || "Jamais",
-      "Nb appels": client.callsCount,
-      "Total dépensé": `${client.totalSpent}€`,
-      "Email vérifié": client.emailVerified ? "Oui" : "Non",
-      "Téléphone vérifié": client.phoneVerified ? "Oui" : "Non",
+    const csvData = clients.map((c: Client) => ({
+      ID: c.id,
+      Email: c.email,
+      FirstName: c.firstName,
+      LastName: c.lastName,
+      Phone: c.phone ?? "",
+      Country: c.country ?? "",
+      City: c.city ?? "",
+      Status: c.status,
+      SignedUpAt: c.createdAt.toISOString(),
+      LastLoginAt: c.lastLoginAt?.toISOString() ?? "",
+      CallsCount: c.callsCount,
+      TotalSpent: c.totalSpent,
+      EmailVerified: c.emailVerified ? "Yes" : "No",
     }));
-
-    const headers = Object.keys(csvData[0]).join(",");
-    const rows = csvData.map((row) =>
-      Object.values(row)
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(",")
-    );
-    const csvContent = [headers, ...rows].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const headers = Object.keys(csvData[0]).join(";");
+    const rows = csvData.map((r) => Object.values(r).join(";")).join("\n");
+    const blob = new Blob([`${headers}\n${rows}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `clients-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `clients_page_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const getStatusColor = (status: ClientStatus) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "suspended":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  // Export ALL (selon filtres) — parcours toutes les pages (max 5000)
+  const exportAllCsv = async () => {
+    try {
+      alert(t("exportAllRunning"));
+      const base = collection(db, "users") as CollectionReference<DocumentData>;
+      const constraintsBase: QueryConstraint[] = [where("role", "==", "client"), orderBy("createdAt", "desc")];
 
-  const getStatusIcon = (status: ClientStatus) => {
-    switch (status) {
-      case "active":
-        return <CheckCircle size={16} />;
-      case "suspended":
-        return <XCircle size={16} />;
-      case "pending":
-        return <Calendar size={16} />;
-      default:
-        return null;
+      if (filters.status !== "all") constraintsBase.splice(1, 0, where("status", "==", filters.status));
+      if (filters.emailVerified !== "all")
+        constraintsBase.splice(1, 0, where("emailVerified", "==", filters.emailVerified === "verified"));
+      if (filters.country !== "all" && filters.country.trim() !== "")
+        constraintsBase.splice(1, 0, where("country", "==", filters.country.trim()));
+      if (filters.dateRange !== "all") {
+        const now = new Date();
+        let cutoff = new Date(now);
+        if (filters.dateRange === "today") cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (filters.dateRange === "week") {
+          const day = now.getDay();
+          const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+          cutoff = new Date(now.setDate(diff));
+          cutoff.setHours(0, 0, 0, 0);
+        }
+        if (filters.dateRange === "month") cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+        constraintsBase.splice(1, 0, where("createdAt", ">=", Timestamp.fromDate(cutoff)));
+      }
+
+      const all: Client[] = [];
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+      const cap = 5000;
+      // boucle
+      while (all.length < cap) {
+        const q: FSQuery<DocumentData> = cursor
+          ? fsQuery(base, ...constraintsBase, limit(500), startAfter(cursor))
+          : fsQuery(base, ...constraintsBase, limit(500));
+        const snap = await getDocs(q);
+        if (snap.empty) break;
+        const chunk: Client[] = snap.docs.map((d: QueryDocumentSnapshot<DocumentData>) => {
+          const data = d.data() as FirestoreClientDoc;
+          return {
+            id: d.id,
+            email: data.email ?? "",
+            firstName: data.firstName ?? "",
+            lastName: data.lastName ?? "",
+            phone: data.phone ?? "",
+            country: data.country ?? "",
+            city: data.city ?? "",
+            status: (data.status ?? "active") as ClientStatus,
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+            lastLoginAt: data.lastLoginAt ? data.lastLoginAt.toDate() : undefined,
+            callsCount: data.callsCount ?? 0,
+            totalSpent: data.totalSpent ?? 0,
+            emailVerified: !!data.emailVerified,
+            phoneVerified: !!data.phoneVerified,
+          };
+        });
+
+        // Recherche locale optionnelle
+        const filtered = filters.searchTerm.trim()
+          ? chunk.filter((c: Client) => {
+              const term = filters.searchTerm.trim().toLowerCase();
+              return (
+                `${c.firstName} ${c.lastName}`.toLowerCase().includes(term) ||
+                c.email.toLowerCase().includes(term) ||
+                (c.phone || "").toLowerCase().includes(term)
+              );
+            })
+          : chunk;
+
+        all.push(...filtered);
+        cursor = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < 500) break;
+      }
+
+      if (all.length >= cap) alert(t("exportAllCap"));
+      if (all.length === 0) {
+        alert(t("noneBody"));
+        return;
+      }
+
+      const csvData = all.map((c: Client) => ({
+        ID: c.id,
+        Email: c.email,
+        FirstName: c.firstName,
+        LastName: c.lastName,
+        Phone: c.phone ?? "",
+        Country: c.country ?? "",
+        City: c.city ?? "",
+        Status: c.status,
+        SignedUpAt: c.createdAt.toISOString(),
+        LastLoginAt: c.lastLoginAt?.toISOString() ?? "",
+        CallsCount: c.callsCount,
+        TotalSpent: c.totalSpent,
+        EmailVerified: c.emailVerified ? "Yes" : "No",
+      }));
+      const headers = Object.keys(csvData[0]).join(";");
+      const rows = csvData.map((r) => Object.values(r).join(";")).join("\n");
+      const blob = new Blob([`${headers}\n${rows}`], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clients_all_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(t("exportAllDone"));
+    } catch (e) {
+      console.error("Export all error", e);
+      alert(t("errorUpdate"));
     }
   };
 
   return (
-    <AdminLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <AdminLayout activeMenuKey="admin-users-clients">
+      <div className="space-y-6">
+        {/* Header (rendu dans la page pour éviter les props inconnues d'AdminLayout) */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <Users className="w-8 h-8 mr-3 text-blue-600" />
-              Gestion des Clients
-            </h1>
-            <p className="text-gray-600 mt-1">
-              {stats.total} clients • {stats.active} actifs • {stats.thisMonth} ce mois
-            </p>
+            <h1 className="text-2xl font-semibold text-gray-900">{t("title")}</h1>
+            <p className="text-sm text-gray-500">{t("subtitle")}</p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              className="flex items-center"
+          <div className="flex items-center gap-2">
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Lang)}
+              className="border border-gray-300 rounded-md px-2 py-2 text-sm"
+              title={t("lang")}
             >
-              <Filter size={16} className="mr-2" />
-              Filtres
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+            </select>
+
+            <Button variant="secondary" onClick={() => setShowFilters((s) => !s)}>
+              <Filter className="w-4 h-4 mr-2" />
+              {t("filters")}
             </Button>
 
-            <Button onClick={exportClients} variant="outline" className="flex items-center">
-              <Download size={16} className="mr-2" />
-              Exporter CSV
+            <Button variant="secondary" onClick={exportAllCsv}>
+              <Download className="w-4 h-4 mr-2" />
+              {t("exportAll")}
+            </Button>
+
+            <Button onClick={exportPageCsv}>
+              <Download className="w-4 h-4 mr-2" />
+              {t("export")}
             </Button>
           </div>
         </div>
 
-        {/* Statistiques */}
+        {/* Stat cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center">
@@ -389,8 +671,8 @@ const AdminClients: React.FC = () => {
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Total Clients</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <h3 className="text-sm font-medium text-gray-500">{t("totalExact")}</h3>
+                <p className="text-2xl font-bold text-gray-900">{totalExact ?? "—"}</p>
               </div>
             </div>
           </div>
@@ -401,7 +683,7 @@ const AdminClients: React.FC = () => {
                 <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Actifs</h3>
+                <h3 className="text-sm font-medium text-gray-500">{t("active")}</h3>
                 <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
               </div>
             </div>
@@ -413,7 +695,7 @@ const AdminClients: React.FC = () => {
                 <XCircle className="w-6 h-6 text-red-600" />
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Suspendus</h3>
+                <h3 className="text-sm font-medium text-gray-500">{t("suspended")}</h3>
                 <p className="text-2xl font-bold text-gray-900">{stats.suspended}</p>
               </div>
             </div>
@@ -421,44 +703,37 @@ const AdminClients: React.FC = () => {
 
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-purple-600" />
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Ce mois</h3>
+                <h3 className="text-sm font-medium text-gray-500">{t("newThisMonth")}</h3>
                 <p className="text-2xl font-bold text-gray-900">{stats.thisMonth}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filtres */}
+        {/* Filters */}
         {showFilters && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold mb-4">Filtres de recherche</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recherche
-                </label>
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("search")}</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Nom, email..."
                     value={filters.searchTerm}
-                    onChange={(e) =>
-                      setFilters({ ...filters, searchTerm: e.target.value })
-                    }
-                    className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
+                    placeholder={t("search")}
+                    className="w-full pl-9 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Statut
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("status")}</label>
                 <select
                   value={filters.status}
                   onChange={(e) =>
@@ -469,17 +744,16 @@ const AdminClients: React.FC = () => {
                   }
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="all">Tous les statuts</option>
-                  <option value="active">Actif</option>
-                  <option value="pending">En attente</option>
-                  <option value="suspended">Suspendu</option>
+                  <option value="all">{t("all")}</option>
+                  <option value="active">{t("active")}</option>
+                  <option value="pending">{t("pending")}</option>
+                  <option value="blocked">{t("blocked")}</option>
+                  <option value="suspended">{t("suspended")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email vérifié
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("emailVerified")}</label>
                 <select
                   value={filters.emailVerified}
                   onChange={(e) =>
@@ -490,16 +764,14 @@ const AdminClients: React.FC = () => {
                   }
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="all">Tous</option>
-                  <option value="verified">Vérifié</option>
-                  <option value="unverified">Non vérifié</option>
+                  <option value="all">{t("all")}</option>
+                  <option value="verified">{t("verified")}</option>
+                  <option value="unverified">{t("unverified")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Période d'inscription
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("period")}</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) =>
@@ -510,54 +782,76 @@ const AdminClients: React.FC = () => {
                   }
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="all">Toutes les périodes</option>
-                  <option value="today">Aujourd'hui</option>
-                  <option value="week">Cette semaine</option>
-                  <option value="month">Ce mois</option>
+                  <option value="all">{t("all")}</option>
+                  <option value="today">{t("today")}</option>
+                  <option value="week">{t("week")}</option>
+                  <option value="month">{t("month")}</option>
                 </select>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Actions en lot */}
-        {selectedClients.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-blue-800">
-                <strong>{selectedClients.length}</strong> client(s) sélectionné(s)
-              </p>
-              <div className="flex space-x-3">
-                <Button
-                  onClick={() => void handleBulkAction("activer")}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  Activer
-                </Button>
-                <Button
-                  onClick={() => void handleBulkAction("suspendre")}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                >
-                  Suspendre
-                </Button>
-                <Button
-                  onClick={() => void handleBulkAction("supprimer")}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  Supprimer
-                </Button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("country")}</label>
+                <input
+                  type="text"
+                  value={filters.country === "all" ? "" : filters.country}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      country: (e.target.value || "all") as FilterOptions["country"],
+                    })
+                  }
+                  placeholder="FR, MA, SN…"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
           </div>
         )}
 
-        {/* Tableau des clients */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Bulk actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            disabled={selectedClients.length === 0}
+            onClick={() => handleBulkAction("activer")}
+          >
+            {t("bulkActivate")} ({selectedClients.length} {t("selected")})
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={selectedClients.length === 0}
+            onClick={() => handleBulkAction("suspendre")}
+          >
+            {t("bulkSuspend")} ({selectedClients.length} {t("selected")})
+          </Button>
+          <Button
+            variant="outline"
+            disabled={selectedClients.length === 0}
+            onClick={() => handleBulkAction("supprimer")}
+          >
+            <Trash2 className="w-4 h-4 mr-2 text-red-600" />
+            {t("bulkDelete")} ({selectedClients.length} {t("selected")})
+          </Button>
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="flex justify-center items-center h-48">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-2 text-gray-600">Chargement des clients...</span>
+              <div className="p-6 text-sm text-gray-500">{t("loading")}</div>
+            ) : errorMsg ? (
+              <div className="p-6 text-sm text-red-600 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                <span>{errorMsg}</span>
+                <Button size="small" variant="secondary" onClick={loadPage} className="ml-2">
+                  {t("retry")}
+                </Button>
+              </div>
+            ) : clients.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">{t("noneTitle")}</h3>
+                <p className="mt-1 text-sm text-gray-500">{t("noneBody")}</p>
               </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
@@ -568,83 +862,62 @@ const AdminClients: React.FC = () => {
                         type="checkbox"
                         checked={selectedClients.length === clients.length && clients.length > 0}
                         onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedClients(clients.map((c) => c.id));
-                          } else {
-                            setSelectedClients([]);
-                          }
+                          if (e.target.checked) setSelectedClients(clients.map((c: Client) => c.id));
+                          else setSelectedClients([]);
                         }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Client
+                      {t("tableClient")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact
+                      {t("tableContact")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Localisation
+                      {t("tableLocation")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statut
+                      {t("tableStatus")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Activité
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Inscription
+                      {t("tableActivity")}
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      {t("tableActions")}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {clients.map((client) => (
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {clients.map((client: Client) => (
                     <tr key={client.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
                           checked={selectedClients.includes(client.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedClients((prev) => [...prev, client.id]);
-                            } else {
-                              setSelectedClients((prev) =>
-                                prev.filter((id) => id !== client.id)
-                              );
-                            }
-                          }}
+                          onChange={() => toggleSelectClient(client.id)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0">
-                            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                              {client.firstName.charAt(0)}
-                              {client.lastName.charAt(0)}
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {client.firstName} {client.lastName}
-                            </div>
-                            <div className="text-sm text-gray-500">{client.email}</div>
-                          </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {client.firstName} {client.lastName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {t("signedUpOn")}{" "}
+                          {client.createdAt.toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="space-y-1">
                           <div className="flex items-center">
                             <Mail size={14} className="mr-2 text-gray-400" />
-                            <span
-                              className={
-                                client.emailVerified ? "text-green-600" : "text-red-600"
-                              }
-                            >
-                              {client.emailVerified ? "Vérifié" : "Non vérifié"}
+                            <span className={client.emailVerified ? "text-green-600" : "text-red-600"}>
+                              {client.email} • {client.emailVerified ? t("verified") : t("unverified")}
                             </span>
                           </div>
                           {client.phone && (
@@ -658,61 +931,115 @@ const AdminClients: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="flex items-center">
                           <MapPin size={14} className="mr-2 text-gray-400" />
-                          <span>
-                            {client.city ? `${client.city}, ` : ""}
-                            {client.country || "Non renseigné"}
-                          </span>
+                          <span>{client.city ? `${client.city}, ` : ""}{client.country || "—"}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                            client.status
-                          )}`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            client.status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : client.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : client.status === "suspended"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
                         >
-                          {getStatusIcon(client.status)}
-                          <span className="ml-1 capitalize">{client.status}</span>
+                          {client.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="space-y-1">
-                          <div>{client.callsCount} appel(s)</div>
-                          <div className="text-green-600 font-medium">
-                            {client.totalSpent.toFixed(2)}€ dépensé
+                          <div className="flex items-center">
+                            <Calendar size={14} className="mr-2 text-gray-400" />
+                            <span>
+                              {t("lastLogin")}:{" "}
+                              {client.lastLoginAt
+                                ? client.lastLoginAt.toLocaleDateString(undefined, {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : "—"}
+                            </span>
                           </div>
-                          {client.lastLoginAt && (
-                            <div className="text-xs text-gray-500">
-                              Dernière connexion:{" "}
-                              {client.lastLoginAt.toLocaleDateString("fr-FR")}
-                            </div>
-                          )}
+                          <div className="text-xs text-gray-500">
+                            {client.callsCount} {t("callsSpend").split(" ")[0]} • {client.totalSpent.toFixed(2)} €
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {client.createdAt.toLocaleDateString("fr-FR")}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <Eye size={16} />
-                          </button>
-                          <button className="text-gray-600 hover:text-gray-900">
-                            <Edit size={16} />
-                          </button>
-                          <select
-                            value={client.status}
-                            onChange={(e) =>
-                              void handleStatusChange(
-                                client.id,
-                                e.target.value as ClientStatus
-                              )
-                            }
-                            className="text-xs border border-gray-300 rounded px-1 py-1"
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="relative inline-flex items-center justify-end gap-2">
+                          <Button size="small" variant="secondary" onClick={() => updateClientStatus(client.id, "active")}>
+                            {t("activate")}
+                          </Button>
+
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => {
+                              setReasonOpen({ type: "suspend", ids: [client.id] });
+                              setReasonText("");
+                            }}
                           >
-                            <option value="active">Actif</option>
-                            <option value="pending">En attente</option>
-                            <option value="suspended">Suspendu</option>
-                          </select>
+                            {t("suspend")}
+                          </Button>
+
+                          <Button
+                            size="small"
+                            variant="outline"
+                            onClick={() => {
+                              setReasonOpen({ type: "delete", ids: [client.id] });
+                              setReasonText("");
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+
+                          {/* Menu 3 points */}
+                          <button
+                            className="p-2 rounded hover:bg-gray-100"
+                            onClick={() => setOpenMenuId((cur) => (cur === client.id ? null : client.id))}
+                            aria-label="More"
+                          >
+                            <MoreVertical className="w-4 h-4 text-gray-500" />
+                          </button>
+
+                          {openMenuId === client.id && (
+                            <div
+                              className="absolute right-0 top-9 z-10 w-48 bg-white border rounded-lg shadow-lg py-1"
+                              onMouseLeave={() => setOpenMenuId(null)}
+                            >
+                              <button
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(client.email);
+                                  alert(t("copied"));
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <ClipboardCopy className="w-4 h-4" /> {t("copyEmail")}
+                              </button>
+                              <button
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(client.id);
+                                  alert(t("copied"));
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <ClipboardCopy className="w-4 h-4" /> {t("copyId")}
+                              </button>
+                              <a
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                href={`mailto:${client.email}`}
+                                onClick={() => setOpenMenuId(null)}
+                              >
+                                <ExternalLink className="w-4 h-4" /> {t("contact")}
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -721,20 +1048,119 @@ const AdminClients: React.FC = () => {
               </table>
             )}
           </div>
+
+          {/* ✅ Footer de pagination à curseur + total exact */}
+          <div className="flex items-center justify-between p-4 border-t bg-gray-50">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600">{t("rowsPerPage")}</label>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+
+              <label className="ml-4 text-sm text-gray-600">{t("page")}</label>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+                  disabled={pageIndex === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm">
+                  {pageIndex} {t("of")} {hasNext ? "…" : pageIndex}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setPageIndex((p) => (hasNext ? p + 1 : p))}
+                  disabled={!hasNext}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-500">
+              {t("totalExact")}: {totalExact ?? "—"}
+            </div>
+          </div>
         </div>
 
-        {clients.length === 0 && !loading && (
+        {clients.length === 0 && !loading && !errorMsg && (
           <div className="text-center py-12">
             <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              Aucun client trouvé
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Aucun client ne correspond aux critères de recherche.
-            </p>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">{t("noneTitle")}</h3>
+            <p className="mt-1 text-sm text-gray-500">{t("noneBody")}</p>
           </div>
         )}
       </div>
+
+      {/* Modale Raison (Suspend/Delete) */}
+      <Modal
+        isOpen={!!reasonOpen}
+        onClose={() => setReasonOpen(null)}
+        title={reasonOpen?.type === "suspend" ? t("reasonTitleSuspend") : t("reasonTitleDelete")}
+      >
+        <div className="space-y-3">
+          <label className="text-sm text-gray-700">{t("reasonLabel")}</label>
+          <textarea
+            className="w-full border rounded p-2"
+            rows={4}
+            value={reasonText}
+            placeholder={t("reasonPlaceholder")}
+            onChange={(e) => setReasonText(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setReasonOpen(null)}>
+              {t("cancel")}
+            </Button>
+            <Button
+              variant={reasonOpen?.type === "delete" ? "outline" : "secondary"}
+              onClick={async () => {
+                const ids = reasonOpen?.ids || [];
+                const reason = reasonText.trim();
+                if (reason.length < 3) return;
+
+                try {
+                  if (reasonOpen?.type === "suspend") {
+                    // suspendre en lot
+                    await Promise.all(
+                      ids.map((id: string) =>
+                        updateDoc(doc(db, "users", id), {
+                          status: "suspended",
+                          suspendedReason: reason,
+                          suspendedAt: new Date(),
+                          updatedAt: new Date(),
+                        })
+                      )
+                    );
+                  } else {
+                    // supprimer en lot (hard delete)
+                    await Promise.all(ids.map((id: string) => deleteDoc(doc(db, "users", id))));
+                  }
+                  setReasonOpen(null);
+                  setReasonText("");
+                  setSelectedClients([]);
+                  await loadPage();
+                  alert(t("successUpdate"));
+                } catch (e) {
+                  console.error("Reason action error", e);
+                  alert(t("errorUpdate"));
+                }
+              }}
+            >
+              {t("confirm")}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 };

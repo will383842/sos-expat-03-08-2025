@@ -136,3 +136,4 @@ export const flattenLawyerSpecialities = () =>
 export type LawyerSpecialityCode = typeof lawyerSpecialitiesData[number]['items'][number]['code'];
 export type LawyerSpecialityGroupCode = typeof lawyerSpecialitiesData[number]['code'];
 
+

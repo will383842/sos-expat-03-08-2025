@@ -8,9 +8,9 @@ export { default as SpecialtySelect } from './SpecialtySelect';
 export { default as ExpatHelpSelect } from './ExpatHelpSelect';
 
 // ---- Données (depuis src/data) ----
-import LANGUAGE_OPTIONS_DEFAULT from '../../data/languages-spoken';
-import LAWYER_SPECIALTIES_DEFAULT from '../../data/lawyer-specialties';
-import EXPAT_HELP_TYPES_DEFAULT from '../../data/expat-help-types';
+import { languagesData as LANGUAGE_OPTIONS_DEFAULT } from '../../data/languages-spoken';
+import { lawyerSpecialitiesData as LAWYER_SPECIALTIES_DEFAULT } from '../../data/lawyer-specialties';
+import { expatHelpTypesData as EXPAT_HELP_TYPES_DEFAULT } from '../../data/expat-help-types';
 
 // on ré-exporte sous des noms stables
 export const LANGUAGE_OPTIONS = LANGUAGE_OPTIONS_DEFAULT;

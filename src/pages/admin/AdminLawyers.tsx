@@ -1124,7 +1124,7 @@ const AdminLawyers: React.FC = () => {
     const r = resizingRef.current;
     if (!r) return;
     const delta = e.clientX - r.startX;
-    const next = Math.max(80, r.startW + delta); // min 80px → on peut VRAIMENT réduire
+    const next = Math.max(80, r.startW + delta); // min 80px
     setWidths((w) => ({ ...w, [r.id]: next }));
   };
   const onResizeEnd = () => {
@@ -1288,6 +1288,20 @@ const AdminLawyers: React.FC = () => {
 
   const visibleOrder = order.filter((c) => visible[c]);
 
+  // Style commun pour la "barre de redimensionnement" (trait visible)
+  const Resizer = ({
+    onMouseDown,
+  }: {
+    onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
+  }) => (
+    <div
+      onMouseDown={onMouseDown}
+      className="absolute top-0 right-0 h-full w-1 cursor-col-resize bg-gray-300 hover:bg-blue-400"
+      style={{ userSelect: "none" }}
+      aria-hidden
+    />
+  );
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -1321,11 +1335,13 @@ const AdminLawyers: React.FC = () => {
                   <div className="flex items-center justify-between px-2 pb-2 border-b">
                     <button
                       className="text-xs underline"
-                      onClick={() => setVisible((v) => {
-                        const all: Record<ColId, boolean> = { ...v };
-                        (Object.keys(all) as ColId[]).forEach((k) => (all[k] = true));
-                        return all;
-                      })}
+                      onClick={() =>
+                        setVisible((v) => {
+                          const all: Record<ColId, boolean> = { ...v };
+                          (Object.keys(all) as ColId[]).forEach((k) => (all[k] = true));
+                          return all;
+                        })
+                      }
                     >
                       {t("showAll")}
                     </button>
@@ -1435,7 +1451,7 @@ const AdminLawyers: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-yellow-100 rounded-lg">
                 <AlertCircle className="w-6 h-6 text-yellow-600" />
@@ -1713,10 +1729,7 @@ const AdminLawyers: React.FC = () => {
                         }
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <div
-                        onMouseDown={(e) => onResizeStart("select", e)}
-                        className="absolute top-0 right-0 h-full w-2 cursor-col-resize"
-                      />
+                      <Resizer onMouseDown={(e) => onResizeStart("select", e)} />
                     </th>
 
                     {/* Dynamic columns with DnD + resize */}
@@ -1729,15 +1742,13 @@ const AdminLawyers: React.FC = () => {
                         onDrop={(e) => onDropHeader(e, id)}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
                         style={{ width: widths[id] }}
+                        title=""
                       >
                         <div className="flex items-center gap-2">
                           <GripVertical className="w-4 h-4 text-gray-400" />
                           {headerLabel(id)}
                         </div>
-                        <div
-                          onMouseDown={(e) => onResizeStart(id, e)}
-                          className="absolute top-0 right-0 h-full w-2 cursor-col-resize"
-                        />
+                        <Resizer onMouseDown={(e) => onResizeStart(id, e)} />
                       </th>
                     ))}
 
@@ -1747,10 +1758,7 @@ const AdminLawyers: React.FC = () => {
                       style={{ width: widths.actions }}
                     >
                       {t("tableActions")}
-                      <div
-                        onMouseDown={(e) => onResizeStart("actions", e)}
-                        className="absolute top-0 right-0 h-full w-2 cursor-col-resize"
-                      />
+                      <Resizer onMouseDown={(e) => onResizeStart("actions", e)} />
                     </th>
                   </tr>
                 </thead>

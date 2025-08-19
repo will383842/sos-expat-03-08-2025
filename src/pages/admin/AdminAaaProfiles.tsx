@@ -19,8 +19,7 @@ import {
   Search,
   List,
   Upload,
-  Calendar,
-  Settings
+  Calendar
 } from 'lucide-react';
 import {
   collection,
@@ -33,34 +32,47 @@ import {
   where,
   updateDoc,
   deleteDoc,
-  orderBy,
-  limit,
   runTransaction,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import AdminLayout from '../../components/admin/AdminLayout';
-import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { useAuth } from '../../contexts/AuthContext';
 
-// ---------- DATA IMPORTS (depuis ton zip) ----------
-/**
- * IMPORTANT:
- * - countries: tes pays => dans ta capture l'export s’appelle "countriesData"
- * - languages: dans ton zip "languages-spoken" exporte par défaut => on importe le default
- * - specialties: on passe par un index pour éviter les erreurs de chemin
- *   crée (si pas déjà) src/components/forms-data/index.ts qui ré-exporte les constantes
- */
+// ---------- IMPORTS DE DONNÉES CORRIGÉS ----------
 import { countriesData } from '../../data/countries';
-import LANGUAGE_OPTIONS from '../../data/languages-spoken';
-// crée / vérifie cet index : export { default as LAWYER_SPECIALTIES } from './lawyer-specialties'; export { default as EXPAT_HELP_TYPES } from './expat-help-types';
-import { LAWYER_SPECIALTIES, EXPAT_HELP_TYPES } from '../../components/forms-data';
-
-// ---------- PHOTOS ----------
-// Les photos sont alimentées depuis un fichier dédié (tu vas le créer juste après):
-// src/data/profile-photos.ts  => export const PROFILE_PHOTOS: AaaPhoto[] = [...]
+import { languagesData } from '../../data/languages-spoken';
+import { flattenLawyerSpecialities } from '../../data/lawyer-specialties';
+import { expatHelpTypesData } from '../../data/expat-help-types';
 import { PROFILE_PHOTOS } from '../../data/profile-photos';
+
+// ---------- EXTRACTION DES NOMS SIMPLES ----------
+const getCountryNames = (): string[] => {
+  return countriesData
+    .filter(country => country.code !== 'SEPARATOR' && !country.disabled)
+    .map(country => country.nameFr);
+};
+
+const getLanguageNames = (): string[] => {
+  return languagesData.map(lang => lang.name);
+};
+
+const getLawyerSpecialtyNames = (): string[] => {
+  return flattenLawyerSpecialities().map(spec => spec.labelFr);
+};
+
+const getExpatHelpTypeNames = (): string[] => {
+  return expatHelpTypesData
+    .filter(type => !type.disabled)
+    .map(type => type.labelFr);
+};
+
+// Créer les constantes utilisées dans le composant
+const COUNTRIES_LIST = getCountryNames();
+const LANGUAGE_OPTIONS = getLanguageNames();
+const LAWYER_SPECIALTIES = getLawyerSpecialtyNames();
+const EXPAT_HELP_TYPES = getExpatHelpTypeNames();
 
 // ---------- TYPES ----------
 type Role = 'lawyer' | 'expat';
@@ -87,10 +99,11 @@ interface AaaProfile {
   isVisible: boolean;
   isCallable: boolean;
   createdAt: Date;
+  isTestProfile?: boolean;
   price?: number;
   duration?: number;
   slug?: string;
-  role?: Role; // pour compat compat avec anciens champs
+  role?: Role;
 }
 
 interface GenerationForm {
@@ -98,7 +111,7 @@ interface GenerationForm {
   roleDistribution: { lawyer: number; expat: number };
   genderDistribution: { male: number; female: number };
   countries: string[];
-  languages: string[]; // options choisies (Français/Anglais plus probables)
+  languages: string[];
   minExperience: number;
   maxExperience: number;
   minAge: number;
@@ -109,13 +122,12 @@ interface GenerationForm {
   useCustomPhone: boolean;
 }
 
-// Photo catalogue item (dans src/data/profile-photos.ts)
 export interface AaaPhoto {
   url: string;
-  role: Role;          // 'lawyer' | 'expat'
-  gender: Gender;      // 'male' | 'female'
-  countries?: string[]; // optionnel: liste de pays compatibles
-  weight?: number;     // optionnel: pondération (par défaut 1)
+  role: Role;
+  gender: Gender;
+  countries?: string[];
+  weight?: number;
 }
 
 // ---------- UTILS ----------
@@ -130,22 +142,18 @@ const slugify = (input: string): string =>
 const randomInt = (min: number, max: number): number =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
-// 95% des cas: [4.0, 5.0], 5% des cas: [3.0, 3.9]
 const randomRating = (): number => {
   const r = Math.random();
   if (r < 0.95) return parseFloat((4 + Math.random()).toFixed(2));
   return parseFloat((3 + Math.random() * 0.9).toFixed(2));
 };
 
-// 5..30 avis
 const randomReviewCount = (): number => randomInt(5, 30);
 
-// Chance plus forte pour FR/EN quand disponibles dans LANGUAGE_OPTIONS
 const pickLanguages = (selected: string[]): string[] => {
   const pool = [...selected];
   const result = new Set<string>();
 
-  // On pousse Français + Anglais si présents dans les options
   const pushIf = (lang: string) => {
     const found = pool.find(
       (l) => l.toLowerCase() === lang.toLowerCase()
@@ -180,15 +188,7 @@ const genName = (gender: Gender) => {
 const genEmail = (firstName: string, lastName: string) =>
   `${slugify(firstName)}.${slugify(lastName)}@example.com`;
 
-// ---------- PHOTO LIBRARY (one-time use) ----------
-/**
- * On garde une collection Firestore "assets_profile_photos".
- * Chaque doc: { url, role, gender, countries:[], weight, inUse, usedBy, usedAt }
- *
- * - Au 1er lancement, tu peux "seeder" à partir du fichier src/data/profile-photos.ts
- *   en cliquant sur "Importer les photos (catalogue)" ci-dessous.
- * - Lors de la génération d’un profil, on "claim" une photo compatible via Transaction.
- */
+// ---------- PHOTO LIBRARY ----------
 const ASSETS_COLL = 'assets_profile_photos';
 
 interface PhotoDoc {
@@ -203,76 +203,83 @@ interface PhotoDoc {
 }
 
 async function seedPhotoLibraryFromCatalog(): Promise<number> {
-  const collRef = collection(db, ASSETS_COLL);
-  const snap = await getDocs(collRef);
-  if (!snap.empty) return 0; // déjà seedé
+  try {
+    const collRef = collection(db, ASSETS_COLL);
+    const snap = await getDocs(collRef);
+    if (!snap.empty) return 0;
 
-  // on insère tous les éléments du catalogue
-  let inserted = 0;
-  for (const p of PROFILE_PHOTOS) {
-    await addDoc(collRef, {
-      url: p.url,
-      role: p.role,
-      gender: p.gender,
-      countries: p.countries || [],
-      weight: p.weight || 1,
-      inUse: false,
-      usedBy: null,
-      usedAt: null,
-      createdAt: serverTimestamp(),
-    });
-    inserted++;
+    let inserted = 0;
+    for (const p of PROFILE_PHOTOS) {
+      await addDoc(collRef, {
+        url: p.url,
+        role: p.role,
+        gender: p.gender,
+        countries: p.countries || [],
+        weight: p.weight || 1,
+        inUse: false,
+        usedBy: null,
+        usedAt: null,
+        createdAt: serverTimestamp(),
+      });
+      inserted++;
+    }
+    return inserted;
+  } catch (error) {
+    console.error('Erreur lors du seed des photos:', error);
+    return 0;
   }
-  return inserted;
 }
 
 async function claimPhoto(role: Role, gender: Gender, country: string): Promise<string> {
-  // On prend une photo non utilisée, compatible role/gender/pays
-  // puis on la lock via transaction
-  const collRef = collection(db, ASSETS_COLL);
-  const q1 = query(collRef, where('role', '==', role), where('gender', '==', gender), where('inUse', '==', false));
-  const snap = await getDocs(q1);
+  try {
+    const collRef = collection(db, ASSETS_COLL);
+    const q1 = query(collRef, where('role', '==', role), where('gender', '==', gender), where('inUse', '==', false));
+    const snap = await getDocs(q1);
 
-  const candidates: { id: string; data: PhotoDoc }[] = [];
-  snap.forEach((d) => {
-    const data = d.data() as PhotoDoc;
-    if (!data.countries || data.countries.length === 0 || data.countries.includes(country)) {
-      candidates.push({ id: d.id, data });
+    const candidates: { id: string; data: PhotoDoc }[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as PhotoDoc;
+      if (!data.countries || data.countries.length === 0 || data.countries.includes(country)) {
+        candidates.push({ id: d.id, data });
+      }
+    });
+
+    if (candidates.length === 0) {
+      const q2 = query(collRef, where('role', '==', role), where('gender', '==', gender), where('inUse', '==', false));
+      const snap2 = await getDocs(q2);
+      const all: { id: string; data: PhotoDoc }[] = [];
+      snap2.forEach((d) => all.push({ id: d.id, data: d.data() as PhotoDoc }));
+      if (all.length === 0) {
+        const defaultPhoto = `https://images.unsplash.com/photo-${gender === 'male' ? '1560250097-0b93528c311a' : '1594736797933-d0501ba2fe65'}?w=400&h=400&fit=crop&crop=face`;
+        return defaultPhoto;
+      }
+      const picked = all[randomInt(0, all.length - 1)];
+      await runTransaction(db, async (tx) => {
+        const refDoc = doc(db, ASSETS_COLL, picked.id);
+        tx.update(refDoc, { inUse: true, usedAt: serverTimestamp() });
+      });
+      return picked.data.url;
     }
-  });
 
-  if (candidates.length === 0) {
-    // aucun match strict => on retente sans filtrer le pays
-    const q2 = query(collRef, where('role', '==', role), where('gender', '==', gender), where('inUse', '==', false));
-    const snap2 = await getDocs(q2);
-    const all: { id: string; data: PhotoDoc }[] = [];
-    snap2.forEach((d) => all.push({ id: d.id, data: d.data() as PhotoDoc }));
-    if (all.length === 0) throw new Error('Aucune photo disponible: ajoute des images dans la bibliothèque.');
-    // on prend au hasard
-    const picked = all[randomInt(0, all.length - 1)];
+    const weighted: { id: string; data: PhotoDoc }[] = [];
+    for (const c of candidates) {
+      const w = Math.max(1, c.data.weight || 1);
+      for (let i = 0; i < w; i++) weighted.push(c);
+    }
+    const chosen = weighted[randomInt(0, weighted.length - 1)];
+
     await runTransaction(db, async (tx) => {
-      const refDoc = doc(db, ASSETS_COLL, picked.id);
+      const refDoc = doc(db, ASSETS_COLL, chosen.id);
       tx.update(refDoc, { inUse: true, usedAt: serverTimestamp() });
     });
-    return picked.data.url;
+    return chosen.data.url;
+  } catch (error) {
+    console.error('Erreur lors de la récupération de photo:', error);
+    return `https://images.unsplash.com/photo-${gender === 'male' ? '1560250097-0b93528c311a' : '1594736797933-d0501ba2fe65'}?w=400&h=400&fit=crop&crop=face`;
   }
-
-  // pondération par weight (si définie)
-  const weighted: { id: string; data: PhotoDoc }[] = [];
-  for (const c of candidates) {
-    const w = Math.max(1, c.data.weight || 1);
-    for (let i = 0; i < w; i++) weighted.push(c);
-  }
-  const chosen = weighted[randomInt(0, weighted.length - 1)];
-
-  await runTransaction(db, async (tx) => {
-    const refDoc = doc(db, ASSETS_COLL, chosen.id);
-    tx.update(refDoc, { inUse: true, usedAt: serverTimestamp() });
-  });
-  return chosen.data.url;
 }
 
-// ---------- UI COMPONENT ----------
+// ---------- COMPOSANT PRINCIPAL ----------
 const AdminAaaProfiles: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
@@ -310,8 +317,7 @@ const AdminAaaProfiles: React.FC = () => {
     useCustomPhone: true,
   });
 
-  // Planner (génération programmée côté UI)
-  const [planner, setPlanner] = useState({
+  const [planner] = useState({
     enabled: false,
     dailyCount: 20,
     regionCountries: ['Thaïlande', 'Vietnam', 'Cambodge'],
@@ -320,23 +326,67 @@ const AdminAaaProfiles: React.FC = () => {
     languages: ['Français', 'Anglais'],
   });
 
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [photoMeta, setPhotoMeta] = useState<{ role: Role; gender: Gender; countries: string[] }>({
+    role: 'lawyer',
+    gender: 'male',
+    countries: [],
+  });
+
+  // Gestion d'erreur pour les données manquantes
+  useEffect(() => {
+    if (!COUNTRIES_LIST || COUNTRIES_LIST.length === 0) {
+      setError('Erreur de chargement des données pays');
+      return;
+    }
+    if (!LANGUAGE_OPTIONS || LANGUAGE_OPTIONS.length === 0) {
+      setError('Erreur de chargement des données langues');
+      return;
+    }
+  }, []);
+
   // Guard
   useEffect(() => {
-    if (!currentUser || (currentUser as any).role !== 'admin') {
+    if (!currentUser || (currentUser as { role?: string }).role !== 'admin') {
       navigate('/admin/login');
       return;
     }
     if (activeTab === 'manage') loadExistingProfiles().catch(() => {});
   }, [currentUser, navigate, activeTab]);
 
-  // --------- LOAD EXISTING ----------
+  // --------- MEMOIZED VALUES ----------
+  const filteredProfiles = useMemo(
+    () =>
+      existingProfiles.filter(
+        (p) =>
+          p.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.country?.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [existingProfiles, searchTerm]
+  );
+
+  // Affichage de fallback si les données ne sont pas chargées
+  if (!COUNTRIES_LIST || !LANGUAGE_OPTIONS || !LAWYER_SPECIALTIES) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <Loader className="animate-spin mx-auto mb-4" size={48} />
+            <p className="text-gray-600">Chargement des données...</p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   const loadExistingProfiles = async () => {
     try {
       setIsLoadingProfiles(true);
       const usersRef = collection(db, 'users');
       const snapshot = await getDocs(usersRef);
       const all = snapshot.docs.map((d) => {
-        const data = d.data() as any;
+        const data = d.data();
         return {
           id: d.id,
           ...data,
@@ -384,17 +434,6 @@ const AdminAaaProfiles: React.FC = () => {
       minute: '2-digit',
     }).format(date);
 
-  const filteredProfiles = useMemo(
-    () =>
-      existingProfiles.filter(
-        (p) =>
-          p.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.country?.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [existingProfiles, searchTerm]
-  );
-
   // --------- GENERATION CORE ----------
   const generateAaaProfiles = async () => {
     try {
@@ -422,7 +461,7 @@ const AdminAaaProfiles: React.FC = () => {
       const lawyerCount = Math.round((roleDistribution.lawyer / 100) * count);
       const expatCount = count - lawyerCount;
       const maleCount = Math.round((genderDistribution.male / 100) * count);
-      const femaleCount = count - maleCount;
+      console.log(`Génération: ${lawyerCount} avocats, ${expatCount} expatriés, ${maleCount} hommes, ${count - maleCount} femmes`);
 
       let malesGenerated = 0;
       let lawyersGenerated = 0;
@@ -465,9 +504,7 @@ const AdminAaaProfiles: React.FC = () => {
     const phone = useCustomPhone ? customPhoneNumber : '+33743331201';
     const selectedLanguages = pickLanguages(languages);
 
-    // Photo unique (depuis la bibliothèque Firestore)
     const profilePhoto = await claimPhoto(role, gender, country);
-
     const rating = randomRating();
     const reviewCount = randomReviewCount();
 
@@ -475,8 +512,7 @@ const AdminAaaProfiles: React.FC = () => {
     const slug = `${slugify(firstName)}-${slugify(lastName)}-${uid.slice(-6)}`;
     const hourlyRate = role === 'lawyer' ? 49 : 19;
 
-    // base user
-    const baseUser: any = {
+    const baseUser = {
       uid,
       firstName,
       lastName,
@@ -529,9 +565,9 @@ const AdminAaaProfiles: React.FC = () => {
         const s = LAWYER_SPECIALTIES[randomInt(0, LAWYER_SPECIALTIES.length - 1)];
         if (!specialties.includes(s)) specialties.push(s);
       }
-      const bio = `Avocat${gender === 'female' ? 'e' : ''} en ${country} spécialisé${gender === 'female' ? 'e' : ''} en ${specialties.join(', ')} (${experience} ans). J’accompagne les expatriés francophones.`;
+      const bio = `Avocat${gender === 'female' ? 'e' : ''} en ${country} spécialisé${gender === 'female' ? 'e' : ''} en ${specialties.join(', ')} (${experience} ans). J'accompagne les expatriés francophones.`;
 
-      Object.assign(baseUser, {
+      const lawyerData = {
         bio,
         specialties,
         practiceCountries: [country],
@@ -542,7 +578,9 @@ const AdminAaaProfiles: React.FC = () => {
         certifications: ['Certification Barreau'],
         needsVerification: false,
         verificationStatus: 'approved',
-      });
+      };
+      
+      Object.assign(baseUser, lawyerData);
     } else {
       const help: string[] = [];
       const count = randomInt(2, 4);
@@ -552,7 +590,7 @@ const AdminAaaProfiles: React.FC = () => {
       }
       const bio = `Expatrié${gender === 'female' ? 'e' : ''} en ${country} depuis ${experience} ans. Aide sur ${help.join(', ')}.`;
 
-      Object.assign(baseUser, {
+      const expatData = {
         bio,
         helpTypes: help,
         specialties: help,
@@ -560,17 +598,19 @@ const AdminAaaProfiles: React.FC = () => {
         yearsAsExpat: experience,
         yearsOfExperience: experience,
         previousCountries: [],
-        motivation: `Faciliter l’installation en ${country}`,
+        motivation: `Faciliter l'installation en ${country}`,
         needsVerification: false,
         verificationStatus: 'approved',
-      });
+      };
+      
+      Object.assign(baseUser, expatData);
     }
 
     // write user
     await setDoc(doc(db, 'users', uid), baseUser);
 
     // provider profile (public)
-    const providerProfile = {
+    const providerProfile: FirestoreData = {
       ...baseUser,
       uid,
       type: role,
@@ -581,7 +621,7 @@ const AdminAaaProfiles: React.FC = () => {
     };
     await setDoc(doc(db, 'sos_profiles', uid), providerProfile);
 
-    // UI cards (carousel + card) – champs simples et dérivés
+    // UI cards (carousel + card)
     const card = {
       id: uid,
       uid,
@@ -592,7 +632,7 @@ const AdminAaaProfiles: React.FC = () => {
       rating,
       reviewCount,
       languages: selectedLanguages,
-      specialties: providerProfile.specialties || [],
+      specialties: (providerProfile.specialties as string[]) || [],
       href: `/${role === 'lawyer' ? 'avocat' : 'expatrie'}/${slugify(country)}/${slugify(selectedLanguages[0] || 'francais')}/${slug}`,
       createdAt: serverTimestamp(),
     };
@@ -609,7 +649,7 @@ const AdminAaaProfiles: React.FC = () => {
     ];
     const reviewsToCreate = reviewCount;
     for (let i = 0; i < reviewsToCreate; i++) {
-      const r = randomRating(); // encore dans [3..5] avec faible proba de 3.x
+      const r = randomRating();
       await addDoc(collection(db, 'reviews'), {
         providerId: uid,
         clientId: `aaa_client_${Date.now()}_${i}`,
@@ -656,6 +696,7 @@ const AdminAaaProfiles: React.FC = () => {
     if (!selectedProfile) return;
     try {
       setIsLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updateData: any = {
         ...editFormData,
         fullName: `${editFormData.firstName} ${editFormData.lastName}`.trim(),
@@ -787,13 +828,6 @@ const AdminAaaProfiles: React.FC = () => {
   };
 
   // --------- PHOTOS: import ZIP/lot + rename SEO + push Storage + index Firestore ----------
-  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
-  const [photoMeta, setPhotoMeta] = useState<{ role: Role; gender: Gender; countries: string[] }>({
-    role: 'lawyer',
-    gender: 'male',
-    countries: [],
-  });
-
   const seoName = (fileName: string, role: Role, gender: Gender, countries: string[]) => {
     const base = fileName.replace(/\.[^.]+$/, ''); // sans extension
     const ext = fileName.split('.').pop() || 'jpg';
@@ -843,18 +877,46 @@ const AdminAaaProfiles: React.FC = () => {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Gestion des profils AAA</h1>
           <div className="flex gap-2">
-            <Button onClick={() => setActiveTab('generate')} variant={activeTab === 'generate' ? 'default' : 'outline'}>
+            <button
+              onClick={() => setActiveTab('generate')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
+                activeTab === 'generate' 
+                  ? 'bg-red-600 text-white hover:bg-red-700' 
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
               <UserPlus className="mr-2" size={18} /> Générer
-            </Button>
-            <Button onClick={() => setActiveTab('manage')} variant={activeTab === 'manage' ? 'default' : 'outline'}>
+            </button>
+            <button
+              onClick={() => setActiveTab('manage')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
+                activeTab === 'manage' 
+                  ? 'bg-red-600 text-white hover:bg-red-700' 
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
               <List className="mr-2" size={18} /> Gérer ({existingProfiles.length})
-            </Button>
-            <Button onClick={() => setActiveTab('photos')} variant={activeTab === 'photos' ? 'default' : 'outline'}>
+            </button>
+            <button
+              onClick={() => setActiveTab('photos')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
+                activeTab === 'photos' 
+                  ? 'bg-red-600 text-white hover:bg-red-700' 
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
               <Upload className="mr-2" size={18} /> Photos
-            </Button>
-            <Button onClick={() => setActiveTab('planner')} variant={activeTab === 'planner' ? 'default' : 'outline'}>
+            </button>
+            <button
+              onClick={() => setActiveTab('planner')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
+                activeTab === 'planner' 
+                  ? 'bg-red-600 text-white hover:bg-red-700' 
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
               <Calendar className="mr-2" size={18} /> Planification
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -872,9 +934,7 @@ const AdminAaaProfiles: React.FC = () => {
                       min={1}
                       max={200}
                       value={formData.count}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setFormData((p) => ({ ...p, count: Number(e.target.value) }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, count: Number(e.target.value) }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                   </div>
@@ -895,7 +955,7 @@ const AdminAaaProfiles: React.FC = () => {
                             max={100}
                             step={5}
                             value={formData.roleDistribution.lawyer}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            onChange={(e) => {
                               const v = Number(e.target.value);
                               setFormData((p) => ({ ...p, roleDistribution: { lawyer: v, expat: 100 - v } }));
                             }}
@@ -913,7 +973,7 @@ const AdminAaaProfiles: React.FC = () => {
                             max={100}
                             step={5}
                             value={formData.roleDistribution.expat}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            onChange={(e) => {
                               const v = Number(e.target.value);
                               setFormData((p) => ({ ...p, roleDistribution: { lawyer: 100 - v, expat: v } }));
                             }}
@@ -937,7 +997,7 @@ const AdminAaaProfiles: React.FC = () => {
                             max={100}
                             step={5}
                             value={formData.genderDistribution.male}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            onChange={(e) => {
                               const v = Number(e.target.value);
                               setFormData((p) => ({ ...p, genderDistribution: { male: v, female: 100 - v } }));
                             }}
@@ -955,7 +1015,7 @@ const AdminAaaProfiles: React.FC = () => {
                             max={100}
                             step={5}
                             value={formData.genderDistribution.female}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            onChange={(e) => {
                               const v = Number(e.target.value);
                               setFormData((p) => ({ ...p, genderDistribution: { male: 100 - v, female: v } }));
                             }}
@@ -973,7 +1033,7 @@ const AdminAaaProfiles: React.FC = () => {
                     </h3>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {countriesData.map((country: string) => (
+                        {COUNTRIES_LIST.map((country: string) => (
                           <label key={country} className="flex items-center text-sm">
                             <input
                               type="checkbox"
@@ -995,15 +1055,15 @@ const AdminAaaProfiles: React.FC = () => {
                     </h3>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {(LANGUAGE_OPTIONS as string[]).map((l) => (
-                          <label key={l} className="flex items-center text-sm">
+                        {LANGUAGE_OPTIONS.map((language: string) => (
+                          <label key={language} className="flex items-center text-sm">
                             <input
                               type="checkbox"
-                              checked={formData.languages.includes(l)}
-                              onChange={() => handleLanguageToggle(l)}
+                              checked={formData.languages.includes(language)}
+                              onChange={() => handleLanguageToggle(language)}
                               className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mr-2"
                             />
-                            {l}
+                            {language}
                           </label>
                         ))}
                       </div>
@@ -1017,9 +1077,7 @@ const AdminAaaProfiles: React.FC = () => {
                         id="useCustomPhone"
                         type="checkbox"
                         checked={formData.useCustomPhone}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setFormData((p) => ({ ...p, useCustomPhone: e.target.checked }))
-                        }
+                        onChange={(e) => setFormData((p) => ({ ...p, useCustomPhone: e.target.checked }))}
                         className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                       />
                       <label htmlFor="useCustomPhone" className="ml-2 text-sm font-medium text-gray-700">
@@ -1032,13 +1090,11 @@ const AdminAaaProfiles: React.FC = () => {
                           type="text"
                           placeholder="+33743331201"
                           value={formData.customPhoneNumber}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setFormData((p) => ({ ...p, customPhoneNumber: e.target.value }))
-                          }
+                          onChange={(e) => setFormData((p) => ({ ...p, customPhoneNumber: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Utilise une URL d'image haute qualité (&ge; 400×400)
+                          Numéro utilisé pour tous les profils générés
                         </p>
                       </>
                     )}
@@ -1056,9 +1112,7 @@ const AdminAaaProfiles: React.FC = () => {
                             min={1}
                             max={50}
                             value={formData.minExperience}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setFormData((p) => ({ ...p, minExperience: Number(e.target.value) }))
-                            }
+                            onChange={(e) => setFormData((p) => ({ ...p, minExperience: Number(e.target.value) }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                           />
                         </div>
@@ -1069,9 +1123,7 @@ const AdminAaaProfiles: React.FC = () => {
                             min={1}
                             max={50}
                             value={formData.maxExperience}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setFormData((p) => ({ ...p, maxExperience: Number(e.target.value) }))
-                            }
+                            onChange={(e) => setFormData((p) => ({ ...p, maxExperience: Number(e.target.value) }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                           />
                         </div>
@@ -1088,9 +1140,7 @@ const AdminAaaProfiles: React.FC = () => {
                             min={18}
                             max={80}
                             value={formData.minAge}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setFormData((p) => ({ ...p, minAge: Number(e.target.value) }))
-                            }
+                            onChange={(e) => setFormData((p) => ({ ...p, minAge: Number(e.target.value) }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                           />
                         </div>
@@ -1101,9 +1151,7 @@ const AdminAaaProfiles: React.FC = () => {
                             min={18}
                             max={80}
                             value={formData.maxAge}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setFormData((p) => ({ ...p, maxAge: Number(e.target.value) }))
-                            }
+                            onChange={(e) => setFormData((p) => ({ ...p, maxAge: Number(e.target.value) }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                           />
                         </div>
@@ -1117,9 +1165,7 @@ const AdminAaaProfiles: React.FC = () => {
                       id="allowRealCalls"
                       type="checkbox"
                       checked={formData.allowRealCalls}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setFormData((p) => ({ ...p, allowRealCalls: e.target.checked }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, allowRealCalls: e.target.checked }))}
                       className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                     />
                     <label htmlFor="allowRealCalls" className="ml-2 block text-sm text-gray-700">
@@ -1129,12 +1175,10 @@ const AdminAaaProfiles: React.FC = () => {
 
                   {/* Action */}
                   <div className="pt-4">
-                    <Button
+                    <button
                       onClick={generateAaaProfiles}
-                      loading={isGenerating}
                       disabled={isGenerating}
-                      className="bg-red-600 hover:bg-red-700"
-                      fullWidth
+                      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
                     >
                       {isGenerating ? (
                         <>
@@ -1147,7 +1191,7 @@ const AdminAaaProfiles: React.FC = () => {
                           Générer {formData.count} profils
                         </>
                       )}
-                    </Button>
+                    </button>
                   </div>
 
                   {error && (
@@ -1255,12 +1299,18 @@ const AdminAaaProfiles: React.FC = () => {
               <div className="flex items-center space-x-4">
                 {selectedProfiles.length > 0 && (
                   <div className="flex items-center space-x-2">
-                    <Button onClick={() => handleBulkToggleOnline(true)} size="small" className="bg-green-600 hover:bg-green-700">
+                    <button
+                      onClick={() => handleBulkToggleOnline(true)}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                    >
                       Mettre en ligne ({selectedProfiles.length})
-                    </Button>
-                    <Button onClick={() => handleBulkToggleOnline(false)} size="small" className="bg-gray-600 hover:bg-gray-700">
+                    </button>
+                    <button
+                      onClick={() => handleBulkToggleOnline(false)}
+                      className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
+                    >
                       Mettre hors ligne ({selectedProfiles.length})
-                    </Button>
+                    </button>
                   </div>
                 )}
                 <div className="relative">
@@ -1268,15 +1318,18 @@ const AdminAaaProfiles: React.FC = () => {
                     type="text"
                     placeholder="Rechercher un profil..."
                     value={searchTerm}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 </div>
-                <Button onClick={loadExistingProfiles} size="small">
+                <button
+                  onClick={loadExistingProfiles}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center"
+                >
                   <RefreshCw size={16} className="mr-2" />
                   Actualiser
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -1330,7 +1383,7 @@ const AdminAaaProfiles: React.FC = () => {
                                 src={profile.profilePhoto}
                                 alt={profile.fullName}
                                 className="h-10 w-10 rounded-full object-cover"
-                                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                onError={(e) => {
                                   (e.target as HTMLImageElement).src = '/default-avatar.png';
                                 }}
                               />
@@ -1455,17 +1508,18 @@ const AdminAaaProfiles: React.FC = () => {
                 1) Clique sur <b>Importer le catalogue</b> pour créer les entrées Firestore à partir du fichier
                 <code className="mx-1 px-1 rounded bg-gray-100">src/data/profile-photos.ts</code>.
                 <br />
-                2) Ajoute autant d’images que tu veux via l’upload ci-dessous (renommage SEO &amp; cache).
+                2) Ajoute autant d'images que tu veux via l'upload ci-dessous (renommage SEO &amp; cache).
               </p>
               <div className="flex gap-3 mb-6">
-                <Button
+                <button
                   onClick={async () => {
                     const inserted = await seedPhotoLibraryFromCatalog();
                     alert(inserted === 0 ? 'La bibliothèque existe déjà.' : `${inserted} photos importées depuis le catalogue.`);
                   }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
                   Importer le catalogue
-                </Button>
+                </button>
               </div>
 
               <div className="space-y-3">
@@ -1474,7 +1528,7 @@ const AdminAaaProfiles: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
                     <select
                       value={photoMeta.role}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      onChange={(e) =>
                         setPhotoMeta((p) => ({ ...p, role: e.target.value as Role }))
                       }
                       className="w-full px-3 py-2 border rounded"
@@ -1487,7 +1541,7 @@ const AdminAaaProfiles: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Genre</label>
                     <select
                       value={photoMeta.gender}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      onChange={(e) =>
                         setPhotoMeta((p) => ({ ...p, gender: e.target.value as Gender }))
                       }
                       className="w-full px-3 py-2 border rounded"
@@ -1501,7 +1555,7 @@ const AdminAaaProfiles: React.FC = () => {
                     <select
                       multiple
                       value={photoMeta.countries}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      onChange={(e) =>
                         setPhotoMeta((p) => ({
                           ...p,
                           countries: Array.from(e.target.selectedOptions).map((o) => o.value),
@@ -1509,13 +1563,13 @@ const AdminAaaProfiles: React.FC = () => {
                       }
                       className="w-full px-3 py-2 border rounded min-h-[42px]"
                     >
-                      {countriesData.map((c: string) => (
+                      {COUNTRIES_LIST.map((c: string) => (
                         <option key={c} value={c}>
                           {c}
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">Laisse vide pour “global”.</p>
+                    <p className="text-xs text-gray-500 mt-1">Laisse vide pour "global".</p>
                   </div>
                 </div>
 
@@ -1557,9 +1611,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={planner.enabled}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setPlanner((p) => ({ ...p, enabled: e.target.checked }))
-                    }
+                    readOnly
                   />
                   <span className="text-sm text-gray-600">Actif</span>
                 </div>
@@ -1571,9 +1623,7 @@ const AdminAaaProfiles: React.FC = () => {
                   min={1}
                   max={200}
                   value={planner.dailyCount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setPlanner((p) => ({ ...p, dailyCount: Number(e.target.value) }))
-                  }
+                  readOnly
                   className="w-full px-3 py-2 border rounded"
                 />
               </div>
@@ -1581,9 +1631,7 @@ const AdminAaaProfiles: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
                 <select
                   value={planner.role}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setPlanner((p) => ({ ...p, role: e.target.value as Role }))
-                  }
+                  disabled
                   className="w-full px-3 py-2 border rounded"
                 >
                   <option value="lawyer">Avocat</option>
@@ -1598,15 +1646,10 @@ const AdminAaaProfiles: React.FC = () => {
                 <select
                   multiple
                   value={planner.regionCountries}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setPlanner((p) => ({
-                      ...p,
-                      regionCountries: Array.from(e.target.selectedOptions).map((o) => o.value),
-                    }))
-                  }
+                  disabled
                   className="w-full px-3 py-2 border rounded min-h-[120px]"
                 >
-                  {countriesData.map((c: string) => (
+                  {COUNTRIES_LIST.map((c: string) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
@@ -1618,15 +1661,10 @@ const AdminAaaProfiles: React.FC = () => {
                 <select
                   multiple
                   value={planner.languages}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setPlanner((p) => ({
-                      ...p,
-                      languages: Array.from(e.target.selectedOptions).map((o) => o.value),
-                    }))
-                  }
+                  disabled
                   className="w-full px-3 py-2 border rounded min-h-[120px]"
                 >
-                  {(LANGUAGE_OPTIONS as string[]).map((l) => (
+                  {LANGUAGE_OPTIONS.map((l: string) => (
                     <option key={l} value={l}>
                       {l}
                     </option>
@@ -1646,9 +1684,7 @@ const AdminAaaProfiles: React.FC = () => {
                   min={0}
                   max={100}
                   value={planner.genderBias.male}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setPlanner((p) => ({ ...p, genderBias: { male: Number(e.target.value), female: 100 - Number(e.target.value) } }))
-                  }
+                  readOnly
                   className="w-full px-3 py-2 border rounded"
                 />
               </div>
@@ -1659,19 +1695,15 @@ const AdminAaaProfiles: React.FC = () => {
                   min={0}
                   max={100}
                   value={planner.genderBias.female}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setPlanner((p) => ({ ...p, genderBias: { female: Number(e.target.value), male: 100 - Number(e.target.value) } }))
-                  }
+                  readOnly
                   className="w-full px-3 py-2 border rounded"
                 />
               </div>
               <div className="flex items-end">
-                <Button
+                <button
                   onClick={async () => {
-                    if (!planner.enabled) return alert('Active le plan d’abord');
-                    // On exécute la génération "aujourd’hui" avec les paramètres du planner
+                    if (!planner.enabled) return alert('Active le plan d\'abord');
                     const maleCount = Math.round((planner.genderBias.male / 100) * planner.dailyCount);
-                    const femaleCount = planner.dailyCount - maleCount;
                     let m = 0;
                     for (let i = 0; i < planner.dailyCount; i++) {
                       const gender: Gender = m < maleCount ? 'male' : 'female';
@@ -1689,9 +1721,10 @@ const AdminAaaProfiles: React.FC = () => {
                     }
                     alert(`${planner.dailyCount} profils générés via le plan du jour`);
                   }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                 >
                   Lancer la génération du jour
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -1712,7 +1745,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="text"
                     value={editFormData.firstName || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, firstName: e.target.value }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1723,7 +1756,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="text"
                     value={editFormData.lastName || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, lastName: e.target.value }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1737,7 +1770,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="email"
                     value={editFormData.email || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, email: e.target.value }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1748,7 +1781,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="text"
                     value={editFormData.phone || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, phone: e.target.value }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1767,7 +1800,7 @@ const AdminAaaProfiles: React.FC = () => {
                       type="url"
                       placeholder="https://..."
                       value={newProfilePhoto}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProfilePhoto(e.target.value)}
+                      onChange={(e) => setNewProfilePhoto(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">Utilise une image nette (≥ 400×400)</p>
@@ -1784,7 +1817,7 @@ const AdminAaaProfiles: React.FC = () => {
                     max={5}
                     step={0.1}
                     value={editFormData.rating || 4.5}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, rating: parseFloat(e.target.value) }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1797,7 +1830,7 @@ const AdminAaaProfiles: React.FC = () => {
                     min={5}
                     max={30}
                     value={editFormData.reviewCount || 5}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, reviewCount: parseInt(e.target.value, 10) }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1810,7 +1843,7 @@ const AdminAaaProfiles: React.FC = () => {
                     min={1}
                     max={50}
                     value={editFormData.yearsOfExperience || 5}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, yearsOfExperience: parseInt(e.target.value, 10) }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1823,7 +1856,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={!!(editFormData.isOnline && editFormData.phone)}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, isOnline: e.target.checked && !!p.phone }))
                     }
                     disabled={!editFormData.phone}
@@ -1835,7 +1868,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={!!editFormData.isVisible}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, isVisible: e.target.checked }))
                     }
                     className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
@@ -1846,7 +1879,7 @@ const AdminAaaProfiles: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={!!editFormData.isCallable}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    onChange={(e) =>
                       setEditFormData((p) => ({ ...p, isCallable: e.target.checked }))
                     }
                     className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
@@ -1856,13 +1889,21 @@ const AdminAaaProfiles: React.FC = () => {
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
-                <Button onClick={() => setShowEditModal(false)} variant="outline" disabled={isLoading}>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  disabled={isLoading}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                >
                   Annuler
-                </Button>
-                <Button onClick={handleSaveProfile} className="bg-green-600 hover:bg-green-700" loading={isLoading}>
-                  <Save size={16} className="mr-2" />
+                </button>
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors flex items-center"
+                >
+                  {isLoading ? <Loader className="animate-spin mr-2" size={16} /> : <Save size={16} className="mr-2" />}
                   Enregistrer
-                </Button>
+                </button>
               </div>
             </div>
           )}
@@ -1889,12 +1930,21 @@ const AdminAaaProfiles: React.FC = () => {
               </div>
 
               <div className="flex justify-end space-x-3">
-                <Button onClick={() => setShowDeleteModal(false)} variant="outline" disabled={isLoading}>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isLoading}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                >
                   Annuler
-                </Button>
-                <Button onClick={handleDeleteProfile} className="bg-red-600 hover:bg-red-700" loading={isLoading}>
+                </button>
+                <button
+                  onClick={handleDeleteProfile}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                >
+                  {isLoading ? <Loader className="animate-spin mr-2" size={16} /> : null}
                   Confirmer la suppression
-                </Button>
+                </button>
               </div>
             </div>
           )}

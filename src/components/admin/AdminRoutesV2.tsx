@@ -1,4 +1,4 @@
-// src/components/admin/AdminRoutesV2.tsx
+// src/components/admin/AdminRoutesV2.tsx 
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -39,26 +39,8 @@ const AdminReviews = lazy(() => import("../../pages/admin/AdminReviews"));
 
 // ===== LAZY IMPORTS - CALLS =====
 const AdminCalls = lazy(() => import("../../pages/admin/AdminCalls"));
-const AdminCallsSessions = lazy(() =>
-  Promise.resolve({
-    default: () => (
-      <div className="p-6">
-        <h1 className="text-2xl font-semibold mb-2">Sessions d'appels</h1>
-        <p className="text-sm opacity-80">Page en cours de développement</p>
-      </div>
-    ),
-  })
-);
-const AdminCallsRecordings = lazy(() =>
-  Promise.resolve({
-    default: () => (
-      <div className="p-6">
-        <h1 className="text-2xl font-semibold mb-2">Enregistrements</h1>
-        <p className="text-sm opacity-80">Page en cours de développement</p>
-      </div>
-    ),
-  })
-);
+const AdminCallsSessions = lazy(() => import("../../pages/admin/AdminCallsSessions"));
+
 
 // ===== LAZY IMPORTS - COMMUNICATIONS =====
 const AdminCommsCampaigns = lazy(() => import("../../pages/admin/AdminCommsCampaigns"));
@@ -345,14 +327,6 @@ const AdminRoutesV2: React.FC = () => {
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des sessions..." />}>
               <AdminCallsSessions />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin/calls/recordings"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des enregistrements..." />}>
-              <AdminCallsRecordings />
             </Suspense>
           }
         />
@@ -697,7 +671,6 @@ export const useAdminRouteValidation = () => {
       "/admin/finance/ledger",
       "/admin/calls",
       "/admin/calls/sessions",
-      "/admin/calls/recordings",
       "/admin/comms/campaigns",
       "/admin/comms/automations",
       "/admin/comms/segments",
@@ -734,4 +707,3 @@ export const useAdminRouteValidation = () => {
 };
 
 export default AdminRoutesV2;
-

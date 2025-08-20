@@ -33,7 +33,6 @@ import {
   TestTube,
   PhoneCall,
   PlayCircle,
-  Mic,
   Percent,
   Gift,
   Award,
@@ -173,13 +172,7 @@ export const adminMenuTree: AdminMenuItem[] = [
         icon: PlayCircle,
         description: 'Archive des sessions d\'appels'
       },
-      {
-        id: 'calls-recordings',
-        label: 'Enregistrements',
-        path: '/admin/calls/recordings',
-        icon: Mic,
-        description: 'Gestion des enregistrements audio'
-      }
+      
     ]
   },
 

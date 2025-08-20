@@ -253,6 +253,7 @@ const App: React.FC = () => {
           <Routes>
             {routeConfigs.map((cfg, i) => renderRoute(cfg, i))}
             {protectedUserRoutes.map((cfg, i) => renderRoute(cfg, i + 1000))}
+            <Route path="/admin/*" element={<AdminRoutesV2 />} />
           </Routes>
 
           {/* Routes admin gérées par AdminRoutesV2 */}

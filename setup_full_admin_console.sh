@@ -102,7 +102,6 @@ export const adminMenuTree: AdminMenuItem[] = [
     { id:'sessions', label:'Sessions d’appel', path:'/admin/calls/sessions' },
     { id:'planning', label:'Planification', path:'/admin/calls/planning' },
     { id:'qos', label:'Qualité audio (Twilio)', path:'/admin/calls/qos' },
-    { id:'recordings', label:'Enregistrements', path:'/admin/calls/recordings' },
   ]},
   { id:'finance', label:'Finances & Comptabilité', children:[
     { id:'payments', label:'Paiements', path:'/admin/finance/payments' },
@@ -667,7 +666,6 @@ export default function AdminRoutesV2(){
         <Route path="/admin/calls/sessions" element={<AdminCalls/>} />
         <Route path="/admin/calls/planning" element={<Placeholder title="Planification d’appels" />} />
         <Route path="/admin/calls/qos" element={<Placeholder title="Qualité audio (Twilio)" />} />
-        <Route path="/admin/calls/recordings" element={<AdminCalls/>} />
 
         {/* Finance */}
         <Route path="/admin/finance/payments" element={<AdminPayments/>} />

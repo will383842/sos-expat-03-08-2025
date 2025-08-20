@@ -57,9 +57,28 @@ const AdminPricing: React.FC = () => {
   // Fonctions pour récupérer les données réelles
   const fetchFinancialStats = async (): Promise<FinancialStats> => {
     try {
-      const response = await fetch('/api/admin/financial-stats');
-      if (!response.ok) throw new Error('Failed to fetch financial stats');
-      return await response.json();
+     const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+async function getJSON<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include' });
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} (${path}): ${text.slice(0,120)}`);
+  }
+  // Empêche les "<!doctype" surprises
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error(`Unexpected content-type: ${ct}. Body: ${text.slice(0,120)}`);
+  }
+  return JSON.parse(text);
+}
+
+// Puis :
+const fetchFinancialStats = () => getJSON<FinancialStats>('/admin/financial-stats');
+const fetchLastModifications = () => getJSON<LastModifications>('/admin/last-modifications');
+const fetchSystemStatus = () => getJSON<SystemStatus>('/admin/system-status');
+
     } catch (err) {
       console.error('Error fetching financial stats:', err);
       throw err;

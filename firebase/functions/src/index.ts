@@ -624,7 +624,7 @@ export const scheduledFirestoreExport = onSchedule(
     }
   }
 );
-
+export { api } from './adminApi';
 // ====== FONCTION DE NETTOYAGE PÉRIODIQUE ======
 export const scheduledCleanup = onSchedule(
   {

@@ -61,6 +61,9 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     return false;
   }, [node, location.pathname, hasChildren]);
 
+  // Vérifier si c'est exactement cette page qui est active (pas un enfant)
+  const isExactlyActive = node.path && location.pathname === node.path;
+
   // Auto-expand si contient un élément actif
   useEffect(() => {
     if (isActiveOrHasActiveChild && hasChildren) {
@@ -71,84 +74,74 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   // Styles basés sur le niveau et l'état
   const getContainerStyles = () => {
     if (isRootLevel) {
-      return "mb-1";
+      return "mb-2";
     }
     if (isSecondLevel) {
-      return "ml-4 mb-0.5";
+      return "ml-6 mb-1";
     }
     if (isThirdLevel) {
-      return "ml-6 mb-0.5";
+      return "ml-10 mb-1";
     }
-    return "ml-2 mb-0.5";
+    return "ml-12 mb-1";
   };
 
-  const getButtonStyles = (isActive: boolean) => {
-    const baseStyles = "w-full flex items-center justify-between rounded-md text-sm font-medium transition-all duration-200 group";
+  const getButtonStyles = () => {
+    const baseStyles = "w-full flex items-center justify-between rounded-md text-sm transition-all duration-200 group";
     
     if (isRootLevel) {
-      if (isActive) {
-        return `${baseStyles} px-3 py-2.5 bg-red-600 text-white shadow-sm`;
-      }
-      return `${baseStyles} px-3 py-2.5 text-gray-300 hover:bg-gray-800 hover:text-white`;
+      // Onglets principaux : TOUJOURS surlignés en gris - FORCE avec !important
+      const textColor = isExactlyActive ? "!text-gray-900" : "!text-gray-700";
+      return `${baseStyles} px-3 py-3 font-semibold ${textColor} !bg-gray-300 hover:!bg-gray-400`;
     }
     
     if (isSecondLevel) {
-      if (isActive) {
-        return `${baseStyles} px-3 py-2 bg-red-500 text-white shadow-sm`;
-      }
-      return `${baseStyles} px-3 py-2 text-gray-400 hover:bg-gray-700 hover:text-gray-200`;
+      // Sous-onglets : transparents, seulement texte rouge si actif
+      const textColor = isExactlyActive ? "!text-red-400" : "!text-gray-300 hover:!text-gray-100";
+      return `${baseStyles} px-3 py-2.5 font-medium ${textColor} !bg-transparent hover:!bg-transparent`;
     }
     
     if (isThirdLevel) {
-      if (isActive) {
-        return `${baseStyles} px-3 py-1.5 bg-red-400 text-white shadow-sm`;
-      }
-      return `${baseStyles} px-3 py-1.5 text-gray-500 hover:bg-gray-600 hover:text-gray-300`;
+      // Sous-sous-onglets : transparents, seulement texte rouge si actif
+      const textColor = isExactlyActive ? "!text-red-400" : "!text-gray-400 hover:!text-gray-200";
+      return `${baseStyles} px-3 py-2 font-normal ${textColor} !bg-transparent hover:!bg-transparent`;
     }
     
     // Fallback pour niveaux plus profonds
-    if (isActive) {
-      return `${baseStyles} px-2 py-1.5 bg-red-300 text-white shadow-sm`;
-    }
-    return `${baseStyles} px-2 py-1.5 text-gray-500 hover:bg-gray-600 hover:text-gray-300`;
+    const textColor = isExactlyActive ? "!text-red-400" : "!text-gray-500 hover:!text-gray-300";
+    return `${baseStyles} px-2 py-1.5 font-normal ${textColor} !bg-transparent hover:!bg-transparent`;
   };
 
   const getLinkStyles = (isActive: boolean) => {
     const baseStyles = "w-full flex items-center rounded-md text-sm transition-all duration-200 group text-left";
     
     if (isRootLevel) {
-      if (isActive) {
-        return `${baseStyles} px-3 py-2.5 bg-red-600 text-white shadow-sm border-l-4 border-red-400`;
-      }
-      return `${baseStyles} px-3 py-2.5 text-gray-300 hover:bg-gray-800 hover:text-white hover:border-l-4 hover:border-red-500`;
+      // Onglets principaux : TOUJOURS surlignés en gris - FORCE avec !important
+      const textColor = isActive ? "!text-gray-900" : "!text-gray-700";
+      return `${baseStyles} px-3 py-3 font-semibold ${textColor} !bg-gray-300 hover:!bg-gray-400`;
     }
     
     if (isSecondLevel) {
-      if (isActive) {
-        return `${baseStyles} px-3 py-2 bg-red-500 text-white shadow-sm border-l-2 border-red-300`;
-      }
-      return `${baseStyles} px-3 py-2 text-gray-400 hover:bg-gray-700 hover:text-gray-200 hover:border-l-2 hover:border-red-400`;
+      // Sous-onglets : transparents, seulement texte rouge si actif
+      const textColor = isActive ? "!text-red-400" : "!text-gray-300 hover:!text-gray-100";
+      return `${baseStyles} px-3 py-2.5 font-medium ${textColor} !bg-transparent hover:!bg-transparent`;
     }
     
     if (isThirdLevel) {
-      if (isActive) {
-        return `${baseStyles} px-3 py-1.5 bg-red-400 text-white shadow-sm border-l border-red-200`;
-      }
-      return `${baseStyles} px-3 py-1.5 text-gray-500 hover:bg-gray-600 hover:text-gray-300 hover:border-l hover:border-red-300`;
+      // Sous-sous-onglets : transparents, seulement texte rouge si actif
+      const textColor = isActive ? "!text-red-400" : "!text-gray-400 hover:!text-gray-200";
+      return `${baseStyles} px-3 py-2 font-normal ${textColor} !bg-transparent hover:!bg-transparent`;
     }
     
     // Fallback pour niveaux plus profonds
-    if (isActive) {
-      return `${baseStyles} px-2 py-1.5 bg-red-300 text-white shadow-sm`;
-    }
-    return `${baseStyles} px-2 py-1.5 text-gray-500 hover:bg-gray-600 hover:text-gray-300`;
+    const textColor = isActive ? "!text-red-400" : "!text-gray-500 hover:!text-gray-300";
+    return `${baseStyles} px-2 py-1.5 font-normal ${textColor} !bg-transparent hover:!bg-transparent`;
   };
 
   const getIconSize = () => {
-    if (isRootLevel) return 18;
-    if (isSecondLevel) return 16;
-    if (isThirdLevel) return 14;
-    return 12;
+    if (isRootLevel) return 20;
+    if (isSecondLevel) return 18;
+    if (isThirdLevel) return 16;
+    return 14;
   };
 
   const handleToggleExpand = (e: React.MouseEvent) => {
@@ -171,9 +164,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   const renderBadge = () => {
     if (!node.badge) return null;
     
-    const badgeStyles = isRootLevel 
-      ? "ml-2 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full font-medium"
-      : "ml-auto px-1.5 py-0.5 text-xs bg-red-400 text-white rounded-full font-medium";
+    const badgeStyles = "ml-2 px-2 py-0.5 text-xs bg-gray-600 text-gray-200 rounded-full font-medium";
     
     return (
       <span className={badgeStyles}>
@@ -187,13 +178,17 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     if (isSidebarCollapsed && !isRootLevel) return null;
     
     const iconSize = getIconSize();
-    const iconMargin = isRootLevel ? "mr-3" : isSecondLevel ? "mr-2.5" : "mr-2";
+    const iconMargin = isRootLevel ? "mr-3" : isSecondLevel ? "mr-3" : "mr-2";
     
     if (node.icon) {
       return (
         <node.icon 
           size={iconSize} 
-          className={`${iconMargin} flex-shrink-0 transition-colors duration-200`} 
+          className={`${iconMargin} flex-shrink-0 transition-colors duration-200 ${
+            isRootLevel 
+              ? (isExactlyActive ? '!text-gray-900' : '!text-gray-700')
+              : (isExactlyActive ? '!text-red-400' : '')
+          }`} 
         />
       );
     }
@@ -203,7 +198,11 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       return (
         <Dot 
           size={iconSize} 
-          className={`${iconMargin} flex-shrink-0 transition-colors duration-200`} 
+          className={`${iconMargin} flex-shrink-0 transition-colors duration-200 ${
+            isRootLevel 
+              ? (isExactlyActive ? 'text-gray-900' : 'text-gray-700')
+              : (isExactlyActive ? 'text-red-400' : '')
+          }`} 
         />
       );
     }
@@ -215,7 +214,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   const renderChevron = () => {
     if (!hasChildren || (isSidebarCollapsed && isRootLevel)) return null;
     
-    const chevronSize = isRootLevel ? 16 : 14;
+    const chevronSize = isRootLevel ? 18 : 16;
     
     return (
       <div className="ml-auto flex-shrink-0 transition-transform duration-200">
@@ -268,14 +267,20 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
         {/* Header du groupe */}
         <button
           onClick={handleToggleExpand}
-          className={getButtonStyles(isActiveOrHasActiveChild)}
+          className={getButtonStyles()}
           title={node.description}
           aria-expanded={isExpanded}
           aria-label={`${isExpanded ? 'Réduire' : 'Étendre'} ${node.label}`}
         >
           <div className="flex items-center min-w-0 flex-1">
             {renderIcon()}
-            {renderLabel()}
+            <span className={`truncate ${
+              isRootLevel 
+                ? (isExactlyActive ? 'text-gray-900' : 'text-gray-700')
+                : (isExactlyActive ? 'text-red-400' : '')
+            }`}>
+              {node.label}
+            </span>
             {renderBadge()}
           </div>
           {renderChevron()}
@@ -284,9 +289,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 
         {/* Enfants - ATTENTION: Condition stricte pour éviter double rendu */}
         {isExpanded && !isSidebarCollapsed && node.children && (
-          <div className={`mt-1 space-y-0.5 transition-all duration-200 ${
-            isRootLevel ? 'border-l-2 border-gray-700 ml-4 pl-2' : ''
-          }`}>
+          <div className="mt-2 space-y-1 transition-all duration-200">
             {node.children.map((child) => (
               <SidebarItem 
                 key={child.id} 
@@ -298,27 +301,6 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
             ))}
           </div>
         )}
-
-        {/* SUPPRESSION TEMPORAIRE DU MENU CONTEXTUEL - CAUSE POTENTIELLE DU DOUBLE RENDU
-        {isSidebarCollapsed && isRootLevel && isExpanded && (
-          <div className="absolute left-full top-0 ml-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 min-w-64">
-            <div className="p-2 space-y-1">
-              <div className="px-3 py-2 text-sm font-medium text-white border-b border-gray-700 mb-2">
-                {node.label}
-              </div>
-              {node.children!.map((child) => (
-                <SidebarItem 
-                  key={child.id} 
-                  node={child} 
-                  level={1}
-                  isSidebarCollapsed={false}
-                  onItemClick={onItemClick}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        */}
       </div>
     );
   }

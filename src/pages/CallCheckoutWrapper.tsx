@@ -101,24 +101,13 @@ const reconstructServiceData = (provider: ProviderLike, currency?: 'eur' | 'usd'
   const providerRole: 'lawyer' | 'expat' =
     (provider.role || provider.type || provider.providerType || 'expat') as 'lawyer' | 'expat';
 
-  // Valeurs provisoires (seront écrasées par la config Firestore)
-  const baseAmount =
-    typeof provider.price === 'number'
-      ? provider.price
-      : providerRole === 'lawyer'
-      ? 49
-      : 19;
-
-  const duration =
-    typeof provider.duration === 'number'
-      ? provider.duration
-      : providerRole === 'lawyer'
-      ? 20
-      : 30;
-
-  const commissionRate = 0.2;
-  const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
-  const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
+  // Valeurs provisoires (seront écrasées par la config Firestore via calculateServiceAmounts)
+  const baseAmount = providerRole === 'lawyer' ? 49 : 19;
+  const duration   = providerRole === 'lawyer' ? 20 : 30;
+  const commissionAmount = providerRole === 'lawyer'
+    ? (currency === 'usd' ? 25 : 19)
+    : (currency === 'usd' ? 15 : 9);
+  const providerAmount = Math.max(0, Math.round((baseAmount - commissionAmount) * 100) / 100);
 
   return {
     providerId: provider.id || provider.providerId || Math.random().toString(36).slice(2),
@@ -154,18 +143,8 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
     languagesSpoken: bookingData.providerLanguages || [],
     languages: bookingData.providerLanguages || [],
     preferredLanguage: 'fr',
-    price:
-      typeof bookingData.price === 'number'
-        ? bookingData.price
-        : bookingData.providerType === 'lawyer'
-        ? 49
-        : 19,
-    duration:
-      typeof bookingData.duration === 'number'
-        ? bookingData.duration
-        : bookingData.providerType === 'lawyer'
-        ? 20
-        : 30,
+    price: typeof bookingData.price === 'number' ? bookingData.price : (bookingData.providerType === 'lawyer' ? 49 : 19),
+    duration: typeof bookingData.duration === 'number' ? bookingData.duration : (bookingData.providerType === 'lawyer' ? 20 : 30),
     rating: bookingData.providerRating || 4.5,
     reviewCount: bookingData.providerReviewCount || 0,
     specialties: bookingData.providerSpecialties || [],
@@ -185,14 +164,12 @@ const reconstructServiceFromBooking = (
   currency?: 'eur' | 'usd'
 ): ServiceData => {
   const providerRole: 'lawyer' | 'expat' = (bookingData.providerType as 'lawyer' | 'expat') || 'expat';
-  const baseAmount =
-    typeof bookingData.price === 'number' ? bookingData.price : providerRole === 'lawyer' ? 49 : 19;
-  const duration =
-    typeof bookingData.duration === 'number' ? bookingData.duration : providerRole === 'lawyer' ? 20 : 30;
-
-  const commissionRate = 0.2;
-  const commissionAmount = Math.round(baseAmount * commissionRate * 100) / 100;
-  const providerAmount = Math.round((baseAmount - commissionAmount) * 100) / 100;
+  const baseAmount = providerRole === 'lawyer' ? 49 : 19;
+  const duration   = providerRole === 'lawyer' ? 20 : 30;
+  const commissionAmount = providerRole === 'lawyer'
+    ? (currency === 'usd' ? 25 : 19)
+    : (currency === 'usd' ? 15 : 9);
+  const providerAmount = Math.max(0, Math.round((baseAmount - commissionAmount) * 100) / 100);
 
   return {
     providerId: bookingData.providerId || Math.random().toString(36).slice(2),
@@ -221,15 +198,11 @@ const CallCheckoutWrapper: React.FC = () => {
     try {
       const fromSession = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
       if (fromSession && (fromSession === 'eur' || fromSession === 'usd')) return fromSession;
-    } catch (e) {
-      if (import.meta.env.DEV) console.error('[Wrapper] session selectedCurrency parse error', e);
-    }
+    } catch { /* noop */ }
     try {
       const fromLocal = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
       if (fromLocal && (fromLocal === 'eur' || fromLocal === 'usd')) return fromLocal;
-    } catch (e) {
-      if (import.meta.env.DEV) console.error('[Wrapper] local preferredCurrency parse error', e);
-    }
+    } catch { /* noop */ }
     return detectUserCurrency();
   });
 
@@ -238,9 +211,7 @@ const CallCheckoutWrapper: React.FC = () => {
     try {
       sessionStorage.setItem('selectedCurrency', selectedCurrency);
       localStorage.setItem('preferredCurrency', selectedCurrency);
-    } catch (e) {
-      if (import.meta.env.DEV) console.error('[Wrapper] persist currency error', e);
-    }
+    } catch { /* noop */ }
     if (import.meta.env.DEV) {
       console.log('💱 [Wrapper] currency:', selectedCurrency);
     }
@@ -283,7 +254,7 @@ const CallCheckoutWrapper: React.FC = () => {
         if (stateProvider && (stateProvider as ProviderLike).id) {
           if (import.meta.env.DEV) console.log('✅ Provider via location.state');
           const normalized = normalizeProvider(stateProvider as Provider);
-          const svc =
+          const svc: ServiceData =
             (stateService as ServiceData | undefined) && (stateService as ServiceData).amount
               ? ({ ...(stateService as ServiceData), currency: (stateService as ServiceData).currency ?? selectedCurrency })
               : reconstructServiceData(normalized, selectedCurrency);
@@ -460,7 +431,7 @@ const CallCheckoutWrapper: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locState, providerId, t]);
 
-  // 🔥 Recalcul admin en fonction de la devise sélectionnée
+  // 🔥 Recalcul ADMIN (totaux + FRAIS) selon la devise sélectionnée
   useEffect(() => {
     if (!state.provider || !state.serviceData || state.isLoading) return;
     const role = (state.provider.role || state.provider.type || 'expat') as 'lawyer' | 'expat';
@@ -486,7 +457,7 @@ const CallCheckoutWrapper: React.FC = () => {
         }));
       } catch (e) {
         if (import.meta.env.DEV) {
-          console.warn('[CallCheckoutWrapper] Pricing admin indisponible, on garde le fallback local.', e);
+          console.warn('[CallCheckoutWrapper] Pricing admin indisponible, on garde le secours local.', e);
         }
         // On garde la version existante, mais on force la currency si absente
         setState(prev => ({
@@ -547,9 +518,9 @@ const CallCheckoutWrapper: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 sm:p-8 text-center w-full max-w-lg">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">{t('error.title')}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Données manquantes</h2>
           <p className="text-gray-600 text-sm mb-5">
-            {state.error || t('error.body')}
+            {state.error || 'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.'}
           </p>
 
           <div className="space-y-2">
@@ -557,34 +528,28 @@ const CallCheckoutWrapper: React.FC = () => {
               onClick={() => navigate('/experts')}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              {t('cta.select_expert')}
+              🔍 Sélectionner un expert
             </button>
             <button
               onClick={() => navigate('/')}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              {t('cta.home')}
+              🏠 Retour à l’accueil
             </button>
             <button
               onClick={handleGoBack}
               className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              {t('cta.back')}
+              ← Retour
             </button>
             <button
               onClick={() => {
-                try {
-                  sessionStorage.clear();
-                  localStorage.clear();
-                } catch (e) {
-                  if (import.meta.env.DEV) console.error('[Wrapper] clear storages error', e);
-                } finally {
-                  window.location.reload();
-                }
+                try { sessionStorage.clear(); localStorage.clear(); } catch { /* noop */ }
+                finally { window.location.reload(); }
               }}
               className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 rounded-lg text-sm transition-colors"
             >
-              {t('cta.clear_cache')}
+              🗑️ Vider le cache et recharger
             </button>
           </div>
         </div>

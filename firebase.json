@@ -1,19 +1,6 @@
 {
   "functions": [
     {
-      "source": "backup-functions",
-      "codebase": "backup",
-      "runtime": "nodejs22",
-      "region": "europe-west1",
-      "environmentVariables": {
-        "BACKUP_BUCKET": "sos-expat-backup"
-      }
-    }
-  ]
-}
-{
-  "functions": [
-    {
       "source": "firebase/functions",
       "codebase": "default",
       "runtime": "nodejs22",
@@ -24,15 +11,27 @@
       "codebase": "backup",
       "runtime": "nodejs22",
       "region": "europe-west1",
-      "environmentVariables": { "BACKUP_BUCKET": "sos-expat-backup" }
+      "environmentVariables": { 
+        "BACKUP_BUCKET": "sos-expat-backup" 
+      }
     }
   ],
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/api/**", "function": { "functionId": "api", "region": "europe-west1", "codebase": "default" } },
-      { "source": "**", "destination": "/index.html" }
+      { 
+        "source": "/api/**", 
+        "function": { 
+          "functionId": "api", 
+          "region": "europe-west1", 
+          "codebase": "default" 
+        } 
+      },
+      { 
+        "source": "**", 
+        "destination": "/index.html" 
+      }
     ]
   }
 }

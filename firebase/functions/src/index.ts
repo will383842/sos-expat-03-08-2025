@@ -2,7 +2,6 @@
 
 // ====== EXPORTS PRINCIPAUX ======
 
-// Export des webhooks modernisés (remplace les anciens)
 // Configuration globale pour toutes les fonctions
 import { setGlobalOptions } from 'firebase-functions/v2';
 setGlobalOptions({
@@ -37,16 +36,56 @@ export { createPaymentIntent } from './createPaymentIntent';
 // ====== IMPORTS POUR FONCTIONS RESTANTES ======
 
 import { onRequest } from 'firebase-functions/v2/https';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
-import * as functions from "firebase-functions";
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
 
 // Interface pour les requêtes avec rawBody (Firebase Functions)
 interface FirebaseRequest extends ExpressRequest {
   rawBody: Buffer;
+}
+
+// Types pour les fonctions admin
+interface AdminUpdateStatusData {
+  userId: string;
+  status: "active" | "pending" | "blocked" | "suspended";
+  reason?: string;
+}
+
+interface AdminSoftDeleteData {
+  userId: string;
+  reason?: string;
+}
+
+interface AdminBulkUpdateData {
+  ids: string[];
+  status: "active" | "pending" | "blocked" | "suspended";
+  reason?: string;
+}
+
+// Types pour les fonctions admin v2
+interface AdminCallActionData {
+  sessionId: string;
+  reason?: string;
+}
+
+interface AdminTransferCallData {
+  sessionId: string;
+  newProviderId: string;
+}
+
+interface AdminMuteParticipantData {
+  sessionId: string;
+  participantType: string;
+  mute?: boolean;
+}
+
+// Interface pour les custom claims
+interface CustomClaims {
+  role?: string;
+  [key: string]: unknown;
 }
 
 // Charger les variables d'environnement depuis .env
@@ -59,83 +98,107 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-// ✅ AJOUTEZ CES DEUX LIGNES ICI
+// Configuration Firestore
 try {
   db.settings({ ignoreUndefinedProperties: true });
   console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
-} catch (error) {
-  console.log('ℹ️ Firestore déjà configuré');
+} catch (firebaseError) {
+  console.log('ℹ️ Firestore déjà configuré', firebaseError);
 }
 
 // ========================================
-// FONCTIONS ADMIN
+// FONCTIONS ADMIN (TOUTES EN V2 MAINTENANT)
 // ========================================
 
-function assertAdmin(ctx: functions.https.CallableContext) {
-  if (!ctx.auth || (ctx.auth.token as any)?.role !== "admin") {
-    throw new functions.https.HttpsError("permission-denied", "Admins only");
+export const adminUpdateStatus = onCall(
+  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  async (request: CallableRequest<AdminUpdateStatusData>) => {
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { userId, status, reason } = request.data;
+    
+    await db.collection("users").doc(userId).update({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    await db.collection("adminLogs").add({
+      action: "updateStatus",
+      userId,
+      status,
+      reason: reason || null,
+      adminId: request.auth.uid,
+      ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    return { ok: true };
   }
-}
+);
 
-export const adminUpdateStatus = functions.https.onCall(async (data, ctx) => {
-  assertAdmin(ctx);
-  const { userId, status, reason } = data as { userId: string; status: "active"|"pending"|"blocked"|"suspended"; reason?: string };
-  await db.collection("users").doc(userId).update({
-    status,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  await db.collection("adminLogs").add({
-    action: "updateStatus",
-    userId,
-    status,
-    reason: reason || null,
-    adminId: ctx.auth!.uid,
-    ts: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  return { ok: true };
-});
+export const adminSoftDeleteUser = onCall(
+  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  async (request: CallableRequest<AdminSoftDeleteData>) => {
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
 
-export const adminSoftDeleteUser = functions.https.onCall(async (data, ctx) => {
-  assertAdmin(ctx);
-  const { userId, reason } = data as { userId: string; reason?: string };
-  await db.collection("users").doc(userId).update({
-    isDeleted: true,
-    deletedAt: admin.firestore.FieldValue.serverTimestamp(),
-    deletedBy: ctx.auth!.uid,
-    deletedReason: reason || null,
-  });
-  await db.collection("adminLogs").add({
-    action: "softDelete",
-    userId,
-    reason: reason || null,
-    adminId: ctx.auth!.uid,
-    ts: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  return { ok: true };
-});
+    const { userId, reason } = request.data;
+    
+    await db.collection("users").doc(userId).update({
+      isDeleted: true,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      deletedBy: request.auth.uid,
+      deletedReason: reason || null,
+    });
+    
+    await db.collection("adminLogs").add({
+      action: "softDelete",
+      userId,
+      reason: reason || null,
+      adminId: request.auth.uid,
+      ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    return { ok: true };
+  }
+);
 
-export const adminBulkUpdateStatus = functions.https.onCall(async (data, ctx) => {
-  assertAdmin(ctx);
-  const { ids, status, reason } = data as { ids: string[]; status: "active"|"pending"|"blocked"|"suspended"; reason?: string };
-  const batch = db.batch();
-  ids.forEach((id) => batch.update(db.collection("users").doc(id), {
-    status,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }));
-  await batch.commit();
-  await db.collection("adminLogs").add({
-    action: "bulkUpdateStatus",
-    ids,
-    status,
-    reason: reason || null,
-    adminId: ctx.auth!.uid,
-    ts: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  return { ok: true };
-});
+export const adminBulkUpdateStatus = onCall(
+  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  async (request: CallableRequest<AdminBulkUpdateData>) => {
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { ids, status, reason } = request.data;
+    
+    const batch = db.batch();
+    ids.forEach((id) => batch.update(db.collection("users").doc(id), {
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }));
+    await batch.commit();
+    
+    await db.collection("adminLogs").add({
+      action: "bulkUpdateStatus",
+      ids,
+      status,
+      reason: reason || null,
+      adminId: request.auth.uid,
+      ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    return { ok: true };
+  }
+);
 
 // ========================================
-// FONCTIONS ADMIN POUR MONITORING DES APPELS
+// FONCTIONS ADMIN POUR MONITORING DES APPELS (V2)
 // ========================================
 
 export const adminForceDisconnectCall = onCall(
@@ -144,9 +207,9 @@ export const adminForceDisconnectCall = onCall(
     memory: "256MiB",
     timeoutSeconds: 30 
   },
-  async (request) => {
+  async (request: CallableRequest<AdminCallActionData>) => {
     // Vérifier que l'utilisateur est admin
-    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
@@ -177,8 +240,8 @@ export const adminForceDisconnectCall = onCall(
         success, 
         message: `Call ${sessionId} disconnected successfully` 
       };
-    } catch (error) {
-      console.error('Error force disconnecting call:', error);
+    } catch (callError) {
+      console.error('Error force disconnecting call:', callError);
       throw new HttpsError('internal', 'Failed to disconnect call');
     }
   }
@@ -190,8 +253,8 @@ export const adminJoinCall = onCall(
     memory: "256MiB",
     timeoutSeconds: 30 
   },
-  async (request) => {
-    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+  async (request: CallableRequest<AdminCallActionData>) => {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
@@ -229,8 +292,8 @@ export const adminJoinCall = onCall(
         conferenceName: session.conference.name,
         message: 'Open Twilio Console to join the conference'
       };
-    } catch (error) {
-      console.error('Error joining call:', error);
+    } catch (joinError) {
+      console.error('Error joining call:', joinError);
       throw new HttpsError('internal', 'Failed to join call');
     }
   }
@@ -242,8 +305,8 @@ export const adminTransferCall = onCall(
     memory: "256MiB",
     timeoutSeconds: 30 
   },
-  async (request) => {
-    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+  async (request: CallableRequest<AdminTransferCallData>) => {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
@@ -304,8 +367,8 @@ export const adminTransferCall = onCall(
         newProviderId,
         newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim()
       };
-    } catch (error) {
-      console.error('Error transferring call:', error);
+    } catch (transferError) {
+      console.error('Error transferring call:', transferError);
       throw new HttpsError('internal', 'Failed to transfer call');
     }
   }
@@ -317,8 +380,8 @@ export const adminMuteParticipant = onCall(
     memory: "256MiB",
     timeoutSeconds: 30 
   },
-  async (request) => {
-    if (!request.auth || (request.auth.token as any)?.role !== 'admin') {
+  async (request: CallableRequest<AdminMuteParticipantData>) => {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
@@ -375,8 +438,8 @@ export const adminMuteParticipant = onCall(
         muted: mute,
         note: 'Action recorded in session - Twilio Conference API integration required for actual mute/unmute'
       };
-    } catch (error) {
-      console.error('Error muting participant:', error);
+    } catch (muteError) {
+      console.error('Error muting participant:', muteError);
       throw new HttpsError('internal', 'Failed to mute participant');
     }
   }
@@ -394,8 +457,8 @@ if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('s
       apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
     });
     console.log('✅ Stripe configuré avec succès');
-  } catch (error) {
-    console.error('❌ Erreur configuration Stripe:', error);
+  } catch (stripeError) {
+    console.error('❌ Erreur configuration Stripe:', stripeError);
     stripe = null;
   }
 } else {
@@ -450,9 +513,9 @@ export const stripeWebhook = onRequest(async (req: FirebaseRequest, res: Respons
     }
     
     res.json({ received: true });
-  } catch (error: unknown) {
-    console.error('Error processing Stripe webhook:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  } catch (webhookError: unknown) {
+    console.error('Error processing Stripe webhook:', webhookError);
+    const errorMessage = webhookError instanceof Error ? webhookError.message : 'Unknown error';
     res.status(400).send(`Webhook Error: ${errorMessage}`);
   }
 });
@@ -482,8 +545,8 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     }
 
     return true;
-  } catch (error: unknown) {
-    console.error('❌ Erreur handlePaymentIntentSucceeded:', error);
+  } catch (succeededError: unknown) {
+    console.error('❌ Erreur handlePaymentIntentSucceeded:', succeededError);
     return false;
   }
 }
@@ -512,8 +575,8 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     }
     
     return true;
-  } catch (error: unknown) {
-    console.error('Error handling payment intent failed:', error);
+  } catch (failedError: unknown) {
+    console.error('Error handling payment intent failed:', failedError);
     return false;
   }
 }
@@ -542,8 +605,8 @@ async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) 
     }
     
     return true;
-  } catch (error: unknown) {
-    console.error('Error handling payment intent canceled:', error);
+  } catch (canceledError: unknown) {
+    console.error('Error handling payment intent canceled:', canceledError);
     return false;
   }
 }
@@ -565,8 +628,8 @@ async function handlePaymentIntentRequiresAction(paymentIntent: Stripe.PaymentIn
     }
     
     return true;
-  } catch (error: any) {
-    console.error('Error handling payment intent requires action:', error);
+  } catch (actionError: unknown) {
+    console.error('Error handling payment intent requires action:', actionError);
     return false;
   }
 }
@@ -609,10 +672,10 @@ export const scheduledFirestoreExport = onSchedule(
         status: 'completed'
       });
       
-    } catch (error: unknown) {
-      console.error('❌ Erreur sauvegarde automatique:', error);
+    } catch (exportError: unknown) {
+      console.error('❌ Erreur sauvegarde automatique:', exportError);
       
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = exportError instanceof Error ? exportError.message : 'Unknown error';
       
       // Enregistrer l'erreur dans les logs
       await admin.firestore().collection('logs').doc('backups').collection('entries').add({
@@ -624,7 +687,9 @@ export const scheduledFirestoreExport = onSchedule(
     }
   }
 );
+
 export { api } from './adminApi';
+
 // ====== FONCTION DE NETTOYAGE PÉRIODIQUE ======
 export const scheduledCleanup = onSchedule(
   {
@@ -652,10 +717,10 @@ export const scheduledCleanup = onSchedule(
         timestamp: admin.firestore.FieldValue.serverTimestamp()
       });
       
-    } catch (error: unknown) {
-      console.error('❌ Erreur nettoyage périodique:', error);
+    } catch (cleanupError: unknown) {
+      console.error('❌ Erreur nettoyage périodique:', cleanupError);
       
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = cleanupError instanceof Error ? cleanupError.message : 'Unknown error';
       
       await admin.firestore().collection('logs').doc('cleanup').collection('entries').add({
         type: 'scheduled_cleanup',

@@ -45,13 +45,11 @@ import SEOHead from '../components/layout/SEOHead';
 import { Review } from '../types';
 import { formatLanguages } from '@/i18n';
 
-// 👉 Pricing admin + détection devise
-import { usePricingConfig, detectUserCurrency } from '../services/pricingService';
-// 👉 Toggle devise (UI façon “pill”)
-import { CurrencySelector } from '../components/checkout/CurrencySelector';
+// 👉 Pricing admin (source de vérité)
+import { usePricingConfig } from '../services/pricingService';
 
 /* =====================================================================
-   🔍 Traçabilité (utile en QA, inoffensif si non utilisé)
+   🔍 Traçabilité (facultatif / QA)
 ===================================================================== */
 export function usePriceTracing() {
   const { pricing, loading } = usePricingConfig();
@@ -59,22 +57,13 @@ export function usePriceTracing() {
   const getTraceAttributes = (
     serviceType: 'lawyer' | 'expat',
     currency: 'eur' | 'usd',
-    providerOverride?: number
   ): Record<string, string | number> => {
     if (loading) {
       return {
         'data-price-source': 'loading',
         'data-currency': currency,
-        title: 'Prix en cours de chargement...',
-      };
-    }
-
-    if (typeof providerOverride === 'number') {
-      return {
-        'data-price-source': 'provider',
-        'data-currency': currency,
         'data-service-type': serviceType,
-        title: `Prix personnalisé du prestataire (${providerOverride}${currency === 'eur' ? '€' : '$'})`,
+        title: 'Prix en cours de chargement...',
       };
     }
 
@@ -95,6 +84,7 @@ export function usePriceTracing() {
     return {
       'data-price-source': 'fallback',
       'data-currency': currency,
+      'data-service-type': serviceType,
       title: `Prix par défaut (${serviceType === 'lawyer' ? '49€' : '19€'})`,
     };
   };
@@ -106,7 +96,6 @@ interface TracedPriceProps {
   children: React.ReactNode;
   serviceType: 'lawyer' | 'expat';
   currency: 'eur' | 'usd';
-  providerOverride?: number;
   className?: string;
 }
 
@@ -114,11 +103,10 @@ export const TracedPrice: React.FC<TracedPriceProps> = ({
   children,
   serviceType,
   currency,
-  providerOverride,
   className = '',
 }) => {
   const { getTraceAttributes } = usePriceTracing();
-  const traceAttrs = getTraceAttributes(serviceType, currency, providerOverride);
+  const traceAttrs = getTraceAttributes(serviceType, currency);
 
   return (
     <span className={className} {...traceAttrs}>
@@ -391,6 +379,17 @@ const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
 const isUser = (user: unknown): user is AuthUser => typeof user === 'object' && user !== null && 'id' in user;
 const isLocationState = (state: unknown): state is LocationState => typeof state === 'object' && state !== null;
 
+/* ======= Helpers prix (format) ======= */
+const formatEUR = (value?: number) =>
+  typeof value === 'number'
+    ? `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}€`
+    : '—';
+
+const formatUSD = (value?: number) =>
+  typeof value === 'number'
+    ? `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`
+    : '$—';
+
 // Component
 const ProviderProfile: React.FC = () => {
   const params = useParams<RouteParams>();
@@ -409,42 +408,8 @@ const ProviderProfile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // 👉 Pricing admin
+  // 👉 Pricing admin (page AdminPricing -> doc "admin_config/pricing")
   const { pricing, loading: pricingLoading } = usePricingConfig();
-
-  // 👉 Devise (détection auto + persistance)
-  const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
-    try {
-      const ss = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
-      if (ss && ['eur', 'usd'].includes(ss)) return ss;
-    } catch {}
-    try {
-      const ls = localStorage.getItem('preferredCurrency') as 'eur' | 'usd' | null;
-      if (ls && ['eur', 'usd'].includes(ls)) return ls;
-    } catch {}
-    return detectUserCurrency();
-  });
-  const currencySymbol = selectedCurrency === 'eur' ? '€' : '$';
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('selectedCurrency', selectedCurrency);
-      localStorage.setItem('preferredCurrency', selectedCurrency);
-    } catch {}
-  }, [selectedCurrency]);
-
-  // 👉 Résolution DU prix unique (override provider > admin config)
-  const priceInfo = useMemo(() => {
-    if (!provider) return { price: undefined as number | undefined, duration: undefined as number | undefined, source: 'unknown' as 'provider' | 'admin' | 'unknown' };
-    if (typeof provider.price === 'number' && typeof provider.duration === 'number') {
-      return { price: provider.price, duration: provider.duration, source: 'provider' as const };
-    }
-    if (!pricingLoading && pricing) {
-      const cfg = provider.type === 'lawyer' ? pricing.lawyer[selectedCurrency] : pricing.expat[selectedCurrency];
-      return { price: cfg.totalAmount, duration: cfg.duration, source: 'admin' as const };
-    }
-    return { price: undefined, duration: undefined, source: 'unknown' as const };
-  }, [provider, pricing, pricingLoading, selectedCurrency]);
 
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -454,6 +419,18 @@ const ProviderProfile: React.FC = () => {
 
   // Online status
   const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({ isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0 });
+
+  // ======= Prix depuis Admin (EUR principal + équivalent USD) =======
+  const serviceTypeForPricing: 'lawyer' | 'expat' | undefined = provider?.type;
+  const bookingPrice = useMemo(() => {
+    if (!pricing || !serviceTypeForPricing) return null;
+    const cfg = pricing[serviceTypeForPricing];
+    return {
+      eur: cfg.eur.totalAmount,
+      usd: cfg.usd.totalAmount,
+      duration: cfg.eur.duration, // durée admin
+    };
+  }, [pricing, serviceTypeForPricing]);
 
   // Reviews loader
   const realLoadReviews = useCallback(async (providerId: string): Promise<Review[]> => {
@@ -625,8 +602,8 @@ const ProviderProfile: React.FC = () => {
         }
 
         // State fallback
-        if (!providerData && isLocationState(location.state)) {
-          const state = location.state;
+        if (!providerData && typeof location.state === 'object' && location.state !== null) {
+          const state = location.state as any;
           const navData = state.selectedProvider || state.providerData;
           if (navData) {
             const built: SosProfile = {
@@ -652,8 +629,7 @@ const ProviderProfile: React.FC = () => {
               reviewCount: Number(navData.reviewCount) || 0,
               yearsOfExperience: Number(navData.yearsOfExperience) || 0,
               yearsAsExpat: Number(navData.yearsAsExpat) || 0,
-              price: typeof navData.price === 'number' ? navData.price : undefined,
-              duration: typeof navData.duration === 'number' ? navData.duration : undefined,
+              // ⚠️ On ignore price/duration override — on se base sur AdminPricing
               isOnline: !!navData.isOnline,
               isActive: true,
               isApproved: !!navData.isApproved,
@@ -783,10 +759,10 @@ const ProviderProfile: React.FC = () => {
         provider_id: provider.id, provider_uid: provider.uid, provider_type: provider.type, provider_country: provider.country, is_online: onlineStatus.isOnline,
       });
     }
-    if (isUser(user)) {
+    if ((user as any)?.id) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
-        userId: user.id,
+        userId: (user as any).id,
         eventData: {
           providerId: provider.id, providerUid: provider.uid, providerType: provider.type, providerName: provider.fullName, providerOnlineStatus: onlineStatus.isOnline,
         },
@@ -922,7 +898,7 @@ const ProviderProfile: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        {user && provider && isUser(user) && user.id === provider.uid && (
+        {user && provider && (user as any)?.id === provider.uid && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
@@ -1102,40 +1078,40 @@ const ProviderProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* Booking card — PLUS DE 2 CARRÉS, juste toggle + prix unique */}
+              {/* Booking card — ✅ Pas de sélecteur devise, pas de frais, prix unique depuis Admin */}
               <aside className="lg:col-span-1">
                 <div className="group relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-200 transition-all hover:scale-[1.01]">
                   <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-red-500/5 to-orange-500/5 group-hover:from-red-500/10 group-hover:to-orange-500/10 transition-opacity" />
                   <div className="relative z-10">
 
-                    {/* ✅ Toggle devise (comme la capture) */}
-                    <div className="mb-6">
-                      <CurrencySelector
-                        serviceType={provider?.type === 'lawyer' ? 'lawyer' : 'expat'}
-                        selectedCurrency={selectedCurrency}
-                        onCurrencyChange={setSelectedCurrency}
-                        className="text-sm"
-                      />
-                    </div>
-
-                    {/* ✅ Prix unique dynamique (override provider > admin). AUCUN frais affiché */}
+                    {/* Badge délai d'appel */}
                     <div className="text-center mb-6">
                       <div className="inline-flex items-center gap-2 bg-gray-900 text-white rounded-full px-3 py-1 text-xs font-semibold">
                         <Phone size={14} />
                         <span>Appel en ~5 min</span>
                       </div>
 
-                      <TracedPrice
-                        serviceType={provider.type}
-                        currency={selectedCurrency}
-                        providerOverride={typeof provider.price === 'number' ? provider.price : undefined}
-                        className="mt-4 text-3xl sm:text-4xl font-black text-gray-900 block"
-                      >
-                        {priceInfo.price != null ? `${currencySymbol}${Math.round(priceInfo.price)}` : `${currencySymbol}—`}
-                      </TracedPrice>
+                      {/* ✅ Prix principal EUR + équivalent USD (admin_config/pricing) */}
+                      <div className="mt-4 text-3xl sm:text-4xl font-black text-gray-900">
+                        {bookingPrice ? (
+                          <>
+                            {/* On trace le prix EUR avec data-attrs admin */}
+                            <TracedPrice
+                              serviceType={provider.type}
+                              currency="eur"
+                              className="bg-clip-text"
+                            >
+                              {formatEUR(bookingPrice.eur)}
+                            </TracedPrice>{' '}
+                            <span className="text-gray-600">({formatUSD(bookingPrice.usd)})</span>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </div>
 
                       <div className="text-gray-600">
-                        {priceInfo.duration ? `${priceInfo.duration} ${t('minutes')}` : '—'}
+                        {bookingPrice?.duration ? `${bookingPrice.duration} ${t('minutes')}` : '—'}
                       </div>
                     </div>
 

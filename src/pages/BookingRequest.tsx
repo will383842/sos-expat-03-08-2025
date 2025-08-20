@@ -34,6 +34,15 @@ import type { Provider } from '../types/provider';
 import { normalizeProvider } from '../types/provider';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 
+/** ---- PRICING (ADMIN + fallback) ---- */
+import {
+  usePricingConfig,
+  calculateServiceAmounts,
+  detectUserCurrency,
+  type ServiceType,
+  type Currency,
+} from '../services/pricingService';
+
 /** ===== Types complémentaires ===== */
 type LangKey = keyof typeof I18N;
 type Language = { code: string; name: string };
@@ -67,10 +76,18 @@ const THEME = {
   button: 'from-red-600 via-orange-600 to-rose-600',
 } as const;
 
-/** ===== Prix fixes ===== */
-const FIXED_PRICING = {
-  lawyer: { EUR: 49, USD: 55, duration: 30 },
-  expat: { EUR: 19, USD: 25, duration: 30 },
+/** ===== Fallbacks (si admin indisponible) =====
+ *  - Prix de secours (total)
+ *  - Frais de service par défaut (commission)
+ */
+const FALLBACK_TOTALS = {
+  lawyer: { eur: 49, usd: 55, duration: 20 },
+  expat: { eur: 19, usd: 25, duration: 30 },
+} as const;
+
+const DEFAULT_SERVICE_FEES = {
+  lawyer: { eur: 19, usd: 25 },
+  expat: { eur: 9, usd: 15 },
 } as const;
 
 /** ===== i18n (FR par défaut) ===== */
@@ -457,6 +474,9 @@ const BookingRequest: React.FC = () => {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [providerLoading, setProviderLoading] = useState<boolean>(true);
 
+  // PRICING depuis l'admin
+  const { pricing } = usePricingConfig();
+
   const [formData, setFormData] = useState<BookingFormData>({
     title: '',
     description: '',
@@ -519,7 +539,6 @@ const BookingRequest: React.FC = () => {
         return normalizeProvider(parsed as Partial<Provider> & { id: string });
       }
     } catch (error) {
-      // silencieux mais non vide pour satisfaire no-empty
       console.warn('Failed to read provider from sessionStorage', error);
     }
     return null;
@@ -670,8 +689,20 @@ const BookingRequest: React.FC = () => {
   }
   if (!provider) return null;
 
-  const isLawyer = provider.type === 'lawyer';
-  const pricing = isLawyer ? FIXED_PRICING.lawyer : FIXED_PRICING.expat;
+  const isLawyer = provider.type === 'lawyer' || provider.role === 'lawyer';
+  const role: ServiceType = isLawyer ? 'lawyer' : 'expat';
+
+  /** Prix affichés (ADMIN si dispo, sinon secours) */
+  const eurAdmin = pricing?.[role]?.eur;
+  const usdAdmin = pricing?.[role]?.usd;
+
+  const displayEUR = eurAdmin?.totalAmount ?? FALLBACK_TOTALS[role].eur;
+  const displayUSD = usdAdmin?.totalAmount ?? FALLBACK_TOTALS[role].usd;
+  const displayDuration =
+    eurAdmin?.duration ??
+    usdAdmin?.duration ??
+    provider.duration ??
+    FALLBACK_TOTALS[role].duration;
 
   const sanitizeText = (
     input: string,
@@ -698,7 +729,6 @@ const BookingRequest: React.FC = () => {
   ) => {
     const { name, value, type } = e.target as HTMLInputElement;
     if (type === 'checkbox') {
-      // seul checkbox = acceptTerms
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, acceptTerms: checked }));
       return;
@@ -776,6 +806,8 @@ const BookingRequest: React.FC = () => {
     state: BookingFormData,
     p: Provider,
     currentUser: { id?: string; firstName?: string; lastName?: string } | null,
+    eurTotalForDisplay: number,
+    durationForDisplay: number,
   ): {
     selectedProvider: Partial<Provider> & {
       id: string;
@@ -791,7 +823,7 @@ const BookingRequest: React.FC = () => {
       name: p.name,
       firstName: p.firstName,
       lastName: p.lastName,
-      type: p.type,
+      type: (p.type || p.role) as 'lawyer' | 'expat',
       country: p.country,
       avatar: p.avatar,
       price: p.price,
@@ -816,8 +848,6 @@ const BookingRequest: React.FC = () => {
           '',
         )}`
       : '';
-
-    const pr = p.type === 'lawyer' ? FIXED_PRICING.lawyer : FIXED_PRICING.expat;
 
     const bookingRequest: BookingRequestData = {
       clientPhone,
@@ -852,8 +882,9 @@ const BookingRequest: React.FC = () => {
         code: l.code,
         name: l.name,
       })),
-      price: pr.EUR,
-      duration: pr.duration,
+      // Prix enregistré côté requête: EUR affiché (cohérent avec l'historique)
+      price: eurTotalForDisplay,
+      duration: durationForDisplay,
       status: 'pending',
       createdAt: new Date(),
       ip: window.location.hostname,
@@ -968,14 +999,20 @@ const BookingRequest: React.FC = () => {
 
     setIsLoading(true);
     try {
+      // Prix affichés pour l’aperçu / stockage côté bookingRequest (EUR)
+      const eurTotalForDisplay = displayEUR;
+      const durationForDisplay = displayDuration;
+
       const { selectedProvider, bookingRequest } = prepareStandardizedData(
         formData,
         provider,
         user,
+        eurTotalForDisplay,
+        durationForDisplay,
       );
+
       if (user) {
         try {
-          // createBookingRequest attend Record<string, unknown>
           await createBookingRequest(
             bookingRequest as unknown as Record<string, unknown>,
           );
@@ -983,11 +1020,40 @@ const BookingRequest: React.FC = () => {
           console.error('createBookingRequest failed', error);
         }
       }
+
+      // ————————————————————————————
+      // ServiceData (admin = vérité ; fallback = prix secours + frais défaut)
+      // ————————————————————————————
+      const selectedCurrency: Currency = detectUserCurrency();
+      const roleForPricing: ServiceType = (provider.role || provider.type || 'expat') as ServiceType;
+
+      let svcAmount = 0;
+      let svcDuration = FALLBACK_TOTALS[roleForPricing].duration;
+      let svcCommission = 0;
+      let svcProviderAmount = 0;
+
       try {
-        const commissionAmount =
-          Math.round(bookingRequest.price * 0.2 * 100) / 100;
-        const providerAmount =
-          Math.round(bookingRequest.price * 0.8 * 100) / 100;
+        const p = await calculateServiceAmounts(roleForPricing, selectedCurrency);
+        svcAmount = p.totalAmount;
+        svcDuration = p.duration;
+        svcCommission = p.connectionFeeAmount;
+        svcProviderAmount = p.providerAmount;
+      } catch {
+        // fallback cohérent avec la règle demandée
+        const total =
+          selectedCurrency === 'usd'
+            ? FALLBACK_TOTALS[roleForPricing].usd
+            : FALLBACK_TOTALS[roleForPricing].eur;
+        const fee =
+          selectedCurrency === 'usd'
+            ? DEFAULT_SERVICE_FEES[roleForPricing].usd
+            : DEFAULT_SERVICE_FEES[roleForPricing].eur;
+        svcAmount = total;
+        svcCommission = fee;
+        svcProviderAmount = Math.max(0, Math.round((total - fee) * 100) / 100);
+      }
+
+      try {
         sessionStorage.setItem(
           'selectedProvider',
           JSON.stringify(selectedProvider),
@@ -997,13 +1063,14 @@ const BookingRequest: React.FC = () => {
           JSON.stringify({
             providerId: selectedProvider.id,
             serviceType:
-              provider.type === 'lawyer' ? 'lawyer_call' : 'expat_call',
-            providerRole: provider.type,
-            amount: bookingRequest.price,
-            duration: bookingRequest.duration,
+              roleForPricing === 'lawyer' ? 'lawyer_call' : 'expat_call',
+            providerRole: roleForPricing,
+            amount: svcAmount,
+            duration: svcDuration,
             clientPhone: bookingRequest.clientPhone,
-            commissionAmount,
-            providerAmount,
+            commissionAmount: svcCommission,
+            providerAmount: svcProviderAmount,
+            currency: selectedCurrency,
           }),
         );
       } catch (error) {
@@ -1147,9 +1214,9 @@ const BookingRequest: React.FC = () => {
               )}
             </div>
             <div className="text-center sm:text-right bg-white rounded-xl p-3 sm:p-4 border border-gray-200 w-auto min-w-[120px]">
-              <div className="text-2xl sm:text-3xl font-extrabold text-red-600">{`${pricing.EUR}€ / $${pricing.USD}`}</div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-red-600">{`${displayEUR}€ / $${displayUSD}`}</div>
               <div className="text-sm text-gray-600 mt-1">
-                {pricing.duration} min
+                {displayDuration} min
               </div>
               <div className="mt-1 text-xs text-gray-500">💳 {t.securePay}</div>
             </div>
@@ -1674,8 +1741,8 @@ const BookingRequest: React.FC = () => {
                           }
                           langs={languagesSpoken.map((l) => l.code)}
                           phone={`${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
-                          priceLabel={`${pricing.EUR}€ / $${pricing.USD}`}
-                          duration={pricing.duration}
+                          priceLabel={`${displayEUR}€ / $${displayUSD}`}
+                          duration={displayDuration}
                           langPack={t}
                         />
                       </div>
@@ -1714,7 +1781,7 @@ const BookingRequest: React.FC = () => {
                         <div className="flex items-center justify-center">
                           <Euro size={20} className="mr-2 sm:mr-3" />
                           <span>
-                            {t.continuePay} ({`${pricing.EUR}€ / $${pricing.USD}`}
+                            {t.continuePay} ({`${displayEUR}€ / $${displayUSD}`}
                             )
                           </span>
                         </div>

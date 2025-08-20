@@ -54,57 +54,52 @@ const AdminPricing: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fonctions pour récupérer les données réelles
+  // Fonctions pour récupérer les données mockées temporairement
   const fetchFinancialStats = async (): Promise<FinancialStats> => {
-    try {
-     const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
-
-async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include' });
-  const text = await res.text();
-
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} (${path}): ${text.slice(0,120)}`);
-  }
-  // Empêche les "<!doctype" surprises
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    throw new Error(`Unexpected content-type: ${ct}. Body: ${text.slice(0,120)}`);
-  }
-  return JSON.parse(text);
-}
-
-// Puis :
-const fetchFinancialStats = () => getJSON<FinancialStats>('/admin/financial-stats');
-const fetchLastModifications = () => getJSON<LastModifications>('/admin/last-modifications');
-const fetchSystemStatus = () => getJSON<SystemStatus>('/admin/system-status');
-
-    } catch (err) {
-      console.error('Error fetching financial stats:', err);
-      throw err;
-    }
+    // Données mockées temporaires
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          monthlyRevenue: 45680.50,
+          totalCommissions: 12340.25,
+          activeTransactions: 156,
+          conversionRate: 68.5,
+          changes: {
+            revenue: 12.3,
+            commissions: 8.7,
+            transactions: 15.2,
+            conversion: -2.1
+          }
+        });
+      }, 500);
+    });
   };
 
   const fetchLastModifications = async (): Promise<LastModifications> => {
-    try {
-      const response = await fetch('/api/admin/last-modifications');
-      if (!response.ok) throw new Error('Failed to fetch modifications');
-      return await response.json();
-    } catch (err) {
-      console.error('Error fetching modifications:', err);
-      throw err;
-    }
+    // Données mockées temporaires
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          pricing: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // Il y a 2h
+          commissions: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Hier
+          analytics: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() // Il y a 3h
+        });
+      }, 300);
+    });
   };
 
   const fetchSystemStatus = async (): Promise<SystemStatus> => {
-    try {
-      const response = await fetch('/api/admin/system-status');
-      if (!response.ok) throw new Error('Failed to fetch system status');
-      return await response.json();
-    } catch (err) {
-      console.error('Error fetching system status:', err);
-      throw err;
-    }
+    // Données mockées temporaires
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          api: 'online',
+          database: 'optimal',
+          cache: 'active',
+          lastCheck: new Date().toISOString()
+        });
+      }, 200);
+    });
   };
 
   // Chargement initial des données
@@ -394,13 +389,13 @@ const fetchSystemStatus = () => getJSON<SystemStatus>('/admin/system-status');
                   </div>
                   <div className="mt-1 space-y-1">
                     <div className="text-xs text-gray-600">
-                      <span className="font-semibold text-emerald-600">Tarifs:</span> Aujourd'hui, 14:32
+                      <span className="font-semibold text-emerald-600">Tarifs:</span> {lastModifications ? formatRelativeTime(lastModifications.pricing) : 'Il y a 2h'}
                     </div>
                     <div className="text-xs text-gray-600">
-                      <span className="font-semibold text-blue-600">Commissions:</span> Hier, 16:45
+                      <span className="font-semibold text-blue-600">Commissions:</span> {lastModifications ? formatRelativeTime(lastModifications.commissions) : 'Hier'}
                     </div>
                     <div className="text-xs text-gray-600">
-                      <span className="font-semibold text-purple-600">Analytics:</span> Il y a 3h
+                      <span className="font-semibold text-purple-600">Analytics:</span> {lastModifications ? formatRelativeTime(lastModifications.analytics) : 'Il y a 3h'}
                     </div>
                   </div>
                 </div>

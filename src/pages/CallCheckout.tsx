@@ -18,8 +18,7 @@ import { httpsCallable, HttpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
-import { detectUserCurrency, calculateServiceAmounts, usePricingConfig } from '../services/pricingService';
-import { CurrencySelector } from '../components/checkout/CurrencySelector';
+import { detectUserCurrency, usePricingConfig, calculateServiceAmounts } from '../services/pricingService';
 
 /* ------------------------------ Stripe init ------------------------------ */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
@@ -112,26 +111,11 @@ const useTranslation = () => {
   const language: Lang = (ctxLang === 'en' ? 'en' : 'fr');
 
   const dict: Record<string, Record<Lang, string>> = {
-    'meta.title': {
-      fr: 'Paiement & Mise en relation - SOS Expats',
-      en: 'Checkout & Connection - SOS Expats'
-    },
-    'meta.description': {
-      fr: "Réglez en toute sécurité et lancez votre consultation avec l'expert sélectionné.",
-      en: 'Pay securely and start your consultation with the selected expert.'
-    },
-    'meta.keywords': {
-      fr: 'paiement, consultation, avocat, expatriés, SOS Expats, appel',
-      en: 'payment, consultation, lawyer, expats, SOS Expats, call'
-    },
-    'meta.og_title': {
-      fr: 'Paiement sécurisé - SOS Expats',
-      en: 'Secure Checkout - SOS Expats'
-    },
-    'meta.og_description': {
-      fr: 'Paiement SSL, mise en relation automatique avec votre expert.',
-      en: 'SSL payment, automatic connection with your expert.'
-    },
+    'meta.title': { fr: 'Paiement & Mise en relation - SOS Expats', en: 'Checkout & Connection - SOS Expats' },
+    'meta.description': { fr: "Réglez en toute sécurité et lancez votre consultation avec l'expert sélectionné.", en: 'Pay securely and start your consultation with the selected expert.' },
+    'meta.keywords': { fr: 'paiement, consultation, avocat, expatriés, SOS Expats, appel', en: 'payment, consultation, lawyer, expats, call' },
+    'meta.og_title': { fr: 'Paiement sécurisé - SOS Expats', en: 'Secure Checkout - SOS Expats' },
+    'meta.og_description': { fr: 'Paiement SSL, mise en relation automatique avec votre expert.', en: 'SSL payment, automatic connection with your expert.' },
     'meta.og_image_alt': { fr: 'Paiement SOS Expats', en: 'SOS Expats Checkout' },
     'meta.twitter_image_alt': { fr: 'Interface de paiement SOS Expats', en: 'SOS Expats checkout interface' },
 
@@ -166,15 +150,9 @@ const useTranslation = () => {
     'status.callStarted': { fr: 'Consultation démarrée', en: 'Consultation started' },
 
     'alert.missingDataTitle': { fr: 'Données manquantes', en: 'Missing data' },
-    'alert.missingDataText': {
-      fr: 'Veuillez sélectionner à nouveau un expert.',
-      en: 'Please select an expert again.'
-    },
+    'alert.missingDataText': { fr: 'Veuillez sélectionner à nouveau un expert.', en: 'Please select an expert again.' },
     'alert.loginRequiredTitle': { fr: 'Connexion requise', en: 'Login required' },
-    'alert.loginRequiredText': {
-      fr: 'Connectez-vous pour lancer une consultation.',
-      en: 'Sign in to start a consultation.'
-    },
+    'alert.loginRequiredText': { fr: 'Connectez-vous pour lancer une consultation.', en: 'Sign in to start a consultation.' },
 
     'banner.secure': { fr: 'Paiement sécurisé', en: 'Secure payment' },
     'banner.ssl': {
@@ -182,14 +160,11 @@ const useTranslation = () => {
       en: 'Data protected by SSL. Call launched automatically after payment.'
     },
 
-    'form.phone': { fr: 'Numéro de téléphone', en: 'Phone number' }, // conservé pour i18n (non utilisé à l’écran)
+    'form.phone': { fr: 'Numéro de téléphone', en: 'Phone number' },
     'form.whatsapp': { fr: 'Numéro WhatsApp (facultatif)', en: 'WhatsApp number (optional)' },
     'form.phonePlaceholder': { fr: 'ex: +33612345678', en: 'e.g. +447911123456' },
     'form.whatsappPlaceholder': { fr: 'ex: +33612345678', en: 'e.g. +447911123456' },
-    'form.phoneHelp': {
-      fr: 'Incluez le code pays (format +33, +44, ...).',
-      en: 'Include country code (format +33, +44, ...).'
-    },
+    'form.phoneHelp': { fr: 'Incluez le code pays (format +33, +44, ...).', en: 'Include country code (format +33, +44, ...).' },
 
     'err.invalidConfig': { fr: 'Configuration de paiement invalide', en: 'Invalid payment configuration' },
     'err.unauth': { fr: 'Utilisateur non authentifié', en: 'Unauthenticated user' },
@@ -217,30 +192,16 @@ const useTranslation = () => {
 
 /* ------------------------------ SEO helpers ------------------------------ */
 const useSEO = (meta: {
-  title: string;
-  description: string;
-  keywords: string;
-  ogTitle: string;
-  ogDescription: string;
-  canonicalUrl: string;
-  alternateUrls: Record<'fr' | 'en', string>;
-  structuredData: Record<string, unknown>;
-  locale: Lang;
-  ogImagePath: string;
-  twitterImagePath: string;
-  ogImageAlt: string;
-  twitterImageAlt: string;
+  title: string; description: string; keywords: string; ogTitle: string; ogDescription: string;
+  canonicalUrl: string; alternateUrls: Record<'fr' | 'en', string>; structuredData: Record<string, unknown>;
+  locale: Lang; ogImagePath: string; twitterImagePath: string; ogImageAlt: string; twitterImageAlt: string;
 }) => {
   useEffect(() => {
     document.title = meta.title;
     const updateMeta = (name: string, content: string, property = false) => {
       const attr = property ? 'property' : 'name';
       let el = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement | null;
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute(attr, name);
-        document.head.appendChild(el);
-      }
+      if (!el) { el = document.createElement('meta'); el.setAttribute(attr, name); document.head.appendChild(el); }
       el.content = content;
     };
 
@@ -273,41 +234,25 @@ const useSEO = (meta: {
     updateMeta('twitter:image:alt', meta.twitterImageAlt);
 
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.rel = 'canonical';
-      document.head.appendChild(canonical);
-    }
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical); }
     canonical.href = meta.canonicalUrl;
 
     document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(l => l.parentElement?.removeChild(l));
     Object.entries(meta.alternateUrls).forEach(([lang, url]) => {
       const el = document.createElement('link');
-      el.rel = 'alternate';
-      el.hreflang = lang;
-      el.href = url;
-      document.head.appendChild(el);
+      el.rel = 'alternate'; el.hreflang = lang; el.href = url; document.head.appendChild(el);
     });
     const xDef = document.createElement('link');
-    xDef.rel = 'alternate';
-    xDef.hreflang = 'x-default';
-    xDef.href = meta.alternateUrls.fr;
-    document.head.appendChild(xDef);
+    xDef.rel = 'alternate'; xDef.hreflang = 'x-default'; xDef.href = meta.alternateUrls.fr; document.head.appendChild(xDef);
 
     let ld = document.querySelector('#structured-data') as HTMLScriptElement | null;
-    if (!ld) {
-      ld = document.createElement('script');
-      ld.id = 'structured-data';
-      ld.type = 'application/ld+json';
-      document.head.appendChild(ld);
-    }
+    if (!ld) { ld = document.createElement('script'); ld.id = 'structured-data'; ld.type = 'application/ld+json'; document.head.appendChild(ld); }
     ld.textContent = JSON.stringify(meta.structuredData);
   }, [meta]);
 };
 
 /* ------------------------ Helpers: device & phone utils ------------------ */
 const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
-
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -320,9 +265,9 @@ const useIsMobile = () => {
       mq.addEventListener('change', update);
       return () => mq.removeEventListener('change', update);
     } else {
-      // @ts-expect-error - Legacy MediaQueryList API (Safari < 14)
+      // @ts-expect-error legacy safari
       mq.addListener(update);
-      // @ts-expect-error - Legacy MediaQueryList API (Safari < 14)
+      // @ts-expect-error legacy safari
       return () => mq.removeListener('change', update);
     }
   }, []);
@@ -330,15 +275,15 @@ const useIsMobile = () => {
 };
 
 /* --------------------- Price tracing: hook & helpers --------------------- */
-interface PricingEntry {
+interface PricingEntryTrace {
   totalAmount: number;
   connectionFeeAmount: number;
   providerAmount: number;
   duration: number;
 }
 interface PricingConfigShape {
-  lawyer: Record<Currency, PricingEntry>;
-  expat: Record<Currency, PricingEntry>;
+  lawyer: Record<Currency, PricingEntryTrace>;
+  expat:  Record<Currency, PricingEntryTrace>;
 }
 type TraceAttributes = {
   [K in `data-${string}`]?: string | number;
@@ -356,7 +301,7 @@ function usePriceTracing() {
       return {
         'data-price-source': 'loading',
         'data-currency': currency,
-        title: 'Prix en cours de chargement...'
+        title: 'Prix en cours de chargement...',
       };
     }
 
@@ -365,28 +310,28 @@ function usePriceTracing() {
         'data-price-source': 'provider',
         'data-currency': currency,
         'data-service-type': serviceType,
-        title: `Prix personnalisé du prestataire (${providerOverride}${currency === 'eur' ? '€' : '$'})`
+        title: `Prix personnalisé prestataire (${providerOverride}${currency === 'eur' ? '€' : '$'})`,
       };
     }
 
     if (pricing) {
-      const config = pricing[serviceType][currency];
+      const cfg = pricing[serviceType][currency];
       return {
         'data-price-source': 'admin',
         'data-currency': currency,
         'data-service-type': serviceType,
-        'data-total-amount': config.totalAmount,
-        'data-connection-fee': config.connectionFeeAmount,
-        'data-provider-amount': config.providerAmount,
-        'data-duration': config.duration,
-        title: `Prix admin: ${config.totalAmount}${currency === 'eur' ? '€' : '$'} (Frais: ${config.connectionFeeAmount}${currency === 'eur' ? '€' : '$'}, Provider: ${config.providerAmount}${currency === 'eur' ? '€' : '$'}, ${config.duration}min)`
+        'data-total-amount': cfg.totalAmount,
+        'data-connection-fee': cfg.connectionFeeAmount,
+        'data-provider-amount': cfg.providerAmount,
+        'data-duration': cfg.duration,
+        title: `Prix admin: ${cfg.totalAmount}${currency === 'eur' ? '€' : '$'} • Frais: ${cfg.connectionFeeAmount}${currency === 'eur' ? '€' : '$'} • Provider: ${cfg.providerAmount}${currency === 'eur' ? '€' : '$'} • ${cfg.duration}min`,
       };
     }
 
     return {
       'data-price-source': 'fallback',
       'data-currency': currency,
-      title: `Prix par défaut (${serviceType === 'lawyer' ? '49€' : '19€'})`
+      title: 'Prix de secours (admin indisponible)',
     };
   };
 
@@ -413,23 +358,6 @@ const singleCardElementOptions = {
   style: cardElementOptions.style,
   hidePostalCode: true,
 } as const;
-
-/* -------------------------- Fallback pricing helper ---------------------- */
-const toCurrency = (c: unknown): Currency => (c === 'usd' ? 'usd' : 'eur');
-
-function getFallbackPricing(role: ServiceKind, currency: Currency) {
-  const table: Record<ServiceKind, Record<Currency, PricingEntry>> = {
-    lawyer: {
-      eur: { totalAmount: 49, connectionFeeAmount: 10, providerAmount: 39, duration: 20 },
-      usd: { totalAmount: 55, connectionFeeAmount: 12, providerAmount: 43, duration: 20 },
-    },
-    expat: {
-      eur: { totalAmount: 19, connectionFeeAmount: 6, providerAmount: 13, duration: 15 },
-      usd: { totalAmount: 21, connectionFeeAmount: 7, providerAmount: 14, duration: 15 },
-    },
-  };
-  return table[role][currency];
-}
 
 /* ------------------------------ Payment Form ----------------------------- */
 interface PaymentFormProps {
@@ -492,7 +420,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         clientEmail: user.email || '',
         clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         clientPhone: service.clientPhone,
-        clientWhatsapp: '', // plus d’input WhatsApp
+        clientWhatsapp: '',
         serviceType: service.serviceType,
         duration: service.duration,
         amount: service.amount,
@@ -503,15 +431,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         createdAt: serverTimestamp(),
       };
 
-      try {
-        await setDoc(doc(db, 'payments', paymentIntentId), baseDoc, { merge: true });
-      } catch { /* no-op */ }
-      try {
-        await setDoc(doc(db, 'users', user.uid!, 'payments', paymentIntentId), baseDoc, { merge: true });
-      } catch { /* no-op */ }
-      try {
-        await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true });
-      } catch { /* no-op */ }
+      try { await setDoc(doc(db, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
+      try { await setDoc(doc(db, 'users', user.uid!, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
+      try { await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
     },
     [provider, service, user, serviceCurrency]
   );
@@ -737,7 +659,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         )}
       </div>
 
-      {/* Récapitulatif avec devise dynamique */}
+      {/* Récapitulatif simplifié */}
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
         <h4 className="font-semibold text-gray-900 mb-3 text-sm">{t('summary.title')}</h4>
         <div className="space-y-2 text-sm">
@@ -748,7 +670,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
                 src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
                 className="w-5 h-5 rounded-full object-cover"
                 onError={(e) => {
-                  const target = e.currentTarget;
+                  const target = e.currentTarget as HTMLImageElement;
                   const name = providerDisplayName;
                   target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=40`;
                 }}
@@ -765,21 +687,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           <div className="flex justify-between items-center">
             <span className="text-gray-600">{t('summary.duration')}</span>
             <span className="font-medium text-gray-800 text-xs">{service.duration} min</span>
-          </div>
-
-          <div className="border-t border-gray-300 pt-2 mt-2">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">{t('summary.fee')}</span>
-              <span className="font-medium text-gray-800 text-xs">
-                {service.commissionAmount.toFixed(2)} {currencySymbol}
-              </span>
-            </div>
-            <div className="flex justify-between items-center mt-1">
-              <span className="text-gray-600">{t('summary.consult')}</span>
-              <span className="font-medium text-gray-800 text-xs">
-                {service.providerAmount.toFixed(2)} {currencySymbol}
-              </span>
-            </div>
           </div>
 
           <div className="border-t-2 border-gray-400 pt-2 mt-2">
@@ -916,7 +823,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     return null;
   }, [selectedProvider]);
 
-  // Pricing (avec fallback)
+  // Pricing via ADMIN (avec secours intégré côté service)
   const [serviceWithPricing, setServiceWithPricing] = useState<ServiceData | null>(null);
   const [isFallback, setIsFallback] = useState<boolean>(false);
 
@@ -931,43 +838,27 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   useEffect(() => {
     const loadServicePricing = async () => {
       if (!provider?.id || !selectedCurrency) return;
-
       const providerRole: ServiceKind = (provider.role || provider.type || 'expat') as ServiceKind;
 
       try {
-        const fromService = await calculateServiceAmounts(providerRole, selectedCurrency);
+        const adminPricing = await calculateServiceAmounts(providerRole, selectedCurrency);
         setServiceWithPricing({
           providerId: provider.id,
           serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
           providerRole,
-          amount: fromService.totalAmount,
-          duration: fromService.duration,
-          clientPhone: normalizePhone(user?.phone || ''), // aucune saisie visible
-          commissionAmount: fromService.connectionFeeAmount,
-          providerAmount: fromService.providerAmount,
-          currency: toCurrency(fromService.currency),
+          amount: adminPricing.totalAmount,
+          duration: adminPricing.duration,
+          clientPhone: normalizePhone(user?.phone || ''),
+          commissionAmount: adminPricing.connectionFeeAmount,
+          providerAmount: adminPricing.providerAmount,
+          currency: selectedCurrency,
         });
         setIsFallback(false);
-      } catch (calcErr) {
-        const fb = getFallbackPricing(providerRole, selectedCurrency);
-        setServiceWithPricing({
-          providerId: provider.id,
-          serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
-          providerRole,
-          amount: fb.totalAmount,
-          duration: fb.duration,
-          clientPhone: normalizePhone(user?.phone || ''),
-          commissionAmount: fb.connectionFeeAmount,
-          providerAmount: fb.providerAmount,
-          currency: selectedCurrency, // Currency strict
-        });
+      } catch {
+        // Par sécurité (cas improbable si Firestore indispo), on garde un secours homogène
+        // — mais calculateServiceAmounts gère déjà un secours; on ne devrait pas passer ici.
+        setServiceWithPricing(null);
         setIsFallback(true);
-        console.error('[PRICING FALLBACK] calculateServiceAmounts failed, using fallback', {
-          error: calcErr,
-          providerRole,
-          currency: selectedCurrency,
-          fallback: fb,
-        });
       }
     };
 
@@ -1174,12 +1065,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   /* ------------------------------ Render page ---------------------------- */
   return (
     <Layout>
-      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)]">
+      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h=[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
         <div className="max-w-lg mx-auto px-4 py-4">
           {(pricingError || isFallback) && (
             <div className="mb-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
               {language === 'fr'
-                ? 'Les tarifs affichés utilisent une configuration de secours. La configuration centrale sera rechargée automatiquement.'
+                ? 'Les tarifs affichés proviennent d’une configuration de secours. La configuration centrale sera rechargée automatiquement.'
                 : 'Displayed prices are using a fallback configuration. Central pricing will be reloaded automatically.'}
             </div>
           )}
@@ -1218,7 +1109,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                   alt={provider.fullName || provider.name || 'Expert'}
                   className="w-12 h-12 rounded-lg object-cover ring-2 ring-white shadow-sm"
                   onError={(e) => {
-                    const target = e.currentTarget;
+                    const target = e.currentTarget as HTMLImageElement;
                     const name = provider.fullName || provider.name || 'Expert';
                     target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=4F46E5&color=fff`;
                   }}
@@ -1258,14 +1149,30 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             </div>
           </section>
 
-          {/* Sélecteur de devise */}
+          {/* Sélecteur devise simple */}
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
-            <CurrencySelector
-              serviceType={(provider?.role === 'lawyer' || provider?.type === 'lawyer') ? 'lawyer' : 'expat'}
-              selectedCurrency={selectedCurrency}
-              onCurrencyChange={handleCurrencyChange}
-              className="mb-4"
-            />
+            <div className="flex items-center justify-center space-x-4">
+              <button
+                onClick={() => handleCurrencyChange('eur')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  selectedCurrency === 'eur'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                EUR (€)
+              </button>
+              <button
+                onClick={() => handleCurrencyChange('usd')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  selectedCurrency === 'usd'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                USD ($)
+              </button>
+            </div>
           </section>
 
           {/* Contenu principal */}
@@ -1312,17 +1219,11 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                   <Phone
                     size={32}
                     className={`mx-auto mb-4 animate-pulse ${(provider.role || provider.type) === 'lawyer' ? 'text-blue-600' : 'text-green-600'}`}
-                    aria-hidden="true"
+                    aria-hidden={true}
                   />
                   <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('ui.connecting')}</h2>
                   <p className="text-gray-600 text-sm">
-                    {callProgress < 3
-                      ? `${language === 'fr' ? 'Nous contactons' : 'Contacting'} ${provider.fullName || provider.name || 'Expert'}...`
-                      : callProgress === 3
-                      ? `${(provider.fullName || provider.name || 'Expert')} ${language === 'fr' ? 'a accepté !' : 'accepted!'}`
-                      : callProgress === 4
-                      ? `${language === 'fr' ? 'Connexion établie !' : 'Connected!'}`
-                      : `${language === 'fr' ? 'Consultation en cours...' : 'Consultation in progress...'}`}
+                    {`${language === 'fr' ? 'Connexion à' : 'Connecting to'} ${provider.fullName || provider.name || 'Expert'}...`}
                   </p>
                 </div>
 
@@ -1331,18 +1232,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                     <Check className="w-4 h-4 text-green-600 mr-2" aria-hidden="true" />
                     <span className="text-green-800">{t('status.paid')}</span>
                   </div>
-                  {callProgress >= 2 && (
-                    <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
-                      <Phone className="w-4 h-4 text-blue-600 mr-2" aria-hidden="true" />
-                      <span className="text-blue-800">{t('status.expertContacted')}</span>
-                    </div>
-                  )}
-                  {callProgress >= 4 && (
-                    <div className="bg-purple-100 rounded-lg p-3 flex items-center text-sm">
-                      <Clock className="w-4 h-4 text-purple-600 mr-2" aria-hidden="true" />
-                      <span className="text-purple-800">{t('status.callStarted')}</span>
-                    </div>
-                  )}
+                  <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
+                    <Phone className="w-4 h-4 text-blue-600 mr-2" aria-hidden="true" />
+                    <span className="text-blue-800">{t('status.expertContacted')}</span>
+                  </div>
                 </div>
 
                 <div className="flex justify-center mb-4">

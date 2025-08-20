@@ -1077,11 +1077,6 @@ const BookingRequest: React.FC = () => {
         console.warn('Failed to save serviceData in session', error);
       }
 
-      try {
-        await notifyProviderOfRequest(provider.id, bookingRequest);
-      } catch (error) {
-        console.warn('notifyProviderOfRequest failed', error);
-      }
 
       navigate(`/call-checkout/${providerId}`);
     } catch (err) {

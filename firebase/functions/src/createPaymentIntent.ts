@@ -447,6 +447,7 @@ function logSecurityEvent(event: string, data: any) {
 export const createPaymentIntent = onCall(
   CPU_OPTIMIZED_CONFIG,
   async (request: CallableRequest<PaymentIntentRequestData>) => {
+    // CORS fix deployment - Updated 2025-01-20
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
 

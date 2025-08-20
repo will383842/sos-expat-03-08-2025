@@ -29,6 +29,10 @@ export { initializeMessageTemplates } from './initializeMessageTemplates';
 // Export des fonctions de notification (si nécessaire)
 export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 
+// Export des fonctions réelles utilisées par le frontend
+export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
+export { createPaymentIntent } from './createPaymentIntent';
+
 // Export de l'API admin
 export { api } from './adminApi';
 
@@ -106,121 +110,9 @@ try {
   console.log('ℹ️ Firestore déjà configuré', firebaseError);
 }
 
-// Configuration CORS pour les fonctions HTTP publiques
-const publicCorsOptions = true; // Ou utilisez un objet si vous voulez plus de contrôle
-
-// ====== FONCTIONS PUBLIQUES AVEC CORS (V2) ======
-
-export const createAndScheduleCall = onRequest({
-  cors: publicCorsOptions,
-  memory: "512MiB",
-  timeoutSeconds: 60
-}, async (req: ExpressRequest, res: Response) => {
-  try {
-    // Vérifier la méthode HTTP
-    if (req.method !== 'POST') {
-      res.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-
-    // Extraire les données de la requête
-    const requestData = req.body;
-    
-    if (!requestData) {
-      res.status(400).json({ error: 'Request body is required' });
-      return;
-    }
-
-    // Créer et planifier l'appel (logique à adapter selon votre implémentation)
-    // Remplacez cette partie par votre logique métier
-    const result = {
-      success: true,
-      sessionId: `session_${Date.now()}`,
-      message: 'Call scheduled successfully'
-    };
-
-    res.status(200).json(result);
-
-  } catch (error: unknown) {
-    console.error('Error in createAndScheduleCall:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: errorMessage });
-  }
-});
-
-export const createPaymentIntent = onRequest({
-  cors: publicCorsOptions,
-  memory: "256MiB",
-  timeoutSeconds: 30
-}, async (req: ExpressRequest, res: Response) => {
-  try {
-    // Vérifier la méthode HTTP
-    if (req.method !== 'POST') {
-      res.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-
-    if (!stripe) {
-      res.status(500).json({ error: 'Stripe service not configured' });
-      return;
-    }
-
-    // Extraire les données de la requête
-    const { amount, currency = 'eur', metadata = {} } = req.body;
-    
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      res.status(400).json({ error: 'Invalid amount' });
-      return;
-    }
-
-    // Créer le PaymentIntent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      metadata,
-      automatic_payment_methods: {
-        enabled: true,
-      },
-    });
-
-    res.status(200).json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-    });
-
-  } catch (error: unknown) {
-    console.error('Stripe error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: errorMessage });
-  }
-});
-
-export const callScheduler = onRequest({
-  cors: publicCorsOptions,
-  memory: "256MiB",
-  timeoutSeconds: 30
-}, async (req: ExpressRequest, res: Response) => {
-  try {
-    // Vérifier la méthode HTTP
-    if (!['POST', 'GET'].includes(req.method || '')) {
-      res.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-
-    // Logique du scheduler (à adapter selon vos besoins)
-    const result = {
-      success: true,
-      message: 'Scheduler operation completed'
-    };
-
-    res.status(200).json(result);
-
-  } catch (error: unknown) {
-    console.error('Error in callScheduler:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: errorMessage });
-  }
-});
+// ====== FONCTIONS PUBLIQUES SUPPRIMÉES ======
+// Ces fonctions onRequest ne sont pas utilisées par le frontend
+// Le frontend utilise les fonctions onCall directement
 
 // ========================================
 // FONCTIONS ADMIN (TOUTES EN V2 MAINTENANT)
@@ -838,14 +730,6 @@ export const scheduledCleanup = onSchedule(
       // Enregistrer le résultat
       await admin.firestore().collection('logs').doc('cleanup').collection('entries').add({
         type: 'scheduled_cleanup',
-        status: 'failed',
-        error: errorMessage,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-  }
-);('entries').add({
-        type: 'scheduled_cleanup',
         result: cleanupResult,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -855,4 +739,12 @@ export const scheduledCleanup = onSchedule(
       
       const errorMessage = cleanupError instanceof Error ? cleanupError.message : 'Unknown error';
       
-      await admin.firestore().collection('logs').doc('cleanup').collection
+      await admin.firestore().collection('logs').doc('cleanup').collection('entries').add({
+        type: 'scheduled_cleanup',
+        status: 'failed',
+        error: errorMessage,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  }
+);

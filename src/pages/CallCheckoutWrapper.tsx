@@ -13,31 +13,16 @@ import {
 // —————————————————————————————————————————————————————
 // Types
 // —————————————————————————————————————————————————————
-interface ServiceData {
-  providerId: string;
-  serviceType: 'lawyer_call' | 'expat_call';
-  providerRole: 'lawyer' | 'expat';
-  amount: number;
-  duration: number;
-  clientPhone: string;
-  commissionAmount: number;
-  providerAmount: number;
-  currency?: 'eur' | 'usd';
-}
-
 interface LoadingState {
   isLoading: boolean;
   error: string | null;
   provider: Provider | null;
-  serviceData: ServiceData | null;
 }
 
 type RouterState = {
   selectedProvider?: Provider;
   providerData?: Provider;
   provider?: Provider;
-  serviceData?: ServiceData;
-  service?: ServiceData;
   bookingData?: BookingData;
 } | null;
 
@@ -97,31 +82,6 @@ const useTranslation = () => {
 // —————————————————————————————————————————————————————
 // Helpers
 // —————————————————————————————————————————————————————
-const reconstructServiceData = (provider: ProviderLike, currency?: 'eur' | 'usd'): ServiceData => {
-  const providerRole: 'lawyer' | 'expat' =
-    (provider.role || provider.type || provider.providerType || 'expat') as 'lawyer' | 'expat';
-
-  // Valeurs provisoires (seront écrasées par la config Firestore via calculateServiceAmounts)
-  const baseAmount = providerRole === 'lawyer' ? 49 : 19;
-  const duration   = providerRole === 'lawyer' ? 20 : 30;
-  const commissionAmount = providerRole === 'lawyer'
-    ? (currency === 'usd' ? 25 : 19)
-    : (currency === 'usd' ? 15 : 9);
-  const providerAmount = Math.max(0, Math.round((baseAmount - commissionAmount) * 100) / 100);
-
-  return {
-    providerId: provider.id || provider.providerId || Math.random().toString(36).slice(2),
-    serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
-    providerRole,
-    amount: baseAmount,
-    duration,
-    clientPhone: '',
-    commissionAmount,
-    providerAmount,
-    currency,
-  };
-};
-
 const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
   return normalizeProvider({
     id: bookingData.providerId || Math.random().toString(36).slice(2),
@@ -157,31 +117,6 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
     isBanned: false,
     isOnline: true,
   });
-};
-
-const reconstructServiceFromBooking = (
-  bookingData: BookingData,
-  currency?: 'eur' | 'usd'
-): ServiceData => {
-  const providerRole: 'lawyer' | 'expat' = (bookingData.providerType as 'lawyer' | 'expat') || 'expat';
-  const baseAmount = providerRole === 'lawyer' ? 49 : 19;
-  const duration   = providerRole === 'lawyer' ? 20 : 30;
-  const commissionAmount = providerRole === 'lawyer'
-    ? (currency === 'usd' ? 25 : 19)
-    : (currency === 'usd' ? 15 : 9);
-  const providerAmount = Math.max(0, Math.round((baseAmount - commissionAmount) * 100) / 100);
-
-  return {
-    providerId: bookingData.providerId || Math.random().toString(36).slice(2),
-    serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
-    providerRole,
-    amount: baseAmount,
-    duration,
-    clientPhone: bookingData.clientPhone || '',
-    commissionAmount,
-    providerAmount,
-    currency,
-  };
 };
 
 // —————————————————————————————————————————————————————
@@ -221,8 +156,10 @@ const CallCheckoutWrapper: React.FC = () => {
     isLoading: true,
     error: null,
     provider: null,
-    serviceData: null,
   });
+
+  // Erreur stricte si pas de prix admin disponible
+  const [pricingError, setPricingError] = useState<string | null>(null);
 
   const locState = useMemo(() => location.state || null, [location.state]);
 
@@ -243,64 +180,41 @@ const CallCheckoutWrapper: React.FC = () => {
           console.log('🔍 CallCheckoutWrapper - providerId:', providerId);
         }
 
-        // 1) location.state
-        const stateProvider = locState?.selectedProvider || locState?.providerData || locState?.provider;
-        const stateService = locState?.serviceData || locState?.service || locState?.bookingData;
-
-        if (stateService && (stateService as ServiceData).currency) {
-          setCurrency((stateService as ServiceData).currency as string);
-        }
+        // 1) location.state → on lit uniquement le provider
+        const stateProvider =
+          locState?.selectedProvider || locState?.providerData || locState?.provider;
 
         if (stateProvider && (stateProvider as ProviderLike).id) {
           if (import.meta.env.DEV) console.log('✅ Provider via location.state');
           const normalized = normalizeProvider(stateProvider as Provider);
-          const svc: ServiceData =
-            (stateService as ServiceData | undefined) && (stateService as ServiceData).amount
-              ? ({ ...(stateService as ServiceData), currency: (stateService as ServiceData).currency ?? selectedCurrency })
-              : reconstructServiceData(normalized, selectedCurrency);
-          setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
+          setState({ isLoading: false, error: null, provider: normalized });
           return;
         }
 
-        // 2) sessionStorage
+        // 2) sessionStorage → uniquement le provider
         if (import.meta.env.DEV) console.log('🔎 sessionStorage…');
-        let savedProviderData: Provider | null = null;
-        let savedServiceData: ServiceData | null = null;
-
         try {
           const savedProvider = sessionStorage.getItem('selectedProvider');
-          if (savedProvider) savedProviderData = JSON.parse(savedProvider) as Provider;
+          if (savedProvider) {
+            const savedProviderData = JSON.parse(savedProvider) as Provider;
+            if (!providerId || savedProviderData.id === providerId) {
+              const normalized = normalizeProvider(savedProviderData);
+              setState({ isLoading: false, error: null, provider: normalized });
+              return;
+            }
+          }
         } catch (err) {
           if (import.meta.env.DEV) console.error('[Wrapper] parse selectedProvider error', err);
         }
 
-        try {
-          const savedService = sessionStorage.getItem('serviceData');
-          if (savedService) {
-            const parsed = JSON.parse(savedService) as ServiceData;
-            savedServiceData = { ...parsed, currency: parsed.currency ?? selectedCurrency };
-            setCurrency(savedServiceData.currency || null);
-          }
-        } catch (err) {
-          if (import.meta.env.DEV) console.error('[Wrapper] parse serviceData error', err);
-        }
-
-        if (savedProviderData && (!providerId || savedProviderData.id === providerId)) {
-          const normalized = normalizeProvider(savedProviderData);
-          const svc = savedServiceData ?? reconstructServiceData(normalized, selectedCurrency);
-          setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
-          return;
-        }
-
-        // 3) bookingRequest
+        // 3) bookingRequest → reconstruire uniquement le provider
         try {
           const savedBookingRequest = sessionStorage.getItem('bookingRequest');
           if (savedBookingRequest) {
             const bookingData = JSON.parse(savedBookingRequest) as BookingData;
             if (!providerId || bookingData.providerId === providerId) {
               const reconstructedProvider = reconstructProviderFromBooking(bookingData);
-              const reconstructedService = reconstructServiceFromBooking(bookingData, selectedCurrency);
-              setState({ isLoading: false, error: null, provider: reconstructedProvider, serviceData: reconstructedService });
+              setState({ isLoading: false, error: null, provider: reconstructedProvider });
               return;
             }
           }
@@ -315,8 +229,7 @@ const CallCheckoutWrapper: React.FC = () => {
             const profileData = JSON.parse(savedProviderProfile) as Provider;
             if (!providerId || profileData.id === providerId) {
               const normalized = normalizeProvider(profileData);
-              const reconstructedService = reconstructServiceData(normalized, selectedCurrency);
-              setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructedService });
+              setState({ isLoading: false, error: null, provider: normalized });
               return;
             }
           }
@@ -324,7 +237,7 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse providerProfile error', err);
         }
 
-        // 5) autres clés sessionStorage
+        // 5) autres clés sessionStorage (provider-like)
         const sessionStorageKeys = ['providerData', 'selectedExpert', 'expertData', 'consultationData', 'callData'] as const;
         for (const key of sessionStorageKeys) {
           try {
@@ -333,8 +246,7 @@ const CallCheckoutWrapper: React.FC = () => {
               const parsed = JSON.parse(data) as ProviderLike;
               if (parsed && (parsed.id || parsed.providerId) && (!providerId || parsed.id === providerId || parsed.providerId === providerId)) {
                 const normalized = normalizeProvider(parsed as Provider);
-                const reconstructedService = reconstructServiceData(normalized, selectedCurrency);
-                setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructedService });
+                setState({ isLoading: false, error: null, provider: normalized });
                 return;
               }
             }
@@ -349,7 +261,7 @@ const CallCheckoutWrapper: React.FC = () => {
           const historyProvider = historyState?.selectedProvider || historyState?.provider || historyState?.providerData;
           if (historyProvider && (historyProvider as ProviderLike).id && (!providerId || (historyProvider as ProviderLike).id === providerId)) {
             const normalized = normalizeProvider(historyProvider as Provider);
-            setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized, selectedCurrency) });
+            setState({ isLoading: false, error: null, provider: normalized });
             return;
           }
         } catch (err) {
@@ -365,7 +277,7 @@ const CallCheckoutWrapper: React.FC = () => {
               const parsed = JSON.parse(data) as Provider;
               if (parsed && parsed.id && (!providerId || parsed.id === providerId)) {
                 const normalized = normalizeProvider(parsed);
-                setState({ isLoading: false, error: null, provider: normalized, serviceData: reconstructServiceData(normalized, selectedCurrency) });
+                setState({ isLoading: false, error: null, provider: normalized });
                 return;
               }
             }
@@ -374,11 +286,10 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse localStorage provider error', err);
         }
 
-        // 8) paramètres URL
+        // 8) paramètres URL → provider + currency uniquement
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const providerParam = urlParams.get('provider');
-          const serviceParam = urlParams.get('service');
           const currencyParam = urlParams.get('currency'); // ex: ?currency=usd
           if (currencyParam) setCurrency(currencyParam);
 
@@ -386,10 +297,7 @@ const CallCheckoutWrapper: React.FC = () => {
             const providerData = JSON.parse(decodeURIComponent(providerParam)) as Provider;
             if (providerData && providerData.id && (!providerId || providerData.id === providerId)) {
               const normalized = normalizeProvider(providerData);
-              const svc = serviceParam
-                ? ({ ...(JSON.parse(decodeURIComponent(serviceParam)) as ServiceData), currency: selectedCurrency })
-                : reconstructServiceData(normalized, selectedCurrency);
-              setState({ isLoading: false, error: null, provider: normalized, serviceData: svc });
+              setState({ isLoading: false, error: null, provider: normalized });
               return;
             }
           }
@@ -397,14 +305,13 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse URL params error', err);
         }
 
-        // 9) fallback avec providerId
+        // 9) fallback avec providerId (strict — pas de prix par défaut ici)
         if (providerId) {
           const defaultProvider = createDefaultProvider(providerId);
           setState({
             isLoading: false,
             error: null,
             provider: defaultProvider,
-            serviceData: reconstructServiceData(defaultProvider, selectedCurrency),
           });
           return;
         }
@@ -414,7 +321,6 @@ const CallCheckoutWrapper: React.FC = () => {
           isLoading: false,
           error: t('error.body'),
           provider: null,
-          serviceData: null,
         });
       } catch (err) {
         if (import.meta.env.DEV) console.error('❌ loadData error', err);
@@ -422,7 +328,6 @@ const CallCheckoutWrapper: React.FC = () => {
           isLoading: false,
           error: t('error.body'),
           provider: null,
-          serviceData: null,
         });
       }
     };
@@ -431,61 +336,48 @@ const CallCheckoutWrapper: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locState, providerId, t]);
 
-  // 🔥 Recalcul ADMIN (totaux + FRAIS) selon la devise sélectionnée
+  // ✅ Vérification stricte : un prix admin doit exister (pas de fallback permissif)
   useEffect(() => {
-    if (!state.provider || !state.serviceData || state.isLoading) return;
+    if (!state.provider || state.isLoading) return;
+
     const role = (state.provider.role || state.provider.type || 'expat') as 'lawyer' | 'expat';
 
     (async () => {
       try {
-        if (import.meta.env.DEV) {
-          console.log(`🔄 [Wrapper] Recalcul admin ${role} en ${selectedCurrency.toUpperCase()}`);
+        const res = await calculateServiceAmounts(role, selectedCurrency);
+        // Si la config renvoie des montants incohérents → on considère que le prix admin est manquant
+        const ok =
+          res &&
+          typeof res.totalAmount === 'number' &&
+          res.totalAmount > 0 &&
+          typeof res.duration === 'number' &&
+          res.duration > 0 &&
+          typeof res.connectionFeeAmount === 'number' &&
+          typeof res.providerAmount === 'number';
+
+        if (!ok) {
+          throw new Error('Invalid admin pricing response');
         }
-        const p = await calculateServiceAmounts(role, selectedCurrency);
-        setState(prev => ({
-          ...prev,
-          serviceData: prev.serviceData
-            ? {
-                ...prev.serviceData,
-                amount: p.totalAmount,
-                duration: p.duration,
-                commissionAmount: p.connectionFeeAmount,
-                providerAmount: p.providerAmount,
-                currency: (p.currency as 'eur' | 'usd'),
-              }
-            : prev.serviceData,
-        }));
+        setPricingError(null);
       } catch (e) {
-        if (import.meta.env.DEV) {
-          console.warn('[CallCheckoutWrapper] Pricing admin indisponible, on garde le secours local.', e);
-        }
-        // On garde la version existante, mais on force la currency si absente
-        setState(prev => ({
-          ...prev,
-          serviceData: prev.serviceData
-            ? {
-                ...prev.serviceData,
-                currency: prev.serviceData.currency ?? selectedCurrency,
-              }
-            : prev.serviceData,
-        }));
+        const msg = `Configuration tarifaire manquante pour le rôle « ${role} » en ${selectedCurrency.toUpperCase()}. Contactez un administrateur.`;
+        if (import.meta.env.DEV) console.error('[CallCheckoutWrapper] Admin pricing error:', e);
+        setPricingError(msg);
       }
     })();
-  }, [state.provider, state.serviceData, state.isLoading, selectedCurrency]);
+  }, [state.provider, state.isLoading, selectedCurrency]);
 
-  // Sauvegarde session (utile pour CallCheckout et retours)
+  // Sauvegarde session (❌ pas de serviceData — on garde seulement le provider)
   useEffect(() => {
-    if (state.provider && state.serviceData && !state.isLoading && !state.error) {
+    if (state.provider && !state.isLoading && !state.error) {
       try {
         sessionStorage.setItem('selectedProvider', JSON.stringify(state.provider));
-        sessionStorage.setItem('serviceData', JSON.stringify(state.serviceData));
         localStorage.setItem('lastSelectedProvider', JSON.stringify(state.provider));
-        localStorage.setItem('lastServiceData', JSON.stringify(state.serviceData));
       } catch (err) {
-        if (import.meta.env.DEV) console.error('[Wrapper] persist provider/service error', err);
+        if (import.meta.env.DEV) console.error('[Wrapper] persist provider error', err);
       }
     }
-  }, [state.provider, state.serviceData, state.isLoading, state.error]);
+  }, [state.provider, state.isLoading, state.error]);
 
   const handleGoBack = (): void => {
     if (window.history.length > 1) navigate(-1);
@@ -513,14 +405,16 @@ const CallCheckoutWrapper: React.FC = () => {
     );
   }
 
-  if (state.error || !state.provider || !state.serviceData) {
+  if (state.error || pricingError || !state.provider) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 sm:p-8 text-center w-full max-w-lg">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Données manquantes</h2>
           <p className="text-gray-600 text-sm mb-5">
-            {state.error || 'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.'}
+            {pricingError ||
+              state.error ||
+              'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.'}
           </p>
 
           <div className="space-y-2">
@@ -557,11 +451,10 @@ const CallCheckoutWrapper: React.FC = () => {
     );
   }
 
-  // Success — CallCheckout
+  // Success — CallCheckout (✅ on ne passe plus de serviceData depuis le wrapper)
   return (
     <CallCheckout
       selectedProvider={state.provider}
-      serviceData={state.serviceData} // contient currency
       onGoBack={handleGoBack}
     />
   );

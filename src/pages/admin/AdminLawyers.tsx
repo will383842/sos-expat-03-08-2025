@@ -1,1957 +1,2088 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Users,
-  UserPlus,
-  Scale,
-  Flag,
-  Check,
-  AlertCircle,
-  Loader,
-  RefreshCw,
-  Save,
-  AlertTriangle,
-  Edit,
-  Eye,
-  Trash,
-  EyeOff,
-  Star,
-  Search,
-  List,
-  Upload,
-  Calendar
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   collection,
-  addDoc,
-  setDoc,
-  doc,
-  serverTimestamp,
-  getDocs,
-  query,
+  query as fsQuery,
   where,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
   updateDoc,
   deleteDoc,
-  runTransaction,
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../config/firebase';
-import AdminLayout from '../../components/admin/AdminLayout';
-import Modal from '../../components/common/Modal';
-import { useAuth } from '../../contexts/AuthContext';
+  Timestamp,
+  startAfter,
+  getCountFromServer,
+  QueryDocumentSnapshot,
+  DocumentData,
+  QueryConstraint,
+  Query as FSQuery,
+  CollectionReference,
+  onSnapshot,
+  Unsubscribe,
+} from "firebase/firestore";
+import { db } from "../../config/firebase";
+import {
+  Scale,
+  Users,
+  Search,
+  Filter,
+  MoreVertical,
+  Download,
+  Trash2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCopy,
+  ExternalLink,
+  BadgeCheck,
+  Languages as LanguagesIcon,
+  FileCheck2,
+  Link as LinkIcon,
+  GripVertical,
+} from "lucide-react";
+import AdminLayout from "../../components/admin/AdminLayout";
+import Button from "../../components/common/Button";
+import Modal from "../../components/common/Modal";
 
-// ---------- IMPORTS DE DONNÉES CORRIGÉS ----------
-import { countriesData } from '../../data/countries';
-import { languagesData } from '../../data/languages-spoken';
-import { flattenLawyerSpecialities } from '../../data/lawyer-specialties';
-import { expatHelpTypesData } from '../../data/expat-help-types';
-import { PROFILE_PHOTOS } from '../../data/profile-photos';
-
-// ---------- EXTRACTION DES NOMS SIMPLES ----------
-const getCountryNames = (): string[] => {
-  return countriesData
-    .filter(country => country.code !== 'SEPARATOR' && !country.disabled)
-    .map(country => country.nameFr);
+/* ---------------------- i18n ---------------------- */
+type Lang = "fr" | "en";
+const detectLang = (): Lang => {
+  const ls = (localStorage.getItem("admin_lang") || "").toLowerCase();
+  if (ls === "fr" || ls === "en") return ls as Lang;
+  return navigator.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
 };
-
-const getLanguageNames = (): string[] => {
-  return languagesData.map(lang => lang.name);
+const STRINGS: Record<Lang, Record<string, string>> = {
+  fr: {
+    title: "Avocats",
+    subtitle: "Gestion des avocats (validation, KYC, statut, notation)",
+    search: "Nom, email, N° barreau…",
+    filters: "Filtres",
+    columns: "Colonnes",
+    showAll: "Tout",
+    hideAll: "Aucun",
+    export: "Exporter CSV",
+    exportAll: "Exporter (tous filtres)",
+    totalExact: "Total (exact)",
+    active: "Actifs",
+    suspended: "Suspendus",
+    pending: "En attente",
+    validated: "Validés",
+    notValidated: "Non validés",
+    kyc: "KYC",
+    kycPending: "En cours",
+    kycVerified: "Vérifié",
+    kycRejected: "Refusé",
+    kycRequested: "Demandé",
+    status: "Statut",
+    all: "Tous",
+    blocked: "Bloqué",
+    emailVerified: "Email vérifié",
+    verified: "Vérifié",
+    unverified: "Non vérifié",
+    validationStatus: "Validation",
+    period: "Période",
+    today: "Aujourd'hui",
+    week: "Cette semaine",
+    month: "Ce mois",
+    country: "Pays",
+    specialties: "Spécialités (contient)",
+    languages: "Langues (contient)",
+    barId: "N° barreau (contient)",
+    tableName: "Nom",
+    tableEmail: "Email",
+    tableEmailVerif: "Email vérifié",
+    tablePhone: "Téléphone",
+    tableCountry: "Pays",
+    tableCity: "Ville",
+    tableBarId: "N° barreau",
+    tableBarCountry: "Pays du barreau",
+    tableLanguages: "Langues",
+    tableSpecialties: "Spécialités",
+    tableRating: "Note",
+    tableReviews: "Avis",
+    tableSignup: "Inscription",
+    tableLastLogin: "Dernière connexion",
+    tableAccount: "Compte",
+    tableValidation: "Validation",
+    tableKyc: "KYC",
+    tableActions: "Actions",
+    approve: "Valider",
+    reject: "Refuser",
+    requestKyc: "Demander KYC",
+    setKycVerified: "KYC Vérifié",
+    setKycRejected: "KYC Refusé",
+    activate: "Activer",
+    suspend: "Suspendre",
+    delete: "Supprimer",
+    openValidation: "Ouvrir validation",
+    bulkApprove: "Valider",
+    bulkReject: "Refuser",
+    bulkSuspend: "Suspendre",
+    bulkDelete: "Supprimer",
+    selected: "sélectionné(s)",
+    noneTitle: "Aucun avocat trouvé",
+    noneBody: "Aucun avocat ne correspond aux critères.",
+    loading: "Chargement…",
+    rowsPerPage: "Lignes / page",
+    page: "Page",
+    of: "sur",
+    successUpdate: "Mise à jour réussie.",
+    errorUpdate: "Erreur lors de la mise à jour.",
+    retry: "Réessayer",
+    lang: "Langue",
+    reasonTitleSuspend: "Raison de suspension",
+    reasonTitleDelete: "Confirmer la suppression",
+    reasonTitleReject: "Raison de refus de validation",
+    reasonTitleKycRequest: "Message de demande KYC (optionnel)",
+    reasonLabel: "Raison (obligatoire)",
+    reasonPlaceholder: "Ex: pièce non conforme, incohérence identité…",
+    optionalMessage: "Message (optionnel)",
+    cancel: "Annuler",
+    confirm: "Confirmer",
+    copied: "Copié ✅",
+    exportAllRunning: "Export en cours…",
+    exportAllDone: "Export terminé ✅",
+    exportAllCap: "Limite atteinte (5000 lignes). Affinez vos filtres.",
+    contact: "Contacter",
+    copyEmail: "Copier email",
+    copyId: "Copier ID",
+    sortAsc: "Tri ↑",
+    sortDesc: "Tri ↓",
+    dateFrom: "Du",
+    dateTo: "Au",
+    quick: "Raccourcis",
+    syncedStripe: "Synchronisé Stripe",
+    resetLayout: "Réinitialiser colonnes",
+  },
+  en: {
+    title: "Lawyers",
+    subtitle: "Lawyers management (validation, KYC, status, rating)",
+    search: "Name, email, Bar ID…",
+    filters: "Filters",
+    columns: "Columns",
+    showAll: "All",
+    hideAll: "None",
+    export: "Export CSV",
+    exportAll: "Export (all filters)",
+    totalExact: "Total (exact)",
+    active: "Active",
+    suspended: "Suspended",
+    pending: "Pending",
+    validated: "Validated",
+    notValidated: "Not validated",
+    kyc: "KYC",
+    kycPending: "In progress",
+    kycVerified: "Verified",
+    kycRejected: "Rejected",
+    kycRequested: "Requested",
+    status: "Status",
+    all: "All",
+    blocked: "Blocked",
+    emailVerified: "Email verified",
+    verified: "Verified",
+    unverified: "Unverified",
+    validationStatus: "Validation",
+    period: "Period",
+    today: "Today",
+    week: "This week",
+    month: "This month",
+    country: "Country",
+    specialties: "Specialties (contains)",
+    languages: "Languages (contains)",
+    barId: "Bar ID (contains)",
+    tableName: "Name",
+    tableEmail: "Email",
+    tableEmailVerif: "Email verified",
+    tablePhone: "Phone",
+    tableCountry: "Country",
+    tableCity: "City",
+    tableBarId: "Bar ID",
+    tableBarCountry: "Bar country",
+    tableLanguages: "Languages",
+    tableSpecialties: "Specialties",
+    tableRating: "Rating",
+    tableReviews: "Reviews",
+    tableSignup: "Sign-up",
+    tableLastLogin: "Last login",
+    tableAccount: "Account",
+    tableValidation: "Validation",
+    tableKyc: "KYC",
+    tableActions: "Actions",
+    approve: "Approve",
+    reject: "Reject",
+    requestKyc: "Request KYC",
+    setKycVerified: "KYC Verified",
+    setKycRejected: "KYC Rejected",
+    activate: "Activate",
+    suspend: "Suspend",
+    delete: "Delete",
+    openValidation: "Open validation",
+    bulkApprove: "Approve",
+    bulkReject: "Reject",
+    bulkSuspend: "Suspend",
+    bulkDelete: "Delete",
+    selected: "selected",
+    noneTitle: "No lawyers found",
+    noneBody: "No lawyers match your filters.",
+    loading: "Loading…",
+    rowsPerPage: "Rows / page",
+    page: "Page",
+    of: "of",
+    successUpdate: "Update successful.",
+    errorUpdate: "Update failed.",
+    retry: "Retry",
+    lang: "Language",
+    reasonTitleSuspend: "Suspension reason",
+    reasonTitleDelete: "Confirm deletion",
+    reasonTitleReject: "Validation rejection reason",
+    reasonTitleKycRequest: "KYC request message (optional)",
+    reasonLabel: "Reason (required)",
+    reasonPlaceholder: "Eg: non compliant document, identity mismatch…",
+    optionalMessage: "Message (optional)",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    copied: "Copied ✅",
+    exportAllRunning: "Export running…",
+    exportAllDone: "Export finished ✅",
+    exportAllCap: "Cap reached (5000 rows). Refine filters.",
+    contact: "Contact",
+    copyEmail: "Copy email",
+    copyId: "Copy ID",
+    sortAsc: "Sort ↑",
+    sortDesc: "Sort ↓",
+    dateFrom: "From",
+    dateTo: "To",
+    quick: "Shortcuts",
+    syncedStripe: "Synced with Stripe",
+    resetLayout: "Reset columns",
+  },
 };
-
-const getLawyerSpecialtyNames = (): string[] => {
-  return flattenLawyerSpecialities().map(spec => spec.labelFr);
+const useI18n = () => {
+  const [lang, setLang] = useState<Lang>(detectLang());
+  useEffect(() => localStorage.setItem("admin_lang", lang), [lang]);
+  const t = useCallback(
+    (k: keyof typeof STRINGS["fr"]) => STRINGS[lang][k] ?? (k as string),
+    [lang]
+  );
+  return { t, lang, setLang };
 };
+/* -------------------------------------------------- */
 
-const getExpatHelpTypeNames = (): string[] => {
-  return expatHelpTypesData
-    .filter(type => !type.disabled)
-    .map(type => type.labelFr);
-};
+type UserStatus = "active" | "pending" | "blocked" | "suspended";
+type KycStatus = "pending" | "verified" | "rejected" | "requested";
+type ValidationStatus = "validated" | "rejected" | "pending";
+type SortDir = "asc" | "desc";
 
-// Créer les constantes utilisées dans le composant
-const COUNTRIES_LIST = getCountryNames();
-const LANGUAGE_OPTIONS = getLanguageNames();
-const LAWYER_SPECIALTIES = getLawyerSpecialtyNames();
-const EXPAT_HELP_TYPES = getExpatHelpTypeNames();
-
-// ---------- TYPES ----------
-type Role = 'lawyer' | 'expat';
-type Gender = 'male' | 'female';
-
-interface AaaProfile {
+type Lawyer = {
   id: string;
-  fullName: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phone: string;
-  phoneCountryCode: string;
-  type: Role;
-  country: string;
-  languages: string[];
-  specialties: string[];
-  rating: number;
-  reviewCount: number;
-  yearsOfExperience: number;
-  profilePhoto: string;
-  description: string;
-  isOnline: boolean;
-  isVisible: boolean;
-  isCallable: boolean;
+  phone?: string;
+  country?: string;
+  city?: string;
+  status: UserStatus;
   createdAt: Date;
-  isTestProfile?: boolean;
-  price?: number;
-  duration?: number;
-  slug?: string;
-  role?: Role;
-}
+  lastLoginAt?: Date;
+  emailVerified: boolean;
 
-interface GenerationForm {
-  count: number;
-  roleDistribution: { lawyer: number; expat: number };
-  genderDistribution: { male: number; female: number };
-  countries: string[];
-  languages: string[];
-  minExperience: number;
-  maxExperience: number;
-  minAge: number;
-  maxAge: number;
-  allowRealCalls: boolean;
-  isTestProfile: boolean;
-  customPhoneNumber: string;
-  useCustomPhone: boolean;
-}
+  barId?: string;
+  barCountry?: string;
+  isValidated: boolean;
+  validationStatus: ValidationStatus;
+  validationReason?: string;
 
-export interface AaaPhoto {
-  url: string;
-  role: Role;
-  gender: Gender;
-  countries?: string[];
-  weight?: number;
-}
+  kycStatus: KycStatus;
+  kycProvider?: "stripe" | "manual";
+  kycStripeAccountId?: string;
+  kycLastSyncAt?: Date;
 
-// ---------- UTILS ----------
-const slugify = (input: string): string =>
-  input
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '');
-
-const randomInt = (min: number, max: number): number =>
-  Math.floor(Math.random() * (max - min + 1)) + min;
-
-const randomRating = (): number => {
-  const r = Math.random();
-  if (r < 0.95) return parseFloat((4 + Math.random()).toFixed(2));
-  return parseFloat((3 + Math.random() * 0.9).toFixed(2));
+  specialties?: string[];
+  languages?: string[];
+  rating?: number;
+  reviewsCount?: number;
 };
 
-const randomReviewCount = (): number => randomInt(5, 30);
-
-const pickLanguages = (selected: string[]): string[] => {
-  const pool = [...selected];
-  const result = new Set<string>();
-
-  const pushIf = (lang: string) => {
-    const found = pool.find(
-      (l) => l.toLowerCase() === lang.toLowerCase()
-    );
-    if (found) result.add(found);
-  };
-
-  pushIf('Français');
-  pushIf('Anglais');
-
-  const maxExtra = Math.min(3, pool.length);
-  const addCount = randomInt(0, maxExtra);
-  for (let i = 0; i < addCount; i++) {
-    const cand = pool[randomInt(0, pool.length - 1)];
-    result.add(cand);
-  }
-  return Array.from(result);
+type FilterOptions = {
+  status: "all" | UserStatus;
+  emailVerified: "all" | "verified" | "unverified";
+  country: "all" | string;
+  validation: "all" | "validated" | "notValidated";
+  kyc: "all" | KycStatus;
+  specialties: string;
+  langs: string;
+  barId: string;
+  searchTerm: string;
+  quickRange: "all" | "today" | "week" | "month";
+  from?: string;
+  to?: string;
 };
 
-const namesFR = {
-  male: ['Jean','Pierre','Michel','Philippe','Thomas','Nicolas','François','Laurent','Éric','David','Stéphane','Olivier','Christophe','Frédéric','Patrick','Antoine','Julien','Alexandre','Sébastien','Vincent','Maxime','Romain','Florian','Guillaume','Kévin'],
-  female: ['Marie','Sophie','Catherine','Isabelle','Anne','Nathalie','Sylvie','Céline','Julie','Valérie','Christine','Sandrine','Caroline','Stéphanie','Émilie','Aurélie','Camille','Laure','Virginie','Delphine','Manon','Clara','Léa','Emma','Chloé'],
+type FirestoreLawyerDoc = {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  city?: string;
+  status?: string;
+  createdAt?: Timestamp;
+  lastLoginAt?: Timestamp;
+  emailVerified?: boolean;
+
+  barId?: string;
+  barCountry?: string;
+  isValidated?: boolean;
+  validationStatus?: ValidationStatus;
+  validationReason?: string;
+
+  kycStatus?: KycStatus;
+  kycProvider?: "stripe" | "manual";
+  kycStripeAccountId?: string;
+  kycLastSyncAt?: Timestamp;
+
+  specialties?: string[];
+  languages?: string[];
+  rating?: number;
+  reviewsCount?: number;
 };
-const lastNamesFR = ['Martin','Bernard','Dubois','Thomas','Robert','Richard','Petit','Durand','Leroy','Moreau','Simon','Laurent','Lefebvre','Michel','Garcia','David','Bertrand','Roux','Vincent','Fournier','Morel','Girard','André','Lefevre','Mercier','Dupont','Lambert','Bonnet','François','Martinez'];
 
-const genName = (gender: Gender) => {
-  const f = namesFR[gender][randomInt(0, namesFR[gender].length - 1)];
-  const l = lastNamesFR[randomInt(0, lastNamesFR.length - 1)];
-  return { firstName: f, lastName: l, fullName: `${f} ${l}` };
+/* ------------ Column layout (order + resizable widths + visibility) ------------- */
+type ColId =
+  | "name"
+  | "email"
+  | "emailVerified"
+  | "phone"
+  | "country"
+  | "city"
+  | "barId"
+  | "barCountry"
+  | "languages"
+  | "specialties"
+  | "rating"
+  | "reviews"
+  | "signup"
+  | "lastLogin"
+  | "accountStatus"
+  | "validation"
+  | "kyc";
+
+const DEFAULT_ORDER: ColId[] = [
+  "name",
+  "email",
+  "emailVerified",
+  "phone",
+  "country",
+  "city",
+  "barId",
+  "barCountry",
+  "languages",
+  "specialties",
+  "rating",
+  "reviews",
+  "signup",
+  "lastLogin",
+  "accountStatus",
+  "validation",
+  "kyc",
+];
+
+const DEFAULT_WIDTHS: Record<ColId | "select" | "actions", number> = {
+  select: 56,
+  name: 200,
+  email: 220,
+  emailVerified: 150,
+  phone: 140,
+  country: 120,
+  city: 120,
+  barId: 130,
+  barCountry: 150,
+  languages: 170,
+  specialties: 200,
+  rating: 100,
+  reviews: 100,
+  signup: 130,
+  lastLogin: 130,
+  accountStatus: 140,
+  validation: 150,
+  kyc: 200,
+  actions: 420,
 };
 
-const genEmail = (firstName: string, lastName: string) =>
-  `${slugify(firstName)}.${slugify(lastName)}@example.com`;
+const DEFAULT_VISIBLE: Record<ColId, boolean> = DEFAULT_ORDER.reduce(
+  (acc, k) => ((acc[k] = true), acc),
+  {} as Record<ColId, boolean>
+);
 
-// ---------- PHOTO LIBRARY ----------
-const ASSETS_COLL = 'assets_profile_photos';
-
-interface PhotoDoc {
-  url: string;
-  role: Role;
-  gender: Gender;
-  countries?: string[];
-  weight?: number;
-  inUse: boolean;
-  usedBy?: string;
-  usedAt?: any;
-}
-
-async function seedPhotoLibraryFromCatalog(): Promise<number> {
-  try {
-    const collRef = collection(db, ASSETS_COLL);
-    const snap = await getDocs(collRef);
-    if (!snap.empty) return 0;
-
-    let inserted = 0;
-    for (const p of PROFILE_PHOTOS) {
-      await addDoc(collRef, {
-        url: p.url,
-        role: p.role,
-        gender: p.gender,
-        countries: p.countries || [],
-        weight: p.weight || 1,
-        inUse: false,
-        usedBy: null,
-        usedAt: null,
-        createdAt: serverTimestamp(),
-      });
-      inserted++;
-    }
-    return inserted;
-  } catch (error) {
-    console.error('Erreur lors du seed des photos:', error);
-    return 0;
-  }
-}
-
-async function claimPhoto(role: Role, gender: Gender, country: string): Promise<string> {
-  try {
-    const collRef = collection(db, ASSETS_COLL);
-    const q1 = query(collRef, where('role', '==', role), where('gender', '==', gender), where('inUse', '==', false));
-    const snap = await getDocs(q1);
-
-    const candidates: { id: string; data: PhotoDoc }[] = [];
-    snap.forEach((d) => {
-      const data = d.data() as PhotoDoc;
-      if (!data.countries || data.countries.length === 0 || data.countries.includes(country)) {
-        candidates.push({ id: d.id, data });
-      }
-    });
-
-    if (candidates.length === 0) {
-      const q2 = query(collRef, where('role', '==', role), where('gender', '==', gender), where('inUse', '==', false));
-      const snap2 = await getDocs(q2);
-      const all: { id: string; data: PhotoDoc }[] = [];
-      snap2.forEach((d) => all.push({ id: d.id, data: d.data() as PhotoDoc }));
-      if (all.length === 0) {
-        const defaultPhoto = `https://images.unsplash.com/photo-${gender === 'male' ? '1560250097-0b93528c311a' : '1594736797933-d0501ba2fe65'}?w=400&h=400&fit=crop&crop=face`;
-        return defaultPhoto;
-      }
-      const picked = all[randomInt(0, all.length - 1)];
-      await runTransaction(db, async (tx) => {
-        const refDoc = doc(db, ASSETS_COLL, picked.id);
-        tx.update(refDoc, { inUse: true, usedAt: serverTimestamp() });
-      });
-      return picked.data.url;
-    }
-
-    const weighted: { id: string; data: PhotoDoc }[] = [];
-    for (const c of candidates) {
-      const w = Math.max(1, c.data.weight || 1);
-      for (let i = 0; i < w; i++) weighted.push(c);
-    }
-    const chosen = weighted[randomInt(0, weighted.length - 1)];
-
-    await runTransaction(db, async (tx) => {
-      const refDoc = doc(db, ASSETS_COLL, chosen.id);
-      tx.update(refDoc, { inUse: true, usedAt: serverTimestamp() });
-    });
-    return chosen.data.url;
-  } catch (error) {
-    console.error('Erreur lors de la récupération de photo:', error);
-    return `https://images.unsplash.com/photo-${gender === 'male' ? '1560250097-0b93528c311a' : '1594736797933-d0501ba2fe65'}?w=400&h=400&fit=crop&crop=face`;
-  }
-}
-
-// ---------- COMPOSANT PRINCIPAL ----------
-const AdminAaaProfiles: React.FC = () => {
-  const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
-
-  const [activeTab, setActiveTab] = useState<'generate' | 'manage' | 'photos' | 'planner'>('generate');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCount, setGeneratedCount] = useState(0);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const [existingProfiles, setExistingProfiles] = useState<AaaProfile[]>([]);
-  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
-  const [selectedProfile, setSelectedProfile] = useState<AaaProfile | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [newProfilePhoto, setNewProfilePhoto] = useState<string>('');
-  const [editFormData, setEditFormData] = useState<Partial<AaaProfile>>({});
-
-  const [formData, setFormData] = useState<GenerationForm>({
-    count: 10,
-    roleDistribution: { lawyer: 50, expat: 50 },
-    genderDistribution: { male: 50, female: 50 },
-    countries: ['Canada', 'Thaïlande', 'Australie', 'Espagne', 'Allemagne'],
-    languages: ['Français', 'Anglais'],
-    minExperience: 2,
-    maxExperience: 15,
-    minAge: 28,
-    maxAge: 65,
-    allowRealCalls: false,
-    isTestProfile: true,
-    customPhoneNumber: '+33743331201',
-    useCustomPhone: true,
-  });
-
-  const [planner] = useState({
-    enabled: false,
-    dailyCount: 20,
-    regionCountries: ['Thaïlande', 'Vietnam', 'Cambodge'],
-    role: 'expat' as Role,
-    genderBias: { male: 50, female: 50 },
-    languages: ['Français', 'Anglais'],
-  });
-
-  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
-  const [photoMeta, setPhotoMeta] = useState<{ role: Role; gender: Gender; countries: string[] }>({
-    role: 'lawyer',
-    gender: 'male',
-    countries: [],
-  });
-
-  // Gestion d'erreur pour les données manquantes
-  useEffect(() => {
-    if (!COUNTRIES_LIST || COUNTRIES_LIST.length === 0) {
-      setError('Erreur de chargement des données pays');
-      return;
-    }
-    if (!LANGUAGE_OPTIONS || LANGUAGE_OPTIONS.length === 0) {
-      setError('Erreur de chargement des données langues');
-      return;
-    }
-  }, []);
-
-  // Guard
-  useEffect(() => {
-    if (!currentUser || (currentUser as { role?: string }).role !== 'admin') {
-      navigate('/admin/login');
-      return;
-    }
-    if (activeTab === 'manage') loadExistingProfiles().catch(() => {});
-  }, [currentUser, navigate, activeTab]);
-
-  // --------- MEMOIZED VALUES ----------
-  const filteredProfiles = useMemo(
-    () =>
-      existingProfiles.filter(
-        (p) =>
-          p.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.country?.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [existingProfiles, searchTerm]
+const useColumnLayout = () => {
+  const [order, setOrder] = useState<ColId[]>(
+    (() => {
+      try {
+        const raw = localStorage.getItem("admin.lawyers.colOrder.v2");
+        if (raw) {
+          const arr = JSON.parse(raw) as ColId[];
+          if (Array.isArray(arr) && arr.length) return arr;
+        }
+      } catch {}
+      return DEFAULT_ORDER;
+    })()
+  );
+  const [widths, setWidths] = useState<Record<ColId | "select" | "actions", number>>(
+    (() => {
+      try {
+        const raw = localStorage.getItem("admin.lawyers.colWidths.v2");
+        if (raw) {
+          const obj = JSON.parse(raw) as Record<string, number>;
+          return { ...DEFAULT_WIDTHS, ...obj };
+        }
+      } catch {}
+      return DEFAULT_WIDTHS;
+    })()
+  );
+  const [visible, setVisible] = useState<Record<ColId, boolean>>(
+    (() => {
+      try {
+        const raw = localStorage.getItem("admin.lawyers.colVisible.v1");
+        if (raw) return { ...DEFAULT_VISIBLE, ...(JSON.parse(raw) as Record<ColId, boolean>) };
+      } catch {}
+      return DEFAULT_VISIBLE;
+    })()
   );
 
-  // Affichage de fallback si les données ne sont pas chargées
-  if (!COUNTRIES_LIST || !LANGUAGE_OPTIONS || !LAWYER_SPECIALTIES) {
-    return (
-      <AdminLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <Loader className="animate-spin mx-auto mb-4" size={48} />
-            <p className="text-gray-600">Chargement des données...</p>
-          </div>
-        </div>
-      </AdminLayout>
-    );
-  }
+  useEffect(() => {
+    localStorage.setItem("admin.lawyers.colOrder.v2", JSON.stringify(order));
+  }, [order]);
 
-  const loadExistingProfiles = async () => {
+  useEffect(() => {
+    localStorage.setItem("admin.lawyers.colWidths.v2", JSON.stringify(widths));
+  }, [widths]);
+
+  useEffect(() => {
+    localStorage.setItem("admin.lawyers.colVisible.v1", JSON.stringify(visible));
+  }, [visible]);
+
+  const reset = () => {
+    setOrder(DEFAULT_ORDER);
+    setWidths(DEFAULT_WIDTHS);
+    setVisible(DEFAULT_VISIBLE);
+  };
+
+  return { order, setOrder, widths, setWidths, visible, setVisible, reset };
+};
+/* ------------------------------------------------------------------- */
+
+const AdminLawyers: React.FC = () => {
+  const { t, lang, setLang } = useI18n();
+
+  const [rows, setRows] = useState<Lawyer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showColsPanel, setShowColsPanel] = useState(false);
+
+  const [sortDir, setSortDir] = useState<SortDir>(
+    (localStorage.getItem("admin.lawyers.sortDir") as SortDir) || "desc"
+  );
+
+  const [filters, setFilters] = useState<FilterOptions>({
+    status: "all",
+    emailVerified: "all",
+    country: "all",
+    validation: "all",
+    kyc: "all",
+    specialties: "",
+    langs: "",
+    barId: "",
+    searchTerm: "",
+    quickRange: "all",
+    from: "",
+    to: "",
+  });
+
+  // column layout
+  const { order, setOrder, widths, setWidths, visible, setVisible, reset: resetLayout } =
+    useColumnLayout();
+  const resizingRef = useRef<{
+    id: ColId | "select" | "actions";
+    startX: number;
+    startW: number;
+  } | null>(null);
+
+  // Pagination + count
+  const [pageSize, setPageSize] = useState<number>(
+    Number(localStorage.getItem("admin.lawyers.pageSize")) || 25
+  );
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const cursors = useRef<Record<number, QueryDocumentSnapshot<DocumentData> | null>>({
+    1: null,
+  });
+  const [hasNext, setHasNext] = useState(false);
+  const [totalExact, setTotalExact] = useState<number | null>(null);
+
+  // listeners temps réel par doc visible
+  const docUnsubsRef = useRef<Record<string, Unsubscribe>>({});
+
+  useEffect(() => {
+    localStorage.setItem("admin.lawyers.pageSize", String(pageSize));
+  }, [pageSize]);
+  useEffect(() => {
+    localStorage.setItem("admin.lawyers.sortDir", sortDir);
+  }, [sortDir]);
+
+  // COUNT exact
+  const fetchExactCount = useCallback(async () => {
     try {
-      setIsLoadingProfiles(true);
-      const usersRef = collection(db, 'users');
-      const snapshot = await getDocs(usersRef);
-      const all = snapshot.docs.map((d) => {
-        const data = d.data();
+      const base = collection(db, "users") as CollectionReference<DocumentData>;
+      const constraints: QueryConstraint[] = [where("role", "==", "lawyer")];
+
+      if (filters.status !== "all") constraints.push(where("status", "==", filters.status));
+      if (filters.emailVerified !== "all")
+        constraints.push(where("emailVerified", "==", filters.emailVerified === "verified"));
+      if (filters.country !== "all" && filters.country.trim() !== "")
+        constraints.push(where("country", "==", filters.country.trim()));
+      if (filters.validation !== "all")
+        constraints.push(where("isValidated", "==", filters.validation === "validated"));
+      if (filters.kyc !== "all") constraints.push(where("kycStatus", "==", filters.kyc));
+
+      // Dates
+      const now = new Date();
+      let from: Date | null = null;
+      if (filters.quickRange === "today")
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (filters.quickRange === "week") {
+        const d = now.getDay();
+        const diff = now.getDate() - d + (d === 0 ? -6 : 1);
+        from = new Date(now.setDate(diff));
+        from.setHours(0, 0, 0, 0);
+      }
+      if (filters.quickRange === "month")
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (from) constraints.push(where("createdAt", ">=", Timestamp.fromDate(from)));
+      if (filters.from)
+        constraints.push(
+          where("createdAt", ">=", Timestamp.fromDate(new Date(filters.from + "T00:00:00")))
+        );
+      if (filters.to)
+        constraints.push(
+          where("createdAt", "<=", Timestamp.fromDate(new Date(filters.to + "T23:59:59.999")))
+        );
+
+      const q: FSQuery<DocumentData> = fsQuery(base, ...constraints);
+      const snap = await getCountFromServer(q);
+      setTotalExact(snap.data().count);
+    } catch (e) {
+      console.error("[AdminLawyers] count error", e);
+      setTotalExact(null);
+    }
+  }, [filters]);
+
+  // LOAD page
+  const loadPage = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg(null);
+
+    Object.values(docUnsubsRef.current).forEach((u) => u && u());
+    docUnsubsRef.current = {};
+
+    try {
+      const base = collection(db, "users") as CollectionReference<DocumentData>;
+      const constraints: QueryConstraint[] = [
+        where("role", "==", "lawyer"),
+        orderBy("createdAt", sortDir),
+        limit(pageSize + 1),
+      ];
+
+      if (filters.status !== "all") constraints.splice(1, 0, where("status", "==", filters.status));
+      if (filters.emailVerified !== "all")
+        constraints.splice(
+          1,
+          0,
+          where("emailVerified", "==", filters.emailVerified === "verified")
+        );
+      if (filters.country !== "all" && filters.country.trim() !== "")
+        constraints.splice(1, 0, where("country", "==", filters.country.trim()));
+      if (filters.validation !== "all")
+        constraints.splice(1, 0, where("isValidated", "==", filters.validation === "validated"));
+      if (filters.kyc !== "all") constraints.splice(1, 0, where("kycStatus", "==", filters.kyc));
+
+      const now = new Date();
+      let from: Date | null = null;
+      if (filters.quickRange === "today")
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (filters.quickRange === "week") {
+        const d = now.getDay();
+        const diff = now.getDate() - d + (d === 0 ? -6 : 1);
+        from = new Date(now.setDate(diff));
+        from.setHours(0, 0, 0, 0);
+      }
+      if (filters.quickRange === "month")
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (from) constraints.splice(1, 0, where("createdAt", ">=", Timestamp.fromDate(from)));
+      if (filters.from)
+        constraints.splice(
+          1,
+          0,
+          where("createdAt", ">=", Timestamp.fromDate(new Date(filters.from + "T00:00:00")))
+        );
+      if (filters.to)
+        constraints.splice(
+          1,
+          0,
+          where("createdAt", "<=", Timestamp.fromDate(new Date(filters.to + "T23:59:59.999")))
+        );
+
+      const cursor = cursors.current[pageIndex];
+      const q: FSQuery<DocumentData> = cursor
+        ? fsQuery(base, ...constraints, startAfter(cursor))
+        : fsQuery(base, ...constraints);
+
+      const snap = await getDocs(q);
+      const docs = snap.docs;
+      const pageDocs = docs.slice(0, pageSize);
+      setHasNext(docs.length > pageSize);
+      cursors.current[pageIndex + 1] =
+        docs.length > pageSize ? pageDocs[pageDocs.length - 1] : null;
+
+      let data: Lawyer[] = pageDocs.map((d: QueryDocumentSnapshot<DocumentData>) => {
+        const v = d.data() as FirestoreLawyerDoc;
         return {
           id: d.id,
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
-        } as AaaProfile;
+          email: v.email ?? "",
+          firstName: v.firstName ?? "",
+          lastName: v.lastName ?? "",
+          phone: v.phone ?? "",
+          country: v.country ?? "",
+          city: v.city ?? "",
+          status: (v.status ?? "active") as UserStatus,
+          createdAt: v.createdAt ? v.createdAt.toDate() : new Date(),
+          lastLoginAt: v.lastLoginAt ? v.lastLoginAt.toDate() : undefined,
+          emailVerified: !!v.emailVerified,
+          barId: v.barId,
+          barCountry: v.barCountry,
+          isValidated: !!v.isValidated,
+          validationStatus: v.validationStatus ?? "pending",
+          validationReason: v.validationReason,
+          kycStatus: v.kycStatus ?? "pending",
+          kycProvider: v.kycProvider,
+          kycStripeAccountId: v.kycStripeAccountId,
+          kycLastSyncAt: v.kycLastSyncAt ? v.kycLastSyncAt.toDate() : undefined,
+          specialties: Array.isArray(v.specialties) ? v.specialties : [],
+          languages: Array.isArray(v.languages) ? v.languages : [],
+          rating: typeof v.rating === "number" ? v.rating : undefined,
+          reviewsCount: typeof v.reviewsCount === "number" ? v.reviewsCount : undefined,
+        };
       });
 
-      const profiles = all
-        .filter((p) => p.isTestProfile === true)
-        .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
+      // filtres "contient" côté page
+      const hasTerm = filters.searchTerm.trim();
+      const hasSpec = filters.specialties.trim();
+      const hasLang = filters.langs.trim();
+      const hasBar = filters.barId.trim();
+      if (hasTerm || hasSpec || hasLang || hasBar) {
+        const term = filters.searchTerm.trim().toLowerCase();
+        data = data.filter((l) => {
+          const okTerm =
+            !hasTerm ||
+            `${l.firstName} ${l.lastName}`.toLowerCase().includes(term) ||
+            l.email.toLowerCase().includes(term) ||
+            (l.barId || "").toLowerCase().includes(term) ||
+            (l.phone || "").toLowerCase().includes(term);
+          const okSpec =
+            !hasSpec ||
+            (l.specialties || [])
+              .join(" ")
+              .toLowerCase()
+              .includes(filters.specialties.trim().toLowerCase());
+          const okLang =
+            !hasLang ||
+            (l.languages || [])
+              .join(" ")
+              .toLowerCase()
+              .includes(filters.langs.trim().toLowerCase());
+          const okBar =
+            !hasBar || (l.barId || "").toLowerCase().includes(filters.barId.trim().toLowerCase());
+          return okTerm && okSpec && okLang && okBar;
+        });
+      }
 
-      setExistingProfiles(profiles);
+      setRows(data);
+
+      // temps réel
+      data.forEach((row) => {
+        const id = row.id;
+        const ref = doc(db, "users", id);
+        docUnsubsRef.current[id] = onSnapshot(ref, (ds) => {
+          if (!ds.exists()) {
+            setRows((prev) => prev.filter((x) => x.id !== id));
+            return;
+          }
+          const v = ds.data() as FirestoreLawyerDoc;
+          setRows((prev) =>
+            prev.map((x) =>
+              x.id !== id
+                ? x
+                : {
+                    ...x,
+                    status: (v.status ?? x.status) as UserStatus,
+                    isValidated: v.isValidated ?? x.isValidated,
+                    validationStatus: v.validationStatus ?? x.validationStatus,
+                    validationReason: v.validationReason ?? x.validationReason,
+                    kycStatus: v.kycStatus ?? x.kycStatus,
+                    kycProvider: v.kycProvider ?? x.kycProvider,
+                    kycStripeAccountId: v.kycStripeAccountId ?? x.kycStripeAccountId,
+                    kycLastSyncAt: v.kycLastSyncAt
+                      ? v.kycLastSyncAt.toDate()
+                      : x.kycLastSyncAt,
+                    lastLoginAt: v.lastLoginAt ? v.lastLoginAt.toDate() : x.lastLoginAt,
+                    emailVerified: v.emailVerified ?? x.emailVerified,
+                    phone: v.phone ?? x.phone,
+                  }
+            )
+          );
+        });
+      });
     } catch (e) {
-      console.error(e);
+      console.error("[AdminLawyers] load error", e);
+      setErrorMsg((e as Error)?.message || "Failed to load");
     } finally {
-      setIsLoadingProfiles(false);
+      setLoading(false);
     }
+  }, [filters, pageIndex, pageSize, sortDir]);
+
+  useEffect(() => {
+    fetchExactCount();
+  }, [fetchExactCount]);
+  useEffect(() => {
+    cursors.current = { 1: null };
+    setPageIndex(1);
+  }, [
+    filters.status,
+    filters.emailVerified,
+    filters.country,
+    filters.validation,
+    filters.kyc,
+    filters.quickRange,
+    filters.from,
+    filters.to,
+    filters.specialties,
+    filters.langs,
+    filters.barId,
+    filters.searchTerm,
+    sortDir,
+  ]);
+  useEffect(() => {
+    loadPage();
+    return () => {
+      Object.values(docUnsubsRef.current).forEach((u) => u && u());
+      docUnsubsRef.current = {};
+    };
+  }, [loadPage]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  // --------- HANDLERS ----------
-  const handleCountryToggle = (country: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      countries: prev.countries.includes(country)
-        ? prev.countries.filter((c) => c !== country)
-        : [...prev.countries, country],
-    }));
-  };
+  // Modales raison
+  const [reasonOpen, setReasonOpen] = useState<
+    | null
+    | {
+        type: "suspend" | "delete" | "reject" | "kycRequest";
+        ids: string[];
+      }
+  >(null);
+  const [reasonText, setReasonText] = useState("");
 
-  const handleLanguageToggle = (language: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      languages: prev.languages.includes(language)
-        ? prev.languages.filter((l) => l !== language)
-        : [...prev.languages, language],
-    }));
-  };
-
-  const formatDate = (date: Date) =>
-    new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-
-  // --------- GENERATION CORE ----------
-  const generateAaaProfiles = async () => {
+  // Actions unitaires
+  const setValidation = async (id: string, status: ValidationStatus, reason?: string) => {
     try {
-      setIsGenerating(true);
-      setGeneratedCount(0);
-      setSuccess(null);
-      setError(null);
-
-      const {
-        count,
-        roleDistribution,
-        genderDistribution,
-        countries,
-        languages,
-        minExperience,
-        maxExperience,
-        customPhoneNumber,
-        useCustomPhone,
-      } = formData;
-
-      if (count <= 0) return setError('Le nombre de profils doit être supérieur à 0');
-      if (countries.length === 0) return setError('Veuillez sélectionner au moins un pays');
-      if (languages.length === 0) return setError('Veuillez sélectionner au moins une langue');
-
-      const lawyerCount = Math.round((roleDistribution.lawyer / 100) * count);
-      const expatCount = count - lawyerCount;
-      const maleCount = Math.round((genderDistribution.male / 100) * count);
-      console.log(`Génération: ${lawyerCount} avocats, ${expatCount} expatriés, ${maleCount} hommes, ${count - maleCount} femmes`);
-
-      let malesGenerated = 0;
-      let lawyersGenerated = 0;
-
-      for (let i = 0; i < count; i++) {
-        const gender: Gender = malesGenerated < maleCount ? 'male' : 'female';
-        if (gender === 'male') malesGenerated++;
-
-        const role: Role = lawyersGenerated < lawyerCount ? 'lawyer' : 'expat';
-        if (role === 'lawyer') lawyersGenerated++;
-
-        await generateOne(role, gender, countries, languages, minExperience, maxExperience, customPhoneNumber, useCustomPhone);
-        setGeneratedCount((n) => n + 1);
-      }
-
-      setSuccess(`${count} profils créés avec succès (${lawyerCount} avocats, ${expatCount} expatriés).`);
-      if (activeTab === 'manage') loadExistingProfiles();
-    } catch (e: any) {
-      console.error(e);
-      setError(`Erreur de génération: ${e.message || 'inconnue'}`);
-    } finally {
-      setIsGenerating(false);
+      const payload: Record<string, unknown> = {
+        validationStatus: status,
+        isValidated: status === "validated",
+        updatedAt: new Date(),
+      };
+      if (status === "rejected") payload.validationReason = reason || null;
+      if (status === "validated") payload["validationReason"] = null;
+      await updateDoc(doc(db, "users", id), payload);
+      alert(t("successUpdate"));
+    } catch (e) {
+      console.error("setValidation error", e);
+      alert(t("errorUpdate"));
     }
   };
 
-  const generateOne = async (
-    role: Role,
-    gender: Gender,
-    countries: string[],
-    languages: string[],
-    minExperience: number,
-    maxExperience: number,
-    customPhoneNumber: string,
-    useCustomPhone: boolean
-  ): Promise<string> => {
-    const { firstName, lastName, fullName } = genName(gender);
-    const email = genEmail(firstName, lastName);
-    const country = countries[randomInt(0, countries.length - 1)];
-    const experience = randomInt(minExperience, maxExperience);
-    const phone = useCustomPhone ? customPhoneNumber : '+33743331201';
-    const selectedLanguages = pickLanguages(languages);
-
-    const profilePhoto = await claimPhoto(role, gender, country);
-    const rating = randomRating();
-    const reviewCount = randomReviewCount();
-
-    const uid = `aaa_${role}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const slug = `${slugify(firstName)}-${slugify(lastName)}-${uid.slice(-6)}`;
-    const hourlyRate = role === 'lawyer' ? 49 : 19;
-
-    const baseUser: Record<string, string | number | boolean | string[] | ReturnType<typeof serverTimestamp> | { lat: number; lng: number } | null> = {
-      uid,
-      firstName,
-      lastName,
-      fullName,
-      email,
-      phone,
-      phoneCountryCode: '+33',
-      country,
-      currentCountry: country,
-      preferredLanguage: 'fr',
-      languages: selectedLanguages,
-      profilePhoto,
-      avatar: profilePhoto,
-      isTestProfile: true,
-      isActive: true,
-      isApproved: true,
-      isVerified: true,
-      isOnline: false,
-      isVisible: true,
-      isVisibleOnMap: true,
-      isCallable: formData.allowRealCalls,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp(),
-      role,
-      isSOS: true,
-      points: 0,
-      affiliateCode: `AAA${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
-      referralBy: null,
-      bio: '',
-      hourlyRate,
-      responseTime: '< 5 minutes',
-      availability: 'available',
-      totalCalls: randomInt(0, 50),
-      totalEarnings: 0,
-      averageRating: rating,
-      rating,
-      reviewCount,
-      mapLocation: {
-        lat: 20 + Math.random() * 40,
-        lng: -30 + Math.random() * 60,
-      },
-    };
-
-    // role-specific
-    if (role === 'lawyer') {
-      const specialties: string[] = [];
-      const count = randomInt(2, 4);
-      while (specialties.length < count) {
-        const s = LAWYER_SPECIALTIES[randomInt(0, LAWYER_SPECIALTIES.length - 1)];
-        if (!specialties.includes(s)) specialties.push(s);
-      }
-      const bio = `Avocat${gender === 'female' ? 'e' : ''} en ${country} spécialisé${gender === 'female' ? 'e' : ''} en ${specialties.join(', ')} (${experience} ans). J'accompagne les expatriés francophones.`;
-
-      const lawyerData = {
-        bio,
-        specialties,
-        practiceCountries: [country],
-        yearsOfExperience: experience,
-        barNumber: `BAR${randomInt(10000, 99999)}`,
-        lawSchool: `Université de ${country}`,
-        graduationYear: new Date().getFullYear() - experience - 5,
-        certifications: ['Certification Barreau'],
-        needsVerification: false,
-        verificationStatus: 'approved',
-      };
-      
-      Object.assign(baseUser, lawyerData);
-    } else {
-      const help: string[] = [];
-      const count = randomInt(2, 4);
-      while (help.length < count) {
-        const s = EXPAT_HELP_TYPES[randomInt(0, EXPAT_HELP_TYPES.length - 1)];
-        if (!help.includes(s)) help.push(s);
-      }
-      const bio = `Expatrié${gender === 'female' ? 'e' : ''} en ${country} depuis ${experience} ans. Aide sur ${help.join(', ')}.`;
-
-      const expatData = {
-        bio,
-        helpTypes: help,
-        specialties: help,
-        residenceCountry: country,
-        yearsAsExpat: experience,
-        yearsOfExperience: experience,
-        previousCountries: [],
-        motivation: `Faciliter l'installation en ${country}`,
-        needsVerification: false,
-        verificationStatus: 'approved',
-      };
-      
-      Object.assign(baseUser, expatData);
+  const setKyc = async (id: string, next: KycStatus, message?: string) => {
+    try {
+      const row = rows.find((r) => r.id === id);
+      if (row?.kycProvider === "stripe") return; // read-only si piloté Stripe
+      const payload: Record<string, unknown> = { kycStatus: next, updatedAt: new Date() };
+      if (message) payload["kycMessage"] = message;
+      await updateDoc(doc(db, "users", id), payload);
+      alert(t("successUpdate"));
+    } catch (e) {
+      console.error("setKyc error", e);
+      alert(t("errorUpdate"));
     }
+  };
 
-    // write user
-    await setDoc(doc(db, 'users', uid), baseUser);
+  const setStatus = async (id: string, status: UserStatus, reason?: string) => {
+    try {
+      const payload: Record<string, unknown> = { status, updatedAt: new Date() };
+      if (status === "suspended" && reason) {
+        payload["suspendedReason"] = reason;
+        payload["suspendedAt"] = new Date();
+      }
+      await updateDoc(doc(db, "users", id), payload);
+      alert(t("successUpdate"));
+    } catch (e) {
+      console.error("setStatus error", e);
+      alert(t("errorUpdate"));
+    }
+  };
 
-    // provider profile (public)
-    const providerProfile = {
-      ...baseUser,
-      uid,
-      type: role,
-      fullName,
-      slug,
-      createdByAdmin: true,
-      profileCompleted: true,
-    };
-    await setDoc(doc(db, 'sos_profiles', uid), providerProfile);
-
-    // UI cards (carousel + card)
-    const card = {
-      id: uid,
-      uid,
-      title: fullName,
-      subtitle: role === 'lawyer' ? 'Avocat' : 'Expatrié',
-      country,
-      photo: profilePhoto,
-      rating,
-      reviewCount,
-      languages: selectedLanguages,
-      specialties: providerProfile.specialties || [],
-      href: `/${role === 'lawyer' ? 'avocat' : 'expatrie'}/${slugify(country)}/${slugify(selectedLanguages[0] || 'francais')}/${slug}`,
-      createdAt: serverTimestamp(),
-    };
-    await setDoc(doc(db, 'ui_profile_cards', uid), card);
-    await setDoc(doc(db, 'ui_profile_carousel', uid), card);
-
-    // reviews
-    const reviewPhrases = [
-      'Très pro et efficace.',
-      'Conseils précieux, réponse rapide.',
-      'Je recommande vivement.',
-      'Service de qualité.',
-      'Parfait pour résoudre mon problème.',
-    ];
-    const reviewsToCreate = reviewCount;
-    for (let i = 0; i < reviewsToCreate; i++) {
-      const r = randomRating();
-      await addDoc(collection(db, 'reviews'), {
-        providerId: uid,
-        clientId: `aaa_client_${Date.now()}_${i}`,
-        clientName: `Client ${i + 1}`,
-        clientCountry: country,
-        rating: r,
-        comment: reviewPhrases[randomInt(0, reviewPhrases.length - 1)],
-        isPublic: true,
-        status: 'published',
-        serviceType: role === 'lawyer' ? 'lawyer_call' : 'expat_call',
-        createdAt: serverTimestamp(),
-        helpfulVotes: randomInt(0, 10),
+  // Bulk
+  const onBulk = (action: "approve" | "reject" | "suspend" | "delete") => {
+    if (selected.length === 0) {
+      alert("Sélection vide.");
+      return;
+    }
+    if (action === "reject" || action === "suspend" || action === "delete") {
+      setReasonOpen({
+        type: action === "reject" ? "reject" : action === "suspend" ? "suspend" : "delete",
+        ids: selected,
       });
+      setReasonText("");
+      return;
     }
-
-    return uid;
+    Promise.all(
+      selected.map((id) =>
+        updateDoc(doc(db, "users", id), {
+          validationStatus: "validated",
+          isValidated: true,
+          updatedAt: new Date(),
+        })
+      )
+    )
+      .then(async () => {
+        setSelected([]);
+        alert(t("successUpdate"));
+      })
+      .catch(() => alert(t("errorUpdate")));
   };
 
-  // --------- EDIT / DELETE / TOGGLES ----------
-  const handleEditProfile = (profile: AaaProfile) => {
-    setSelectedProfile(profile);
-    setEditFormData({
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      email: profile.email,
-      phone: profile.phone,
-      phoneCountryCode: profile.phoneCountryCode,
-      country: profile.country,
-      languages: profile.languages,
-      specialties: profile.specialties,
-      description: profile.description,
-      isOnline: profile.isOnline,
-      isVisible: profile.isVisible,
-      isCallable: profile.isCallable,
-      rating: profile.rating,
-      reviewCount: profile.reviewCount,
-      yearsOfExperience: profile.yearsOfExperience,
+  // Export page
+  const exportPage = () => {
+    if (rows.length === 0) {
+      alert(t("noneBody"));
+      return;
+    }
+    const csv = rows.map((l) => ({
+      ID: l.id,
+      FirstName: l.firstName,
+      LastName: l.lastName,
+      Email: l.email,
+      EmailVerified: l.emailVerified ? "Yes" : "No",
+      Phone: l.phone ?? "",
+      Country: l.country ?? "",
+      City: l.city ?? "",
+      BarId: l.barId ?? "",
+      BarCountry: l.barCountry ?? "",
+      Languages: (l.languages || []).join("|"),
+      Specialties: (l.specialties || []).join("|"),
+      Rating: l.rating ?? "",
+      Reviews: l.reviewsCount ?? "",
+      SignedUpAt: l.createdAt.toISOString(),
+      LastLoginAt: l.lastLoginAt?.toISOString() ?? "",
+      AccountStatus: l.status,
+      ValidationStatus: l.validationStatus,
+      IsValidated: l.isValidated ? "Yes" : "No",
+      KycStatus: l.kycStatus,
+      KycProvider: l.kycProvider ?? "",
+    }));
+    const headers = Object.keys(csv[0]).join(";");
+    const rowsStr = csv.map((r) => Object.values(r).join(";")).join("\n");
+    const blob = new Blob([`${headers}\n${rowsStr}`], {
+      type: "text/csv;charset=utf-8;",
     });
-    setNewProfilePhoto(profile.profilePhoto);
-    setShowEditModal(true);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lawyers_page_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleSaveProfile = async () => {
-    if (!selectedProfile) return;
+  // Export all (filters) — cap 5000
+  const exportAll = async () => {
     try {
-      setIsLoading(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const updateData: any = {
-        ...editFormData,
-        fullName: `${editFormData.firstName} ${editFormData.lastName}`.trim(),
-        profilePhoto: newProfilePhoto,
-        avatar: newProfilePhoto,
-        updatedAt: serverTimestamp(),
-      };
-      await updateDoc(doc(db, 'users', selectedProfile.id), updateData);
-      await updateDoc(doc(db, 'sos_profiles', selectedProfile.id), updateData);
-      setShowEditModal(false);
-      setSelectedProfile(null);
-      await loadExistingProfiles();
-      alert('Profil mis à jour avec succès');
-    } catch (e) {
-      console.error(e);
-      alert('Erreur lors de la mise à jour du profil');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      alert(t("exportAllRunning"));
+      const base = collection(db, "users") as CollectionReference<DocumentData>;
+      const constraintsBase: QueryConstraint[] = [
+        where("role", "==", "lawyer"),
+        orderBy("createdAt", sortDir),
+      ];
 
-  const handleDeleteProfile = async () => {
-    if (!selectedProfile) return;
-    try {
-      setIsLoading(true);
-      await deleteDoc(doc(db, 'sos_profiles', selectedProfile.id));
-      await deleteDoc(doc(db, 'users', selectedProfile.id));
-      setShowDeleteModal(false);
-      setSelectedProfile(null);
-      await loadExistingProfiles();
-      alert('Profil supprimé');
-    } catch (e) {
-      console.error(e);
-      alert('Erreur lors de la suppression');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      if (filters.status !== "all")
+        constraintsBase.splice(1, 0, where("status", "==", filters.status));
+      if (filters.emailVerified !== "all")
+        constraintsBase.splice(
+          1,
+          0,
+          where("emailVerified", "==", filters.emailVerified === "verified")
+        );
+      if (filters.country !== "all" && filters.country.trim() !== "")
+        constraintsBase.splice(1, 0, where("country", "==", filters.country.trim()));
+      if (filters.validation !== "all")
+        constraintsBase.splice(1, 0, where("isValidated", "==", filters.validation === "validated"));
+      if (filters.kyc !== "all")
+        constraintsBase.splice(1, 0, where("kycStatus", "==", filters.kyc));
 
-  const handleToggleVisibility = async (profileId: string, currentVisibility: boolean) => {
-    try {
-      const newVisibility = !currentVisibility;
-      await updateDoc(doc(db, 'users', profileId), {
-        isVisible: newVisibility,
-        isVisibleOnMap: newVisibility,
-        updatedAt: serverTimestamp(),
-      });
-      await updateDoc(doc(db, 'sos_profiles', profileId), {
-        isVisible: newVisibility,
-        isVisibleOnMap: newVisibility,
-        updatedAt: serverTimestamp(),
-      });
-      await loadExistingProfiles();
-    } catch (e) {
-      console.error(e);
-    }
-  };
+      const now = new Date();
+      let from: Date | null = null;
+      if (filters.quickRange === "today")
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (filters.quickRange === "week") {
+        const d = now.getDay();
+        const diff = now.getDate() - d + (d === 0 ? -6 : 1);
+        from = new Date(now.setDate(diff));
+        from.setHours(0, 0, 0, 0);
+      }
+      if (filters.quickRange === "month")
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (from) constraintsBase.splice(1, 0, where("createdAt", ">=", Timestamp.fromDate(from)));
+      if (filters.from)
+        constraintsBase.splice(
+          1,
+          0,
+          where("createdAt", ">=", Timestamp.fromDate(new Date(filters.from + "T00:00:00")))
+        );
+      if (filters.to)
+        constraintsBase.splice(
+          1,
+          0,
+          where("createdAt", "<=", Timestamp.fromDate(new Date(filters.to + "T23:59:59.999")))
+        );
 
-  const handleToggleOnline = async (profileId: string, currentOnline: boolean) => {
-    const profile = existingProfiles.find((p) => p.id === profileId);
-    if (!currentOnline && (!profile?.phone || profile.phone === '')) {
-      alert('Téléphone requis pour mettre en ligne');
-      return;
-    }
-    try {
-      const newOnline = !currentOnline;
-      await updateDoc(doc(db, 'users', profileId), {
-        isOnline: newOnline,
-        availability: newOnline ? 'available' : 'offline',
-        updatedAt: serverTimestamp(),
-      });
-      await updateDoc(doc(db, 'sos_profiles', profileId), {
-        isOnline: newOnline,
-        availability: newOnline ? 'available' : 'offline',
-        updatedAt: serverTimestamp(),
-      });
-      await loadExistingProfiles();
-    } catch (e) {
-      console.error(e);
-    }
-  };
+      const all: Lawyer[] = [];
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+      const cap = 5000;
+      while (all.length < cap) {
+        const q: FSQuery<DocumentData> = cursor
+          ? fsQuery(base, ...constraintsBase, limit(500), startAfter(cursor))
+          : fsQuery(base, ...constraintsBase, limit(500));
+        const snap = await getDocs(q);
+        if (snap.empty) break;
 
-  const handleBulkToggleOnline = async (online: boolean) => {
-    if (selectedProfiles.length === 0) {
-      alert('Sélectionnez au moins un profil');
-      return;
-    }
-    if (online) {
-      const missing = selectedProfiles.filter((id) => {
-        const p = existingProfiles.find((x) => x.id === id);
-        return !p?.phone;
-      });
-      if (missing.length > 0) {
-        alert(`${missing.length} profil(s) sans téléphone`);
+        let chunk: Lawyer[] = snap.docs.map((d: QueryDocumentSnapshot<DocumentData>) => {
+          const v = d.data() as FirestoreLawyerDoc;
+          return {
+            id: d.id,
+            email: v.email ?? "",
+            firstName: v.firstName ?? "",
+            lastName: v.lastName ?? "",
+            phone: v.phone ?? "",
+            country: v.country ?? "",
+            city: v.city ?? "",
+            status: (v.status ?? "active") as UserStatus,
+            createdAt: v.createdAt ? v.createdAt.toDate() : new Date(),
+            lastLoginAt: v.lastLoginAt ? v.lastLoginAt.toDate() : undefined,
+            emailVerified: !!v.emailVerified,
+            barId: v.barId,
+            barCountry: v.barCountry,
+            isValidated: !!v.isValidated,
+            validationStatus: v.validationStatus ?? "pending",
+            validationReason: v.validationReason,
+            kycStatus: v.kycStatus ?? "pending",
+            kycProvider: v.kycProvider,
+            kycStripeAccountId: v.kycStripeAccountId,
+            kycLastSyncAt: v.kycLastSyncAt ? v.kycLastSyncAt.toDate() : undefined,
+            specialties: Array.isArray(v.specialties) ? v.specialties : [],
+            languages: Array.isArray(v.languages) ? v.languages : [],
+            rating: typeof v.rating === "number" ? v.rating : undefined,
+            reviewsCount: typeof v.reviewsCount === "number" ? v.reviewsCount : undefined,
+          };
+        });
+
+        const hasTerm2 = filters.searchTerm.trim();
+        const hasSpec2 = filters.specialties.trim();
+        const hasLang2 = filters.langs.trim();
+        const hasBar2 = filters.barId.trim();
+        if (hasTerm2 || hasSpec2 || hasLang2 || hasBar2) {
+          const term = filters.searchTerm.trim().toLowerCase();
+          chunk = chunk.filter((l) => {
+            const okTerm =
+              !hasTerm2 ||
+              `${l.firstName} ${l.lastName}`.toLowerCase().includes(term) ||
+              l.email.toLowerCase().includes(term) ||
+              (l.barId || "").toLowerCase().includes(term) ||
+              (l.phone || "").toLowerCase().includes(term);
+            const okSpec =
+              !hasSpec2 ||
+              (l.specialties || [])
+                .join(" ")
+                .toLowerCase()
+                .includes(filters.specialties.trim().toLowerCase());
+            const okLang =
+              !hasLang2 ||
+              (l.languages || [])
+                .join(" ")
+                .toLowerCase()
+                .includes(filters.langs.trim().toLowerCase());
+            const okBar =
+              !hasBar2 ||
+              (l.barId || "").toLowerCase().includes(filters.barId.trim().toLowerCase());
+            return okTerm && okSpec && okLang && okBar;
+          });
+        }
+
+        all.push(...chunk);
+        cursor = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < 500) break;
+      }
+
+      if (all.length >= cap) alert(t("exportAllCap"));
+      if (all.length === 0) {
+        alert(t("noneBody"));
         return;
       }
-    }
-    try {
-      for (const id of selectedProfiles) {
-        await updateDoc(doc(db, 'users', id), {
-          isOnline: online,
-          availability: online ? 'available' : 'offline',
-          updatedAt: serverTimestamp(),
-        });
-        await updateDoc(doc(db, 'sos_profiles', id), {
-          isOnline: online,
-          availability: online ? 'available' : 'offline',
-          updatedAt: serverTimestamp(),
-        });
-      }
-      await loadExistingProfiles();
-      setSelectedProfiles([]);
-      alert(`${selectedProfiles.length} profil(s) ${online ? 'en ligne' : 'hors ligne'}`);
+
+      const csv = all.map((l) => ({
+        ID: l.id,
+        FirstName: l.firstName,
+        LastName: l.lastName,
+        Email: l.email,
+        EmailVerified: l.emailVerified ? "Yes" : "No",
+        Phone: l.phone ?? "",
+        Country: l.country ?? "",
+        City: l.city ?? "",
+        BarId: l.barId ?? "",
+        BarCountry: l.barCountry ?? "",
+        Languages: (l.languages || []).join("|"),
+        Specialties: (l.specialties || []).join("|"),
+        Rating: l.rating ?? "",
+        Reviews: l.reviewsCount ?? "",
+        SignedUpAt: l.createdAt.toISOString(),
+        LastLoginAt: l.lastLoginAt?.toISOString() ?? "",
+        AccountStatus: l.status,
+        ValidationStatus: l.validationStatus,
+        IsValidated: l.isValidated ? "Yes" : "No",
+        KycStatus: l.kycStatus,
+        KycProvider: l.kycProvider ?? "",
+      }));
+      const headers = Object.keys(csv[0]).join(";");
+      const rowsStr = csv.map((r) => Object.values(r).join(";")).join("\n");
+      const blob = new Blob([`${headers}\n${rowsStr}`], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lawyers_all_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(t("exportAllDone"));
     } catch (e) {
-      console.error(e);
-      alert('Erreur lors de la modification du statut');
+      console.error("Export all error", e);
+      alert(t("errorUpdate"));
     }
   };
 
-  const handleSelectProfile = (id: string) => {
-    setSelectedProfiles((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  /* ---------- Column DnD + Resize handlers ---------- */
+  const onDragStartHeader = (
+    e: React.DragEvent<HTMLTableCellElement>,
+    id: ColId
+  ) => {
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDropHeader = (e: React.DragEvent<HTMLTableCellElement>, targetId: ColId) => {
+    e.preventDefault();
+    const src = e.dataTransfer.getData("text/plain") as ColId;
+    if (!src || src === targetId) return;
+    const cur = [...order];
+    const fromIdx = cur.indexOf(src);
+    const toIdx = cur.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    cur.splice(fromIdx, 1);
+    cur.splice(toIdx, 0, src);
+    setOrder(cur);
+  };
+  const onDragOverHeader = (e: React.DragEvent) => e.preventDefault();
+
+  const onResizeStart = (
+    id: ColId | "select" | "actions",
+    e: React.MouseEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingRef.current = { id, startX: e.clientX, startW: widths[id] || 160 };
+    window.addEventListener("mousemove", onResizing);
+    window.addEventListener("mouseup", onResizeEnd);
+  };
+  const onResizing = (e: MouseEvent) => {
+    const r = resizingRef.current;
+    if (!r) return;
+    const delta = e.clientX - r.startX;
+    const next = Math.max(80, r.startW + delta); // min 80px
+    setWidths((w) => ({ ...w, [r.id]: next }));
+  };
+  const onResizeEnd = () => {
+    resizingRef.current = null;
+    window.removeEventListener("mousemove", onResizing);
+    window.removeEventListener("mouseup", onResizeEnd);
   };
 
-  const handleSelectAll = () => {
-    const ids = filteredProfiles.map((p) => p.id);
-    setSelectedProfiles((prev) => (prev.length === ids.length ? [] : ids));
-  };
+  /* ---------- Cell renderers ---------- */
+  const cellStyleFor = (col: ColId): React.CSSProperties => ({
+    width: widths[col],
+    maxWidth: widths[col],
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  });
 
-  // --------- PHOTOS: import ZIP/lot + rename SEO + push Storage + index Firestore ----------
-  const seoName = (fileName: string, role: Role, gender: Gender, countries: string[]) => {
-    const base = fileName.replace(/\.[^.]+$/, ''); // sans extension
-    const ext = fileName.split('.').pop() || 'jpg';
-    const token = Math.random().toString(36).slice(2, 6);
-    const region = countries.length ? countries.slice(0, 3).map(slugify).join('-') : 'global';
-    return `${slugify(base)}-${role}-${gender}-${region}-${token}.${ext}`;
-  };
-
-  const handleUploadPhotos = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setIsUploadingPhotos(true);
-    try {
-      let added = 0;
-      for (const f of Array.from(files)) {
-        // renommage SEO
-        const newName = seoName(f.name, photoMeta.role, photoMeta.gender, photoMeta.countries);
-        const storageRef = ref(storage, `profile-photos/${newName}`);
-        await uploadBytes(storageRef, f, { cacheControl: 'public,max-age=31536000,immutable' });
-        const url = await getDownloadURL(storageRef);
-
-        await addDoc(collection(db, ASSETS_COLL), {
-          url,
-          role: photoMeta.role,
-          gender: photoMeta.gender,
-          countries: photoMeta.countries,
-          weight: 1,
-          inUse: false,
-          usedBy: null,
-          usedAt: null,
-          createdAt: serverTimestamp(),
-        });
-        added++;
-      }
-      alert(`${added} photo(s) ajoutée(s) à la bibliothèque`);
-    } catch (e) {
-      console.error(e);
-      alert('Erreur import photos');
-    } finally {
-      setIsUploadingPhotos(false);
+  const renderCell = (col: ColId, l: Lawyer) => {
+    switch (col) {
+      case "name":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm font-medium text-gray-900 truncate">
+            {l.firstName} {l.lastName}
+          </div>
+        );
+      case "email":
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.email}</div>;
+      case "emailVerified":
+        return (
+          <div style={cellStyleFor(col)}>
+            <span
+              className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                l.emailVerified ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+              }`}
+            >
+              {l.emailVerified ? t("verified") : t("unverified")}
+            </span>
+          </div>
+        );
+      case "phone":
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.phone || "—"}</div>;
+      case "country":
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.country || "—"}</div>;
+      case "city":
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.city || "—"}</div>;
+      case "barId":
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.barId || "—"}</div>;
+      case "barCountry":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm truncate">
+            {l.barCountry || "—"}
+          </div>
+        );
+      case "languages":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm truncate flex items-center gap-2">
+            <LanguagesIcon className="w-4 h-4 text-gray-400" />
+            {(l.languages || []).join(", ") || "—"}
+          </div>
+        );
+      case "specialties":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm truncate">
+            {(l.specialties || []).join(", ") || "—"}
+          </div>
+        );
+      case "rating":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm">
+            {typeof l.rating === "number" ? l.rating.toFixed(1) : "—"}
+          </div>
+        );
+      case "reviews":
+        return <div style={cellStyleFor(col)} className="text-sm">{l.reviewsCount ?? 0}</div>;
+      case "signup":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm">
+            {l.createdAt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+          </div>
+        );
+      case "lastLogin":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm">
+            {l.lastLoginAt ? l.lastLoginAt.toLocaleDateString() : "—"}
+          </div>
+        );
+      case "accountStatus":
+        return (
+          <div style={cellStyleFor(col)}>
+            <span
+              className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                l.status === "active"
+                  ? "bg-green-100 text-green-800"
+                  : l.status === "pending"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : l.status === "suspended"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {l.status}
+            </span>
+          </div>
+        );
+      case "validation":
+        return (
+          <div style={cellStyleFor(col)} className="flex items-center gap-2">
+            <BadgeCheck className={`w-4 h-4 ${l.isValidated ? "text-green-600" : "text-gray-400"}`} />
+            <span className="text-sm">{l.isValidated ? t("validated") : t("notValidated")}</span>
+          </div>
+        );
+      case "kyc":
+        return (
+          <div style={cellStyleFor(col)} className="text-sm">
+            {l.kycStatus} {l.kycProvider === "stripe" ? `• ${t("syncedStripe")}` : ""}
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
-  // --------- RENDER ----------
+  const headerLabel = (id: ColId) => {
+    switch (id) {
+      case "name":
+        return t("tableName");
+      case "email":
+        return t("tableEmail");
+      case "emailVerified":
+        return t("tableEmailVerif");
+      case "phone":
+        return t("tablePhone");
+      case "country":
+        return t("tableCountry");
+      case "city":
+        return t("tableCity");
+      case "barId":
+        return t("tableBarId");
+      case "barCountry":
+        return t("tableBarCountry");
+      case "languages":
+        return t("tableLanguages");
+      case "specialties":
+        return t("tableSpecialties");
+      case "rating":
+        return t("tableRating");
+      case "reviews":
+        return t("tableReviews");
+      case "signup":
+        return t("tableSignup");
+      case "lastLogin":
+        return t("tableLastLogin");
+      case "accountStatus":
+        return t("tableAccount");
+      case "validation":
+        return t("tableValidation");
+      case "kyc":
+        return t("tableKyc");
+    }
+  };
+
+  const visibleOrder = order.filter((c) => visible[c]);
+
+  // Style commun pour la "barre de redimensionnement" (trait visible)
+  const Resizer = ({
+    onMouseDown,
+  }: {
+    onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
+  }) => (
+    <div
+      onMouseDown={onMouseDown}
+      className="absolute top-0 right-0 h-full w-1 cursor-col-resize bg-gray-300 hover:bg-blue-400"
+      style={{ userSelect: "none" }}
+      aria-hidden
+    />
+  );
+
   return (
     <AdminLayout>
-      <div className="px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des profils AAA</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('generate')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
-                activeTab === 'generate' 
-                  ? 'bg-red-600 text-white hover:bg-red-700' 
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+              <Scale className="w-6 h-6 text-blue-600" /> {t("title")}
+            </h1>
+            <p className="text-sm text-gray-500">{t("subtitle")}</p>
+          </div>
+
+          <div className="flex items-center gap-2 relative">
+            <a
+              href="/admin/validation-avocats"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
             >
-              <UserPlus className="mr-2" size={18} /> Générer
-            </button>
-            <button
-              onClick={() => setActiveTab('manage')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
-                activeTab === 'manage' 
-                  ? 'bg-red-600 text-white hover:bg-red-700' 
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
+              <LinkIcon className="w-4 h-4" />
+              {t("openValidation")}
+            </a>
+
+            <div className="relative">
+              <Button variant="secondary" onClick={() => setShowColsPanel((s) => !s)}>
+                {t("columns")}
+              </Button>
+              {showColsPanel && (
+                <div
+                  className="absolute right-0 mt-2 z-20 w-64 bg-white border rounded-lg shadow-lg p-2"
+                  onMouseLeave={() => setShowColsPanel(false)}
+                >
+                  <div className="flex items-center justify-between px-2 pb-2 border-b">
+                    <button
+                      className="text-xs underline"
+                      onClick={() =>
+                        setVisible((v) => {
+                          const all: Record<ColId, boolean> = { ...v };
+                          (Object.keys(all) as ColId[]).forEach((k) => (all[k] = true));
+                          return all;
+                        })
+                      }
+                    >
+                      {t("showAll")}
+                    </button>
+                    <button
+                      className="text-xs underline"
+                      onClick={() =>
+                        setVisible((v) => {
+                          const none: Record<ColId, boolean> = { ...v };
+                          (Object.keys(none) as ColId[]).forEach((k) => (none[k] = false));
+                          return none;
+                        })
+                      }
+                    >
+                      {t("hideAll")}
+                    </button>
+                    <button className="text-xs underline" onClick={resetLayout}>
+                      {t("resetLayout")}
+                    </button>
+                  </div>
+                  <div className="max-h-72 overflow-auto pt-2">
+                    {DEFAULT_ORDER.map((c) => (
+                      <label key={c} className="flex items-center gap-2 px-2 py-1 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={visible[c]}
+                          onChange={(e) =>
+                            setVisible((v) => ({ ...v, [c]: e.target.checked }))
+                          }
+                        />
+                        <span>{headerLabel(c)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Button variant="secondary" onClick={resetLayout}>
+              {t("resetLayout")}
+            </Button>
+
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Lang)}
+              className="border border-gray-300 rounded-md px-2 py-2 text-sm"
             >
-              <List className="mr-2" size={18} /> Gérer ({existingProfiles.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('photos')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
-                activeTab === 'photos' 
-                  ? 'bg-red-600 text-white hover:bg-red-700' 
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Upload className="mr-2" size={18} /> Photos
-            </button>
-            <button
-              onClick={() => setActiveTab('planner')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
-                activeTab === 'planner' 
-                  ? 'bg-red-600 text-white hover:bg-red-700' 
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Calendar className="mr-2" size={18} /> Planification
-            </button>
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+            </select>
+
+            <Button variant="secondary" onClick={() => setShowFilters((s) => !s)}>
+              <Filter className="w-4 h-4 mr-2" />
+              {t("filters")}
+            </Button>
+
+            <Button variant="secondary" onClick={exportAll}>
+              <Download className="w-4 h-4 mr-2" />
+              {t("exportAll")}
+            </Button>
+
+            <Button onClick={exportPage}>
+              <Download className="w-4 h-4 mr-2" />
+              {t("export")}
+            </Button>
           </div>
         </div>
 
-        {activeTab === 'generate' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">Paramètres de génération</h2>
-                <div className="space-y-6">
-                  {/* Count */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de profils</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={formData.count}
-                      onChange={(e) => setFormData((p) => ({ ...p, count: Number(e.target.value) }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </div>
-
-                  {/* Role & Gender sliders */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Distribution des rôles</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Avocats</span>
-                            <span>{formData.roleDistribution.lawyer}%</span>
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={formData.roleDistribution.lawyer}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setFormData((p) => ({ ...p, roleDistribution: { lawyer: v, expat: 100 - v } }));
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <div>
-                          <label className="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Expatriés</span>
-                            <span>{formData.roleDistribution.expat}%</span>
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={formData.roleDistribution.expat}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setFormData((p) => ({ ...p, roleDistribution: { lawyer: 100 - v, expat: v } }));
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Distribution des genres</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Hommes</span>
-                            <span>{formData.genderDistribution.male}%</span>
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={formData.genderDistribution.male}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setFormData((p) => ({ ...p, genderDistribution: { male: v, female: 100 - v } }));
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <div>
-                          <label className="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Femmes</span>
-                            <span>{formData.genderDistribution.female}%</span>
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={formData.genderDistribution.female}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setFormData((p) => ({ ...p, genderDistribution: { male: 100 - v, female: v } }));
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Countries */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">
-                      Pays d'intervention ({formData.countries.length} sélectionnés)
-                    </h3>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {COUNTRIES_LIST.map((country: string) => (
-                          <label key={country} className="flex items-center text-sm">
-                            <input
-                              type="checkbox"
-                              checked={formData.countries.includes(country)}
-                              onChange={() => handleCountryToggle(country)}
-                              className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mr-2"
-                            />
-                            {country}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Languages */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">
-                      Langues parlées ({formData.languages.length} sélectionnées)
-                    </h3>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {LANGUAGE_OPTIONS.map((language: string) => (
-                          <label key={language} className="flex items-center text-sm">
-                            <input
-                              type="checkbox"
-                              checked={formData.languages.includes(language)}
-                              onChange={() => handleLanguageToggle(language)}
-                              className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mr-2"
-                            />
-                            {language}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <div className="flex items-center mb-3">
-                      <input
-                        id="useCustomPhone"
-                        type="checkbox"
-                        checked={formData.useCustomPhone}
-                        onChange={(e) => setFormData((p) => ({ ...p, useCustomPhone: e.target.checked }))}
-                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="useCustomPhone" className="ml-2 text-sm font-medium text-gray-700">
-                        Utiliser un numéro de téléphone personnalisé
-                      </label>
-                    </div>
-                    {formData.useCustomPhone && (
-                      <>
-                        <input
-                          type="text"
-                          placeholder="+33743331201"
-                          value={formData.customPhoneNumber}
-                          onChange={(e) => setFormData((p) => ({ ...p, customPhoneNumber: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Numéro utilisé pour tous les profils générés
-                        </p>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Experience / Age */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Expérience (années)</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">Minimum</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={formData.minExperience}
-                            onChange={(e) => setFormData((p) => ({ ...p, minExperience: Number(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">Maximum</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={formData.maxExperience}
-                            onChange={(e) => setFormData((p) => ({ ...p, maxExperience: Number(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Âge</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">Minimum</label>
-                          <input
-                            type="number"
-                            min={18}
-                            max={80}
-                            value={formData.minAge}
-                            onChange={(e) => setFormData((p) => ({ ...p, minAge: Number(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">Maximum</label>
-                          <input
-                            type="number"
-                            min={18}
-                            max={80}
-                            value={formData.maxAge}
-                            onChange={(e) => setFormData((p) => ({ ...p, maxAge: Number(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Allow Calls */}
-                  <div className="flex items-center">
-                    <input
-                      id="allowRealCalls"
-                      type="checkbox"
-                      checked={formData.allowRealCalls}
-                      onChange={(e) => setFormData((p) => ({ ...p, allowRealCalls: e.target.checked }))}
-                      className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="allowRealCalls" className="ml-2 block text-sm text-gray-700">
-                      Autoriser les appels réels
-                    </label>
-                  </div>
-
-                  {/* Action */}
-                  <div className="pt-4">
-                    <button
-                      onClick={generateAaaProfiles}
-                      disabled={isGenerating}
-                      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader className="animate-spin mr-2" size={20} />
-                          Génération en cours ({generatedCount}/{formData.count})
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="mr-2" size={20} />
-                          Générer {formData.count} profils
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                      <div className="flex">
-                        <AlertCircle className="h-5 w-5 text-red-400" />
-                        <div className="ml-3">
-                          <h3 className="text-sm font-medium text-red-800">Erreur</h3>
-                          <div className="mt-2 text-sm text-red-700">{error}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {success && (
-                    <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                      <div className="flex">
-                        <Check className="h-5 w-5 text-green-400" />
-                        <div className="ml-3">
-                          <h3 className="text-sm font-medium text-green-800">Succès</h3>
-                          <div className="mt-2 text-sm text-green-700">{success}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+        {/* Cards synthèse */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="w-6 h-6 text-blue-600" />
               </div>
-            </div>
-
-            {/* Presets */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">Préréglages rapides</h2>
-
-                <div className="space-y-4">
-                  <button
-                    onClick={() =>
-                      setFormData((p) => ({
-                        ...p,
-                        count: 20,
-                        roleDistribution: { lawyer: 100, expat: 0 },
-                        genderDistribution: { male: 0, female: 100 },
-                        countries: ['Thaïlande'],
-                        languages: ['Français', 'Anglais', 'Thaï'],
-                      }))
-                    }
-                    className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg border border-blue-200 transition-colors flex items-center justify-between"
-                  >
-                    <div className="flex items-center">
-                      <Scale className="w-5 h-5 mr-2" />
-                      <span>20 avocates en Thaïlande</span>
-                    </div>
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      setFormData((p) => ({
-                        ...p,
-                        count: 50,
-                        roleDistribution: { lawyer: 0, expat: 100 },
-                        genderDistribution: { male: 50, female: 50 },
-                        countries: ['Thaïlande', 'Vietnam', 'Cambodge', 'Malaisie', 'Singapour', 'Indonésie'],
-                        languages: ['Français', 'Anglais'],
-                      }))
-                    }
-                    className="w-full bg-green-50 hover:bg-green-100 text-green-700 font-medium py-3 px-4 rounded-lg border border-green-200 transition-colors flex items-center justify-between"
-                  >
-                    <div className="flex items-center">
-                      <Users className="w-5 h-5 mr-2" />
-                      <span>50 expatriés Asie du Sud-Est</span>
-                    </div>
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      setFormData((p) => ({
-                        ...p,
-                        count: 40,
-                        roleDistribution: { lawyer: 50, expat: 50 },
-                        genderDistribution: { male: 50, female: 50 },
-                        countries: ['Espagne', 'Portugal', 'Italie', 'Grèce'],
-                        languages: ['Français', 'Anglais', 'Espagnol', 'Italien'],
-                      }))
-                    }
-                    className="w-full bg-yellow-50 hover:bg-yellow-100 text-yellow-700 font-medium py-3 px-4 rounded-lg border border-yellow-200 transition-colors flex items-center justify-between"
-                  >
-                    <div className="flex items-center">
-                      <Flag className="w-5 h-5 mr-2" />
-                      <span>40 profils Europe du Sud</span>
-                    </div>
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">{t("totalExact")}</h3>
+                <p className="text-2xl font-bold text-gray-900">{totalExact ?? "—"}</p>
               </div>
             </div>
           </div>
-        )}
 
-        {activeTab === 'manage' && (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Profils existants ({filteredProfiles.length})</h3>
-              <div className="flex items-center space-x-4">
-                {selectedProfiles.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleBulkToggleOnline(true)}
-                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
-                    >
-                      Mettre en ligne ({selectedProfiles.length})
-                    </button>
-                    <button
-                      onClick={() => handleBulkToggleOnline(false)}
-                      className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
-                    >
-                      Mettre hors ligne ({selectedProfiles.length})
-                    </button>
-                  </div>
-                )}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Rechercher un profil..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                </div>
-                <button
-                  onClick={loadExistingProfiles}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center"
-                >
-                  <RefreshCw size={16} className="mr-2" />
-                  Actualiser
-                </button>
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <BadgeCheck className="w-6 h-6 text-green-600" />
               </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <input
-                          type="checkbox"
-                          checked={selectedProfiles.length === filteredProfiles.length && filteredProfiles.length > 0}
-                          onChange={handleSelectAll}
-                          className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                        />
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profil</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pays</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Téléphone</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Créé le</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {isLoadingProfiles ? (
-                      <tr>
-                        <td colSpan={9} className="px-6 py-4 text-center">
-                          <div className="flex justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-                          </div>
-                          <p className="mt-2 text-gray-500">Chargement…</p>
-                        </td>
-                      </tr>
-                    ) : filteredProfiles.length > 0 ? (
-                      filteredProfiles.map((profile) => (
-                        <tr key={profile.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input
-                              type="checkbox"
-                              checked={selectedProfiles.includes(profile.id)}
-                              onChange={() => handleSelectProfile(profile.id)}
-                              className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                            />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <img
-                                src={profile.profilePhoto}
-                                alt={profile.fullName}
-                                className="h-10 w-10 rounded-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '/default-avatar.png';
-                                }}
-                              />
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{profile.fullName}</div>
-                                <div className="text-sm text-gray-500">{profile.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`px-2 py-1 text-xs rounded-full ${
-                                (profile.type || profile.role) === 'lawyer'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-green-100 text-green-800'
-                              }`}
-                            >
-                              {(profile.type || profile.role) === 'lawyer' ? 'Avocat' : 'Expatrié'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{profile.country}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div className="flex items-center">
-                              {Array.from({ length: 5 }, (_, i) => (
-                                <Star
-                                  key={i}
-                                  size={14}
-                                  className={i < Math.floor(profile.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'}
-                                />
-                              ))}
-                              <span className="ml-1">{(profile.rating || 0).toFixed(2)}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {profile.phone || 'Non défini'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col space-y-1">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  profile.isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                }`}
-                              >
-                                {profile.isOnline ? 'En ligne' : 'Hors ligne'}
-                              </span>
-                              {!profile.isVisible && (
-                                <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">Masqué</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {profile.createdAt ? formatDate(new Date(profile.createdAt)) : '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => {
-                                  const slug = (profile.slug ||
-                                    `${slugify(profile.firstName)}-${slugify(profile.lastName)}-${profile.id.substring(0, 6)}`) as string;
-                                  const countrySlug = slugify(profile.country || 'france');
-                                  const roleSlug = (profile.type || profile.role) === 'lawyer' ? 'avocat' : 'expatrie';
-                                  const mainLang = slugify((profile.languages?.[0] || 'francais'));
-                                  const url = `/${roleSlug}/${countrySlug}/${mainLang}/${slug}`;
-                                  window.open(url, '_blank');
-                                }}
-                                className="text-blue-600 hover:text-blue-800"
-                                title="Voir le profil public"
-                              >
-                                <Eye size={18} />
-                              </button>
-                              <button onClick={() => handleEditProfile(profile)} className="text-green-600 hover:text-green-800" title="Modifier">
-                                <Edit size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleToggleOnline(profile.id, profile.isOnline)}
-                                className={`${profile.isOnline ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}
-                                title={profile.isOnline ? 'Mettre hors ligne' : 'Mettre en ligne'}
-                                disabled={!profile.isOnline && (!profile.phone || profile.phone === '')}
-                              >
-                                {profile.isOnline ? <EyeOff size={18} /> : <Eye size={18} />}
-                              </button>
-                              <button
-                                onClick={() => handleToggleVisibility(profile.id, profile.isVisible)}
-                                className={`${profile.isVisible ? 'text-yellow-600 hover:text-yellow-800' : 'text-gray-600 hover:text-gray-800'}`}
-                                title={profile.isVisible ? 'Masquer' : 'Afficher'}
-                              >
-                                {profile.isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedProfile(profile);
-                                  setShowDeleteModal(true);
-                                }}
-                                className="text-red-600 hover:text-red-800"
-                                title="Supprimer"
-                              >
-                                <Trash size={18} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
-                          Aucun profil trouvé
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'photos' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Bibliothèque de photos</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                1) Clique sur <b>Importer le catalogue</b> pour créer les entrées Firestore à partir du fichier
-                <code className="mx-1 px-1 rounded bg-gray-100">src/data/profile-photos.ts</code>.
-                <br />
-                2) Ajoute autant d'images que tu veux via l'upload ci-dessous (renommage SEO &amp; cache).
-              </p>
-              <div className="flex gap-3 mb-6">
-                <button
-                  onClick={async () => {
-                    const inserted = await seedPhotoLibraryFromCatalog();
-                    alert(inserted === 0 ? 'La bibliothèque existe déjà.' : `${inserted} photos importées depuis le catalogue.`);
-                  }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                >
-                  Importer le catalogue
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-                    <select
-                      value={photoMeta.role}
-                      onChange={(e) =>
-                        setPhotoMeta((p) => ({ ...p, role: e.target.value as Role }))
-                      }
-                      className="w-full px-3 py-2 border rounded"
-                    >
-                      <option value="lawyer">Avocat</option>
-                      <option value="expat">Expatrié</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Genre</label>
-                    <select
-                      value={photoMeta.gender}
-                      onChange={(e) =>
-                        setPhotoMeta((p) => ({ ...p, gender: e.target.value as Gender }))
-                      }
-                      className="w-full px-3 py-2 border rounded"
-                    >
-                      <option value="male">Homme</option>
-                      <option value="female">Femme</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pays ciblés (optionnel)</label>
-                    <select
-                      multiple
-                      value={photoMeta.countries}
-                      onChange={(e) =>
-                        setPhotoMeta((p) => ({
-                          ...p,
-                          countries: Array.from(e.target.selectedOptions).map((o) => o.value),
-                        }))
-                      }
-                      className="w-full px-3 py-2 border rounded min-h-[42px]"
-                    >
-                      {COUNTRIES_LIST.map((c: string) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">Laisse vide pour "global".</p>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Uploader des images</label>
-                  <input type="file" accept="image/*" multiple onChange={(e) => handleUploadPhotos(e.target.files)} />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Les fichiers seront renommés (role-genre-pays-slug-xxxx.ext), mis en cache CDN et indexés en base.
-                  </p>
-                </div>
-
-                {isUploadingPhotos && (
-                  <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-700">
-                    Téléversement en cours…
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Bonnes pratiques</h2>
-              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
-                <li>Résolution conseillée : 800×800 (affichage net, recadrage carré possible).</li>
-                <li>Noms descriptifs (SEO) générés automatiquement.</li>
-                <li>Chaque photo est marquée <i>inUse</i> au moment de sa première attribution (unicité garantie).</li>
-                <li>Tu peux fournir des images DALL·E et libres de droits : renseigne bien rôle/genre/pays.</li>
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'planner' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Planification (génération assistée)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Activer un plan</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={planner.enabled}
-                    readOnly
-                  />
-                  <span className="text-sm text-gray-600">Actif</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Profils / jour</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={200}
-                  value={planner.dailyCount}
-                  readOnly
-                  className="w-full px-3 py-2 border rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-                <select
-                  value={planner.role}
-                  disabled
-                  className="w-full px-3 py-2 border rounded"
-                >
-                  <option value="lawyer">Avocat</option>
-                  <option value="expat">Expatrié</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pays (région)</label>
-                <select
-                  multiple
-                  value={planner.regionCountries}
-                  disabled
-                  className="w-full px-3 py-2 border rounded min-h-[120px]"
-                >
-                  {COUNTRIES_LIST.map((c: string) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Langues</label>
-                <select
-                  multiple
-                  value={planner.languages}
-                  disabled
-                  className="w-full px-3 py-2 border rounded min-h-[120px]"
-                >
-                  {LANGUAGE_OPTIONS.map((l: string) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Français/Anglais seront privilégiés automatiquement si présents.
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">{t("validated")}</h3>
+                <p className="text-2xl font-bold text-gray-900">
+                  {rows.filter((r) => r.isValidated).length}
                 </p>
               </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hommes (%)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={planner.genderBias.male}
-                  readOnly
-                  className="w-full px-3 py-2 border rounded"
-                />
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <FileCheck2 className="w-6 h-6 text-amber-600" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Femmes (%)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={planner.genderBias.female}
-                  readOnly
-                  className="w-full px-3 py-2 border rounded"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={async () => {
-                    if (!planner.enabled) return alert('Active le plan d\'abord');
-                    const maleCount = Math.round((planner.genderBias.male / 100) * planner.dailyCount);
-                    let m = 0;
-                    for (let i = 0; i < planner.dailyCount; i++) {
-                      const gender: Gender = m < maleCount ? 'male' : 'female';
-                      if (gender === 'male') m++;
-                      await generateOne(
-                        planner.role,
-                        gender,
-                        planner.regionCountries,
-                        planner.languages,
-                        2,
-                        15,
-                        formData.customPhoneNumber,
-                        formData.useCustomPhone
-                      );
-                    }
-                    alert(`${planner.dailyCount} profils générés via le plan du jour`);
-                  }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                >
-                  Lancer la génération du jour
-                </button>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">{t("kyc")}</h3>
+                <p className="text-2xl font-bold text-gray-900">
+                  {rows.filter((r) => r.kycStatus !== "verified").length} / {rows.length}
+                </p>
               </div>
             </div>
+          </div>
 
-            <p className="text-xs text-gray-500 mt-6">
-              Pour une exécution automatique quotidienne, ajoute une Cloud Function/CRON qui appelle un endpoint admin
-              et réutilise cette logique côté serveur.
-            </p>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">{t("pending")}</h3>
+                <p className="text-2xl font-bold text-gray-900">
+                  {rows.filter((r) => r.status === "pending").length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtres */}
+        {showFilters && (
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("search")}
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filters.searchTerm}
+                    onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
+                    placeholder={t("search")}
+                    className="w-full pl-9 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("status")}
+                </label>
+                <select
+                  value={filters.status}
+                  onChange={(e) =>
+                    setFilters({ ...filters, status: e.target.value as FilterOptions["status"] })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="all">{t("all")}</option>
+                  <option value="active">{t("active")}</option>
+                  <option value="pending">{t("pending")}</option>
+                  <option value="blocked">{t("blocked")}</option>
+                  <option value="suspended">{t("suspended")}</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("validationStatus")}
+                </label>
+                <select
+                  value={filters.validation}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      validation: e.target.value as FilterOptions["validation"],
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="all">{t("all")}</option>
+                  <option value="validated">{t("validated")}</option>
+                  <option value="notValidated">{t("notValidated")}</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("kyc")}</label>
+                <select
+                  value={filters.kyc}
+                  onChange={(e) =>
+                    setFilters({ ...filters, kyc: e.target.value as FilterOptions["kyc"] })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="all">{t("all")}</option>
+                  <option value="pending">{t("kycPending")}</option>
+                  <option value="verified">{t("kycVerified")}</option>
+                  <option value="rejected">{t("kycRejected")}</option>
+                  <option value="requested">{t("kycRequested")}</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("emailVerified")}
+                </label>
+                <select
+                  value={filters.emailVerified}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      emailVerified: e.target.value as FilterOptions["emailVerified"],
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="all">{t("all")}</option>
+                  <option value="verified">{t("verified")}</option>
+                  <option value="unverified">{t("unverified")}</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("country")}
+                </label>
+                <input
+                  type="text"
+                  value={filters.country === "all" ? "" : filters.country}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      country: (e.target.value || "all") as FilterOptions["country"],
+                    })
+                  }
+                  placeholder="FR, MA, SN…"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("specialties")}
+                </label>
+                <input
+                  type="text"
+                  value={filters.specialties}
+                  onChange={(e) => setFilters({ ...filters, specialties: e.target.value })}
+                  placeholder="Ex: droit fiscal, pénal…"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("languages")}
+                </label>
+                <input
+                  type="text"
+                  value={filters.langs}
+                  onChange={(e) => setFilters({ ...filters, langs: e.target.value })}
+                  placeholder="fr, en, ar…"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("barId")}
+                </label>
+                <input
+                  type="text"
+                  value={filters.barId}
+                  onChange={(e) => setFilters({ ...filters, barId: e.target.value })}
+                  placeholder="N° barreau"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+
+              {/* Dates */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("quick")}
+                </label>
+                <select
+                  value={filters.quickRange}
+                  onChange={(e) =>
+                    setFilters({ ...filters, quickRange: e.target.value as FilterOptions["quickRange"] })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="all">{t("all")}</option>
+                  <option value="today">{t("today")}</option>
+                  <option value="week">{t("week")}</option>
+                  <option value="month">{t("month")}</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("dateFrom")}</label>
+                <input
+                  type="date"
+                  value={filters.from}
+                  onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t("dateTo")}</label>
+                <input
+                  type="date"
+                  value={filters.to}
+                  onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+
+              {/* Tri */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("tableSignup")}
+                </label>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setSortDir("asc")}>
+                    {t("sortAsc")}
+                  </Button>
+                  <Button variant="secondary" onClick={() => setSortDir("desc")}>
+                    {t("sortDesc")}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* MODAL EDIT */}
-        <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modifier le profil" size="large">
-          {selectedProfile && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                  <input
-                    type="text"
-                    value={editFormData.firstName || ''}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, firstName: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                  <input
-                    type="text"
-                    value={editFormData.lastName || ''}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, lastName: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-              </div>
+        {/* Actions de masse */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" disabled={selected.length === 0} onClick={() => onBulk("approve")}>
+            {t("bulkApprove")} ({selected.length} {t("selected")})
+          </Button>
+          <Button variant="secondary" disabled={selected.length === 0} onClick={() => onBulk("reject")}>
+            {t("bulkReject")} ({selected.length} {t("selected")})
+          </Button>
+          <Button variant="secondary" disabled={selected.length === 0} onClick={() => onBulk("suspend")}>
+            {t("bulkSuspend")} ({selected.length} {t("selected")})
+          </Button>
+          <Button variant="outline" disabled={selected.length === 0} onClick={() => onBulk("delete")}>
+            <Trash2 className="w-4 h-4 mr-2 text-red-600" />
+            {t("bulkDelete")} ({selected.length} {t("selected")})
+          </Button>
+        </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={editFormData.email || ''}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, email: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                  <input
-                    type="text"
-                    value={editFormData.phone || ''}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, phone: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="+33743331201"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Obligatoire pour "En ligne".</p>
-                </div>
+        {/* Tableau */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="p-6 text-sm text-gray-500">{t("loading")}</div>
+            ) : errorMsg ? (
+              <div className="p-6 text-sm text-red-600 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                <span>{errorMsg}</span>
+                <Button size="small" variant="secondary" onClick={loadPage} className="ml-2">
+                  {t("retry")}
+                </Button>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Photo de profil (URL)</label>
-                <div className="flex items-center space-x-4">
-                  <img src={newProfilePhoto} alt="Photo actuelle" className="w-16 h-16 rounded-full object-cover" />
-                  <div className="flex-1">
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={newProfilePhoto}
-                      onChange={(e) => setNewProfilePhoto(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Utilise une image nette (≥ 400×400)</p>
-                  </div>
-                </div>
+            ) : rows.length === 0 ? (
+              <div className="text-center py-12">
+                <Scale className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">{t("noneTitle")}</h3>
+                <p className="mt-1 text-sm text-gray-500">{t("noneBody")}</p>
               </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <thead className="bg-gray-50 select-none">
+                  <tr>
+                    {/* Select column (fixed left) */}
+                    <th
+                      className="px-4 py-3 text-left relative"
+                      style={{ width: widths.select }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.length === rows.length && rows.length > 0}
+                        onChange={(e) =>
+                          setSelected(e.target.checked ? rows.map((r) => r.id) : [])
+                        }
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <Resizer onMouseDown={(e) => onResizeStart("select", e)} />
+                    </th>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Note (3.0 - 5.0)</label>
-                  <input
-                    type="number"
-                    min={3}
-                    max={5}
-                    step={0.1}
-                    value={editFormData.rating || 4.5}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, rating: parseFloat(e.target.value) }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre d'avis</label>
-                  <input
-                    type="number"
-                    min={5}
-                    max={30}
-                    value={editFormData.reviewCount || 5}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, reviewCount: parseInt(e.target.value, 10) }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Années d'expérience</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={editFormData.yearsOfExperience || 5}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, yearsOfExperience: parseInt(e.target.value, 10) }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-              </div>
+                    {/* Dynamic columns with DnD + resize */}
+                    {visibleOrder.map((id) => (
+                      <th
+                        key={id}
+                        draggable
+                        onDragStart={(e) => onDragStartHeader(e, id)}
+                        onDragOver={onDragOverHeader}
+                        onDrop={(e) => onDropHeader(e, id)}
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+                        style={{ width: widths[id] }}
+                        title=""
+                      >
+                        <div className="flex items-center gap-2">
+                          <GripVertical className="w-4 h-4 text-gray-400" />
+                          {headerLabel(id)}
+                        </div>
+                        <Resizer onMouseDown={(e) => onResizeStart(id, e)} />
+                      </th>
+                    ))}
 
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={!!(editFormData.isOnline && editFormData.phone)}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, isOnline: e.target.checked && !!p.phone }))
-                    }
-                    disabled={!editFormData.phone}
-                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">En ligne</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={!!editFormData.isVisible}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, isVisible: e.target.checked }))
-                    }
-                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Visible</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={!!editFormData.isCallable}
-                    onChange={(e) =>
-                      setEditFormData((p) => ({ ...p, isCallable: e.target.checked }))
-                    }
-                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Appels réels autorisés</span>
-                </label>
-              </div>
+                    {/* Actions (fixed right) */}
+                    <th
+                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+                      style={{ width: widths.actions }}
+                    >
+                      {t("tableActions")}
+                      <Resizer onMouseDown={(e) => onResizeStart("actions", e)} />
+                    </th>
+                  </tr>
+                </thead>
 
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  disabled={isLoading}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {rows.map((l) => (
+                    <tr key={l.id} className="hover:bg-gray-50">
+                      {/* select */}
+                      <td className="px-4 py-4 whitespace-nowrap" style={{ width: widths.select }}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(l.id)}
+                          onChange={() => toggleSelect(l.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
+
+                      {/* dynamic cells */}
+                      {visibleOrder.map((id) => (
+                        <td
+                          key={id}
+                          className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                          style={{ width: widths[id] }}
+                        >
+                          {renderCell(id, l)}
+                        </td>
+                      ))}
+
+                      {/* actions */}
+                      <td
+                        className="px-6 py-4 whitespace-nowrap text-right text-sm"
+                        style={{ width: widths.actions }}
+                      >
+                        <div className="relative inline-flex items-center justify-end gap-2">
+                          {/* Validation */}
+                          {!l.isValidated ? (
+                            <>
+                              <Button
+                                size="small"
+                                variant="secondary"
+                                onClick={() => setValidation(l.id, "validated")}
+                              >
+                                {t("approve")}
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="secondary"
+                                onClick={() => {
+                                  setReasonOpen({ type: "reject", ids: [l.id] });
+                                  setReasonText("");
+                                }}
+                              >
+                                {t("reject")}
+                              </Button>
+                            </>
+                          ) : null}
+
+                          {/* KYC */}
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => {
+                              setReasonOpen({ type: "kycRequest", ids: [l.id] });
+                              setReasonText("");
+                            }}
+                          >
+                            {t("requestKyc")}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => setKyc(l.id, "verified")}
+                            disabled={l.kycProvider === "stripe"}
+                          >
+                            {t("setKycVerified")}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => setKyc(l.id, "rejected")}
+                            disabled={l.kycProvider === "stripe"}
+                          >
+                            {t("setKycRejected")}
+                          </Button>
+
+                          {/* Statut compte */}
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => setStatus(l.id, "active")}
+                          >
+                            {t("activate")}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => {
+                              setReasonOpen({ type: "suspend", ids: [l.id] });
+                              setReasonText("");
+                            }}
+                          >
+                            {t("suspend")}
+                          </Button>
+
+                          {/* Delete */}
+                          <Button
+                            size="small"
+                            variant="outline"
+                            onClick={() => {
+                              setReasonOpen({ type: "delete", ids: [l.id] });
+                              setReasonText("");
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+
+                          {/* Menu 3 points */}
+                          <button
+                            className="p-2 rounded hover:bg-gray-100"
+                            onClick={() => setOpenMenuId((cur) => (cur === l.id ? null : l.id))}
+                            aria-label="More"
+                          >
+                            <MoreVertical className="w-4 h-4 text-gray-500" />
+                          </button>
+
+                          {openMenuId === l.id && (
+                            <div
+                              className="absolute right-0 top-9 z-10 w-56 bg-white border rounded-lg shadow-lg py-1"
+                              onMouseLeave={() => setOpenMenuId(null)}
+                            >
+                              <a
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                href={`/admin/validation-avocats?lawyerId=${l.id}`}
+                                onClick={() => setOpenMenuId(null)}
+                              >
+                                <LinkIcon className="w-4 h-4" /> {t("openValidation")}
+                              </a>
+                              <button
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(l.email);
+                                  alert(t("copied"));
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <ClipboardCopy className="w-4 h-4" /> {t("copyEmail")}
+                              </button>
+                              <button
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(l.id);
+                                  alert(t("copied"));
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <ClipboardCopy className="w-4 h-4" /> {t("copyId")}
+                              </button>
+                              <a
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                href={`mailto:${l.email}`}
+                                onClick={() => setOpenMenuId(null)}
+                              >
+                                <ExternalLink className="w-4 h-4" /> {t("contact")}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Footer pagination */}
+          <div className="flex items-center justify-between p-4 border-t bg-gray-50">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600">{t("rowsPerPage")}</label>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+
+              <label className="ml-4 text-sm text-gray-600">{t("page")}</label>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+                  disabled={pageIndex === 1}
                 >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors flex items-center"
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm">
+                  {pageIndex} {t("of")} {hasNext ? "…" : pageIndex}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setPageIndex((p) => (hasNext ? p + 1 : p))}
+                  disabled={!hasNext}
                 >
-                  {isLoading ? <Loader className="animate-spin mr-2" size={16} /> : <Save size={16} className="mr-2" />}
-                  Enregistrer
-                </button>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
             </div>
-          )}
-        </Modal>
 
-        {/* MODAL DELETE */}
-        <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Confirmer la suppression" size="small">
-          {selectedProfile && (
-            <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="flex">
-                  <AlertTriangle className="h-5 w-5 text-red-400" />
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">Action irréversible</h3>
-                    <div className="mt-2 text-sm text-red-700">
-                      <p>
-                        Supprimer définitivement :
-                        <br />
-                        <strong>{selectedProfile.fullName}</strong>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={isLoading}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleDeleteProfile}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
-                >
-                  {isLoading ? <Loader className="animate-spin mr-2" size={16} /> : null}
-                  Confirmer la suppression
-                </button>
-              </div>
+            <div className="text-xs text-gray-500">
+              {t("totalExact")}: {totalExact ?? "—"}
             </div>
-          )}
-        </Modal>
+          </div>
+        </div>
       </div>
+
+      {/* Modales raison */}
+      <Modal
+        isOpen={!!reasonOpen}
+        onClose={() => setReasonOpen(null)}
+        title={
+          reasonOpen?.type === "suspend"
+            ? t("reasonTitleSuspend")
+            : reasonOpen?.type === "delete"
+            ? t("reasonTitleDelete")
+            : reasonOpen?.type === "reject"
+            ? t("reasonTitleReject")
+            : t("reasonTitleKycRequest")
+        }
+      >
+        <div className="space-y-3">
+          {reasonOpen?.type !== "kycRequest" ? (
+            <>
+              <label className="text-sm text-gray-700">{t("reasonLabel")}</label>
+              <textarea
+                className="w-full border rounded p-2"
+                rows={4}
+                value={reasonText}
+                placeholder={t("reasonPlaceholder")}
+                onChange={(e) => setReasonText(e.target.value)}
+              />
+            </>
+          ) : (
+            <>
+              <label className="text-sm text-gray-700">{t("optionalMessage")}</label>
+              <textarea
+                className="w-full border rounded p-2"
+                rows={4}
+                value={reasonText}
+                placeholder={t("optionalMessage")}
+                onChange={(e) => setReasonText(e.target.value)}
+              />
+            </>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setReasonOpen(null)}>
+              {t("cancel")}
+            </Button>
+            <Button
+              variant={reasonOpen?.type === "delete" ? "outline" : "secondary"}
+              onClick={async () => {
+                const ids = reasonOpen?.ids || [];
+                const msg = reasonText.trim();
+                if (reasonOpen?.type !== "kycRequest" && msg.length < 3) return;
+
+                try {
+                  if (reasonOpen?.type === "suspend") {
+                    await Promise.all(
+                      ids.map((id) =>
+                        updateDoc(doc(db, "users", id), {
+                          status: "suspended",
+                          suspendedReason: msg,
+                          suspendedAt: new Date(),
+                          updatedAt: new Date(),
+                        })
+                      )
+                    );
+                  } else if (reasonOpen?.type === "delete") {
+                    await Promise.all(ids.map((id) => deleteDoc(doc(db, "users", id))));
+                  } else if (reasonOpen?.type === "reject") {
+                    await Promise.all(
+                      ids.map((id) =>
+                        updateDoc(doc(db, "users", id), {
+                          validationStatus: "rejected",
+                          isValidated: false,
+                          validationReason: msg,
+                          updatedAt: new Date(),
+                        })
+                      )
+                    );
+                  } else if (reasonOpen?.type === "kycRequest") {
+                    await Promise.all(
+                      ids.map((id) =>
+                        updateDoc(doc(db, "users", id), {
+                          kycStatus: "requested",
+                          kycMessage: msg || null,
+                          updatedAt: new Date(),
+                        })
+                      )
+                    );
+                  }
+
+                  setReasonOpen(null);
+                  setReasonText("");
+                  setSelected([]);
+                  alert(t("successUpdate"));
+                } catch (e) {
+                  console.error("Reason action error", e);
+                  alert(t("errorUpdate"));
+                }
+              }}
+            >
+              {t("confirm")}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 };
 
-export default AdminAaaProfiles;
+export default AdminLawyers;

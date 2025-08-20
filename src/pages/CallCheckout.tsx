@@ -18,7 +18,7 @@ import { httpsCallable, HttpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
-import { detectUserCurrency, usePricingConfig, calculateServiceAmounts } from '../services/pricingService';
+import { detectUserCurrency, usePricingConfig } from '../services/pricingService';
 
 /* ------------------------------ Stripe init ------------------------------ */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
@@ -50,8 +50,8 @@ interface User {
 }
 
 interface PaymentIntentData {
-  amount: number;
-  currency?: string;
+  amount: number; // unités réelles
+  currency?: string; // "eur" | "usd"
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
   clientId: string;
@@ -83,7 +83,8 @@ interface CreateAndScheduleCallData {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: ServiceKind;
   paymentIntentId: string;
-  amount: number;
+  amount: number; // unités réelles
+  currency: 'EUR' | 'USD';
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
@@ -136,8 +137,6 @@ const useTranslation = () => {
     'summary.expert': { fr: 'Expert', en: 'Expert' },
     'summary.service': { fr: 'Service', en: 'Service' },
     'summary.duration': { fr: 'Durée', en: 'Duration' },
-    'summary.fee': { fr: 'Frais de service', en: 'Service fee' },
-    'summary.consult': { fr: 'Consultation', en: 'Consultation' },
     'summary.total': { fr: 'Total', en: 'Total' },
 
     'btn.pay': { fr: 'Payer', en: 'Pay' },
@@ -160,18 +159,12 @@ const useTranslation = () => {
       en: 'Data protected by SSL. Call launched automatically after payment.'
     },
 
-    'form.phone': { fr: 'Numéro de téléphone', en: 'Phone number' },
-    'form.whatsapp': { fr: 'Numéro WhatsApp (facultatif)', en: 'WhatsApp number (optional)' },
-    'form.phonePlaceholder': { fr: 'ex: +33612345678', en: 'e.g. +447911123456' },
-    'form.whatsappPlaceholder': { fr: 'ex: +33612345678', en: 'e.g. +447911123456' },
-    'form.phoneHelp': { fr: 'Incluez le code pays (format +33, +44, ...).', en: 'Include country code (format +33, +44, ...).' },
-
     'err.invalidConfig': { fr: 'Configuration de paiement invalide', en: 'Invalid payment configuration' },
     'err.unauth': { fr: 'Utilisateur non authentifié', en: 'Unauthenticated user' },
     'err.sameUser': { fr: "Vous ne pouvez pas réserver avec vous-même", en: "You can't book yourself" },
     'err.minAmount': { fr: 'Montant minimum 5€', en: 'Minimum amount €5' },
     'err.maxAmount': { fr: 'Montant maximum 500€', en: 'Maximum amount €500' },
-    'err.amountSplit': { fr: 'Erreur dans la répartition des montants', en: 'Amounts split mismatch' },
+    'err.amountMismatch': { fr: 'Montant invalide. Merci de réessayer.', en: 'Invalid amount. Please try again.' },
     'err.noClientSecret': { fr: 'ClientSecret manquant', en: 'Missing ClientSecret' },
     'err.noCardElement': { fr: 'Champ carte introuvable', en: 'Card field not found' },
     'err.stripe': { fr: 'Erreur de paiement Stripe', en: 'Stripe payment error' },
@@ -364,6 +357,7 @@ interface PaymentFormProps {
   user: User;
   provider: Provider;
   service: ServiceData;
+  adminPricing: PricingEntryTrace; // ✅ prix issus d’admin, passés directement
   onSuccess: (paymentIntentId: string) => void;
   onError: (error: string) => void;
   isProcessing: boolean;
@@ -372,7 +366,7 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
-  user, provider, service, onSuccess, onError, isProcessing, setIsProcessing, isMobile
+  user, provider, service, adminPricing, onSuccess, onError, isProcessing, setIsProcessing, isMobile
 }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -388,26 +382,25 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     [getTraceAttributes, service.serviceType, serviceCurrency]
   );
 
+  // ✅ Validation simplifiée : le montant DOIT être égal au prix admin (pas de décomposition)
   const validatePaymentData = useCallback(() => {
     if (!stripe || !elements) throw new Error(t('err.invalidConfig'));
     if (!user?.uid) throw new Error(t('err.unauth'));
     if (provider.id === user.uid) throw new Error(t('err.sameUser'));
-    if (service.amount < 5) throw new Error(t('err.minAmount'));
-    if (service.amount > 500) throw new Error(t('err.maxAmount'));
-
-    const total = Math.round((service.commissionAmount + service.providerAmount) * 100) / 100;
-    const amountRounded = Math.round(service.amount * 100) / 100;
-    if (Math.abs(amountRounded - total) > 0.01) throw new Error(t('err.amountSplit'));
-  }, [stripe, elements, user, provider, service, t]);
+    if (adminPricing.totalAmount < 5) throw new Error(t('err.minAmount'));
+    if (adminPricing.totalAmount > 500) throw new Error(t('err.maxAmount'));
+    const eq = Math.abs(service.amount - adminPricing.totalAmount) < 0.01;
+    if (!eq) throw new Error(t('err.amountMismatch'));
+  }, [stripe, elements, user, provider.id, service.amount, adminPricing.totalAmount, t]);
 
   const validateCurrencyBeforePayment = useCallback(() => {
     const confirmMessage =
-      `Confirmer le paiement de ${service.amount.toFixed(2)}${currencySymbol} en ${serviceCurrency.toUpperCase()} ?`;
-    if (service.amount > 100) {
+      `Confirmer le paiement de ${adminPricing.totalAmount.toFixed(2)}${currencySymbol} en ${serviceCurrency.toUpperCase()} ?`;
+    if (adminPricing.totalAmount > 100) {
       return confirm(confirmMessage);
     }
     return true;
-  }, [service.amount, currencySymbol, serviceCurrency]);
+  }, [adminPricing.totalAmount, currencySymbol, serviceCurrency]);
 
   const persistPaymentDocs = useCallback(
     async (paymentIntentId: string) => {
@@ -422,10 +415,10 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         clientPhone: service.clientPhone,
         clientWhatsapp: '',
         serviceType: service.serviceType,
-        duration: service.duration,
-        amount: service.amount,
-        commissionAmount: service.commissionAmount,
-        providerAmount: service.providerAmount,
+        duration: adminPricing.duration,
+        amount: adminPricing.totalAmount,
+        commissionAmount: adminPricing.connectionFeeAmount,
+        providerAmount: adminPricing.providerAmount,
         currency: serviceCurrency,
         status: 'succeeded',
         createdAt: serverTimestamp(),
@@ -435,7 +428,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
       try { await setDoc(doc(db, 'users', user.uid!, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
       try { await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
     },
-    [provider, service, user, serviceCurrency]
+    [provider, service.clientPhone, service.serviceType, user, adminPricing, serviceCurrency]
   );
 
   const handlePaymentSubmit = useCallback(async (e: React.FormEvent) => {
@@ -455,10 +448,11 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
 
+      // ✅ Passer DIRECTEMENT les prix admin à l’intent
       const paymentData: PaymentIntentData = {
-        amount: service.amount,
-        commissionAmount: service.commissionAmount,
-        providerAmount: service.providerAmount,
+        amount: adminPricing.totalAmount,
+        commissionAmount: adminPricing.connectionFeeAmount,
+        providerAmount: adminPricing.providerAmount,
         currency: stripeCurrency,
         serviceType: service.serviceType,
         providerId: provider.id,
@@ -470,7 +464,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           : (language === 'fr' ? 'Consultation expatriation' : 'Expat consultation'),
         metadata: {
           providerType: provider.role || provider.type || 'expat',
-          duration: String(service.duration),
+          duration: String(adminPricing.duration),
           clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
           clientPhone: service.clientPhone,
           clientWhatsapp: '',
@@ -525,7 +519,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         serviceType: service.serviceType,
         providerType: (provider.role || provider.type || 'expat') as ServiceKind,
         paymentIntentId: paymentIntent.id,
-        amount: service.amount,
+        amount: adminPricing.totalAmount,
+        currency: serviceCurrency.toUpperCase() as 'EUR' | 'USD',
         delayMinutes: 5,
         clientLanguages: [language],
         providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
@@ -539,7 +534,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         provider_id: provider.id,
         payment_intent: paymentIntent.id,
         currency: serviceCurrency,
-        amount: service.amount,
+        amount: adminPricing.totalAmount,
       });
 
       onSuccess(paymentIntent.id);
@@ -567,7 +562,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     isMobile,
     persistPaymentDocs,
     stripeCurrency,
-    serviceCurrency
+    serviceCurrency,
+    adminPricing
   ]);
 
   const providerDisplayName = useMemo(
@@ -686,7 +682,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-600">{t('summary.duration')}</span>
-            <span className="font-medium text-gray-800 text-xs">{service.duration} min</span>
+            <span className="font-medium text-gray-800 text-xs">{adminPricing.duration} min</span>
           </div>
 
           <div className="border-t-2 border-gray-400 pt-2 mt-2">
@@ -696,7 +692,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
                 className="text-lg font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent"
                 {...priceInfo}
               >
-                {service.amount.toFixed(2)} {currencySymbol}
+                {adminPricing.totalAmount.toFixed(2)} {currencySymbol}
               </span>
             </div>
           </div>
@@ -716,7 +712,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
             : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-lg hover:shadow-xl'
           }
         `}
-        aria-label={`${t('btn.pay')} ${service.amount.toFixed(2)}${currencySymbol}`}
+        aria-label={`${t('btn.pay')} ${adminPricing.totalAmount.toFixed(2)}${currencySymbol}`}
       >
         {isProcessing ? (
           <div className="flex items-center justify-center space-x-2">
@@ -726,7 +722,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         ) : (
           <div className="flex items-center justify-center space-x-2">
             <Lock className="w-5 h-5" aria-hidden="true" />
-            <span>{t('btn.pay')} {service.amount.toFixed(2)}{currencySymbol}</span>
+            <span>{t('btn.pay')} {adminPricing.totalAmount.toFixed(2)}{currencySymbol}</span>
           </div>
         )}
       </button>
@@ -771,10 +767,14 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const isMobile = useIsMobile();
   const { getTraceAttributes } = usePriceTracing();
 
-  // On ne bloque pas l’affichage si la config pricing échoue
-  const { error: pricingError } = usePricingConfig();
+  // Config prix admin (hook central)
+  const { pricing, error: pricingError, loading: pricingLoading } = usePricingConfig() as {
+    pricing?: { lawyer: Record<Currency, PricingEntryTrace>; expat: Record<Currency, PricingEntryTrace> };
+    error?: unknown;
+    loading: boolean;
+  };
 
-  // Devise
+  // Devise (sélecteur conservé, branché sur l’adminPricing)
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>('eur');
 
   useEffect(() => {
@@ -823,59 +823,36 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     return null;
   }, [selectedProvider]);
 
-  // Pricing via ADMIN (avec secours intégré côté service)
-  const [serviceWithPricing, setServiceWithPricing] = useState<ServiceData | null>(null);
-  const [isFallback, setIsFallback] = useState<boolean>(false);
+  const providerRole: ServiceKind | null = useMemo(() => {
+    if (!provider) return null;
+    return ((provider.role || provider.type || 'expat') as ServiceKind);
+  }, [provider]);
 
-  const handleCurrencyChange = useCallback((newCurrency: Currency) => {
-    setSelectedCurrency(newCurrency);
-    try {
-      sessionStorage.setItem('selectedCurrency', newCurrency);
-      localStorage.setItem('preferredCurrency', newCurrency);
-    } catch { /* no-op */ }
-  }, []);
+  // ✅ Sélection des prix depuis la config admin (aucun recalcul côté composant)
+  const adminPricing: PricingEntryTrace | null = useMemo(() => {
+    if (!pricing || !providerRole) return null;
+    return pricing[providerRole]?.[selectedCurrency] ?? null;
+  }, [pricing, providerRole, selectedCurrency]);
 
-  useEffect(() => {
-    const loadServicePricing = async () => {
-      if (!provider?.id || !selectedCurrency) return;
-      const providerRole: ServiceKind = (provider.role || provider.type || 'expat') as ServiceKind;
-
-      try {
-        const adminPricing = await calculateServiceAmounts(providerRole, selectedCurrency);
-        setServiceWithPricing({
-          providerId: provider.id,
-          serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
-          providerRole,
-          amount: adminPricing.totalAmount,
-          duration: adminPricing.duration,
-          clientPhone: normalizePhone(user?.phone || ''),
-          commissionAmount: adminPricing.connectionFeeAmount,
-          providerAmount: adminPricing.providerAmount,
-          currency: selectedCurrency,
-        });
-        setIsFallback(false);
-      } catch {
-        // Par sécurité (cas improbable si Firestore indispo), on garde un secours homogène
-        // — mais calculateServiceAmounts gère déjà un secours; on ne devrait pas passer ici.
-        setServiceWithPricing(null);
-        setIsFallback(true);
-      }
-    };
-
-    loadServicePricing();
-  }, [provider, selectedCurrency, user]);
-
+  // ✅ Service dérivé UNIQUEMENT de l’adminPricing (pas de reconstruct ni d’effet)
   const service: ServiceData | null = useMemo(() => {
-    if (!serviceWithPricing) return null;
-    return serviceWithPricing;
-  }, [serviceWithPricing]);
+    if (!provider || !adminPricing || !providerRole) return null;
+    return {
+      providerId: provider.id,
+      serviceType: providerRole === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      providerRole,
+      amount: adminPricing.totalAmount,
+      duration: adminPricing.duration,
+      clientPhone: normalizePhone(user?.phone || ''),
+      commissionAmount: adminPricing.connectionFeeAmount,
+      providerAmount: adminPricing.providerAmount,
+      currency: selectedCurrency,
+    };
+  }, [provider, adminPricing, providerRole, user?.phone, selectedCurrency]);
 
   const cardTraceAttrs = useMemo(
-    () => getTraceAttributes(
-      (provider?.role === 'lawyer' || provider?.type === 'lawyer') ? 'lawyer' : 'expat',
-      selectedCurrency
-    ),
-    [getTraceAttributes, provider?.role, provider?.type, selectedCurrency]
+    () => getTraceAttributes(providerRole || 'expat', selectedCurrency),
+    [getTraceAttributes, providerRole, selectedCurrency]
   );
 
   // expose debug helper
@@ -1006,7 +983,17 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   }, [currentStep, callProgress]);
 
   /* ------------------------- Guards minimales ------------------------- */
-  if (!provider || !service) {
+  if (pricingLoading || !providerRole) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center text-gray-600">
+          ...
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!provider || !adminPricing || !service) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
@@ -1067,7 +1054,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     <Layout>
       <main className="bg-gradient-to-br from-red-50 to-red-100 min-h=[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
         <div className="max-w-lg mx-auto px-4 py-4">
-          {(pricingError || isFallback) && (
+          {(pricingError) && (
             <div className="mb-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
               {language === 'fr'
                 ? 'Les tarifs affichés proviennent d’une configuration de secours. La configuration centrale sera rechargée automatiquement.'
@@ -1088,14 +1075,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
             <div className="text-center">
               <h1 className="text-xl font-bold text-gray-900 mb-1">
-                {currentStep === 'payment' && t('ui.securePayment')}
-                {currentStep === 'calling' && t('ui.connecting')}
-                {currentStep === 'completed' && t('ui.completed')}
+                {t('ui.securePayment')}
               </h1>
               <p className="text-gray-600 text-sm">
-                {currentStep === 'payment' && t('ui.payToStart')}
-                {currentStep === 'calling' && t('ui.connectingExpert')}
-                {currentStep === 'completed' && t('ui.thanks')}
+                {t('ui.payToStart')}
               </p>
             </div>
           </div>
@@ -1130,7 +1113,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                   <Clock size={12} aria-hidden="true" />
-                  <span>{service.duration} min</span>
+                  <span>{adminPricing.duration} min</span>
                   <span>•</span>
                   <span className="text-green-600 font-medium">{language === 'fr' ? 'Disponible' : 'Available'}</span>
                 </div>
@@ -1142,9 +1125,9 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 {...cardTraceAttrs}
               >
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                  {selectedCurrency === 'usd' ? '$' : ''}{service.amount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
+                  {selectedCurrency === 'usd' ? '$' : ''}{adminPricing.totalAmount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
                 </div>
-                <div className="text-xs text-gray-500">{service.duration} min</div>
+                <div className="text-xs text-gray-500">{adminPricing.duration} min</div>
               </div>
             </div>
           </section>
@@ -1153,7 +1136,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
             <div className="flex items-center justify-center space-x-4">
               <button
-                onClick={() => handleCurrencyChange('eur')}
+                onClick={() => setSelectedCurrency('eur')}
                 className={`px-4 py-2 rounded-lg font-medium transition-all ${
                   selectedCurrency === 'eur'
                     ? 'bg-blue-600 text-white shadow-md'
@@ -1163,7 +1146,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 EUR (€)
               </button>
               <button
-                onClick={() => handleCurrencyChange('usd')}
+                onClick={() => setSelectedCurrency('usd')}
                 className={`px-4 py-2 rounded-lg font-medium transition-all ${
                   selectedCurrency === 'usd'
                     ? 'bg-blue-600 text-white shadow-md'
@@ -1177,160 +1160,52 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
           {/* Contenu principal */}
           <section className="bg-white rounded-xl shadow-md overflow-hidden">
-            {currentStep === 'payment' && (
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-                    <CreditCard className="w-4 h-4 text-white" aria-hidden="true" />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900">{t('card.title')}</h4>
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
+                  <CreditCard className="w-4 h-4 text-white" aria-hidden="true" />
                 </div>
-
-                {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg" role="alert" aria-live="assertive">
-                    <div className="flex items-center">
-                      <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" aria-hidden="true" />
-                      <span className="text-sm text-red-700">{error}</span>
-                    </div>
-                  </div>
-                )}
-
-                <Elements stripe={stripePromise}>
-                  <PaymentForm
-                    user={user}
-                    provider={provider}
-                    service={service}
-                    onSuccess={handlePaymentSuccess}
-                    onError={handlePaymentError}
-                    isProcessing={isProcessing}
-                    setIsProcessing={(p) => {
-                      setError('');
-                      setIsProcessing(p);
-                    }}
-                    isMobile={isMobile}
-                  />
-                </Elements>
+                <h4 className="text-lg font-bold text-gray-900">Paiement</h4>
               </div>
-            )}
 
-            {currentStep === 'calling' && (
-              <div className="p-6 text-center">
-                <div className="mb-6">
-                  <Phone
-                    size={32}
-                    className={`mx-auto mb-4 animate-pulse ${(provider.role || provider.type) === 'lawyer' ? 'text-blue-600' : 'text-green-600'}`}
-                    aria-hidden={true}
-                  />
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('ui.connecting')}</h2>
-                  <p className="text-gray-600 text-sm">
-                    {`${language === 'fr' ? 'Connexion à' : 'Connecting to'} ${provider.fullName || provider.name || 'Expert'}...`}
-                  </p>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="bg-green-100 rounded-lg p-3 flex items-center text-sm">
-                    <Check className="w-4 h-4 text-green-600 mr-2" aria-hidden="true" />
-                    <span className="text-green-800">{t('status.paid')}</span>
-                  </div>
-                  <div className="bg-blue-100 rounded-lg p-3 flex items-center text-sm">
-                    <Phone className="w-4 h-4 text-blue-600 mr-2" aria-hidden="true" />
-                    <span className="text-blue-800">{t('status.expertContacted')}</span>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg" role="alert" aria-live="assertive">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" aria-hidden="true" />
+                    <span className="text-sm text-red-700">{error}</span>
                   </div>
                 </div>
+              )}
 
-                <div className="flex justify-center mb-4">
-                  <div className={`animate-spin rounded-full border-2 ${(provider.role || provider.type) === 'lawyer' ? 'border-blue-500' : 'border-red-500'} border-t-transparent w-8 h-8`} />
-                </div>
-
-                {paymentIntentId && (
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600">
-                      Transaction:{' '}
-                      <code className="bg-gray-200 px-1 rounded text-xs">
-                        {paymentIntentId.slice(-8)}
-                      </code>
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {currentStep === 'completed' && (
-              <div className="p-6 text-center">
-                <div className="mb-6">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Check size={28} className="text-green-600" aria-hidden="true" />
-                  </div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    {t('ui.completed')}
-                  </h2>
-                  <p className="text-gray-600 text-sm mb-4">
-                    {language === 'fr'
-                      ? `Votre consultation avec ${(provider.fullName || provider.name || 'Expert')} s'est terminée avec succès.`
-                      : `Your consultation with ${(provider.fullName || provider.name || 'Expert')} finished successfully.`}
-                  </p>
-
-                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                    <h4 className="font-semibold text-gray-900 mb-3">{t('summary.title')}</h4>
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex justify-between">
-                        <span>{t('summary.expert')}:</span>
-                        <span className="font-medium">{provider.fullName || provider.name || 'Expert'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{t('summary.duration')}:</span>
-                        <span className="font-medium">{service.duration} min</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{t('summary.total')}:</span>
-                        <span className="font-medium text-green-600">
-                          {(service.currency === 'usd' ? '$' : '')}{service.amount.toFixed(2)}{(service.currency === 'eur' ? '€' : '')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Date:</span>
-                        <span className="font-medium">{new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-GB')}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => navigate(`/evaluation/${provider.id}`)}
-                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                    >
-                      ⭐ {t('btn.evaluate')} {provider.fullName || provider.name || 'Expert'}
-                    </button>
-                    <button
-                      onClick={() => navigate(`/receipt/${paymentIntentId}`)}
-                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-gray-500 hover:bg-gray-600 text-white transition-colors"
-                    >
-                      📄 {t('btn.receipt')}
-                    </button>
-                    <button
-                      onClick={() => navigate('/')}
-                      className="w-full px-4 py-3 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white transition-colors"
-                    >
-                      🏠 {t('btn.home')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+              <Elements stripe={stripePromise}>
+                <PaymentForm
+                  user={user}
+                  provider={provider}
+                  service={service}
+                  adminPricing={adminPricing}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                  isProcessing={isProcessing}
+                  setIsProcessing={(p) => {
+                    setError('');
+                    setIsProcessing(p);
+                  }}
+                  isMobile={isMobile}
+                />
+              </Elements>
+            </div>
           </section>
 
           {/* Bandeau sécurité */}
-          {currentStep === 'payment' && (
-            <aside className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Shield className="w-4 h-4 text-blue-600 mt-0.5" aria-hidden="true" />
-                <div>
-                  <h4 className="font-semibold text-blue-900 text-sm">{t('banner.secure')}</h4>
-                  <p className="text-xs text-blue-800 mt-1">{t('banner.ssl')}</p>
-                </div>
+          <aside className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <Shield className="w-4 h-4 text-blue-600 mt-0.5" aria-hidden="true" />
+              <div>
+                <h4 className="font-semibold text-blue-900 text-sm">Paiement sécurisé</h4>
+                <p className="text-xs text-blue-800 mt-1">Données protégées par SSL. Appel lancé automatiquement après paiement.</p>
               </div>
-            </aside>
-          )}
+            </div>
+          </aside>
         </div>
       </main>
     </Layout>

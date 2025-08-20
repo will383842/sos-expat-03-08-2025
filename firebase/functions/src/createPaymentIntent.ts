@@ -25,6 +25,7 @@ const CPU_OPTIMIZED_CONFIG = {
     'http://localhost:8080',
     'https://sos-urgently-ac307.web.app',
     'https://sos-urgently-ac307.firebaseapp.com',
+    'http://localhost:5173',
   ],
 };
 

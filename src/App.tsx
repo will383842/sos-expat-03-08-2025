@@ -1,6 +1,6 @@
 // App.tsx
 import React, { useEffect, Suspense, lazy } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { useDeviceDetection } from './hooks/useDeviceDetection';
 import { registerSW, measurePerformance } from './utils/performance';
@@ -253,11 +253,13 @@ const App: React.FC = () => {
           <Routes>
             {routeConfigs.map((cfg, i) => renderRoute(cfg, i))}
             {protectedUserRoutes.map((cfg, i) => renderRoute(cfg, i + 1000))}
+            
+            {/* Admin routes - Fix: Redirect /admin to /admin/dashboard */}
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/*" element={<AdminRoutesV2 />} />
           </Routes>
 
           {/* Routes admin gérées par AdminRoutesV2 */}
-          <AdminRoutesV2 />
         </Suspense>
       </div>
     </HelmetProvider>

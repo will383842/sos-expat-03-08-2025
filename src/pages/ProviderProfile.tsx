@@ -48,140 +48,6 @@ import { formatLanguages } from '@/i18n';
 // 👉 Pricing admin (source de vérité)
 import { usePricingConfig } from '../services/pricingService';
 
-/* =====================================================================
-   🔍 Traçabilité (facultatif / QA)
-===================================================================== */
-export function usePriceTracing() {
-  const { pricing, loading } = usePricingConfig();
-
-  const getTraceAttributes = (
-    serviceType: 'lawyer' | 'expat',
-    currency: 'eur' | 'usd',
-  ): Record<string, string | number> => {
-    if (loading) {
-      return {
-        'data-price-source': 'loading',
-        'data-currency': currency,
-        'data-service-type': serviceType,
-        title: 'Prix en cours de chargement...',
-      };
-    }
-
-    if (pricing) {
-      const config = pricing[serviceType][currency];
-      return {
-        'data-price-source': 'admin',
-        'data-currency': currency,
-        'data-service-type': serviceType,
-        'data-total-amount': config.totalAmount,
-        'data-connection-fee': config.connectionFeeAmount,
-        'data-provider-amount': config.providerAmount,
-        'data-duration': config.duration,
-        title: `Prix admin: ${config.totalAmount}${currency === 'eur' ? '€' : '$'} (durée ${config.duration}min)`,
-      };
-    }
-
-    return {
-      'data-price-source': 'fallback',
-      'data-currency': currency,
-      'data-service-type': serviceType,
-      title: `Prix par défaut (${serviceType === 'lawyer' ? '49€' : '19€'})`,
-    };
-  };
-
-  return { getTraceAttributes };
-}
-
-interface TracedPriceProps {
-  children: React.ReactNode;
-  serviceType: 'lawyer' | 'expat';
-  currency: 'eur' | 'usd';
-  className?: string;
-}
-
-export const TracedPrice: React.FC<TracedPriceProps> = ({
-  children,
-  serviceType,
-  currency,
-  className = '',
-}) => {
-  const { getTraceAttributes } = usePriceTracing();
-  const traceAttrs = getTraceAttributes(serviceType, currency);
-
-  return (
-    <span className={className} {...traceAttrs}>
-      {children}
-    </span>
-  );
-};
-
-/* Helper console debug (dev uniquement) */
-declare global {
-  interface Window {
-    debugPricing?: {
-      showAllPrices: () => Array<{
-        element: Element;
-        source: string;
-        currency: string;
-        serviceType?: string;
-        text: string;
-      }>;
-      highlightBySource: (source: 'admin' | 'provider' | 'fallback' | 'loading') => void;
-      clearHighlights: () => void;
-    };
-  }
-}
-
-if (import.meta.env.DEV) {
-  window.debugPricing = {
-    showAllPrices: () => {
-      const elements = document.querySelectorAll('[data-price-source]');
-      const prices: Array<{
-        element: Element;
-        source: string;
-        currency: string;
-        serviceType?: string;
-        text: string;
-      }> = [];
-
-      elements.forEach((el) => {
-        prices.push({
-          element: el,
-          source: el.getAttribute('data-price-source') || 'unknown',
-          currency: el.getAttribute('data-currency') || 'unknown',
-          serviceType: el.getAttribute('data-service-type') || undefined,
-          text: el.textContent?.trim() || '',
-        });
-      });
-
-      console.table(prices);
-      return prices;
-    },
-    highlightBySource: (source) => {
-      document.querySelectorAll('.debug-price-highlight').forEach((el) => {
-        el.classList.remove('debug-price-highlight');
-        (el as HTMLElement).style.outline = '';
-        (el as HTMLElement).style.backgroundColor = '';
-      });
-
-      document.querySelectorAll(`[data-price-source="${source}"]`).forEach((el) => {
-        el.classList.add('debug-price-highlight');
-        (el as HTMLElement).style.outline = '3px solid red';
-        (el as HTMLElement).style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-      });
-    },
-    clearHighlights: () => {
-      document.querySelectorAll('.debug-price-highlight').forEach((el) => {
-        el.classList.remove('debug-price-highlight');
-        (el as HTMLElement).style.outline = '';
-        (el as HTMLElement).style.backgroundColor = '';
-      });
-    },
-  };
-
-  console.log('🔍 Debug pricing disponible: window.debugPricing');
-}
-
 /* ===================================================================== */
 
 const IMAGE_SIZES = {
@@ -320,7 +186,8 @@ interface SosProfile {
   experienceDescription?: string | LocalizedText; motivation?: string | LocalizedText; bio?: string | LocalizedText;
   profilePhoto?: string; photoURL?: string; avatar?: string; rating: number; reviewCount: number; yearsOfExperience: number; yearsAsExpat?: number;
   isOnline?: boolean; isActive: boolean; isApproved: boolean; isVerified: boolean; isVisibleOnMap?: boolean;
-  price?: number; duration?: number; education?: Education | Education[] | LocalizedText; certifications?: Certification | Certification[] | LocalizedText;
+  // ❌ Supprimé: price?: number; duration?: number; (plus d'override provider)
+  education?: Education | Education[] | LocalizedText; certifications?: Certification | Certification[] | LocalizedText;
   lawSchool?: string | LocalizedText; graduationYear?: number; responseTime?: string; successRate?: number; totalCalls?: number; successfulCalls?: number;
   totalResponses?: number; totalResponseTime?: number; avgResponseTimeMs?: number; createdAt?: TSLike; updatedAt?: TSLike; lastSeen?: TSLike;
 }
@@ -370,25 +237,32 @@ const toStringFromAny = (val: unknown, preferred?: string): string | undefined =
 const isFsTimestamp = (v: unknown): v is FsTimestamp => typeof (v as FsTimestamp | null)?.toDate === 'function';
 const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
   if (!val) return undefined;
-  let d: Date | undefined;
-  d = isFsTimestamp(val) ? val.toDate() : val instanceof Date ? val : undefined;
+  const d = isFsTimestamp(val) ? val.toDate() : val instanceof Date ? val : undefined;
   if (!d) return undefined;
   const fmt = new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' });
   return fmt.format(d);
 };
-const isUser = (user: unknown): user is AuthUser => typeof user === 'object' && user !== null && 'id' in user;
-const isLocationState = (state: unknown): state is LocationState => typeof state === 'object' && state !== null;
 
-/* ======= Helpers prix (format) ======= */
-const formatEUR = (value?: number) =>
-  typeof value === 'number'
-    ? `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}€`
-    : '—';
+/* ======= Helpers prix avec Intl.NumberFormat ======= */
+const formatEUR = (value?: number) => {
+  if (typeof value !== 'number') return '—';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
 
-const formatUSD = (value?: number) =>
-  typeof value === 'number'
-    ? `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`
-    : '$—';
+const formatUSD = (value?: number) => {
+  if (typeof value !== 'number') return '$—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
 
 // Component
 const ProviderProfile: React.FC = () => {
@@ -409,7 +283,7 @@ const ProviderProfile: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
 
   // 👉 Pricing admin (page AdminPricing -> doc "admin_config/pricing")
-  const { pricing, loading: pricingLoading } = usePricingConfig();
+  const { pricing } = usePricingConfig();
 
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -420,7 +294,7 @@ const ProviderProfile: React.FC = () => {
   // Online status
   const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({ isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0 });
 
-  // ======= Prix depuis Admin (EUR principal + équivalent USD) =======
+  // ======= Prix depuis Admin uniquement (EUR principal + équivalent USD) =======
   const serviceTypeForPricing: 'lawyer' | 'expat' | undefined = provider?.type;
   const bookingPrice = useMemo(() => {
     if (!pricing || !serviceTypeForPricing) return null;
@@ -603,7 +477,7 @@ const ProviderProfile: React.FC = () => {
 
         // State fallback
         if (!providerData && typeof location.state === 'object' && location.state !== null) {
-          const state = location.state as any;
+          const state = location.state as LocationState;
           const navData = state.selectedProvider || state.providerData;
           if (navData) {
             const built: SosProfile = {
@@ -629,7 +503,7 @@ const ProviderProfile: React.FC = () => {
               reviewCount: Number(navData.reviewCount) || 0,
               yearsOfExperience: Number(navData.yearsOfExperience) || 0,
               yearsAsExpat: Number(navData.yearsAsExpat) || 0,
-              // ⚠️ On ignore price/duration override — on se base sur AdminPricing
+              // ❌ Plus de prix/durée override provider — uniquement admin
               isOnline: !!navData.isOnline,
               isActive: true,
               isApproved: !!navData.isApproved,
@@ -759,16 +633,20 @@ const ProviderProfile: React.FC = () => {
         provider_id: provider.id, provider_uid: provider.uid, provider_type: provider.type, provider_country: provider.country, is_online: onlineStatus.isOnline,
       });
     }
-    if ((user as any)?.id) {
+    if ((user as AuthUser)?.id) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
-        userId: (user as any).id,
+        userId: (user as AuthUser).id,
         eventData: {
           providerId: provider.id, providerUid: provider.uid, providerType: provider.type, providerName: provider.fullName, providerOnlineStatus: onlineStatus.isOnline,
         },
       });
     }
-    try { sessionStorage.setItem(STORAGE_KEYS.SELECTED_PROVIDER, JSON.stringify(provider)); } catch {}
+    try { 
+      sessionStorage.setItem(STORAGE_KEYS.SELECTED_PROVIDER, JSON.stringify(provider)); 
+    } catch (error) {
+      console.warn('Failed to save provider to sessionStorage:', error);
+    }
     const target = `/booking-request/${provider.id}`;
     if (user) {
       navigate(target, { state: { selectedProvider: provider, navigationSource: 'provider_profile' } });
@@ -898,7 +776,7 @@ const ProviderProfile: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        {user && provider && (user as any)?.id === provider.uid && (
+        {user && provider && (user as AuthUser)?.id === provider.uid && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
@@ -1078,7 +956,7 @@ const ProviderProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* Booking card — ✅ Pas de sélecteur devise, pas de frais, prix unique depuis Admin */}
+              {/* ✅ Booking card - Prix uniquement depuis Admin (EUR principal + équivalent USD) */}
               <aside className="lg:col-span-1">
                 <div className="group relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-200 transition-all hover:scale-[1.01]">
                   <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-red-500/5 to-orange-500/5 group-hover:from-red-500/10 group-hover:to-orange-500/10 transition-opacity" />
@@ -1091,18 +969,13 @@ const ProviderProfile: React.FC = () => {
                         <span>Appel en ~5 min</span>
                       </div>
 
-                      {/* ✅ Prix principal EUR + équivalent USD (admin_config/pricing) */}
+                      {/* ✅ Prix uniquement depuis admin_config/pricing */}
                       <div className="mt-4 text-3xl sm:text-4xl font-black text-gray-900">
                         {bookingPrice ? (
                           <>
-                            {/* On trace le prix EUR avec data-attrs admin */}
-                            <TracedPrice
-                              serviceType={provider.type}
-                              currency="eur"
-                              className="bg-clip-text"
-                            >
+                            <span className="bg-clip-text">
                               {formatEUR(bookingPrice.eur)}
-                            </TracedPrice>{' '}
+                            </span>{' '}
                             <span className="text-gray-600">({formatUSD(bookingPrice.usd)})</span>
                           </>
                         ) : (
@@ -1351,8 +1224,6 @@ const ProviderProfile: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* TODOs perf/accessibilité (facultatif) */}
     </Layout>
   );
 };

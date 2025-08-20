@@ -1,4 +1,4 @@
-// src/components/admin/AdminRoutesV2.tsx 
+// src/components/admin/AdminRoutesV2.tsx
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -12,6 +12,20 @@ const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Chargement.
     </div>
   </div>
 );
+
+// ===== PAGE 404 ADMIN MINIMALE =====
+const AdminNotFound: React.FC = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-semibold mb-2">Page admin introuvable</h1>
+    <p className="text-sm opacity-80">La page demandée n’existe pas.</p>
+    <div className="mt-4">
+      <a href="/admin/dashboard" className="text-red-600 underline">Retour au dashboard</a>
+    </div>
+  </div>
+);
+
+// ===== LAZY IMPORTS - AUTH =====
+const AdminLogin = lazy(() => import("../../pages/admin/AdminLogin"));
 
 // ===== LAZY IMPORTS - DASHBOARD =====
 const AdminDashboard = lazy(() => import("../../pages/admin/AdminDashboard"));
@@ -40,7 +54,6 @@ const AdminReviews = lazy(() => import("../../pages/admin/AdminReviews"));
 // ===== LAZY IMPORTS - CALLS =====
 const AdminCalls = lazy(() => import("../../pages/admin/AdminCalls"));
 const AdminCallsSessions = lazy(() => import("../../pages/admin/AdminCallsSessions"));
-
 
 // ===== LAZY IMPORTS - COMMUNICATIONS =====
 const AdminCommsCampaigns = lazy(() => import("../../pages/admin/AdminCommsCampaigns"));
@@ -154,13 +167,22 @@ const AdminRoutesV2: React.FC = () => {
   return (
     <Suspense fallback={<LoadingSpinner message="Chargement de la page d'administration..." />}>
       <Routes>
-        {/* ===== REDIRECTIONS PRINCIPALES ===== */}
-        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/admin/" element={<Navigate to="/admin/dashboard" replace />} />
+        {/* ===== INDEX : /admin ===== */}
+        <Route index element={<Navigate to="dashboard" replace />} />
+
+        {/* ===== 🔐 AUTHENTIFICATION ===== */}
+        <Route
+          path="login"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Chargement de la connexion admin..." />}>
+              <AdminLogin />
+            </Suspense>
+          }
+        />
 
         {/* ===== 📊 DASHBOARD ===== */}
         <Route
-          path="/admin/dashboard"
+          path="dashboard"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du tableau de bord..." />}>
               <AdminDashboard />
@@ -170,7 +192,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== 👥 UTILISATEURS & PRESTATAIRES ===== */}
         <Route
-          path="/admin/users/clients"
+          path="users/clients"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des clients..." />}>
               <AdminClients />
@@ -178,7 +200,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/users/providers/lawyers"
+          path="users/providers/lawyers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des avocats..." />}>
               <AdminLawyers />
@@ -186,7 +208,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/users/providers/expats"
+          path="users/providers/expats"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des expatriés..." />}>
               <AdminExpats />
@@ -194,7 +216,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/aaaprofiles"
+          path="aaaprofiles"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des profils de test..." />}>
               <AdminAaaProfiles />
@@ -202,7 +224,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/approvals/lawyers"
+          path="approvals/lawyers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des validations d'avocats..." />}>
               <AdminLawyerApprovals />
@@ -210,7 +232,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/kyc/providers"
+          path="kyc/providers"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du KYC prestataires..." />}>
               <AdminKYCProviders />
@@ -218,7 +240,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/reviews"
+          path="reviews"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des avis..." />}>
               <AdminReviews />
@@ -227,13 +249,13 @@ const AdminRoutesV2: React.FC = () => {
         />
 
         {/* ===== ROUTES DE COMPATIBILITÉ ANCIENNES ===== */}
-        <Route path="/admin/users/list" element={<Navigate to="/admin/users/clients" replace />} />
-        <Route path="/admin/users/providers" element={<Navigate to="/admin/users/providers/lawyers" replace />} />
-        <Route path="/admin/approvals" element={<Navigate to="/admin/approvals/lawyers" replace />} />
+        <Route path="users/list" element={<Navigate to="../users/clients" replace />} />
+        <Route path="users/providers" element={<Navigate to="../users/providers/lawyers" replace />} />
+        <Route path="approvals" element={<Navigate to="../approvals/lawyers" replace />} />
 
         {/* ===== 💰 FINANCES & FACTURATION ===== */}
         <Route
-          path="/admin/finance/payments"
+          path="finance/payments"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des paiements..." />}>
               <AdminPayments />
@@ -241,7 +263,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/invoices"
+          path="finance/invoices"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des factures..." />}>
               <AdminInvoices />
@@ -249,7 +271,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/taxes"
+          path="finance/taxes"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la gestion TVA..." />}>
               <AdminFinanceTaxes />
@@ -257,7 +279,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/taxes/by-country"
+          path="finance/taxes/by-country"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la TVA par pays..." />}>
               <AdminFinanceTaxesByCountry />
@@ -265,7 +287,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/reconciliation"
+          path="finance/reconciliation"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des rapprochements..." />}>
               <AdminFinanceReconciliation />
@@ -273,7 +295,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/disputes"
+          path="finance/disputes"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des litiges..." />}>
               <AdminFinanceDisputes />
@@ -281,7 +303,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/refunds"
+          path="finance/refunds"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des remboursements..." />}>
               <AdminFinanceRefunds />
@@ -289,7 +311,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/payouts"
+          path="finance/payouts"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des payouts..." />}>
               <AdminFinancePayouts />
@@ -297,7 +319,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/exports"
+          path="finance/exports"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
               <AdminFinanceExports />
@@ -305,7 +327,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/finance/ledger"
+          path="finance/ledger"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du grand livre..." />}>
               <AdminFinanceLedger />
@@ -315,7 +337,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== 📞 APPELS & PLANIFICATION ===== */}
         <Route
-          path="/admin/calls"
+          path="calls"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement du monitoring des appels..." />}>
               <AdminCalls />
@@ -323,7 +345,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/calls/sessions"
+          path="calls/sessions"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des sessions..." />}>
               <AdminCallsSessions />
@@ -333,7 +355,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== 💌 COMMUNICATIONS ===== */}
         <Route
-          path="/admin/comms/campaigns"
+          path="comms/campaigns"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des campagnes..." />}>
               <AdminCommsCampaigns />
@@ -341,7 +363,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/automations"
+          path="comms/automations"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des automations..." />}>
               <AdminCommsAutomations />
@@ -349,7 +371,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/segments"
+          path="comms/segments"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des segments..." />}>
               <AdminCommsSegments />
@@ -357,7 +379,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/templates"
+          path="comms/templates"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des templates..." />}>
               <AdminCommsTemplates />
@@ -365,7 +387,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/deliverability"
+          path="comms/deliverability"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la délivrabilité..." />}>
               <AdminCommsDeliverability />
@@ -373,7 +395,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/suppression"
+          path="comms/suppression"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des listes de suppression..." />}>
               <AdminCommsSuppression />
@@ -381,7 +403,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/ab"
+          path="comms/ab"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des tests A/B..." />}>
               <AdminCommsABTests />
@@ -389,7 +411,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/messages"
+          path="comms/messages"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des messages..." />}>
               <AdminClientMessages />
@@ -397,7 +419,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/comms/notifications"
+          path="comms/notifications"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des notifications..." />}>
               <AdminNotifications />
@@ -407,7 +429,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== 🤝 AFFILIATION & AMBASSADEURS ===== */}
         <Route
-          path="/admin/affiliates"
+          path="affiliates"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des affiliés..." />}>
               <AdminAffiliates />
@@ -415,7 +437,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/affiliates/commissions"
+          path="affiliates/commissions"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des règles de commission..." />}>
               <AdminCommissionRules />
@@ -423,7 +445,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/affiliates/payouts"
+          path="affiliates/payouts"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des payouts affiliés..." />}>
               <AdminAffiliatePayouts />
@@ -431,7 +453,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/ambassadors"
+          path="ambassadors"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des ambassadeurs..." />}>
               <AdminAmbassadors />
@@ -441,7 +463,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== 🏢 ENTREPRISES (B2B) ===== */}
         <Route
-          path="/admin/b2b/accounts"
+          path="b2b/accounts"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des comptes B2B..." />}>
               <AdminB2BAccounts />
@@ -449,7 +471,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/b2b/members"
+          path="b2b/members"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des membres B2B..." />}>
               <AdminB2BMembers />
@@ -457,7 +479,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/b2b/pricing"
+          path="b2b/pricing"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des tarifs B2B..." />}>
               <AdminB2BPricing />
@@ -465,7 +487,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/b2b/billing"
+          path="b2b/billing"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la facturation B2B..." />}>
               <AdminB2BBilling />
@@ -473,7 +495,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/b2b/invoices"
+          path="b2b/invoices"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des factures B2B..." />}>
               <AdminB2BInvoices />
@@ -481,7 +503,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/b2b/reports"
+          path="b2b/reports"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des rapports B2B..." />}>
               <AdminB2BReports />
@@ -491,7 +513,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== ⚙️ CONFIGURATION & OUTILS ===== */}
         <Route
-          path="/admin/pricing"
+          path="pricing"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des tarifs..." />}>
               <AdminPricing />
@@ -499,7 +521,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/countries"
+          path="countries"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des pays..." />}>
               <AdminCountries />
@@ -507,7 +529,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/documents"
+          path="documents"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des documents légaux..." />}>
               <AdminLegalDocuments />
@@ -515,7 +537,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/backups"
+          path="backups"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des sauvegardes..." />}>
               <AdminBackups />
@@ -523,7 +545,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/settings"
+          path="settings"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des paramètres..." />}>
               <AdminSettings />
@@ -533,7 +555,7 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== 📊 RAPPORTS & ANALYTICS ===== */}
         <Route
-          path="/admin/reports/financial"
+          path="reports/financial"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des rapports financiers..." />}>
               <AdminFinancialReports />
@@ -541,7 +563,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/reports/users"
+          path="reports/users"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des analytics utilisateurs..." />}>
               <AdminUserAnalytics />
@@ -549,7 +571,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/reports/performance"
+          path="reports/performance"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des performances..." />}>
               <AdminPlatformPerformance />
@@ -557,7 +579,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/reports/exports"
+          path="reports/exports"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
               <AdminDataExports />
@@ -565,17 +587,17 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
 
-        {/* ===== ROUTES HISTORIQUES / LEGACY ===== */}
-        <Route path="/admin/users" element={<Navigate to="/admin/users/clients" replace />} />
-        <Route path="/admin/providers" element={<Navigate to="/admin/users/providers/lawyers" replace />} />
-        <Route path="/admin/payments" element={<Navigate to="/admin/finance/payments" replace />} />
-        <Route path="/admin/invoices" element={<Navigate to="/admin/finance/invoices" replace />} />
-        <Route path="/admin/notifications" element={<Navigate to="/admin/comms/notifications" replace />} />
-        <Route path="/admin/messages" element={<Navigate to="/admin/comms/messages" replace />} />
+        {/* ===== ROUTES HISTORIQUES / LEGACY (relatives) ===== */}
+        <Route path="users" element={<Navigate to="users/clients" replace />} />
+        <Route path="providers" element={<Navigate to="users/providers/lawyers" replace />} />
+        <Route path="payments" element={<Navigate to="finance/payments" replace />} />
+        <Route path="invoices" element={<Navigate to="finance/invoices" replace />} />
+        <Route path="notifications" element={<Navigate to="comms/notifications" replace />} />
+        <Route path="messages" element={<Navigate to="comms/messages" replace />} />
 
-        {/* ===== ROUTES SUPPLÉMENTAIRES EXISTANTES ===== */}
+        {/* ===== ROUTES SUPPLÉMENTAIRES ===== */}
         <Route
-          path="/admin/promo-codes"
+          path="promo-codes"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des codes promo..." />}>
               <AdminPromoCodes />
@@ -583,7 +605,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/documents-old"
+          path="documents-old"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des documents..." />}>
               <AdminDocuments />
@@ -591,7 +613,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/contact-messages"
+          path="contact-messages"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement des messages de contact..." />}>
               <AdminContactMessages />
@@ -599,7 +621,7 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
         <Route
-          path="/admin/emails"
+          path="emails"
           element={
             <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des emails..." />}>
               <AdminEmails />
@@ -607,40 +629,16 @@ const AdminRoutesV2: React.FC = () => {
           }
         />
 
-        {/* ===== ROUTES ALIAS SPÉCIFIQUES ===== */}
-        <Route path="/admin/dashboard/global" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/admin/dashboard/alerts" element={<Navigate to="/admin/reports/performance" replace />} />
-        <Route path="/admin/dashboard/reports" element={<Navigate to="/admin/reports/financial" replace />} />
-        <Route path="/admin/finance" element={<Navigate to="/admin/finance/payments" replace />} />
-        <Route path="/admin/users/all" element={<Navigate to="/admin/users/clients" replace />} />
-        <Route path="/admin/comms" element={<Navigate to="/admin/comms/campaigns" replace />} />
+        {/* ===== ROUTES ALIAS (relatives) ===== */}
+        <Route path="dashboard/global" element={<Navigate to="../dashboard" replace />} />
+        <Route path="dashboard/alerts" element={<Navigate to="../reports/performance" replace />} />
+        <Route path="dashboard/reports" element={<Navigate to="../reports/financial" replace />} />
+        <Route path="finance" element={<Navigate to="finance/payments" replace />} />
+        <Route path="users/all" element={<Navigate to="users/clients" replace />} />
+        <Route path="comms" element={<Navigate to="comms/campaigns" replace />} />
 
-        {/* ===== PAGE 404 POUR L'ADMIN ===== */}
-        <Route
-          path="/admin/*"
-          element={
-            <div className="flex items-center justify-center min-h-[400px] bg-gray-50">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Page non trouvée</h2>
-                <p className="text-gray-600 mb-6">
-                  Cette page d'administration n'existe pas ou a été déplacée.
-                </p>
-                <button
-                  onClick={() => window.history.back()}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors mr-4"
-                >
-                  Retour
-                </button>
-                <button
-                  onClick={() => (window.location.href = "/admin/dashboard")}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-                >
-                  Tableau de bord
-                </button>
-              </div>
-            </div>
-          }
-        />
+        {/* ===== CATCH-ALL : vraie 404 admin (ou remets un redirect si tu préfères) ===== */}
+        <Route path="*" element={<AdminNotFound />} />
       </Routes>
     </Suspense>
   );
@@ -651,6 +649,7 @@ const AdminRoutesV2: React.FC = () => {
 export const useAdminRouteValidation = () => {
   const validateRoute = (path: string): boolean => {
     const validPaths = [
+      "/admin/login",
       "/admin/dashboard",
       "/admin/users/clients",
       "/admin/users/providers/lawyers",

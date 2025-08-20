@@ -1,7 +1,9 @@
+// firebase/functions/src/callScheduler.ts
 import { logCallRecord } from './utils/logs/logCallRecord';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 import { twilioCallManager, CallSessionState } from './TwilioCallManager';
+
 // Assurer que Firebase Admin est initialisé
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -19,7 +21,16 @@ const SCHEDULER_CONFIG = {
   MAX_PENDING_SESSIONS: 100,
 } as const;
 
-// 🔧 FIX: Interface corrigée avec montant EN EUROS reçu du frontend
+/**
+ * ✅ Interface des paramètres de création d’appel.
+ * IMPORTANT MONNAIE :
+ * - `amount` est **toujours en EUROS** (unités réelles), **pas** en centimes.
+ * - La conversion en centimes ne doit se faire **qu’au moment Stripe** (en amont,
+ *   typiquement dans la Cloud Function qui crée le PaymentIntent).
+ * - Les champs `amountCents`, `currency`, `platformAmountCents` ci-dessous sont
+ *   **optionnels** et purement informatifs (déjà calculés en amont). Le scheduler
+ *   n’effectue **aucune** conversion supplémentaire.
+ */
 interface CreateCallParams {
   sessionId?: string;
   providerId: string;
@@ -29,11 +40,17 @@ interface CreateCallParams {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // 🔧 FIX: EN EUROS (sera converti en centimes pour Stripe si nécessaire)
+  amount: number; // ✅ EN EUROS (unités réelles)
   delayMinutes?: number;
   requestId?: string;
   clientLanguages?: string[];
   providerLanguages?: string[];
+
+  // Métadonnées optionnelles passées par l’étape de paiement (déjà converties/calculées)
+  amountCents?: number; // en centimes, si fourni par l’amont (non utilisé pour des calculs ici)
+  currency?: 'eur' | 'usd' | 'EUR' | 'USD';
+  platformAmountCents?: number;
+  platformFeePercent?: number;
 }
 
 // Interface pour les statistiques de planification
@@ -58,7 +75,7 @@ class CallSchedulerManager {
     completedToday: 0,
     failedToday: 0,
     averageWaitTime: 0,
-    queueLength: 0
+    queueLength: 0,
   };
 
   constructor() {
@@ -96,8 +113,9 @@ class CallSchedulerManager {
       await this.restartStuckSessions(pendingSessions);
 
       // Log des métriques pour monitoring
-      console.log(`📊 Scheduler Health: ${this.stats.currentlyPending} pending, ${this.stats.queueLength} queued`);
-
+      console.log(
+        `📊 Scheduler Health: ${this.stats.currentlyPending} pending, ${this.stats.queueLength} queued`
+      );
     } catch (error) {
       await logError('CallScheduler:performHealthCheck', error);
     }
@@ -113,14 +131,15 @@ class CallSchedulerManager {
       const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
 
       // Compter les appels d'aujourd'hui
-      const todayQuery = await db.collection('call_sessions')
+      const todayQuery = await db
+        .collection('call_sessions')
         .where('metadata.createdAt', '>=', todayTimestamp)
         .get();
 
       this.stats.completedToday = 0;
       this.stats.failedToday = 0;
 
-      todayQuery.docs.forEach(doc => {
+      todayQuery.docs.forEach((doc) => {
         const session = doc.data() as CallSessionState;
         if (session.status === 'completed') {
           this.stats.completedToday++;
@@ -128,7 +147,6 @@ class CallSchedulerManager {
           this.stats.failedToday++;
         }
       });
-
     } catch (error) {
       await logError('CallScheduler:loadInitialStats', error);
     }
@@ -138,22 +156,20 @@ class CallSchedulerManager {
    * Nettoie les sessions expirées
    */
   private async cleanupExpiredSessions(): Promise<void> {
-    const expiredThreshold = Date.now() - (30 * 60 * 1000); // 30 minutes
+    const expiredThreshold = Date.now() - 30 * 60 * 1000; // 30 minutes
 
     for (const [sessionId, timeout] of this.scheduledCalls.entries()) {
       try {
         const session = await twilioCallManager.getCallSession(sessionId);
-        
-        if (!session || 
-            session.metadata.createdAt.toMillis() < expiredThreshold) {
-          
+
+        if (!session || session.metadata.createdAt.toMillis() < expiredThreshold) {
           clearTimeout(timeout);
           this.scheduledCalls.delete(sessionId);
-          
+
           if (session && session.status === 'pending') {
             await twilioCallManager.cancelCallSession(sessionId, 'expired', 'scheduler');
           }
-          
+
           console.log(`🧹 Session expirée nettoyée: ${sessionId}`);
         }
       } catch (error) {
@@ -166,14 +182,15 @@ class CallSchedulerManager {
    * Redémarre les sessions bloquées
    */
   private async restartStuckSessions(pendingSessions: CallSessionState[]): Promise<void> {
-    const stuckThreshold = Date.now() - (15 * 60 * 1000); // 15 minutes
+    const stuckThreshold = Date.now() - 15 * 60 * 1000; // 15 minutes
 
     for (const session of pendingSessions) {
-      if (session.metadata.createdAt.toMillis() < stuckThreshold &&
-          !this.scheduledCalls.has(session.id)) {
-        
+      if (
+        session.metadata.createdAt.toMillis() < stuckThreshold &&
+        !this.scheduledCalls.has(session.id)
+      ) {
         console.log(`🔄 Redémarrage session bloquée: ${session.id}`);
-        
+
         try {
           await this.scheduleCallSequence(session.id, 0); // Immédiat
         } catch (error) {
@@ -188,13 +205,14 @@ class CallSchedulerManager {
    */
   private async getPendingSessions(): Promise<CallSessionState[]> {
     try {
-      const snapshot = await db.collection('call_sessions')
+      const snapshot = await db
+        .collection('call_sessions')
         .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
         .orderBy('metadata.createdAt', 'desc')
         .limit(SCHEDULER_CONFIG.MAX_PENDING_SESSIONS)
         .get();
 
-      return snapshot.docs.map(doc => doc.data() as CallSessionState);
+      return snapshot.docs.map((doc) => doc.data() as CallSessionState);
     } catch (error) {
       await logError('CallScheduler:getPendingSessions', error);
       return [];
@@ -205,7 +223,7 @@ class CallSchedulerManager {
    * Programme une séquence d'appel
    */
   async scheduleCallSequence(
-    callSessionId: string, 
+    callSessionId: string,
     delayMinutes: number = SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES
   ): Promise<void> {
     try {
@@ -214,7 +232,10 @@ class CallSchedulerManager {
         throw new Error('callSessionId est requis');
       }
 
-      const sanitizedDelay = Math.min(Math.max(delayMinutes, 0), SCHEDULER_CONFIG.MAX_DELAY_MINUTES);
+      const sanitizedDelay = Math.min(
+        Math.max(delayMinutes, 0),
+        SCHEDULER_CONFIG.MAX_DELAY_MINUTES
+      );
 
       // Vérifier que la session existe et est valide
       const session = await twilioCallManager.getCallSession(callSessionId);
@@ -240,11 +261,13 @@ class CallSchedulerManager {
         retryCount: 0,
         additionalData: {
           delayMinutes: sanitizedDelay,
-          scheduledAt: new Date().toISOString()
-        }
+          scheduledAt: new Date().toISOString(),
+        },
       });
 
-      console.log(`⏰ Séquence d'appel programmée pour ${callSessionId} dans ${sanitizedDelay} minutes`);
+      console.log(
+        `⏰ Séquence d'appel programmée pour ${callSessionId} dans ${sanitizedDelay} minutes`
+      );
 
       // Programmer l'exécution
       const timeout = setTimeout(async () => {
@@ -254,19 +277,18 @@ class CallSchedulerManager {
 
       this.scheduledCalls.set(callSessionId, timeout);
       this.stats.totalScheduled++;
-
     } catch (error) {
       await logError('CallScheduler:scheduleCallSequence', error);
-      
+
       // En cas d'erreur, marquer la session comme échouée
       try {
         await twilioCallManager.updateCallSessionStatus(callSessionId, 'failed');
-        
+
         await logCallRecord({
           callId: callSessionId,
           status: 'sequence_failed',
           retryCount: 0,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
         });
       } catch (updateError) {
         await logError('CallScheduler:scheduleCallSequence:updateError', updateError);
@@ -279,11 +301,15 @@ class CallSchedulerManager {
    */
   private async executeScheduledCall(callSessionId: string): Promise<void> {
     let retryCount = 0;
-    
+
     while (retryCount < SCHEDULER_CONFIG.RETRY_ATTEMPTS) {
       try {
-        console.log(`🚀 Exécution appel programmé: ${callSessionId} (tentative ${retryCount + 1}/${SCHEDULER_CONFIG.RETRY_ATTEMPTS})`);
-        
+        console.log(
+          `🚀 Exécution appel programmé: ${callSessionId} (tentative ${
+            retryCount + 1
+          }/${SCHEDULER_CONFIG.RETRY_ATTEMPTS})`
+        );
+
         // Vérifier que la session est toujours valide
         const session = await twilioCallManager.getCallSession(callSessionId);
         if (!session) {
@@ -292,23 +318,26 @@ class CallSchedulerManager {
         }
 
         if (session.status !== 'pending') {
-          console.log(`Session ${callSessionId} status changed to ${session.status}, arrêt de l'exécution`);
+          console.log(
+            `Session ${callSessionId} status changed to ${session.status}, arrêt de l'exécution`
+          );
           return;
         }
 
         // Utiliser le TwilioCallManager pour la gestion robuste des appels
         await twilioCallManager.initiateCallSequence(callSessionId, 0);
-        
+
         console.log(`✅ Appel initié avec succès: ${callSessionId}`);
         return;
-
       } catch (error) {
         retryCount++;
-        
+
         await logError(`CallScheduler:executeScheduledCall:attempt_${retryCount}`, error);
-        
+
         if (retryCount < SCHEDULER_CONFIG.RETRY_ATTEMPTS) {
-          console.log(`⏳ Retry ${retryCount}/${SCHEDULER_CONFIG.RETRY_ATTEMPTS} pour ${callSessionId} dans ${SCHEDULER_CONFIG.RETRY_DELAY_MS}ms`);
+          console.log(
+            `⏳ Retry ${retryCount}/${SCHEDULER_CONFIG.RETRY_ATTEMPTS} pour ${callSessionId} dans ${SCHEDULER_CONFIG.RETRY_DELAY_MS}ms`
+          );
           await this.delay(SCHEDULER_CONFIG.RETRY_DELAY_MS * retryCount); // Délai progressif
         }
       }
@@ -316,15 +345,15 @@ class CallSchedulerManager {
 
     // Toutes les tentatives ont échoué
     console.error(`❌ Échec de toutes les tentatives pour ${callSessionId}`);
-    
+
     try {
       await twilioCallManager.updateCallSessionStatus(callSessionId, 'failed');
       this.stats.failedToday++;
-      
+
       await logCallRecord({
         callId: callSessionId,
         status: 'sequence_failed_all_retries',
-        retryCount: SCHEDULER_CONFIG.RETRY_ATTEMPTS
+        retryCount: SCHEDULER_CONFIG.RETRY_ATTEMPTS,
       });
     } catch (updateError) {
       await logError('CallScheduler:executeScheduledCall:finalUpdate', updateError);
@@ -354,7 +383,6 @@ class CallSchedulerManager {
       });
 
       console.log(`✅ Appel annulé: ${callSessionId}, raison: ${reason}`);
-
     } catch (error) {
       await logError('CallScheduler:cancelScheduledCall', error);
       throw error;
@@ -373,7 +401,7 @@ class CallSchedulerManager {
    */
   shutdown(): void {
     console.log('🔄 Arrêt du CallScheduler...');
-    
+
     // Arrêter le health check
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
@@ -385,13 +413,13 @@ class CallSchedulerManager {
       clearTimeout(timeout);
       console.log(`🚫 Appel programmé annulé lors de l'arrêt: ${sessionId}`);
     }
-    
+
     this.scheduledCalls.clear();
     console.log('✅ CallScheduler arrêté proprement');
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -402,56 +430,55 @@ const callSchedulerManager = new CallSchedulerManager();
  * Fonction principale pour programmer une séquence d'appel
  */
 export const scheduleCallSequence = async (
-  callSessionId: string, 
+  callSessionId: string,
   delayMinutes: number = SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES
 ): Promise<void> => {
   return callSchedulerManager.scheduleCallSequence(callSessionId, delayMinutes);
 };
 
 /**
- * 🔧 FIX CRITIQUE: Fonction pour créer et programmer un nouvel appel - MONTANT EN EUROS
+ * ✅ Fonction pour créer et programmer un nouvel appel
+ * - `amount` est **en EUROS** (unités réelles).
+ * - ❌ Pas de vérification de “cohérence service/prix” ici.
+ * - ✅ On garde uniquement la validation min/max.
+ * - ❗️Aucune conversion centimes ici : la conversion unique vers centimes se fait
+ *   au moment Stripe (dans la fonction de paiement en amont).
  */
-export const createAndScheduleCall = async (params: CreateCallParams): Promise<CallSessionState> => {
+export const createAndScheduleCall = async (
+  params: CreateCallParams
+): Promise<CallSessionState> => {
   try {
     // Générer un ID unique si non fourni
-    const sessionId = params.sessionId || `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
-    console.log(`💰 Montant: ${params.amount}€ pour ${params.serviceType}`);
+    const sessionId =
+      params.sessionId ||
+      `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // 🔧 FIX: Valider les paramètres avec montants EN EUROS
-    if (!params.providerId || !params.clientId || !params.providerPhone || 
-        !params.clientPhone || !params.paymentIntentId || !params.amount) {
-      throw new Error('Paramètres obligatoires manquants pour créer l\'appel');
+    console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
+    console.log(`💰 Montant (EUROS): ${params.amount} pour ${params.serviceType}`);
+
+    // Champs obligatoires
+    if (
+      !params.providerId ||
+      !params.clientId ||
+      !params.providerPhone ||
+      !params.clientPhone ||
+      !params.paymentIntentId ||
+      params.amount == null
+    ) {
+      throw new Error("Paramètres obligatoires manquants pour créer l'appel");
     }
 
-    // 🔧 FIX: Validation du montant EN EUROS
-    if (params.amount < 5) { // 5€ minimum
+    // ✅ Validation min/max (toujours en euros)
+    if (params.amount < 5) {
       throw new Error('Montant minimum de 5€ requis');
     }
-
-    if (params.amount > 500) { // 500€ maximum
+    if (params.amount > 500) {
       throw new Error('Montant maximum de 500€ dépassé');
     }
 
-    // 🔧 FIX: Validation cohérence service/montant EN EUROS
-    const expectedAmountEuros = params.serviceType === 'lawyer_call' ? 49 : 19; // 49€ ou 19€
-    const tolerance = 10; // 10€ de tolérance
-    
-    if (Math.abs(params.amount - expectedAmountEuros) > tolerance) {
-      console.warn(`⚠️ Montant inhabituel: ${params.amount}€ pour ${params.serviceType} (attendu: ${expectedAmountEuros}€)`);
-    }
+    // ❌ Supprimé : validations de cohérence service/prix (49€/19€ etc.)
 
-    // 🔧 FIX CRITIQUE: Conversion EN CENTIMES pour le TwilioCallManager et Stripe
-  // 🔧 FIX CRITIQUE: GARDER LES EUROS - ne pas convertir en centimes ici !
-    console.log('💰 Validation montant (GARDE EN EUROS):', {
-      amountInEuros: params.amount,
-      serviceType: params.serviceType,
-      expectedAmountEuros,
-      difference: params.amount - expectedAmountEuros
-    });
-
-    // 🔧 FIX: Créer la session avec montants EN EUROS
+    // ✅ Créer la session avec montants EN EUROS (aucune conversion ici)
     const callSession = await twilioCallManager.createCallSession({
       sessionId,
       providerId: params.providerId,
@@ -461,15 +488,20 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       serviceType: params.serviceType,
       providerType: params.providerType,
       paymentIntentId: params.paymentIntentId,
-      amount: params.amount, // 🔧 FIX: GARDER EN EUROS - laisser TwilioCallManager gérer la conversion
+      amount: params.amount, // ✅ euros
+      // Métadonnées informatives si fournies par l’amont
+      currency: params.currency,
+      amountCents: params.amountCents,
+      platformAmountCents: params.platformAmountCents,
+      platformFeePercent: params.platformFeePercent,
       requestId: params.requestId,
       clientLanguages: params.clientLanguages,
-      providerLanguages: params.providerLanguages
+      providerLanguages: params.providerLanguages,
     });
 
     // Programmer la séquence d'appel
-    const delayMinutes = params.delayMinutes || SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES;
-    
+    const delayMinutes = params.delayMinutes ?? SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES;
+
     // Utiliser setImmediate pour éviter de bloquer la réponse
     setImmediate(async () => {
       try {
@@ -485,19 +517,21 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
       retryCount: 0,
       additionalData: {
         serviceType: params.serviceType,
-        amountInEuros: params.amount, // Pour audit humain
-         // amountInCents supprimé - on garde tout en euros maintenant
-        delayMinutes: delayMinutes,
-        expectedAmountEuros,
-        amountDifferenceFromExpected: params.amount - expectedAmountEuros
-      }
+        amountInEuros: params.amount, // audit humain
+        delayMinutes,
+        // infos additionnelles si disponibles (purement indicatives)
+        currency: params.currency,
+        amountCents: params.amountCents,
+        platformAmountCents: params.platformAmountCents,
+        platformFeePercent: params.platformFeePercent,
+      },
     });
 
-    console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes`);
-    console.log(`💰 Validation finale: ${params.amount}€ pour ${params.serviceType} (gardé en euros)`);
-    
-    return callSession;
+    console.log(
+      `✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes (montant gardé en euros)`
+    );
 
+    return callSession;
   } catch (error) {
     await logError('createAndScheduleCall:error', error);
     throw error;
@@ -507,7 +541,10 @@ export const createAndScheduleCall = async (params: CreateCallParams): Promise<C
 /**
  * Fonction pour annuler un appel programmé
  */
-export const cancelScheduledCall = async (callSessionId: string, reason: string): Promise<void> => {
+export const cancelScheduledCall = async (
+  callSessionId: string,
+  reason: string
+): Promise<void> => {
   return callSchedulerManager.cancelScheduledCall(callSessionId, reason);
 };
 
@@ -517,12 +554,15 @@ export const cancelScheduledCall = async (callSessionId: string, reason: string)
 export const resumePendingCalls = async (): Promise<void> => {
   try {
     console.log('🔄 Récupération des appels en attente...');
-    
+
     const now = admin.firestore.Timestamp.now();
-    const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 5 * 60 * 1000);
+    const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(
+      now.toMillis() - 5 * 60 * 1000
+    );
 
     // Chercher les sessions en attente créées il y a plus de 5 minutes
-    const pendingSessions = await db.collection('call_sessions')
+    const pendingSessions = await db
+      .collection('call_sessions')
       .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
       .where('metadata.createdAt', '<=', fiveMinutesAgo)
       .limit(50) // Limiter pour éviter la surcharge
@@ -542,15 +582,19 @@ export const resumePendingCalls = async (): Promise<void> => {
       try {
         // Vérifier si le paiement est toujours valide
         const paymentValid = await validatePaymentForResume(sessionData.payment.intentId);
-        
+
         if (!paymentValid) {
-          await twilioCallManager.cancelCallSession(sessionId, 'payment_invalid', 'resume_service');
+          await twilioCallManager.cancelCallSession(
+            sessionId,
+            'payment_invalid',
+            'resume_service'
+          );
           return;
         }
 
         // Relancer la séquence d'appel immédiatement
         await twilioCallManager.initiateCallSequence(sessionId, 0);
-        
+
         await logCallRecord({
           callId: sessionId,
           status: 'call_resumed_after_restart',
@@ -558,10 +602,9 @@ export const resumePendingCalls = async (): Promise<void> => {
         });
 
         console.log(`✅ Session reprise: ${sessionId}`);
-
       } catch (error) {
         await logError(`resumePendingCalls:session_${sessionId}`, error);
-        
+
         // Marquer comme échoué si impossible de reprendre
         try {
           await twilioCallManager.updateCallSessionStatus(sessionId, 'failed');
@@ -573,7 +616,6 @@ export const resumePendingCalls = async (): Promise<void> => {
 
     await Promise.allSettled(resumePromises);
     console.log(`✅ Récupération des sessions terminée`);
-
   } catch (error) {
     await logError('resumePendingCalls:error', error);
   }
@@ -585,7 +627,8 @@ export const resumePendingCalls = async (): Promise<void> => {
 async function validatePaymentForResume(paymentIntentId: string): Promise<boolean> {
   try {
     // Vérifier dans Firestore d'abord
-    const paymentQuery = await db.collection('payments')
+    const paymentQuery = await db
+      .collection('payments')
       .where('stripePaymentIntentId', '==', paymentIntentId)
       .limit(1)
       .get();
@@ -595,10 +638,15 @@ async function validatePaymentForResume(paymentIntentId: string): Promise<boolea
     }
 
     const paymentData = paymentQuery.docs[0].data();
-    const validStatuses = ['pending', 'requires_confirmation', 'requires_action', 'processing', 'requires_capture'];
-    
-    return validStatuses.includes(paymentData.status);
+    const validStatuses = [
+      'pending',
+      'requires_confirmation',
+      'requires_action',
+      'processing',
+      'requires_capture',
+    ];
 
+    return validStatuses.includes(paymentData.status);
   } catch (error) {
     await logError('validatePaymentForResume', error);
     return false;
@@ -608,27 +656,32 @@ async function validatePaymentForResume(paymentIntentId: string): Promise<boolea
 /**
  * Fonction de nettoyage des anciennes sessions
  */
-export const cleanupOldSessions = async (olderThanDays: number = 30): Promise<void> => {
+export const cleanupOldSessions = async (
+  olderThanDays: number = 30
+): Promise<void> => {
   try {
     console.log(`🧹 Nettoyage des sessions de plus de ${olderThanDays} jours...`);
-    
+
     const result = await twilioCallManager.cleanupOldSessions({
       olderThanDays,
       keepCompletedDays: 7, // Garder les complétées 7 jours
-      batchSize: 50
+      batchSize: 50,
     });
 
-    console.log(`✅ Nettoyage terminé: ${result.deleted} supprimées, ${result.errors} erreurs`);
-
+    console.log(
+      `✅ Nettoyage terminé: ${result.deleted} supprimées, ${result.errors} erreurs`
+    );
   } catch (error) {
     await logError('cleanupOldSessions:error', error);
   }
 };
 
 /**
- * 🔧 FIX: Fonction pour obtenir des statistiques sur les appels avec montants cohérents
+ * ✅ Fonction pour obtenir des statistiques sur les appels avec montants en EUROS
  */
-export const getCallStatistics = async (periodDays: number = 7): Promise<{
+export const getCallStatistics = async (
+  periodDays: number = 7
+): Promise<{
   scheduler: SchedulerStats;
   calls: {
     total: number;
@@ -637,40 +690,43 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
     cancelled: number;
     averageDuration: number;
     successRate: number;
-    totalRevenueEuros: number; // EN EUROS pour affichage
-    averageAmountEuros: number; // EN EUROS pour affichage
+    totalRevenueEuros: number; // ✅ EN EUROS pour affichage
+    averageAmountEuros: number; // ✅ EN EUROS pour affichage
   };
 }> => {
   try {
     const startDate = admin.firestore.Timestamp.fromMillis(
-      Date.now() - (periodDays * 24 * 60 * 60 * 1000)
+      Date.now() - periodDays * 24 * 60 * 60 * 1000
     );
 
     const [schedulerStats, callStats] = await Promise.all([
       callSchedulerManager.getStats(),
-      twilioCallManager.getCallStatistics({ startDate })
+      twilioCallManager.getCallStatistics({ startDate }),
     ]);
 
-    // 🔧 FIX: Calculs de revenus EN EUROS pour l'affichage
+    // ✅ Calculs de revenus EN EUROS pour l'affichage
     let totalRevenueEuros = 0;
     let completedCallsWithRevenue = 0;
 
     // Récupérer les sessions complétées avec revenus
-    const completedSessionsQuery = await db.collection('call_sessions')
+    const completedSessionsQuery = await db
+      .collection('call_sessions')
       .where('metadata.createdAt', '>=', startDate)
       .where('status', '==', 'completed')
       .where('payment.status', '==', 'captured')
       .get();
 
-    completedSessionsQuery.docs.forEach(doc => {
+    completedSessionsQuery.docs.forEach((doc) => {
       const session = doc.data() as CallSessionState;
-      // Convertir depuis centimes vers euros si nécessaire
-      const amountInEuros = session.payment.amount; // Déjà en euros maintenant
+      const amountInEuros = session.payment.amount; // stocké en euros
       totalRevenueEuros += amountInEuros;
       completedCallsWithRevenue++;
     });
 
-    const averageAmountEuros = completedCallsWithRevenue > 0 ? totalRevenueEuros / completedCallsWithRevenue : 0;
+    const averageAmountEuros =
+      completedCallsWithRevenue > 0
+        ? totalRevenueEuros / completedCallsWithRevenue
+        : 0;
 
     return {
       scheduler: schedulerStats,
@@ -682,10 +738,9 @@ export const getCallStatistics = async (periodDays: number = 7): Promise<{
         averageDuration: callStats.averageDuration,
         successRate: callStats.successRate,
         totalRevenueEuros,
-        averageAmountEuros
-      }
+        averageAmountEuros,
+      },
     };
-
   } catch (error) {
     await logError('getCallStatistics:error', error);
     throw error;

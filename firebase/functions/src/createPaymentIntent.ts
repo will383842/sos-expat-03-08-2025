@@ -1,5 +1,5 @@
 // firebase/functions/src/createPaymentIntent.ts
-// 🔧 FIX CORS: Configuration simplifiée pour Firebase Functions v2
+// 🔧 FIX CORS: Configuration explicite pour Firebase Functions v2
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
@@ -12,7 +12,7 @@ import {
 } from './utils/paymentValidators';
 
 // =========================================
-// 🔧 FIX CORS: Configuration simplifiée - Firebase v2 gère automatiquement les CORS avec onCall
+// 🔧 FIX CORS: Configuration CORS explicite pour Firebase Functions v2
 // =========================================
 const CPU_OPTIMIZED_CONFIG = {
   memory: "256MiB" as const,
@@ -20,7 +20,13 @@ const CPU_OPTIMIZED_CONFIG = {
   maxInstances: 10,
   minInstances: 0,
   concurrency: 80,
-  // ✅ CORS automatique avec onCall - pas besoin de configuration manuelle
+  // ✅ Configuration CORS explicite
+  cors: [
+    'http://localhost:5174',     // Développement local
+    'http://localhost:3000',     // Alternative développement
+    'https://sos-urgently-ac307.web.app',      // Firebase Hosting
+    'https://sos-urgently-ac307.firebaseapp.com'  // Alternative Firebase
+  ]
 };
 
 // =========================================
@@ -388,18 +394,15 @@ function logSecurityEvent(event: string, data: Record<string, unknown>) {
 }
 
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE avec FIX CORS
+// 🚀 CLOUD FUNCTION PRINCIPALE avec CORS FIXÉ
 // =========================================
 export const createPaymentIntent = onCall(
-  CPU_OPTIMIZED_CONFIG,
+  CPU_OPTIMIZED_CONFIG, // ✅ Maintenant avec configuration CORS explicite
   async (request: CallableRequest<PaymentIntentRequestData>) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
 
     try {
-      // 🔧 FIX CORS: Firebase Functions v2 avec onCall gère automatiquement les CORS
-      // Plus besoin de validateAndSetCorsHeaders ou de gestion manuelle
-      
       logSecurityEvent('payment_intent_start', {
         requestId,
         environment: process.env.NODE_ENV,
@@ -585,7 +588,6 @@ export const createPaymentIntent = onCall(
         provider: formatAmount(providerAmountInMainUnit, currency),
       });
 
-      // 🔧 FIX CORS: Retourner directement la réponse - Firebase gère les headers CORS
       const response: SuccessResponse = {
         success: true,
         clientSecret: result.clientSecret!,

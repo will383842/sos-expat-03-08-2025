@@ -859,7 +859,7 @@ const ProviderProfile: React.FC = () => {
                         onClick={() => setShowImageModal(true)}
                         onError={handleImageError}
                         loading="eager"
-                        fetchPriority="high"
+                        fetchpriority="high"
                       />
                     </div>
                     {/* Online status */}

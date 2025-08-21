@@ -172,6 +172,33 @@ service cloud.firestore {
       allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin()) || isDevMode();
     }
 
+    // ========== BOOKING_REQUESTS ==========
+    match /booking_requests/{bookingId} {
+      function hasValidBookingFields() {
+        return request.resource.data.keys().hasAll(['clientId','providerId','serviceType','status']) &&
+               request.resource.data.clientId is string &&
+               request.resource.data.providerId is string &&
+               request.resource.data.serviceType is string &&
+               request.resource.data.status in ['pending','confirmed','cancelled','completed'];
+      }
+
+      allow read: if (isAuthenticated() &&
+                      (request.auth.uid == resource.data.clientId ||
+                       request.auth.uid == resource.data.providerId) ||
+                     isAdmin()) || isDevMode();
+
+      allow create: if (isAuthenticated() && isNotBanned() &&
+                        request.resource.data.clientId == request.auth.uid &&
+                        hasValidBookingFields()) || isDevMode();
+
+      allow update: if ((isAuthenticated() && isNotBanned() &&
+                         (request.auth.uid == resource.data.clientId ||
+                          request.auth.uid == resource.data.providerId)) ||
+                        isAdmin()) || isDevMode();
+
+      allow delete: if isAdmin() || isDevMode();
+    }
+
     // ============ DOCUMENTS ============
     match /documents/{documentId} {
       allow read: if ((isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin()) || isDevMode();

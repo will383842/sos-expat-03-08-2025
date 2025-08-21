@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StripeManager = exports.toCents = void 0;
+exports.stripeManager = exports.StripeManager = exports.toCents = void 0;
 // firebase/functions/src/StripeManager.ts
 const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
@@ -60,9 +60,6 @@ const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || '', {
 class StripeManager {
     constructor() {
         this.db = firebase_1.db;
-        // Méthodes privées manquantes
-        // Instance singleton
-        this.stripeManager = new StripeManager();
     }
     validateConfiguration() {
         if (!process.env.STRIPE_SECRET_KEY) {
@@ -186,7 +183,6 @@ class StripeManager {
             };
         }
     }
-    // ... Reste des méthodes inchangées (capturePayment, refundPayment, etc.)
     async findExistingPayment(clientId, providerId) {
         try {
             const snapshot = await this.db
@@ -267,27 +263,176 @@ class StripeManager {
             hasCallSessionId: !!paymentRecord.callSessionId,
         });
     }
-    // ... Autres méthodes existantes restent identiques
     async capturePayment(paymentIntentId, sessionId) {
-        // ... code existant inchangé
-        return { success: true };
+        try {
+            // Récupérer le paiement depuis Stripe
+            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+            if (paymentIntent.status !== 'requires_capture') {
+                throw new Error(`Cannot capture payment with status: ${paymentIntent.status}`);
+            }
+            // Capturer le paiement
+            const capturedPayment = await stripe.paymentIntents.capture(paymentIntentId);
+            // Mettre à jour en DB
+            await this.db.collection('payments').doc(paymentIntentId).update({
+                status: capturedPayment.status,
+                capturedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                sessionId: sessionId || null,
+            });
+            console.log('✅ Paiement capturé:', {
+                id: paymentIntentId,
+                amount: capturedPayment.amount,
+                status: capturedPayment.status,
+            });
+            return {
+                success: true,
+                paymentIntentId: capturedPayment.id,
+            };
+        }
+        catch (error) {
+            await (0, logError_1.logError)('StripeManager:capturePayment', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Erreur lors de la capture',
+            };
+        }
     }
     async refundPayment(paymentIntentId, reason, sessionId, amount) {
-        // ... code existant inchangé
-        return { success: true };
+        try {
+            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+            const refundData = {
+                payment_intent: paymentIntentId,
+                reason: reason,
+                metadata: {
+                    sessionId: sessionId || '',
+                    refundReason: reason,
+                }
+            };
+            if (amount !== undefined) {
+                refundData.amount = (0, exports.toCents)(amount);
+            }
+            const refund = await stripe.refunds.create(refundData);
+            // Mettre à jour en DB
+            await this.db.collection('payments').doc(paymentIntentId).update({
+                status: 'refunded',
+                refundId: refund.id,
+                refundReason: reason,
+                refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                sessionId: sessionId || null,
+            });
+            console.log('✅ Paiement remboursé:', {
+                paymentIntentId,
+                refundId: refund.id,
+                amount: refund.amount,
+                reason,
+            });
+            return {
+                success: true,
+                paymentIntentId: paymentIntent.id,
+            };
+        }
+        catch (error) {
+            await (0, logError_1.logError)('StripeManager:refundPayment', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Erreur lors du remboursement',
+            };
+        }
     }
     async cancelPayment(paymentIntentId, reason, sessionId) {
-        // ... code existant inchangé
-        return { success: true };
+        try {
+            const canceledPayment = await stripe.paymentIntents.cancel(paymentIntentId, {
+                cancellation_reason: reason,
+            });
+            // Mettre à jour en DB
+            await this.db.collection('payments').doc(paymentIntentId).update({
+                status: canceledPayment.status,
+                cancelReason: reason,
+                canceledAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                sessionId: sessionId || null,
+            });
+            console.log('✅ Paiement annulé:', {
+                id: paymentIntentId,
+                status: canceledPayment.status,
+                reason,
+            });
+            return {
+                success: true,
+                paymentIntentId: canceledPayment.id,
+            };
+        }
+        catch (error) {
+            await (0, logError_1.logError)('StripeManager:cancelPayment', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Erreur lors de l\'annulation',
+            };
+        }
     }
     async getPaymentStatistics(options = {}) {
-        // ... code existant inchangé
-        return {};
+        try {
+            let query = this.db.collection('payments');
+            if (options.startDate) {
+                query = query.where('createdAt', '>=', options.startDate);
+            }
+            if (options.endDate) {
+                query = query.where('createdAt', '<=', options.endDate);
+            }
+            if (options.serviceType) {
+                query = query.where('serviceType', '==', options.serviceType);
+            }
+            if (options.providerType) {
+                query = query.where('providerType', '==', options.providerType);
+            }
+            const snapshot = await query.get();
+            const stats = {
+                totalAmount: 0,
+                totalCommission: 0,
+                totalProvider: 0,
+                count: 0,
+                byStatus: {},
+            };
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                stats.count++;
+                stats.totalAmount += data.amount || 0;
+                stats.totalCommission += data.commissionAmount || 0;
+                stats.totalProvider += data.providerAmount || 0;
+                const status = data.status || 'unknown';
+                stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
+            });
+            // Convertir en euros pour l'affichage
+            return Object.assign(Object.assign({}, stats), { totalAmount: stats.totalAmount / 100, totalCommission: stats.totalCommission / 100, totalProvider: stats.totalProvider / 100 });
+        }
+        catch (error) {
+            await (0, logError_1.logError)('StripeManager:getPaymentStatistics', error);
+            return {
+                totalAmount: 0,
+                totalCommission: 0,
+                totalProvider: 0,
+                count: 0,
+                byStatus: {},
+            };
+        }
     }
     async getPayment(paymentIntentId) {
-        // ... code existant inchangé
-        return null;
+        try {
+            const doc = await this.db.collection('payments').doc(paymentIntentId).get();
+            if (!doc.exists) {
+                return null;
+            }
+            const data = doc.data();
+            return Object.assign(Object.assign({}, data), { amountInEuros: ((data === null || data === void 0 ? void 0 : data.amount) || 0) / 100, commissionAmountEuros: ((data === null || data === void 0 ? void 0 : data.commissionAmount) || 0) / 100, providerAmountEuros: ((data === null || data === void 0 ? void 0 : data.providerAmount) || 0) / 100 });
+        }
+        catch (error) {
+            await (0, logError_1.logError)('StripeManager:getPayment', error);
+            return null;
+        }
     }
-}
+} // ✅ ACCOLADE FERMANTE AJOUTÉE ICI
 exports.StripeManager = StripeManager;
+// Instance singleton
+exports.stripeManager = new StripeManager();
 //# sourceMappingURL=StripeManager.js.map

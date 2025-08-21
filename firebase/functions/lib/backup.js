@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledBackup = void 0;
+exports.listBackups = exports.scheduledBackup = exports.manualBackup = void 0;
 // functions/src/backup.ts
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
@@ -74,8 +74,14 @@ async function exportAuthUsers(gcsPath) {
     do {
         const page = await admin.auth().listUsers(1000, next);
         users.push(...page.users.map(u => ({
-            uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: u.displayName,
-            disabled: u.disabled, providerData: u.providerData, customClaims: u.customClaims, metadata: u.metadata
+            uid: u.uid,
+            email: u.email,
+            phoneNumber: u.phoneNumber,
+            displayName: u.displayName,
+            disabled: u.disabled,
+            providerData: u.providerData,
+            customClaims: u.customClaims,
+            metadata: u.metadata
         })));
         next = page.pageToken;
     } while (next);
@@ -88,22 +94,20 @@ async function runStorageTransfer(prefixForThisBackup) {
     const auth = await googleapis_1.google.auth.getClient({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
     const sts = googleapis_1.google.storagetransfer({ version: "v1", auth });
     const start = new Date(); // démarrer maintenant
-    const request = {
-        requestBody: {
-            projectId: PROJECT_ID,
-            transferSpec: {
-                gcsDataSource: { bucketName: STORAGE_SOURCE_BUCKET },
-                gcsDataSink: { bucketName: BACKUP_BUCKET, path: `app/${prefixForThisBackup}/storage/` },
-                transferOptions: { overwriteObjectsAlreadyExistingInSink: true }
-            },
-            schedule: {
-                scheduleStartDate: { year: start.getFullYear(), month: start.getMonth() + 1, day: start.getDate() }
-            },
-            status: "ENABLED",
-            description: `backup-${prefixForThisBackup}`
-        }
+    const requestBody = {
+        projectId: PROJECT_ID,
+        transferSpec: {
+            gcsDataSource: { bucketName: STORAGE_SOURCE_BUCKET },
+            gcsDataSink: { bucketName: BACKUP_BUCKET, path: `app/${prefixForThisBackup}/storage/` },
+            transferOptions: { overwriteObjectsAlreadyExistingInSink: true }
+        },
+        schedule: {
+            scheduleStartDate: { year: start.getFullYear(), month: start.getMonth() + 1, day: start.getDate() }
+        },
+        status: "ENABLED",
+        description: `backup-${prefixForThisBackup}`
     };
-    const res = await sts.transferJobs.create(request);
+    const res = await sts.transferJobs.create({ requestBody });
     return res.data.name || ""; // ex: transferJobs/123456789
 }
 /** ----------------- FUNCTIONS SNAPSHOT (liste JSON) ----------------- */
@@ -158,7 +162,10 @@ async function runBackupInternal(type, createdBy) {
     const prefix = `${date}/${ts}`;
     const base = `gs://${BACKUP_BUCKET}/app/${prefix}`;
     const docRef = await db.collection("backups").add({
-        type, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy
+        type,
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy
     });
     const artifacts = {};
     try {
@@ -175,30 +182,59 @@ async function runBackupInternal(type, createdBy) {
         return { ok: true, artifacts };
     }
     catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         await docRef.update({
             status: "failed",
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
-            error: (err === null || err === void 0 ? void 0 : err.message) || String(err)
+            error: errorMessage
         });
         throw err;
     }
 }
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
 // 1) Bouton "Sauvegarder maintenant" (depuis ton admin)
-if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
-}
-const claims = request.auth.token;
-return await runBackupInternal("manual", request.auth.uid);
-;
-// 2) Pour l’automatique (Scheduler OU scheduler Firebase)
+exports.manualBackup = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+    }
+    // Vérifier les permissions admin (optionnel)
+    const claims = context.auth.token;
+    if (!claims.admin && !claims.isAdmin) {
+        throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+    }
+    return await runBackupInternal("manual", context.auth.uid);
+});
+// 2) Pour l'automatique (Scheduler OU scheduler Firebase)
 exports.scheduledBackup = functions.https.onRequest(async (_req, res) => {
     try {
         await runBackupInternal("automatic", "system");
         res.status(200).send("ok");
     }
     catch (e) {
-        res.status(500).send((e === null || e === void 0 ? void 0 : e.message) || "error");
+        const errorMessage = e instanceof Error ? e.message : "error";
+        res.status(500).send(errorMessage);
+    }
+});
+// 3) Fonction pour lister les sauvegardes (optionnel)
+exports.listBackups = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+    }
+    const claims = context.auth.token;
+    if (!claims.admin && !claims.isAdmin) {
+        throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+    }
+    try {
+        const limit = (data === null || data === void 0 ? void 0 : data.limit) || 10;
+        const snap = await db.collection("backups")
+            .orderBy("createdAt", "desc")
+            .limit(limit)
+            .get();
+        const backups = snap.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
+        return { backups };
+    }
+    catch (_a) {
+        throw new functions.https.HttpsError("internal", "Erreur lors de la récupération des sauvegardes.");
     }
 });
 //# sourceMappingURL=backup.js.map

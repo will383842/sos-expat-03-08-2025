@@ -1,5 +1,5 @@
 // firebase/functions/src/services/pricingService.ts
-import { firestore } from '../config/firebase';
+import { db as firestore } from '../utils/firebase';
 
 export interface ServiceConfig {
   totalAmount: number;

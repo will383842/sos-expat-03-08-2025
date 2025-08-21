@@ -1,5 +1,5 @@
 "use strict";
-// functions/src/index.ts - Version finale v2 avec CORS intégré
+// functions/src/index.ts - Version finale v2 avec CORS intégré et config Firebase
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -83,11 +83,12 @@ Object.defineProperty(exports, "api", { enumerable: true, get: function () { ret
 const https_1 = require("firebase-functions/v2/https");
 const https_2 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
+const functions = __importStar(require("firebase-functions")); // Ajouté pour config()
 const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
-// Charger les variables d'environnement depuis .env
-const dotenv = __importStar(require("dotenv"));
-dotenv.config();
+// ❌ SUPPRIMÉ - dotenv ne fonctionne pas avec Firebase Functions
+// import * as dotenv from 'dotenv';
+// dotenv.config();
 // Initialiser Firebase Admin (une seule fois)
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -380,11 +381,12 @@ exports.adminMuteParticipant = (0, https_2.onCall)({
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES
 // ========================================
-// Configuration Stripe avec gestion d'erreurs
+// ✅ Configuration Stripe avec Firebase Functions Config
 let stripe = null;
-if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')) {
+const stripeConfig = functions.config().stripe;
+if ((stripeConfig === null || stripeConfig === void 0 ? void 0 : stripeConfig.secret_key) && stripeConfig.secret_key.startsWith('sk_')) {
     try {
-        stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY, {
+        stripe = new stripe_1.default(stripeConfig.secret_key, {
             apiVersion: '2023-10-16',
         });
         console.log('✅ Stripe configuré avec succès');
@@ -396,6 +398,7 @@ if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('s
 }
 else {
     console.warn('⚠️ Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide');
+    console.log('Configuration disponible:', !!stripeConfig);
 }
 // ====== WEBHOOK STRIPE UNIFIÉ ======
 exports.stripeWebhook = (0, https_1.onRequest)({
@@ -417,7 +420,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({
             res.status(400).send('Raw body manquant');
             return;
         }
-        const event = stripe.webhooks.constructEvent(rawBody.toString(), signature, process.env.STRIPE_WEBHOOK_SECRET || '');
+        const event = stripe.webhooks.constructEvent(rawBody.toString(), signature, (stripeConfig === null || stripeConfig === void 0 ? void 0 : stripeConfig.webhook_secret) || '');
         console.log('🔔 Stripe webhook reçu:', event.type);
         // Traiter l'événement avec le nouveau système
         switch (event.type) {

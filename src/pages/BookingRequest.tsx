@@ -309,6 +309,7 @@ interface BookingRequestData {
   clientLanguagesDetails: Array<{ code: string; name: string }>;
   price: number;
   duration: number;
+  serviceType: string;
   status: string;
   createdAt: Date;
   ip: string;
@@ -886,6 +887,7 @@ const BookingRequest: React.FC = () => {
       price: eurTotalForDisplay,
       duration: durationForDisplay,
       status: 'pending',
+      serviceType: isLawyer ? 'lawyer_call' : 'expat_call',
       createdAt: new Date(),
       ip: window.location.hostname,
       userAgent: navigator.userAgent,

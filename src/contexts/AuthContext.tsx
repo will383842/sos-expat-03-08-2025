@@ -334,12 +334,15 @@ const createUserDocumentInFirestore = async (
 
   if (docSnap.exists()) {
     const existing = docSnap.data() as Partial<User>;
+    
+    // ✅ CORRECTION : Ne pas modifier isOnline lors de l'update
     await updateDoc(userRef, {
       lastLoginAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       isActive: true,
-      isOnline: existing.role === 'client',
+      // ❌ SUPPRIMÉ : isOnline: existing.role === 'client',
     });
+    
     return {
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
@@ -348,6 +351,8 @@ const createUserDocumentInFirestore = async (
       updatedAt: new Date(),
       lastLoginAt: new Date(),
       isVerifiedEmail: firebaseUser.emailVerified,
+      // ✅ Garder la valeur existante de isOnline
+      isOnline: existing.isOnline || (existing.role === 'client'),
     } as User;
   }
 
@@ -498,11 +503,12 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
   if (!snap.exists()) return null;
   const data = snap.data() as Partial<User>;
 
+  // ✅ CORRECTION : Ne pas modifier isOnline lors de la lecture
   updateDoc(refUser, {
     lastLoginAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isActive: true,
-    isOnline: data.role === 'client',
+    // ❌ SUPPRIMÉ : isOnline: data.role === 'client',
   }).catch(() => { /* no-op */ });
 
   return {
@@ -513,6 +519,8 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
     updatedAt: new Date(),
     lastLoginAt: new Date(),
     isVerifiedEmail: firebaseUser.emailVerified,
+    // ✅ Garder la valeur existante de isOnline
+    isOnline: data.isOnline || (data.role === 'client'),
   } as User;
 };
 
@@ -781,7 +789,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           lastLoginAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           isActive: true,
-          isOnline: true,
+          // ✅ CORRECTION : Ne pas modifier isOnline ici non plus
           ...(googleUser.photoURL &&
             googleUser.photoURL !== existing.photoURL && {
               photoURL: googleUser.photoURL,
@@ -867,7 +875,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
             lastLoginAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             isActive: true,
-            isOnline: true,
+            // ✅ CORRECTION : Ne pas modifier isOnline ici non plus
           });
         } else {
           await createUserDocumentInFirestore(googleUser, {

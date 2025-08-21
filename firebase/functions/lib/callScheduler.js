@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.callSchedulerManager = exports.gracefulShutdown = exports.getCallStatistics = exports.cleanupOldSessions = exports.resumePendingCalls = exports.cancelScheduledCall = exports.createAndScheduleCall = exports.scheduleCallSequence = void 0;
+// firebase/functions/src/callScheduler.ts
 const logCallRecord_1 = require("./utils/logs/logCallRecord");
 const logError_1 = require("./utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));
@@ -65,7 +66,7 @@ class CallSchedulerManager {
             completedToday: 0,
             failedToday: 0,
             averageWaitTime: 0,
-            queueLength: 0
+            queueLength: 0,
         };
         this.startHealthCheck();
         this.loadInitialStats();
@@ -112,12 +113,13 @@ class CallSchedulerManager {
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
             // Compter les appels d'aujourd'hui
-            const todayQuery = await db.collection('call_sessions')
+            const todayQuery = await db
+                .collection('call_sessions')
                 .where('metadata.createdAt', '>=', todayTimestamp)
                 .get();
             this.stats.completedToday = 0;
             this.stats.failedToday = 0;
-            todayQuery.docs.forEach(doc => {
+            todayQuery.docs.forEach((doc) => {
                 const session = doc.data();
                 if (session.status === 'completed') {
                     this.stats.completedToday++;
@@ -135,12 +137,11 @@ class CallSchedulerManager {
      * Nettoie les sessions expirées
      */
     async cleanupExpiredSessions() {
-        const expiredThreshold = Date.now() - (30 * 60 * 1000); // 30 minutes
+        const expiredThreshold = Date.now() - 30 * 60 * 1000; // 30 minutes
         for (const [sessionId, timeout] of this.scheduledCalls.entries()) {
             try {
                 const session = await TwilioCallManager_1.twilioCallManager.getCallSession(sessionId);
-                if (!session ||
-                    session.metadata.createdAt.toMillis() < expiredThreshold) {
+                if (!session || session.metadata.createdAt.toMillis() < expiredThreshold) {
                     clearTimeout(timeout);
                     this.scheduledCalls.delete(sessionId);
                     if (session && session.status === 'pending') {
@@ -158,7 +159,7 @@ class CallSchedulerManager {
      * Redémarre les sessions bloquées
      */
     async restartStuckSessions(pendingSessions) {
-        const stuckThreshold = Date.now() - (15 * 60 * 1000); // 15 minutes
+        const stuckThreshold = Date.now() - 15 * 60 * 1000; // 15 minutes
         for (const session of pendingSessions) {
             if (session.metadata.createdAt.toMillis() < stuckThreshold &&
                 !this.scheduledCalls.has(session.id)) {
@@ -177,12 +178,13 @@ class CallSchedulerManager {
      */
     async getPendingSessions() {
         try {
-            const snapshot = await db.collection('call_sessions')
+            const snapshot = await db
+                .collection('call_sessions')
                 .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
                 .orderBy('metadata.createdAt', 'desc')
                 .limit(SCHEDULER_CONFIG.MAX_PENDING_SESSIONS)
                 .get();
-            return snapshot.docs.map(doc => doc.data());
+            return snapshot.docs.map((doc) => doc.data());
         }
         catch (error) {
             await (0, logError_1.logError)('CallScheduler:getPendingSessions', error);
@@ -220,8 +222,8 @@ class CallSchedulerManager {
                 retryCount: 0,
                 additionalData: {
                     delayMinutes: sanitizedDelay,
-                    scheduledAt: new Date().toISOString()
-                }
+                    scheduledAt: new Date().toISOString(),
+                },
             });
             console.log(`⏰ Séquence d'appel programmée pour ${callSessionId} dans ${sanitizedDelay} minutes`);
             // Programmer l'exécution
@@ -241,7 +243,7 @@ class CallSchedulerManager {
                     callId: callSessionId,
                     status: 'sequence_failed',
                     retryCount: 0,
-                    errorMessage: error instanceof Error ? error.message : 'Unknown error'
+                    errorMessage: error instanceof Error ? error.message : 'Unknown error',
                 });
             }
             catch (updateError) {
@@ -289,7 +291,7 @@ class CallSchedulerManager {
             await (0, logCallRecord_1.logCallRecord)({
                 callId: callSessionId,
                 status: 'sequence_failed_all_retries',
-                retryCount: SCHEDULER_CONFIG.RETRY_ATTEMPTS
+                retryCount: SCHEDULER_CONFIG.RETRY_ATTEMPTS,
             });
         }
         catch (updateError) {
@@ -347,7 +349,7 @@ class CallSchedulerManager {
         console.log('✅ CallScheduler arrêté proprement');
     }
     delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 }
 // Instance singleton du scheduler
@@ -361,41 +363,39 @@ const scheduleCallSequence = async (callSessionId, delayMinutes = SCHEDULER_CONF
 };
 exports.scheduleCallSequence = scheduleCallSequence;
 /**
- * 🔧 FIX CRITIQUE: Fonction pour créer et programmer un nouvel appel - MONTANT EN EUROS
+ * ✅ Fonction pour créer et programmer un nouvel appel
+ * - `amount` est **en EUROS** (unités réelles).
+ * - ❌ Pas de vérification de “cohérence service/prix” ici.
+ * - ✅ On garde uniquement la validation min/max.
+ * - ❗️Aucune conversion centimes ici : la conversion unique vers centimes se fait
+ *   au moment Stripe (dans la fonction de paiement en amont).
  */
 const createAndScheduleCall = async (params) => {
+    var _a;
     try {
         // Générer un ID unique si non fourni
-        const sessionId = params.sessionId || `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const sessionId = params.sessionId ||
+            `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
-        console.log(`💰 Montant: ${params.amount}€ pour ${params.serviceType}`);
-        // 🔧 FIX: Valider les paramètres avec montants EN EUROS
-        if (!params.providerId || !params.clientId || !params.providerPhone ||
-            !params.clientPhone || !params.paymentIntentId || !params.amount) {
-            throw new Error('Paramètres obligatoires manquants pour créer l\'appel');
+        console.log(`💰 Montant (EUROS): ${params.amount} pour ${params.serviceType}`);
+        // Champs obligatoires
+        if (!params.providerId ||
+            !params.clientId ||
+            !params.providerPhone ||
+            !params.clientPhone ||
+            !params.paymentIntentId ||
+            params.amount == null) {
+            throw new Error("Paramètres obligatoires manquants pour créer l'appel");
         }
-        // 🔧 FIX: Validation du montant EN EUROS
-        if (params.amount < 5) { // 5€ minimum
+        // ✅ Validation min/max (toujours en euros)
+        if (params.amount < 5) {
             throw new Error('Montant minimum de 5€ requis');
         }
-        if (params.amount > 500) { // 500€ maximum
+        if (params.amount > 500) {
             throw new Error('Montant maximum de 500€ dépassé');
         }
-        // 🔧 FIX: Validation cohérence service/montant EN EUROS
-        const expectedAmountEuros = params.serviceType === 'lawyer_call' ? 49 : 19; // 49€ ou 19€
-        const tolerance = 10; // 10€ de tolérance
-        if (Math.abs(params.amount - expectedAmountEuros) > tolerance) {
-            console.warn(`⚠️ Montant inhabituel: ${params.amount}€ pour ${params.serviceType} (attendu: ${expectedAmountEuros}€)`);
-        }
-        // 🔧 FIX CRITIQUE: Conversion EN CENTIMES pour le TwilioCallManager et Stripe
-        // 🔧 FIX CRITIQUE: GARDER LES EUROS - ne pas convertir en centimes ici !
-        console.log('💰 Validation montant (GARDE EN EUROS):', {
-            amountInEuros: params.amount,
-            serviceType: params.serviceType,
-            expectedAmountEuros,
-            difference: params.amount - expectedAmountEuros
-        });
-        // 🔧 FIX: Créer la session avec montants EN EUROS
+        // ❌ Supprimé : validations de cohérence service/prix (49€/19€ etc.)
+        // ✅ Créer la session avec montants EN EUROS (aucune conversion ici)
         const callSession = await TwilioCallManager_1.twilioCallManager.createCallSession({
             sessionId,
             providerId: params.providerId,
@@ -405,13 +405,16 @@ const createAndScheduleCall = async (params) => {
             serviceType: params.serviceType,
             providerType: params.providerType,
             paymentIntentId: params.paymentIntentId,
-            amount: params.amount, // 🔧 FIX: GARDER EN EUROS - laisser TwilioCallManager gérer la conversion
+            amount: params.amount, // ✅ euros
+            // Métadonnées informatives si fournies par l’amont
+            platformAmountCents: params.platformAmountCents,
+            platformFeePercent: params.platformFeePercent,
             requestId: params.requestId,
             clientLanguages: params.clientLanguages,
-            providerLanguages: params.providerLanguages
+            providerLanguages: params.providerLanguages,
         });
         // Programmer la séquence d'appel
-        const delayMinutes = params.delayMinutes || SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES;
+        const delayMinutes = (_a = params.delayMinutes) !== null && _a !== void 0 ? _a : SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES;
         // Utiliser setImmediate pour éviter de bloquer la réponse
         setImmediate(async () => {
             try {
@@ -427,15 +430,16 @@ const createAndScheduleCall = async (params) => {
             retryCount: 0,
             additionalData: {
                 serviceType: params.serviceType,
-                amountInEuros: params.amount, // Pour audit humain
-                // amountInCents supprimé - on garde tout en euros maintenant
-                delayMinutes: delayMinutes,
-                expectedAmountEuros,
-                amountDifferenceFromExpected: params.amount - expectedAmountEuros
-            }
+                amountInEuros: params.amount, // audit humain
+                delayMinutes,
+                // infos additionnelles si disponibles (purement indicatives)
+                currency: params.currency,
+                amountCents: params.amountCents,
+                platformAmountCents: params.platformAmountCents,
+                platformFeePercent: params.platformFeePercent,
+            },
         });
-        console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes`);
-        console.log(`💰 Validation finale: ${params.amount}€ pour ${params.serviceType} (gardé en euros)`);
+        console.log(`✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes (montant gardé en euros)`);
         return callSession;
     }
     catch (error) {
@@ -460,7 +464,8 @@ const resumePendingCalls = async () => {
         const now = admin.firestore.Timestamp.now();
         const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 5 * 60 * 1000);
         // Chercher les sessions en attente créées il y a plus de 5 minutes
-        const pendingSessions = await db.collection('call_sessions')
+        const pendingSessions = await db
+            .collection('call_sessions')
             .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
             .where('metadata.createdAt', '<=', fiveMinutesAgo)
             .limit(50) // Limiter pour éviter la surcharge
@@ -514,7 +519,8 @@ exports.resumePendingCalls = resumePendingCalls;
 async function validatePaymentForResume(paymentIntentId) {
     try {
         // Vérifier dans Firestore d'abord
-        const paymentQuery = await db.collection('payments')
+        const paymentQuery = await db
+            .collection('payments')
             .where('stripePaymentIntentId', '==', paymentIntentId)
             .limit(1)
             .get();
@@ -522,7 +528,13 @@ async function validatePaymentForResume(paymentIntentId) {
             return false;
         }
         const paymentData = paymentQuery.docs[0].data();
-        const validStatuses = ['pending', 'requires_confirmation', 'requires_action', 'processing', 'requires_capture'];
+        const validStatuses = [
+            'pending',
+            'requires_confirmation',
+            'requires_action',
+            'processing',
+            'requires_capture',
+        ];
         return validStatuses.includes(paymentData.status);
     }
     catch (error) {
@@ -539,7 +551,7 @@ const cleanupOldSessions = async (olderThanDays = 30) => {
         const result = await TwilioCallManager_1.twilioCallManager.cleanupOldSessions({
             olderThanDays,
             keepCompletedDays: 7, // Garder les complétées 7 jours
-            batchSize: 50
+            batchSize: 50,
         });
         console.log(`✅ Nettoyage terminé: ${result.deleted} supprimées, ${result.errors} erreurs`);
     }
@@ -549,32 +561,34 @@ const cleanupOldSessions = async (olderThanDays = 30) => {
 };
 exports.cleanupOldSessions = cleanupOldSessions;
 /**
- * 🔧 FIX: Fonction pour obtenir des statistiques sur les appels avec montants cohérents
+ * ✅ Fonction pour obtenir des statistiques sur les appels avec montants en EUROS
  */
 const getCallStatistics = async (periodDays = 7) => {
     try {
-        const startDate = admin.firestore.Timestamp.fromMillis(Date.now() - (periodDays * 24 * 60 * 60 * 1000));
+        const startDate = admin.firestore.Timestamp.fromMillis(Date.now() - periodDays * 24 * 60 * 60 * 1000);
         const [schedulerStats, callStats] = await Promise.all([
             callSchedulerManager.getStats(),
-            TwilioCallManager_1.twilioCallManager.getCallStatistics({ startDate })
+            TwilioCallManager_1.twilioCallManager.getCallStatistics({ startDate }),
         ]);
-        // 🔧 FIX: Calculs de revenus EN EUROS pour l'affichage
+        // ✅ Calculs de revenus EN EUROS pour l'affichage
         let totalRevenueEuros = 0;
         let completedCallsWithRevenue = 0;
         // Récupérer les sessions complétées avec revenus
-        const completedSessionsQuery = await db.collection('call_sessions')
+        const completedSessionsQuery = await db
+            .collection('call_sessions')
             .where('metadata.createdAt', '>=', startDate)
             .where('status', '==', 'completed')
             .where('payment.status', '==', 'captured')
             .get();
-        completedSessionsQuery.docs.forEach(doc => {
+        completedSessionsQuery.docs.forEach((doc) => {
             const session = doc.data();
-            // Convertir depuis centimes vers euros si nécessaire
-            const amountInEuros = session.payment.amount; // Déjà en euros maintenant
+            const amountInEuros = session.payment.amount; // stocké en euros
             totalRevenueEuros += amountInEuros;
             completedCallsWithRevenue++;
         });
-        const averageAmountEuros = completedCallsWithRevenue > 0 ? totalRevenueEuros / completedCallsWithRevenue : 0;
+        const averageAmountEuros = completedCallsWithRevenue > 0
+            ? totalRevenueEuros / completedCallsWithRevenue
+            : 0;
         return {
             scheduler: schedulerStats,
             calls: {
@@ -585,8 +599,8 @@ const getCallStatistics = async (periodDays = 7) => {
                 averageDuration: callStats.averageDuration,
                 successRate: callStats.successRate,
                 totalRevenueEuros,
-                averageAmountEuros
-            }
+                averageAmountEuros,
+            },
         };
     }
     catch (error) {

@@ -51,13 +51,19 @@ async function exportAuthUsers(gcsPath: string) {
   const filePath = rest.join("/") || "auth/users.json";
   const file = storage.bucket(bucketName).file(filePath);
 
-  const users: any[] = [];
+  const users: Record<string, unknown>[] = [];
   let next: string | undefined;
   do {
     const page = await admin.auth().listUsers(1000, next);
     users.push(...page.users.map(u => ({
-      uid: u.uid, email: u.email, phoneNumber: u.phoneNumber, displayName: u.displayName,
-      disabled: u.disabled, providerData: u.providerData, customClaims: u.customClaims, metadata: u.metadata
+      uid: u.uid, 
+      email: u.email, 
+      phoneNumber: u.phoneNumber, 
+      displayName: u.displayName,
+      disabled: u.disabled, 
+      providerData: u.providerData, 
+      customClaims: u.customClaims, 
+      metadata: u.metadata
     })));
     next = page.pageToken;
   } while (next);
@@ -73,23 +79,21 @@ async function runStorageTransfer(prefixForThisBackup: string) {
   const sts = google.storagetransfer({ version: "v1", auth });
 
   const start = new Date(); // démarrer maintenant
-  const request = {
-    requestBody: {
-      projectId: PROJECT_ID,
-      transferSpec: {
-        gcsDataSource: { bucketName: STORAGE_SOURCE_BUCKET },
-        gcsDataSink: { bucketName: BACKUP_BUCKET, path: `app/${prefixForThisBackup}/storage/` },
-        transferOptions: { overwriteObjectsAlreadyExistingInSink: true }
-      },
-      schedule: {
-        scheduleStartDate: { year: start.getFullYear(), month: start.getMonth() + 1, day: start.getDate() }
-      },
-      status: "ENABLED",
-      description: `backup-${prefixForThisBackup}`
-    }
+  const requestBody = {
+    projectId: PROJECT_ID,
+    transferSpec: {
+      gcsDataSource: { bucketName: STORAGE_SOURCE_BUCKET },
+      gcsDataSink: { bucketName: BACKUP_BUCKET, path: `app/${prefixForThisBackup}/storage/` },
+      transferOptions: { overwriteObjectsAlreadyExistingInSink: true }
+    },
+    schedule: {
+      scheduleStartDate: { year: start.getFullYear(), month: start.getMonth() + 1, day: start.getDate() }
+    },
+    status: "ENABLED",
+    description: `backup-${prefixForThisBackup}`
   };
 
-  const res = await sts.transferJobs.create(request as any);
+  const res = await sts.transferJobs.create({ requestBody });
   return res.data.name || ""; // ex: transferJobs/123456789
 }
 
@@ -147,7 +151,10 @@ async function runBackupInternal(type: "manual" | "automatic", createdBy: string
   const base = `gs://${BACKUP_BUCKET}/app/${prefix}`;
 
   const docRef = await db.collection("backups").add({
-    type, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy
+    type, 
+    status: "pending", 
+    createdAt: admin.firestore.FieldValue.serverTimestamp(), 
+    createdBy
   } as BackupDoc);
 
   const artifacts: Record<string, string> = {};
@@ -165,31 +172,70 @@ async function runBackupInternal(type: "manual" | "automatic", createdBy: string
 
     await pruneOldBackups(RETENTION_COUNT);
     return { ok: true, artifacts };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
     await docRef.update({
       status: "failed",
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      error: err?.message || String(err)
+      error: errorMessage
     } as Partial<BackupDoc>);
     throw err;
   }
 }
 
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
+
 // 1) Bouton "Sauvegarder maintenant" (depuis ton admin)
-export const startBackup = functions.https.onCall(async (_data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
-  const claims = context.auth.token as any;
-  if (claims.role !== "admin") throw new functions.https.HttpsError("permission-denied", "Admin requis.");
+export const manualBackup = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+  }
+  
+  // Vérifier les permissions admin (optionnel)
+  const claims = context.auth.token as Record<string, unknown>;
+  if (!claims.admin && !claims.isAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+  }
+  
   return await runBackupInternal("manual", context.auth.uid);
 });
 
-// 2) Pour l’automatique (Scheduler OU scheduler Firebase)
+// 2) Pour l'automatique (Scheduler OU scheduler Firebase)
 export const scheduledBackup = functions.https.onRequest(async (_req, res) => {
   try {
     await runBackupInternal("automatic", "system");
     res.status(200).send("ok");
-  } catch (e: any) {
-    res.status(500).send(e?.message || "error");
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : "error";
+    res.status(500).send(errorMessage);
+  }
+});
+
+// 3) Fonction pour lister les sauvegardes (optionnel)
+export const listBackups = functions.https.onCall(async (data: { limit?: number } | null, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+  }
+  
+  const claims = context.auth.token as Record<string, unknown>;
+  if (!claims.admin && !claims.isAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+  }
+  
+  try {
+    const limit = data?.limit || 10;
+    const snap = await db.collection("backups")
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get();
+    
+    const backups = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    return { backups };
+  } catch {
+    throw new functions.https.HttpsError("internal", "Erreur lors de la récupération des sauvegardes.");
   }
 });

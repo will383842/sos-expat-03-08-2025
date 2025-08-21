@@ -1,4 +1,4 @@
-// functions/src/index.ts - Version finale v2 avec CORS intégré
+// functions/src/index.ts - Version finale v2 avec CORS intégré et config Firebase
 
 // ====== EXPORTS PRINCIPAUX ======
 
@@ -41,6 +41,7 @@ export { api } from './adminApi';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import * as functions from 'firebase-functions'; // Ajouté pour config()
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
@@ -91,9 +92,9 @@ interface CustomClaims {
   [key: string]: unknown;
 }
 
-// Charger les variables d'environnement depuis .env
-import * as dotenv from 'dotenv';
-dotenv.config();
+// ❌ SUPPRIMÉ - dotenv ne fonctionne pas avec Firebase Functions
+// import * as dotenv from 'dotenv';
+// dotenv.config();
 
 // Initialiser Firebase Admin (une seule fois)
 if (!admin.apps.length) {
@@ -457,11 +458,13 @@ export const adminMuteParticipant = onCall(
 // CONFIGURATION SÉCURISÉE DES SERVICES
 // ========================================
 
-// Configuration Stripe avec gestion d'erreurs
+// ✅ Configuration Stripe avec Firebase Functions Config
 let stripe: Stripe | null = null;
-if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')) {
+const stripeConfig = functions.config().stripe;
+
+if (stripeConfig?.secret_key && stripeConfig.secret_key.startsWith('sk_')) {
   try {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    stripe = new Stripe(stripeConfig.secret_key, {
       apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
     });
     console.log('✅ Stripe configuré avec succès');
@@ -471,6 +474,7 @@ if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('s
   }
 } else {
   console.warn('⚠️ Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide');
+  console.log('Configuration disponible:', !!stripeConfig);
 }
 
 // ====== WEBHOOK STRIPE UNIFIÉ ======
@@ -500,7 +504,7 @@ export const stripeWebhook = onRequest({
     const event = stripe.webhooks.constructEvent(
       rawBody.toString(),
       signature as string,
-      process.env.STRIPE_WEBHOOK_SECRET || ''
+      stripeConfig?.webhook_secret || ''
     );
     
     console.log('🔔 Stripe webhook reçu:', event.type);

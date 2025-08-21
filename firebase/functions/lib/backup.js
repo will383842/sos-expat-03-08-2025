@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledBackup = exports.startBackup = void 0;
+exports.scheduledBackup = void 0;
 // functions/src/backup.ts
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
@@ -185,14 +185,12 @@ async function runBackupInternal(type, createdBy) {
 }
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
 // 1) Bouton "Sauvegarder maintenant" (depuis ton admin)
-exports.startBackup = functions.https.onCall(async (_data, context) => {
-    if (!context.auth)
-        throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
-    const claims = context.auth.token;
-    if (claims.role !== "admin")
-        throw new functions.https.HttpsError("permission-denied", "Admin requis.");
-    return await runBackupInternal("manual", context.auth.uid);
-});
+if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+}
+const claims = request.auth.token;
+return await runBackupInternal("manual", request.auth.uid);
+;
 // 2) Pour l’automatique (Scheduler OU scheduler Firebase)
 exports.scheduledBackup = functions.https.onRequest(async (_req, res) => {
     try {

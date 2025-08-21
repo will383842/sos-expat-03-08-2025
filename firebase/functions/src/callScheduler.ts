@@ -490,8 +490,6 @@ export const createAndScheduleCall = async (
       paymentIntentId: params.paymentIntentId,
       amount: params.amount, // ✅ euros
       // Métadonnées informatives si fournies par l’amont
-      currency: params.currency,
-      amountCents: params.amountCents,
       platformAmountCents: params.platformAmountCents,
       platformFeePercent: params.platformFeePercent,
       requestId: params.requestId,

@@ -1,5 +1,5 @@
 "use strict";
-// ====== EXPORTS PRINCIPAUX ======
+// functions/src/index.ts - Version finale v2 avec CORS intégré
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -37,8 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.createPaymentIntent = exports.createAndScheduleCall = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
-// Export des webhooks modernisés (remplace les anciens)
+exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.adminMuteParticipant = exports.adminTransferCall = exports.adminJoinCall = exports.adminForceDisconnectCall = exports.adminBulkUpdateStatus = exports.adminSoftDeleteUser = exports.adminUpdateStatus = exports.api = exports.createPaymentIntent = exports.createAndScheduleCallHTTPS = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.cancelScheduledCall = exports.scheduleCallSequence = exports.twilioCallManager = exports.stripeManager = exports.messageManager = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = void 0;
+// ====== EXPORTS PRINCIPAUX ======
 // Configuration globale pour toutes les fonctions
 const v2_1 = require("firebase-functions/v2");
 (0, v2_1.setGlobalOptions)({
@@ -71,13 +71,17 @@ Object.defineProperty(exports, "initializeMessageTemplates", { enumerable: true,
 // Export des fonctions de notification (si nécessaire)
 var notifyAfterPayment_1 = require("./notifications/notifyAfterPayment");
 Object.defineProperty(exports, "notifyAfterPayment", { enumerable: true, get: function () { return notifyAfterPayment_1.notifyAfterPayment; } });
-// Export des fonctions modernes
+// Export des fonctions réelles utilisées par le frontend
 var createAndScheduleCallFunction_1 = require("./createAndScheduleCallFunction");
-Object.defineProperty(exports, "createAndScheduleCall", { enumerable: true, get: function () { return createAndScheduleCallFunction_1.createAndScheduleCallHTTPS; } });
+Object.defineProperty(exports, "createAndScheduleCallHTTPS", { enumerable: true, get: function () { return createAndScheduleCallFunction_1.createAndScheduleCallHTTPS; } });
 var createPaymentIntent_1 = require("./createPaymentIntent");
 Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: function () { return createPaymentIntent_1.createPaymentIntent; } });
-// ====== IMPORTS POUR FONCTIONS RESTANTES ======
+// Export de l'API admin
+var adminApi_1 = require("./adminApi");
+Object.defineProperty(exports, "api", { enumerable: true, get: function () { return adminApi_1.api; } });
+// ====== IMPORTS POUR FONCTIONS ======
 const https_1 = require("firebase-functions/v2/https");
+const https_2 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
@@ -89,15 +93,290 @@ if (!admin.apps.length) {
     admin.initializeApp();
 }
 const db = admin.firestore();
-// ✅ AJOUTEZ CES DEUX LIGNES ICI
+// Configuration Firestore
 try {
     db.settings({ ignoreUndefinedProperties: true });
     console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
 }
-catch (error) {
-    console.log('ℹ️ Firestore déjà configuré');
+catch (firebaseError) {
+    console.log('ℹ️ Firestore déjà configuré', firebaseError);
 }
-console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
+// ====== FONCTIONS PUBLIQUES SUPPRIMÉES ======
+// Ces fonctions onRequest ne sont pas utilisées par le frontend
+// Le frontend utilise les fonctions onCall directement
+// ========================================
+// FONCTIONS ADMIN (TOUTES EN V2 MAINTENANT)
+// ========================================
+exports.adminUpdateStatus = (0, https_2.onCall)({ cors: true, memory: "256MiB", timeoutSeconds: 30 }, async (request) => {
+    var _a;
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { userId, status, reason } = request.data;
+    await db.collection("users").doc(userId).update({
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection("adminLogs").add({
+        action: "updateStatus",
+        userId,
+        status,
+        reason: reason || null,
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { ok: true };
+});
+exports.adminSoftDeleteUser = (0, https_2.onCall)({ cors: true, memory: "256MiB", timeoutSeconds: 30 }, async (request) => {
+    var _a;
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { userId, reason } = request.data;
+    await db.collection("users").doc(userId).update({
+        isDeleted: true,
+        deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        deletedBy: request.auth.uid,
+        deletedReason: reason || null,
+    });
+    await db.collection("adminLogs").add({
+        action: "softDelete",
+        userId,
+        reason: reason || null,
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { ok: true };
+});
+exports.adminBulkUpdateStatus = (0, https_2.onCall)({ cors: true, memory: "256MiB", timeoutSeconds: 30 }, async (request) => {
+    var _a;
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { ids, status, reason } = request.data;
+    const batch = db.batch();
+    ids.forEach((id) => batch.update(db.collection("users").doc(id), {
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }));
+    await batch.commit();
+    await db.collection("adminLogs").add({
+        action: "bulkUpdateStatus",
+        ids,
+        status,
+        reason: reason || null,
+        adminId: request.auth.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { ok: true };
+});
+// ========================================
+// FONCTIONS ADMIN POUR MONITORING DES APPELS (V2)
+// ========================================
+exports.adminForceDisconnectCall = (0, https_2.onCall)({
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30
+}, async (request) => {
+    var _a;
+    // Vérifier que l'utilisateur est admin
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { sessionId, reason } = request.data;
+    if (!sessionId) {
+        throw new https_2.HttpsError('invalid-argument', 'sessionId is required');
+    }
+    try {
+        const { twilioCallManager } = await Promise.resolve().then(() => __importStar(require('./TwilioCallManager')));
+        const success = await twilioCallManager.cancelCallSession(sessionId, reason || 'admin_force_disconnect', request.auth.uid);
+        // Log l'action admin
+        await db.collection("adminLogs").add({
+            action: "forceDisconnectCall",
+            sessionId,
+            reason: reason || 'admin_force_disconnect',
+            adminId: request.auth.uid,
+            ts: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return {
+            success,
+            message: `Call ${sessionId} disconnected successfully`
+        };
+    }
+    catch (callError) {
+        console.error('Error force disconnecting call:', callError);
+        throw new https_2.HttpsError('internal', 'Failed to disconnect call');
+    }
+});
+exports.adminJoinCall = (0, https_2.onCall)({
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30
+}, async (request) => {
+    var _a;
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { sessionId } = request.data;
+    if (!sessionId) {
+        throw new https_2.HttpsError('invalid-argument', 'sessionId is required');
+    }
+    try {
+        const { twilioCallManager } = await Promise.resolve().then(() => __importStar(require('./TwilioCallManager')));
+        const session = await twilioCallManager.getCallSession(sessionId);
+        if (!session || session.status !== 'active') {
+            throw new https_2.HttpsError('failed-precondition', 'Call is not active');
+        }
+        // Générer un lien vers la console Twilio pour rejoindre la conférence
+        const conferenceUrl = `https://console.twilio.com/us1/develop/voice/manage/conferences/${session.conference.sid}`;
+        const accessToken = `admin_${request.auth.uid}_${Date.now()}`;
+        // Log l'action admin
+        await db.collection("adminLogs").add({
+            action: "joinCall",
+            sessionId,
+            conferenceSid: session.conference.sid,
+            adminId: request.auth.uid,
+            ts: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return {
+            conferenceUrl,
+            accessToken,
+            conferenceSid: session.conference.sid,
+            conferenceName: session.conference.name,
+            message: 'Open Twilio Console to join the conference'
+        };
+    }
+    catch (joinError) {
+        console.error('Error joining call:', joinError);
+        throw new https_2.HttpsError('internal', 'Failed to join call');
+    }
+});
+exports.adminTransferCall = (0, https_2.onCall)({
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30
+}, async (request) => {
+    var _a;
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { sessionId, newProviderId } = request.data;
+    if (!sessionId || !newProviderId) {
+        throw new https_2.HttpsError('invalid-argument', 'sessionId and newProviderId are required');
+    }
+    try {
+        // Vérifier que le nouveau prestataire existe
+        const newProviderDoc = await db.collection('users').doc(newProviderId).get();
+        if (!newProviderDoc.exists) {
+            throw new https_2.HttpsError('not-found', 'New provider not found');
+        }
+        const newProvider = newProviderDoc.data();
+        if (!(newProvider === null || newProvider === void 0 ? void 0 : newProvider.phone)) {
+            throw new https_2.HttpsError('failed-precondition', 'New provider has no phone number');
+        }
+        // Vérifier que c'est bien un prestataire
+        if (!['lawyer', 'expat'].includes(newProvider.role)) {
+            throw new https_2.HttpsError('failed-precondition', 'User is not a provider');
+        }
+        // Mettre à jour la session avec le nouveau prestataire
+        await db.collection('call_sessions').doc(sessionId).update({
+            'metadata.originalProviderId': admin.firestore.FieldValue.arrayUnion(newProvider.id),
+            'metadata.providerId': newProviderId,
+            'metadata.providerName': `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
+            'metadata.providerType': newProvider.role,
+            'participants.provider.phone': newProvider.phone,
+            'metadata.updatedAt': admin.firestore.Timestamp.now(),
+            transferHistory: admin.firestore.FieldValue.arrayUnion({
+                transferredBy: request.auth.uid,
+                transferredAt: admin.firestore.Timestamp.now(),
+                newProviderId,
+                newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
+                reason: 'admin_transfer'
+            })
+        });
+        // Log l'action admin
+        await db.collection("adminLogs").add({
+            action: "transferCall",
+            sessionId,
+            newProviderId,
+            newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
+            adminId: request.auth.uid,
+            ts: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return {
+            success: true,
+            message: `Call transferred to provider ${newProviderId}`,
+            newProviderId,
+            newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim()
+        };
+    }
+    catch (transferError) {
+        console.error('Error transferring call:', transferError);
+        throw new https_2.HttpsError('internal', 'Failed to transfer call');
+    }
+});
+exports.adminMuteParticipant = (0, https_2.onCall)({
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30
+}, async (request) => {
+    var _a;
+    if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+    }
+    const { sessionId, participantType, mute = true } = request.data;
+    if (!sessionId || !participantType) {
+        throw new https_2.HttpsError('invalid-argument', 'sessionId and participantType are required');
+    }
+    if (!['provider', 'client'].includes(participantType)) {
+        throw new https_2.HttpsError('invalid-argument', 'participantType must be provider or client');
+    }
+    try {
+        const { twilioCallManager } = await Promise.resolve().then(() => __importStar(require('./TwilioCallManager')));
+        const session = await twilioCallManager.getCallSession(sessionId);
+        if (!session || session.status !== 'active') {
+            throw new https_2.HttpsError('failed-precondition', 'Call is not active');
+        }
+        const participant = session.participants[participantType];
+        if (!participant.callSid) {
+            throw new https_2.HttpsError('failed-precondition', 'Participant call SID not found');
+        }
+        // Mettre à jour le statut de mute dans la session
+        await db.collection('call_sessions').doc(sessionId).update({
+            [`participants.${participantType}.isMuted`]: mute,
+            'metadata.updatedAt': admin.firestore.Timestamp.now(),
+            adminActions: admin.firestore.FieldValue.arrayUnion({
+                action: mute ? 'mute' : 'unmute',
+                participantType,
+                performedBy: request.auth.uid,
+                performedAt: admin.firestore.Timestamp.now()
+            })
+        });
+        // Log l'action admin
+        await db.collection("adminLogs").add({
+            action: mute ? "muteParticipant" : "unmuteParticipant",
+            sessionId,
+            participantType,
+            callSid: participant.callSid,
+            adminId: request.auth.uid,
+            ts: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return {
+            success: true,
+            message: `Participant ${participantType} ${mute ? 'muted' : 'unmuted'}`,
+            participantType,
+            muted: mute,
+            note: 'Action recorded in session - Twilio Conference API integration required for actual mute/unmute'
+        };
+    }
+    catch (muteError) {
+        console.error('Error muting participant:', muteError);
+        throw new https_2.HttpsError('internal', 'Failed to mute participant');
+    }
+});
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES
 // ========================================
@@ -110,8 +389,8 @@ if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('s
         });
         console.log('✅ Stripe configuré avec succès');
     }
-    catch (error) {
-        console.error('❌ Erreur configuration Stripe:', error);
+    catch (stripeError) {
+        console.error('❌ Erreur configuration Stripe:', stripeError);
         stripe = null;
     }
 }
@@ -119,7 +398,10 @@ else {
     console.warn('⚠️ Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide');
 }
 // ====== WEBHOOK STRIPE UNIFIÉ ======
-exports.stripeWebhook = (0, https_1.onRequest)(async (req, res) => {
+exports.stripeWebhook = (0, https_1.onRequest)({
+    memory: "256MiB",
+    timeoutSeconds: 30
+}, async (req, res) => {
     const signature = req.headers['stripe-signature'];
     if (!signature) {
         res.status(400).send('Signature Stripe manquante');
@@ -156,14 +438,15 @@ exports.stripeWebhook = (0, https_1.onRequest)(async (req, res) => {
         }
         res.json({ received: true });
     }
-    catch (error) {
-        console.error('Error processing Stripe webhook:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    catch (webhookError) {
+        console.error('Error processing Stripe webhook:', webhookError);
+        const errorMessage = webhookError instanceof Error ? webhookError.message : 'Unknown error';
         res.status(400).send(`Webhook Error: ${errorMessage}`);
     }
 });
 // Handlers pour les événements Stripe
 async function handlePaymentIntentSucceeded(paymentIntent) {
+    var _a;
     try {
         console.log('💰 Paiement réussi:', paymentIntent.id);
         // Mettre à jour le paiement dans Firestore
@@ -178,19 +461,18 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
             });
         }
         // Déclencher les notifications si nécessaire
-        if (paymentIntent.metadata.callSessionId) {
-            // Utiliser le système de notification moderne
+        if ((_a = paymentIntent.metadata) === null || _a === void 0 ? void 0 : _a.callSessionId) {
             console.log('📞 Déclenchement des notifications post-paiement');
         }
         return true;
     }
-    catch (error) {
-        console.error('❌ Erreur handlePaymentIntentSucceeded:', error);
+    catch (succeededError) {
+        console.error('❌ Erreur handlePaymentIntentSucceeded:', succeededError);
         return false;
     }
 }
 async function handlePaymentIntentFailed(paymentIntent) {
-    var _a;
+    var _a, _b;
     try {
         console.log('❌ Paiement échoué:', paymentIntent.id);
         // Mettre à jour le paiement dans Firestore
@@ -205,18 +487,25 @@ async function handlePaymentIntentFailed(paymentIntent) {
             });
         }
         // Annuler l'appel associé si nécessaire
-        if (paymentIntent.metadata.callSessionId) {
-            const { cancelScheduledCall } = await Promise.resolve().then(() => __importStar(require('./callScheduler')));
-            await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_failed');
+        if ((_b = paymentIntent.metadata) === null || _b === void 0 ? void 0 : _b.callSessionId) {
+            // Import et utilisation de la fonction d'annulation
+            try {
+                const { cancelScheduledCall } = await Promise.resolve().then(() => __importStar(require('./callScheduler')));
+                await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_failed');
+            }
+            catch (importError) {
+                console.warn('Could not import cancelScheduledCall:', importError);
+            }
         }
         return true;
     }
-    catch (error) {
-        console.error('Error handling payment intent failed:', error);
+    catch (failedError) {
+        console.error('Error handling payment intent failed:', failedError);
         return false;
     }
 }
 async function handlePaymentIntentCanceled(paymentIntent) {
+    var _a;
     try {
         console.log('🚫 Paiement annulé:', paymentIntent.id);
         // Mettre à jour le paiement dans Firestore
@@ -231,14 +520,19 @@ async function handlePaymentIntentCanceled(paymentIntent) {
             });
         }
         // Annuler l'appel associé
-        if (paymentIntent.metadata.callSessionId) {
-            const { cancelScheduledCall } = await Promise.resolve().then(() => __importStar(require('./callScheduler')));
-            await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_canceled');
+        if ((_a = paymentIntent.metadata) === null || _a === void 0 ? void 0 : _a.callSessionId) {
+            try {
+                const { cancelScheduledCall } = await Promise.resolve().then(() => __importStar(require('./callScheduler')));
+                await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_canceled');
+            }
+            catch (importError) {
+                console.warn('Could not import cancelScheduledCall:', importError);
+            }
         }
         return true;
     }
-    catch (error) {
-        console.error('Error handling payment intent canceled:', error);
+    catch (canceledError) {
+        console.error('Error handling payment intent canceled:', canceledError);
         return false;
     }
 }
@@ -257,8 +551,8 @@ async function handlePaymentIntentRequiresAction(paymentIntent) {
         }
         return true;
     }
-    catch (error) {
-        console.error('Error handling payment intent requires action:', error);
+    catch (actionError) {
+        console.error('Error handling payment intent requires action:', actionError);
         return false;
     }
 }
@@ -292,9 +586,9 @@ exports.scheduledFirestoreExport = (0, scheduler_1.onSchedule)({
             status: 'completed'
         });
     }
-    catch (error) {
-        console.error('❌ Erreur sauvegarde automatique:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    catch (exportError) {
+        console.error('❌ Erreur sauvegarde automatique:', exportError);
+        const errorMessage = exportError instanceof Error ? exportError.message : 'Unknown error';
         // Enregistrer l'erreur dans les logs
         await admin.firestore().collection('logs').doc('backups').collection('entries').add({
             type: 'scheduled_backup',
@@ -326,9 +620,9 @@ exports.scheduledCleanup = (0, scheduler_1.onSchedule)({
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
     }
-    catch (error) {
-        console.error('❌ Erreur nettoyage périodique:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    catch (cleanupError) {
+        console.error('❌ Erreur nettoyage périodique:', cleanupError);
+        const errorMessage = cleanupError instanceof Error ? cleanupError.message : 'Unknown error';
         await admin.firestore().collection('logs').doc('cleanup').collection('entries').add({
             type: 'scheduled_cleanup',
             status: 'failed',

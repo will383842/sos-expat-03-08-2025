@@ -9,8 +9,8 @@ export async function listPayments(params?: { from?: string; to?: string; countr
 export async function listInvoices(params?: { from?: string; to?: string; country?: string }): Promise<Invoice[]> {
   return [];
 }
-export async function listDisputes(params?: { from?: string; to?: string; country?: string }): Promise{Dispute[]} {
-  return [] as any;
+export async function listDisputes(params?: { from?: string; to?: string; country?: string }): Promise<Dispute[]> {
+  return [];
 }
 export async function listRefunds(params?: { from?: string; to?: string; country?: string }): Promise<Refund[]> {
   return [];

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar, Phone, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getFunctions } from 'firebase/functions';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -445,8 +446,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
       validatePaymentData();
 
-      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
-        httpsCallable(functions, 'createPaymentIntent');
+      const functionsInstance = getFunctions(undefined, 'europe-west1');
+const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
+  httpsCallable(functionsInstance, 'createPaymentIntent');
 
       // ✅ Passer DIRECTEMENT les prix admin à l’intent
       const paymentData: PaymentIntentData = {

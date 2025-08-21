@@ -1,5 +1,5 @@
 // src/services/pricingService.ts (FRONTEND VERSION — STRICT TYPAGE)
-
+import { db as firestore } from '../config/firebase';
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useEffect, useState } from "react";

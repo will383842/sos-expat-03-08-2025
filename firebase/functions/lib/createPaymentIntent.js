@@ -34,9 +34,10 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPaymentIntent = void 0;
+// firebase/functions/src/createPaymentIntent.ts
 // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU au début du fichier
 const https_1 = require("firebase-functions/v2/https");
-const StripeManager_1 = require("./StripeManager"); // 👈 plus d'import du type StripePaymentData pour garder un payload 100% connectionFee
+const StripeManager_1 = require("./StripeManager");
 const logError_1 = require("./utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));
 const paymentValidators_1 = require("./utils/paymentValidators");
@@ -55,6 +56,7 @@ const CPU_OPTIMIZED_CONFIG = {
         'http://localhost:8080',
         'https://sos-urgently-ac307.web.app',
         'https://sos-urgently-ac307.firebaseapp.com',
+        'http://localhost:5173',
     ],
 };
 // =========================================
@@ -269,13 +271,22 @@ async function checkDuplicatePayments(clientId, providerId, amountInMainUnit, cu
     }
 }
 /**
- * Validation de cohérence: total = frais + prestataire (dans l'unité principale)
+ * ✅ Validation de cohérence: total = commission + prestataire (dans l'unité principale)
  */
-function validateAmountCoherence(totalAmount, connectionFeeAmount, providerAmount) {
-    const totalCalculated = Math.round((connectionFeeAmount + providerAmount) * 100) / 100;
+function validateAmountCoherence(totalAmount, commissionAmount, // ✅ CHANGEMENT: commissionAmount au lieu de connectionFeeAmount
+providerAmount) {
+    const totalCalculated = Math.round((commissionAmount + providerAmount) * 100) / 100;
     const amountRounded = Math.round(totalAmount * 100) / 100;
     const difference = Math.abs(totalCalculated - amountRounded);
     const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
+    console.log('💰 Validation cohérence (commissionAmount):', {
+        totalAmount: amountRounded,
+        commissionAmount,
+        providerAmount,
+        totalCalculated,
+        difference,
+        tolerance,
+    });
     if (difference > tolerance) {
         return {
             valid: false,
@@ -286,7 +297,7 @@ function validateAmountCoherence(totalAmount, connectionFeeAmount, providerAmoun
     return { valid: true, difference };
 }
 /**
- * Sanitization ET conversion des données en fonction de la devise
+ * ✅ Sanitization ET conversion des données en fonction de la devise
  */
 function sanitizeAndConvertInput(data) {
     var _a, _b, _c, _d;
@@ -296,16 +307,16 @@ function sanitizeAndConvertInput(data) {
     const maxMetaValueLength = isDevelopment ? 500 : 200;
     const currency = (data.currency || 'eur').toLowerCase().trim();
     const amountInMainUnit = Number(data.amount);
-    const connectionFeeAmountInMainUnit = Number(data.connectionFeeAmount);
+    const commissionAmountInMainUnit = Number(data.commissionAmount); // ✅ CHANGEMENT
     const providerAmountInMainUnit = Number(data.providerAmount);
     const amountInCents = (0, paymentValidators_1.toCents)(amountInMainUnit, currency);
-    const connectionFeeAmountInCents = (0, paymentValidators_1.toCents)(connectionFeeAmountInMainUnit, currency);
+    const commissionAmountInCents = (0, paymentValidators_1.toCents)(commissionAmountInMainUnit, currency); // ✅ CHANGEMENT
     const providerAmountInCents = (0, paymentValidators_1.toCents)(providerAmountInMainUnit, currency);
     return {
         amountInMainUnit,
         amountInCents,
-        connectionFeeAmountInMainUnit,
-        connectionFeeAmountInCents,
+        commissionAmountInMainUnit, // ✅ CHANGEMENT
+        commissionAmountInCents, // ✅ CHANGEMENT
         providerAmountInMainUnit,
         providerAmountInCents,
         currency,
@@ -332,7 +343,7 @@ function logSecurityEvent(event, data) {
         console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
     }
     else if (isProduction) {
-        const sanitizedData = Object.assign(Object.assign({}, data), { userId: data.userId ? data.userId.substring(0, 8) + '...' : undefined, clientId: data.clientId ? data.clientId.substring(0, 8) + '...' : undefined, providerId: data.providerId ? data.providerId.substring(0, 8) + '...' : undefined });
+        const sanitizedData = Object.assign(Object.assign({}, data), { userId: data.userId ? String(data.userId).substring(0, 8) + '...' : undefined, clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined, providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined });
         console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
     }
     else {
@@ -340,10 +351,11 @@ function logSecurityEvent(event, data) {
     }
 }
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE (OPTIMISÉE CPU) — sans “commission”
+// 🚀 CLOUD FUNCTION PRINCIPALE (OPTIMISÉE CPU) — INTERFACE CORRIGÉE
 // =========================================
 exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (request) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
+    // CORS fix deployment - Updated 2025-01-20
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
     logSecurityEvent('payment_intent_start', {
@@ -359,11 +371,11 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
             throw new https_1.HttpsError('unauthenticated', 'Authentification requise pour créer un paiement.');
         }
         const userId = request.auth.uid;
-        // Debug entrée
-        console.log('💳 === BACKEND - DONNÉES REÇUES (optimisé CPU) ===');
+        // ✅ Debug entrée avec interface corrigée
+        console.log('💳 === BACKEND - DONNÉES REÇUES (interface corrigée) ===');
         console.log('📥 Données brutes reçues:', {
             amount: request.data.amount,
-            connectionFeeAmount: request.data.connectionFeeAmount,
+            commissionAmount: request.data.commissionAmount, // ✅ CHANGEMENT
             providerAmount: request.data.providerAmount,
             serviceType: request.data.serviceType,
             currency: request.data.currency || 'eur',
@@ -372,10 +384,11 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
         if (typeof request.data.amount !== 'number' || isNaN(request.data.amount) || request.data.amount <= 0) {
             throw new https_1.HttpsError('invalid-argument', `Montant invalide reçu: ${request.data.amount} (type: ${typeof request.data.amount})`);
         }
-        if (typeof request.data.connectionFeeAmount !== 'number' ||
-            isNaN(request.data.connectionFeeAmount) ||
-            request.data.connectionFeeAmount < 0) {
-            throw new https_1.HttpsError('invalid-argument', 'Frais de mise en relation invalides');
+        // ✅ Validation avec commissionAmount
+        if (typeof request.data.commissionAmount !== 'number' ||
+            isNaN(request.data.commissionAmount) ||
+            request.data.commissionAmount < 0) {
+            throw new https_1.HttpsError('invalid-argument', 'Commission invalide');
         }
         if (typeof request.data.providerAmount !== 'number' ||
             isNaN(request.data.providerAmount) ||
@@ -390,18 +403,20 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
         }
         // 4) SANITIZE + CONVERT
         const sanitizedData = sanitizeAndConvertInput(request.data);
-        console.log('💳 === APRÈS SANITIZATION (optimisé) ===');
+        console.log('💳 === APRÈS SANITIZATION (interface corrigée) ===');
         console.log('✅ Données sanitisées & converties:', {
             totalInMainUnit: sanitizedData.amountInMainUnit,
             totalInCents: sanitizedData.amountInCents,
-            connectionFeeInMainUnit: sanitizedData.connectionFeeAmountInMainUnit,
-            connectionFeeInCents: sanitizedData.connectionFeeAmountInCents,
+            commissionInMainUnit: sanitizedData.commissionAmountInMainUnit, // ✅ CHANGEMENT
+            commissionInCents: sanitizedData.commissionAmountInCents, // ✅ CHANGEMENT
             providerInMainUnit: sanitizedData.providerAmountInMainUnit,
             providerInCents: sanitizedData.providerAmountInCents,
             currency: sanitizedData.currency,
         });
         // 5) VALIDATION DE BASE
-        const { amountInMainUnit, amountInCents, connectionFeeAmountInMainUnit, connectionFeeAmountInCents, providerAmountInMainUnit, providerAmountInCents, currency, serviceType, providerId, clientId, clientEmail, providerName, description, callSessionId, metadata, } = sanitizedData;
+        const { amountInMainUnit, amountInCents, commissionAmountInMainUnit, // ✅ CHANGEMENT
+        commissionAmountInCents, // ✅ CHANGEMENT
+        providerAmountInMainUnit, providerAmountInCents, currency, serviceType, providerId, clientId, clientEmail, providerName, description, callSessionId, metadata, } = sanitizedData;
         if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
             throw new https_1.HttpsError('invalid-argument', 'Type de service invalide');
         }
@@ -415,8 +430,9 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
         if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
             throw new https_1.HttpsError('invalid-argument', `Devise non supportée: ${currency}`);
         }
-        // 7) VALIDATION COHÉRENCE (total = frais + prestataire)
-        const coherence = validateAmountCoherence(amountInMainUnit, connectionFeeAmountInMainUnit, providerAmountInMainUnit);
+        // 7) ✅ VALIDATION COHÉRENCE (total = commission + prestataire) - Interface corrigée
+        const coherence = validateAmountCoherence(amountInMainUnit, commissionAmountInMainUnit, // ✅ CHANGEMENT
+        providerAmountInMainUnit);
         if (!coherence.valid) {
             if (isProduction || coherence.difference > 1) {
                 throw new https_1.HttpsError('invalid-argument', coherence.error);
@@ -441,8 +457,8 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
         if (hasDuplicate) {
             throw new https_1.HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
         }
-        // 11) CRÉATION PAIEMENT (Stripe) — payload 100% “frais de mise en relation”
-        console.log('💳 === ENVOI VERS STRIPEMANAGER (optimisé) ===');
+        // 11) ✅ CRÉATION PAIEMENT (Stripe) — payload avec commissionAmount
+        console.log('💳 === ENVOI VERS STRIPEMANAGER (interface corrigée) ===');
         const stripePayload = {
             amount: amountInCents, // centimes
             currency,
@@ -450,12 +466,12 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
             providerId,
             serviceType,
             providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
-            connectionFeeAmount: connectionFeeAmountInCents, // centimes
+            commissionAmount: commissionAmountInCents, // ✅ CHANGEMENT - StripeManager accepte commissionAmount
             providerAmount: providerAmountInCents, // centimes
             callSessionId,
             metadata: Object.assign({ clientEmail: clientEmail || '', providerName: providerName || '', description: description || `Service ${serviceType}`, requestId, environment: process.env.NODE_ENV || 'development', 
                 // Trace côté audit (unités principales)
-                originalTotal: amountInMainUnit.toString(), originalConnectionFee: connectionFeeAmountInMainUnit.toString(), originalProviderAmount: providerAmountInMainUnit.toString(), originalCurrency: currency }, metadata),
+                originalTotal: amountInMainUnit.toString(), originalCommission: commissionAmountInMainUnit.toString(), originalProviderAmount: providerAmountInMainUnit.toString(), originalCurrency: currency }, metadata),
         };
         const result = await StripeManager_1.stripeManager.createPaymentIntent(stripePayload);
         if (!(result === null || result === void 0 ? void 0 : result.success)) {
@@ -471,7 +487,7 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
         }
         // 12) AUDIT
         if (isProduction) {
-            await (0, paymentValidators_1.logPaymentAudit)({
+            const auditData = {
                 paymentId: result.paymentIntentId,
                 userId: clientId,
                 amount: amountInMainUnit,
@@ -479,19 +495,20 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
                 type: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
                 action: 'create',
                 metadata: {
-                    connectionFeeAmountInMainUnit,
+                    commissionAmountInMainUnit, // ✅ CHANGEMENT
                     providerAmountInMainUnit,
                     amountInCents,
-                    connectionFeeAmountInCents,
+                    commissionAmountInCents, // ✅ CHANGEMENT
                     providerAmountInCents,
                     requestId,
                 },
-            }, db);
+            };
+            await (0, paymentValidators_1.logPaymentAudit)(auditData, db);
         }
-        console.log('✅ Paiement créé:', {
+        console.log('✅ Paiement créé (interface corrigée):', {
             id: result.paymentIntentId,
             total: (0, paymentValidators_1.formatAmount)(amountInMainUnit, currency),
-            connectionFee: (0, paymentValidators_1.formatAmount)(connectionFeeAmountInMainUnit, currency),
+            commission: (0, paymentValidators_1.formatAmount)(commissionAmountInMainUnit, currency), // ✅ CHANGEMENT
             provider: (0, paymentValidators_1.formatAmount)(providerAmountInMainUnit, currency),
         });
         // 13) RÉPONSE
@@ -510,7 +527,7 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
     catch (error) {
         // 14) ERREURS
         const processingTime = Date.now() - startTime;
-        await (0, logError_1.logError)('createPaymentIntent:error', {
+        const errorData = {
             requestId,
             error: error instanceof Error ? error.message : 'Unknown error',
             stack: error instanceof Error ? error.stack : undefined,
@@ -520,10 +537,12 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
                 serviceType: (_b = request.data) === null || _b === void 0 ? void 0 : _b.serviceType,
                 currency: ((_c = request.data) === null || _c === void 0 ? void 0 : _c.currency) || 'eur',
                 hasAuth: !!request.auth,
+                hasCommission: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.commissionAmount) !== undefined, // ✅ CHANGEMENT
             },
-            userAuth: ((_d = request.auth) === null || _d === void 0 ? void 0 : _d.uid) || 'not-authenticated',
+            userAuth: ((_e = request.auth) === null || _e === void 0 ? void 0 : _e.uid) || 'not-authenticated',
             environment: process.env.NODE_ENV,
-        });
+        };
+        await (0, logError_1.logError)('createPaymentIntent:error', errorData);
         if (error instanceof https_1.HttpsError)
             throw error;
         const errorResponse = {

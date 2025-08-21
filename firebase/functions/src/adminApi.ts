@@ -1,4 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https';
+import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import { stripeManager } from './StripeManager';
 
@@ -10,14 +11,15 @@ function pctChange(curr: number, prev: number) {
   return ((curr - prev) / prev) * 100;
 }
 
-export const api = onRequest({ region: 'europe-west1', cors: true }, async (req, res) => {
+export const api = onRequest({ region: 'europe-west1', cors: true }, async (req: Request, res: Response): Promise<void> => {
   try {
     // Préflight CORS
     if (req.method === 'OPTIONS') {
       res.set('Access-Control-Allow-Origin', '*');
       res.set('Access-Control-Allow-Methods', 'GET');
       res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      return res.status(204).send('');
+      res.status(204).send('');
+      return; // ✅ Retour explicite void
     }
     res.set('Access-Control-Allow-Origin', '*');
 
@@ -44,7 +46,7 @@ export const api = onRequest({ region: 'europe-west1', cors: true }, async (req,
       const activeTransactions = pendingSnap.size;
       const conversionRate = curr.paymentCount ? (curr.successfulPayments / curr.paymentCount) * 100 : 0;
 
-      return res.json({
+      res.json({
         monthlyRevenue,
         totalCommissions,
         activeTransactions,
@@ -52,10 +54,11 @@ export const api = onRequest({ region: 'europe-west1', cors: true }, async (req,
         changes: {
           revenue: pctChange(curr.totalAmountEuros, prev.totalAmountEuros || 0),
           commissions: pctChange(curr.totalCommission, prev.totalCommission || 0),
-          transactions: pctChange(activeTransactions, 0), // simple, faute d’historique
+          transactions: pctChange(activeTransactions, 0), // simple, faute d'historique
           conversion: pctChange(conversionRate, 0),
         },
       });
+      return; // ✅ Retour explicite void
     }
 
     if (path === '/api/admin/last-modifications') {
@@ -71,11 +74,12 @@ export const api = onRequest({ region: 'europe-west1', cors: true }, async (req,
       const fmt = (ts?: admin.firestore.Timestamp | null) =>
         ts ? ts.toDate().toISOString() : 'N/A';
 
-      return res.json({
-        pricing: fmt((pricingDoc?.updateTime as any) ?? pricingDoc?.get('updatedAt')),
+      res.json({
+        pricing: fmt((pricingDoc?.updateTime as admin.firestore.Timestamp) ?? pricingDoc?.get('updatedAt')),
         commissions: fmt(lastPayment?.docs[0]?.get('updatedAt') || lastPayment?.docs[0]?.get('createdAt')),
         analytics: fmt(lastAnalytics?.docs[0]?.get('updatedAt') || lastAnalytics?.docs[0]?.get('createdAt')),
       });
+      return; // ✅ Retour explicite void
     }
 
     if (path === '/api/admin/system-status') {
@@ -83,17 +87,21 @@ export const api = onRequest({ region: 'europe-west1', cors: true }, async (req,
       await db.collection('users').limit(1).get(); // simple ping Firestore
       const latency = Date.now() - t0;
 
-      return res.json({
+      res.json({
         api: 'online',
         database: latency < 250 ? 'optimal' : latency < 1000 ? 'slow' : 'error',
         cache: 'inactive',
         lastCheck: new Date().toISOString(),
       });
+      return; // ✅ Retour explicite void
     }
 
-    return res.status(404).json({ error: 'Not found' });
-  } catch (e: any) {
+    res.status(404).json({ error: 'Not found' });
+    return; // ✅ Retour explicite void
+  } catch (e: unknown) {
     console.error(e);
-    return res.status(500).json({ error: e.message ?? 'Internal error' });
+    const errorMessage = e instanceof Error ? e.message : 'Internal error';
+    res.status(500).json({ error: errorMessage });
+    return; // ✅ Retour explicite void
   }
 });

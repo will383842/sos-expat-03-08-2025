@@ -1,19 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createAndScheduleCallHTTPS = void 0;
+// firebase/functions/src/createAndScheduleCallFunction.ts
 const https_1 = require("firebase-functions/v2/https");
 const callScheduler_1 = require("./callScheduler");
 const logError_1 = require("./utils/logs/logError");
 /**
- * 🔧 Cloud Function CORRIGÉE - Convertie de onRequest vers onCall pour résoudre CORS
- * Crée et programme un appel entre client et prestataire
+ * ✅ Cloud Function CORRIGÉE avec interface unifiée
+ * - Accepte les montants en EUROS
+ * - Validation simplifiée
+ * - Support rétrocompatibilité
  */
 exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
     memory: "256MiB",
     timeoutSeconds: 60,
-    cors: true // Simplifie pour accepter tous les origins
+    cors: true
 }, async (request) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
         // ========================================
@@ -27,13 +30,13 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // 2. VALIDATION DES DONNÉES
         // ========================================
         const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, // EN EUROS
-        delayMinutes = 5, clientLanguages, providerLanguages } = request.data;
-        // 🔧 Debug des données reçues
-        console.log('📞 === CREATE AND SCHEDULE CALL - DONNÉES REÇUES ===');
+        delayMinutes = 5, clientLanguages, providerLanguages, currency = 'EUR', } = request.data;
+        // ✅ Debug des données reçues
+        console.log('📞 === CREATE AND SCHEDULE CALL - DONNÉES REÇUES (UNIFIÉES) ===');
         console.log('💰 Montant reçu:', {
             amount,
             type: typeof amount,
-            amountInEuros: amount,
+            currency,
             serviceType,
             providerType,
             requestId
@@ -61,23 +64,23 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             throw new https_1.HttpsError('invalid-argument', `Type de prestataire invalide. Types autorisés: ${allowedProviderTypes.join(', ')}`);
         }
         // ========================================
-        // 5. VALIDATION DES MONTANTS EN EUROS
+        // 5. VALIDATION DES MONTANTS EN EUROS (SIMPLIFIÉE)
         // ========================================
         if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
             throw new https_1.HttpsError('invalid-argument', `Montant invalide: ${amount} (type: ${typeof amount})`);
         }
-        if (amount > 500) { // Max 500€
+        if (amount > 500) {
             throw new https_1.HttpsError('invalid-argument', 'Montant maximum de 500€ dépassé.');
         }
-        if (amount < 5) { // 5€ minimum
+        if (amount < 5) {
             throw new https_1.HttpsError('invalid-argument', 'Montant minimum de 5€ requis.');
         }
-        // Validation cohérence montant/service EN EUROS
+        // ✅ Validation cohérence montant/service simplifiée (tolérance élargie)
         const expectedAmountEuros = serviceType === 'lawyer_call' ? 49 : 19;
-        const tolerance = 5; // 5€ de tolérance
+        const tolerance = 10; // 10€ de tolérance
         if (Math.abs(amount - expectedAmountEuros) > tolerance) {
             console.warn(`⚠️ [${requestId}] Montant inhabituel: reçu ${amount}€, attendu ${expectedAmountEuros}€ pour ${serviceType}`);
-            // Ne pas bloquer mais logger pour audit
+            // ✅ Ne pas bloquer, juste logger pour audit
         }
         // ========================================
         // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE
@@ -95,7 +98,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // ========================================
         // 7. VALIDATION DU DÉLAI
         // ========================================
-        const validDelayMinutes = Math.min(Math.max(delayMinutes, 0), 10); // Entre 0 et 10 minutes
+        const validDelayMinutes = Math.min(Math.max(delayMinutes, 0), 10);
         // ========================================
         // 8. VALIDATION DU PAYMENT INTENT
         // ========================================
@@ -105,12 +108,12 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // ========================================
         // 9. CRÉATION ET PLANIFICATION DE L'APPEL
         // ========================================
-        console.log(`📞 [${requestId}] Création appel initiée`);
+        console.log(`📞 [${requestId}] Création appel initiée (interface unifiée)`);
         console.log(`👥 [${requestId}] Client: ${clientId.substring(0, 8)}... → Provider: ${providerId.substring(0, 8)}...`);
-        console.log(`💰 [${requestId}] Montant: ${amount}€ pour service ${serviceType}`);
+        console.log(`💰 [${requestId}] Montant: ${amount}€ (${currency}) pour service ${serviceType}`);
         console.log(`⏰ [${requestId}] Délai programmé: ${validDelayMinutes} minutes`);
         console.log(`💳 [${requestId}] PaymentIntent: ${paymentIntentId}`);
-        // Appel au callScheduler avec les données validées
+        // ✅ Appel au callScheduler avec interface simplifiée
         const callSession = await (0, callScheduler_1.createAndScheduleCall)({
             providerId,
             clientId,
@@ -119,7 +122,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             serviceType,
             providerType,
             paymentIntentId,
-            amount, // EN EUROS (le callScheduler gère la conversion si nécessaire)
+            amount, // ✅ EN EUROS directement
             delayMinutes: validDelayMinutes,
             requestId,
             clientLanguages: clientLanguages || ['fr'],
@@ -143,7 +146,8 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
                 timeStyle: 'short'
             }),
             message: `Appel programmé dans ${validDelayMinutes} minutes`,
-            amount: amount, // Retourner en euros pour l'affichage frontend
+            amount: amount, // ✅ Retourner en euros
+            currency,
             serviceType,
             providerType,
             requestId,
@@ -151,11 +155,12 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             delayMinutes: validDelayMinutes,
             timestamp: new Date().toISOString()
         };
-        console.log(`🎉 [${requestId}] Réponse envoyée:`, {
+        console.log(`🎉 [${requestId}] Réponse envoyée (interface unifiée):`, {
             sessionId: response.sessionId,
             status: response.status,
             scheduledFor: response.scheduledFor,
-            amount: response.amount
+            amount: response.amount,
+            currency: response.currency
         });
         return response;
     }
@@ -174,11 +179,12 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
                 serviceType: (_e = request.data) === null || _e === void 0 ? void 0 : _e.serviceType,
                 amount: (_f = request.data) === null || _f === void 0 ? void 0 : _f.amount,
                 amountType: typeof ((_g = request.data) === null || _g === void 0 ? void 0 : _g.amount),
-                paymentIntentId: (_h = request.data) === null || _h === void 0 ? void 0 : _h.paymentIntentId,
+                currency: (_h = request.data) === null || _h === void 0 ? void 0 : _h.currency,
+                paymentIntentId: (_j = request.data) === null || _j === void 0 ? void 0 : _j.paymentIntentId,
                 hasAuth: !!request.auth,
-                delayMinutes: (_j = request.data) === null || _j === void 0 ? void 0 : _j.delayMinutes
+                delayMinutes: (_k = request.data) === null || _k === void 0 ? void 0 : _k.delayMinutes
             },
-            userAuth: ((_l = (_k = request.auth) === null || _k === void 0 ? void 0 : _k.uid) === null || _l === void 0 ? void 0 : _l.substring(0, 8)) + '...' || 'not-authenticated',
+            userAuth: ((_m = (_l = request.auth) === null || _l === void 0 ? void 0 : _l.uid) === null || _m === void 0 ? void 0 : _m.substring(0, 8)) + '...' || 'not-authenticated',
             timestamp: new Date().toISOString()
         };
         // Log détaillé de l'erreur
@@ -186,8 +192,9 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         console.error(`❌ [${requestId}] Erreur lors de la création d'appel:`, {
             error: errorDetails.error,
             errorType: errorDetails.errorType,
-            serviceType: (_m = request.data) === null || _m === void 0 ? void 0 : _m.serviceType,
-            amount: (_o = request.data) === null || _o === void 0 ? void 0 : _o.amount
+            serviceType: (_o = request.data) === null || _o === void 0 ? void 0 : _o.serviceType,
+            amount: (_p = request.data) === null || _p === void 0 ? void 0 : _p.amount,
+            currency: (_q = request.data) === null || _q === void 0 ? void 0 : _q.currency
         });
         // Si c'est déjà une HttpsError Firebase, la relancer telle quelle
         if (error instanceof https_1.HttpsError) {

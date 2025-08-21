@@ -1,8 +1,9 @@
+// firebase/functions/src/createAndScheduleCallFunction.ts
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { createAndScheduleCall } from './callScheduler';
 import { logError } from './utils/logs/logError';
 
-// 🔧 Interface pour les données reçues du frontend
+// ✅ Interface UNIFIÉE pour les données reçues du frontend
 interface CreateAndScheduleCallRequest {
   providerId: string;
   clientId: string;
@@ -11,21 +12,26 @@ interface CreateAndScheduleCallRequest {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
-  amount: number; // EN EUROS
+  amount: number; // EN EUROS - Interface simplifiée
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
+  // ✅ Champs optionnels pour rétrocompatibilité
+  currency?: 'EUR' | 'USD';
+  clientWhatsapp?: string;
 }
 
 /**
- * 🔧 Cloud Function CORRIGÉE - Convertie de onRequest vers onCall pour résoudre CORS
- * Crée et programme un appel entre client et prestataire
+ * ✅ Cloud Function CORRIGÉE avec interface unifiée
+ * - Accepte les montants en EUROS
+ * - Validation simplifiée
+ * - Support rétrocompatibilité
  */
 export const createAndScheduleCallHTTPS = onCall(
   {
     memory: "256MiB",
     timeoutSeconds: 60,
-    cors: true // Simplifie pour accepter tous les origins
+    cors: true
   },
   async (request: CallableRequest<CreateAndScheduleCallRequest>) => {
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -57,15 +63,16 @@ export const createAndScheduleCallHTTPS = onCall(
         amount, // EN EUROS
         delayMinutes = 5,
         clientLanguages,
-        providerLanguages
+        providerLanguages,
+        currency = 'EUR',
       } = request.data;
 
-      // 🔧 Debug des données reçues
-      console.log('📞 === CREATE AND SCHEDULE CALL - DONNÉES REÇUES ===');
+      // ✅ Debug des données reçues
+      console.log('📞 === CREATE AND SCHEDULE CALL - DONNÉES REÇUES (UNIFIÉES) ===');
       console.log('💰 Montant reçu:', {
         amount,
         type: typeof amount,
-        amountInEuros: amount,
+        currency,
         serviceType,
         providerType,
         requestId
@@ -111,7 +118,7 @@ export const createAndScheduleCallHTTPS = onCall(
       }
 
       // ========================================
-      // 5. VALIDATION DES MONTANTS EN EUROS
+      // 5. VALIDATION DES MONTANTS EN EUROS (SIMPLIFIÉE)
       // ========================================
       if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
         throw new HttpsError(
@@ -120,27 +127,27 @@ export const createAndScheduleCallHTTPS = onCall(
         );
       }
 
-      if (amount > 500) { // Max 500€
+      if (amount > 500) {
         throw new HttpsError(
           'invalid-argument',
           'Montant maximum de 500€ dépassé.'
         );
       }
 
-      if (amount < 5) { // 5€ minimum
+      if (amount < 5) {
         throw new HttpsError(
           'invalid-argument',
           'Montant minimum de 5€ requis.'
         );
       }
 
-      // Validation cohérence montant/service EN EUROS
+      // ✅ Validation cohérence montant/service simplifiée (tolérance élargie)
       const expectedAmountEuros = serviceType === 'lawyer_call' ? 49 : 19;
-      const tolerance = 5; // 5€ de tolérance
+      const tolerance = 10; // 10€ de tolérance
       
       if (Math.abs(amount - expectedAmountEuros) > tolerance) {
         console.warn(`⚠️ [${requestId}] Montant inhabituel: reçu ${amount}€, attendu ${expectedAmountEuros}€ pour ${serviceType}`);
-        // Ne pas bloquer mais logger pour audit
+        // ✅ Ne pas bloquer, juste logger pour audit
       }
 
       // ========================================
@@ -171,7 +178,7 @@ export const createAndScheduleCallHTTPS = onCall(
       // ========================================
       // 7. VALIDATION DU DÉLAI
       // ========================================
-      const validDelayMinutes = Math.min(Math.max(delayMinutes, 0), 10); // Entre 0 et 10 minutes
+      const validDelayMinutes = Math.min(Math.max(delayMinutes, 0), 10);
 
       // ========================================
       // 8. VALIDATION DU PAYMENT INTENT
@@ -186,13 +193,13 @@ export const createAndScheduleCallHTTPS = onCall(
       // ========================================
       // 9. CRÉATION ET PLANIFICATION DE L'APPEL
       // ========================================
-      console.log(`📞 [${requestId}] Création appel initiée`);
+      console.log(`📞 [${requestId}] Création appel initiée (interface unifiée)`);
       console.log(`👥 [${requestId}] Client: ${clientId.substring(0, 8)}... → Provider: ${providerId.substring(0, 8)}...`);
-      console.log(`💰 [${requestId}] Montant: ${amount}€ pour service ${serviceType}`);
+      console.log(`💰 [${requestId}] Montant: ${amount}€ (${currency}) pour service ${serviceType}`);
       console.log(`⏰ [${requestId}] Délai programmé: ${validDelayMinutes} minutes`);
       console.log(`💳 [${requestId}] PaymentIntent: ${paymentIntentId}`);
 
-      // Appel au callScheduler avec les données validées
+      // ✅ Appel au callScheduler avec interface simplifiée
       const callSession = await createAndScheduleCall({
         providerId,
         clientId,
@@ -201,7 +208,7 @@ export const createAndScheduleCallHTTPS = onCall(
         serviceType,
         providerType,
         paymentIntentId,
-        amount, // EN EUROS (le callScheduler gère la conversion si nécessaire)
+        amount, // ✅ EN EUROS directement
         delayMinutes: validDelayMinutes,
         requestId,
         clientLanguages: clientLanguages || ['fr'],
@@ -228,7 +235,8 @@ export const createAndScheduleCallHTTPS = onCall(
           timeStyle: 'short'
         }),
         message: `Appel programmé dans ${validDelayMinutes} minutes`,
-        amount: amount, // Retourner en euros pour l'affichage frontend
+        amount: amount, // ✅ Retourner en euros
+        currency,
         serviceType,
         providerType,
         requestId,
@@ -237,11 +245,12 @@ export const createAndScheduleCallHTTPS = onCall(
         timestamp: new Date().toISOString()
       };
 
-      console.log(`🎉 [${requestId}] Réponse envoyée:`, {
+      console.log(`🎉 [${requestId}] Réponse envoyée (interface unifiée):`, {
         sessionId: response.sessionId,
         status: response.status,
         scheduledFor: response.scheduledFor,
-        amount: response.amount
+        amount: response.amount,
+        currency: response.currency
       });
 
       return response;
@@ -261,6 +270,7 @@ export const createAndScheduleCallHTTPS = onCall(
           serviceType: request.data?.serviceType,
           amount: request.data?.amount,
           amountType: typeof request.data?.amount,
+          currency: request.data?.currency,
           paymentIntentId: request.data?.paymentIntentId,
           hasAuth: !!request.auth,
           delayMinutes: request.data?.delayMinutes
@@ -276,7 +286,8 @@ export const createAndScheduleCallHTTPS = onCall(
         error: errorDetails.error,
         errorType: errorDetails.errorType,
         serviceType: request.data?.serviceType,
-        amount: request.data?.amount
+        amount: request.data?.amount,
+        currency: request.data?.currency
       });
 
       // Si c'est déjà une HttpsError Firebase, la relancer telle quelle

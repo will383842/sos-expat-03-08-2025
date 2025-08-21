@@ -1,6 +1,7 @@
+// firebase/functions/src/createPaymentIntent.ts
 // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU au début du fichier
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
-import { stripeManager } from './StripeManager'; // 👈 plus d'import du type StripePaymentData pour garder un payload 100% connectionFee
+import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 import {
@@ -21,11 +22,12 @@ const CPU_OPTIMIZED_CONFIG = {
   concurrency: 80,
   cors: [
     'http://localhost:3000',
-    'http://localhost:5196',
+    'http://localhost:5175',   // ✅ AJOUTÉ - votre vrai port !
+    'http://localhost:5173',   // ✅ Gardé pour compatibilité
+    'http://localhost:5196',   // ✅ Gardé pour compatibilité  
     'http://localhost:8080',
     'https://sos-urgently-ac307.web.app',
     'https://sos-urgently-ac307.firebaseapp.com',
-    'http://localhost:5173',
   ],
 };
 
@@ -55,6 +57,7 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 type SupportedCurrency = 'eur' | 'usd';
 type SupportedServiceType = 'lawyer_call' | 'expat_call';
 
+// ✅ INTERFACE CORRIGÉE - utilise commissionAmount comme CallCheckout.tsx
 interface PaymentIntentRequestData {
   amount: number; // Montant dans l'unité principale (EUR ou USD) — envoyé par le frontend
   currency?: SupportedCurrency;
@@ -65,8 +68,8 @@ interface PaymentIntentRequestData {
   providerName?: string;
   description?: string;
 
-  /** ✅ Frais de mise en relation (dans l'unité principale) */
-  connectionFeeAmount: number;
+  /** ✅ Frais de commission (dans l'unité principale) - CORRESPOND au frontend */
+  commissionAmount: number;
 
   /** ✅ Rémunération prestataire (dans l'unité principale) */
   providerAmount: number;
@@ -335,17 +338,26 @@ async function checkDuplicatePayments(
 }
 
 /**
- * Validation de cohérence: total = frais + prestataire (dans l'unité principale)
+ * ✅ Validation de cohérence: total = commission + prestataire (dans l'unité principale)
  */
 function validateAmountCoherence(
   totalAmount: number,
-  connectionFeeAmount: number,
+  commissionAmount: number, // ✅ CHANGEMENT: commissionAmount au lieu de connectionFeeAmount
   providerAmount: number
 ): { valid: boolean; error?: string; difference: number } {
-  const totalCalculated = Math.round((connectionFeeAmount + providerAmount) * 100) / 100;
+  const totalCalculated = Math.round((commissionAmount + providerAmount) * 100) / 100;
   const amountRounded = Math.round(totalAmount * 100) / 100;
   const difference = Math.abs(totalCalculated - amountRounded);
   const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
+
+  console.log('💰 Validation cohérence (commissionAmount):', {
+    totalAmount: amountRounded,
+    commissionAmount,
+    providerAmount,
+    totalCalculated,
+    difference,
+    tolerance,
+  });
 
   if (difference > tolerance) {
     return {
@@ -359,15 +371,15 @@ function validateAmountCoherence(
 }
 
 /**
- * Sanitization ET conversion des données en fonction de la devise
+ * ✅ Sanitization ET conversion des données en fonction de la devise
  */
 function sanitizeAndConvertInput(
   data: PaymentIntentRequestData
 ): {
   amountInMainUnit: number; // EUR ou USD
   amountInCents: number;
-  connectionFeeAmountInMainUnit: number;
-  connectionFeeAmountInCents: number;
+  commissionAmountInMainUnit: number; // ✅ CHANGEMENT
+  commissionAmountInCents: number;    // ✅ CHANGEMENT
   providerAmountInMainUnit: number;
   providerAmountInCents: number;
   currency: SupportedCurrency;
@@ -388,18 +400,18 @@ function sanitizeAndConvertInput(
   const currency = (data.currency || 'eur').toLowerCase().trim() as SupportedCurrency;
 
   const amountInMainUnit = Number(data.amount);
-  const connectionFeeAmountInMainUnit = Number(data.connectionFeeAmount);
+  const commissionAmountInMainUnit = Number(data.commissionAmount); // ✅ CHANGEMENT
   const providerAmountInMainUnit = Number(data.providerAmount);
 
   const amountInCents = toCents(amountInMainUnit, currency);
-  const connectionFeeAmountInCents = toCents(connectionFeeAmountInMainUnit, currency);
+  const commissionAmountInCents = toCents(commissionAmountInMainUnit, currency); // ✅ CHANGEMENT
   const providerAmountInCents = toCents(providerAmountInMainUnit, currency);
 
   return {
     amountInMainUnit,
     amountInCents,
-    connectionFeeAmountInMainUnit,
-    connectionFeeAmountInCents,
+    commissionAmountInMainUnit, // ✅ CHANGEMENT
+    commissionAmountInCents,    // ✅ CHANGEMENT
     providerAmountInMainUnit,
     providerAmountInCents,
     currency,
@@ -423,7 +435,7 @@ function sanitizeAndConvertInput(
 /**
  * Logging adapté à l'environnement (optimisé)
  */
-function logSecurityEvent(event: string, data: any) {
+function logSecurityEvent(event: string, data: Record<string, unknown>) {
   const timestamp = new Date().toISOString();
 
   if (isDevelopment) {
@@ -431,9 +443,9 @@ function logSecurityEvent(event: string, data: any) {
   } else if (isProduction) {
     const sanitizedData = {
       ...data,
-      userId: data.userId ? data.userId.substring(0, 8) + '...' : undefined,
-      clientId: data.clientId ? data.clientId.substring(0, 8) + '...' : undefined,
-      providerId: data.providerId ? data.providerId.substring(0, 8) + '...' : undefined,
+      userId: data.userId ? String(data.userId).substring(0, 8) + '...' : undefined,
+      clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined,
+      providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined,
     };
     console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
   } else {
@@ -442,7 +454,7 @@ function logSecurityEvent(event: string, data: any) {
 }
 
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE (OPTIMISÉE CPU) — sans “commission”
+// 🚀 CLOUD FUNCTION PRINCIPALE (OPTIMISÉE CPU) — INTERFACE CORRIGÉE
 // =========================================
 export const createPaymentIntent = onCall(
   CPU_OPTIMIZED_CONFIG,
@@ -466,11 +478,11 @@ export const createPaymentIntent = onCall(
       }
       const userId = request.auth.uid;
 
-      // Debug entrée
-      console.log('💳 === BACKEND - DONNÉES REÇUES (optimisé CPU) ===');
+      // ✅ Debug entrée avec interface corrigée
+      console.log('💳 === BACKEND - DONNÉES REÇUES (interface corrigée) ===');
       console.log('📥 Données brutes reçues:', {
         amount: request.data.amount,
-        connectionFeeAmount: request.data.connectionFeeAmount,
+        commissionAmount: request.data.commissionAmount, // ✅ CHANGEMENT
         providerAmount: request.data.providerAmount,
         serviceType: request.data.serviceType,
         currency: request.data.currency || 'eur',
@@ -483,13 +495,16 @@ export const createPaymentIntent = onCall(
           `Montant invalide reçu: ${request.data.amount} (type: ${typeof request.data.amount})`
         );
       }
+      
+      // ✅ Validation avec commissionAmount
       if (
-        typeof request.data.connectionFeeAmount !== 'number' ||
-        isNaN(request.data.connectionFeeAmount) ||
-        request.data.connectionFeeAmount < 0
+        typeof request.data.commissionAmount !== 'number' ||
+        isNaN(request.data.commissionAmount) ||
+        request.data.commissionAmount < 0
       ) {
-        throw new HttpsError('invalid-argument', 'Frais de mise en relation invalides');
+        throw new HttpsError('invalid-argument', 'Commission invalide');
       }
+      
       if (
         typeof request.data.providerAmount !== 'number' ||
         isNaN(request.data.providerAmount) ||
@@ -508,12 +523,12 @@ export const createPaymentIntent = onCall(
       // 4) SANITIZE + CONVERT
       const sanitizedData = sanitizeAndConvertInput(request.data);
 
-      console.log('💳 === APRÈS SANITIZATION (optimisé) ===');
+      console.log('💳 === APRÈS SANITIZATION (interface corrigée) ===');
       console.log('✅ Données sanitisées & converties:', {
         totalInMainUnit: sanitizedData.amountInMainUnit,
         totalInCents: sanitizedData.amountInCents,
-        connectionFeeInMainUnit: sanitizedData.connectionFeeAmountInMainUnit,
-        connectionFeeInCents: sanitizedData.connectionFeeAmountInCents,
+        commissionInMainUnit: sanitizedData.commissionAmountInMainUnit, // ✅ CHANGEMENT
+        commissionInCents: sanitizedData.commissionAmountInCents,       // ✅ CHANGEMENT
         providerInMainUnit: sanitizedData.providerAmountInMainUnit,
         providerInCents: sanitizedData.providerAmountInCents,
         currency: sanitizedData.currency,
@@ -523,8 +538,8 @@ export const createPaymentIntent = onCall(
       const {
         amountInMainUnit,
         amountInCents,
-        connectionFeeAmountInMainUnit,
-        connectionFeeAmountInCents,
+        commissionAmountInMainUnit, // ✅ CHANGEMENT
+        commissionAmountInCents,    // ✅ CHANGEMENT
         providerAmountInMainUnit,
         providerAmountInCents,
         currency,
@@ -553,10 +568,10 @@ export const createPaymentIntent = onCall(
         throw new HttpsError('invalid-argument', `Devise non supportée: ${currency}`);
       }
 
-      // 7) VALIDATION COHÉRENCE (total = frais + prestataire)
+      // 7) ✅ VALIDATION COHÉRENCE (total = commission + prestataire) - Interface corrigée
       const coherence = validateAmountCoherence(
         amountInMainUnit,
-        connectionFeeAmountInMainUnit,
+        commissionAmountInMainUnit, // ✅ CHANGEMENT
         providerAmountInMainUnit
       );
       if (!coherence.valid) {
@@ -586,16 +601,31 @@ export const createPaymentIntent = onCall(
         throw new HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
       }
 
-      // 11) CRÉATION PAIEMENT (Stripe) — payload 100% “frais de mise en relation”
-      console.log('💳 === ENVOI VERS STRIPEMANAGER (optimisé) ===');
-      const stripePayload = {
+      // 11) ✅ CRÉATION PAIEMENT (Stripe) — payload avec commissionAmount
+      console.log('💳 === ENVOI VERS STRIPEMANAGER (interface corrigée) ===');
+      
+      // ✅ Interface typée pour StripeManager
+      interface StripeManagerPayload {
+        amount: number;
+        currency: SupportedCurrency;
+        clientId: string;
+        providerId: string;
+        serviceType: SupportedServiceType;
+        providerType: 'lawyer' | 'expat';
+        commissionAmount: number;
+        providerAmount: number;
+        callSessionId?: string;
+        metadata: Record<string, string>;
+      }
+
+      const stripePayload: StripeManagerPayload = {
         amount: amountInCents, // centimes
         currency,
         clientId,
         providerId,
         serviceType,
         providerType: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
-        connectionFeeAmount: connectionFeeAmountInCents, // centimes
+        commissionAmount: commissionAmountInCents, // ✅ CHANGEMENT - StripeManager accepte commissionAmount
         providerAmount: providerAmountInCents, // centimes
         callSessionId,
         metadata: {
@@ -606,12 +636,12 @@ export const createPaymentIntent = onCall(
           environment: process.env.NODE_ENV || 'development',
           // Trace côté audit (unités principales)
           originalTotal: amountInMainUnit.toString(),
-          originalConnectionFee: connectionFeeAmountInMainUnit.toString(),
+          originalCommission: commissionAmountInMainUnit.toString(), // ✅ CHANGEMENT
           originalProviderAmount: providerAmountInMainUnit.toString(),
           originalCurrency: currency,
           ...metadata,
         },
-      } as any;
+      };
 
       const result = await stripeManager.createPaymentIntent(stripePayload);
 
@@ -629,31 +659,47 @@ export const createPaymentIntent = onCall(
 
       // 12) AUDIT
       if (isProduction) {
-        await logPaymentAudit(
-          {
-            paymentId: result.paymentIntentId!,
-            userId: clientId,
-            amount: amountInMainUnit,
-            currency,
-            type: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
-            action: 'create',
-            metadata: {
-              connectionFeeAmountInMainUnit,
-              providerAmountInMainUnit,
-              amountInCents,
-              connectionFeeAmountInCents,
-              providerAmountInCents,
-              requestId,
-            },
+        interface PaymentAuditData {
+          paymentId: string;
+          userId: string;
+          amount: number;
+          currency: SupportedCurrency;
+          type: 'lawyer' | 'expat';
+          action: 'create';
+          metadata: {
+            commissionAmountInMainUnit: number;
+            providerAmountInMainUnit: number;
+            amountInCents: number;
+            commissionAmountInCents: number;
+            providerAmountInCents: number;
+            requestId: string;
+          };
+        }
+
+        const auditData: PaymentAuditData = {
+          paymentId: result.paymentIntentId!,
+          userId: clientId,
+          amount: amountInMainUnit,
+          currency,
+          type: serviceType === 'lawyer_call' ? 'lawyer' : 'expat',
+          action: 'create',
+          metadata: {
+            commissionAmountInMainUnit, // ✅ CHANGEMENT
+            providerAmountInMainUnit,
+            amountInCents,
+            commissionAmountInCents, // ✅ CHANGEMENT
+            providerAmountInCents,
+            requestId,
           },
-          db
-        );
+        };
+
+        await logPaymentAudit(auditData, db);
       }
 
-      console.log('✅ Paiement créé:', {
+      console.log('✅ Paiement créé (interface corrigée):', {
         id: result.paymentIntentId,
         total: formatAmount(amountInMainUnit, currency),
-        connectionFee: formatAmount(connectionFeeAmountInMainUnit, currency),
+        commission: formatAmount(commissionAmountInMainUnit, currency), // ✅ CHANGEMENT
         provider: formatAmount(providerAmountInMainUnit, currency),
       });
 
@@ -673,7 +719,7 @@ export const createPaymentIntent = onCall(
       // 14) ERREURS
       const processingTime = Date.now() - startTime;
 
-      await logError('createPaymentIntent:error', {
+      const errorData: Record<string, unknown> = {
         requestId,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
@@ -683,10 +729,13 @@ export const createPaymentIntent = onCall(
           serviceType: request.data?.serviceType,
           currency: request.data?.currency || 'eur',
           hasAuth: !!request.auth,
+          hasCommission: request.data?.commissionAmount !== undefined, // ✅ CHANGEMENT
         },
         userAuth: request.auth?.uid || 'not-authenticated',
         environment: process.env.NODE_ENV,
-      });
+      };
+
+      await logError('createPaymentIntent:error', errorData);
 
       if (error instanceof HttpsError) throw error;
 

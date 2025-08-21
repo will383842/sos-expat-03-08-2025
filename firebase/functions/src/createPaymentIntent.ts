@@ -1,5 +1,5 @@
 // firebase/functions/src/createPaymentIntent.ts
-// 🔧 FIX CORS: Configuration sécurisée
+// 🔧 FIX CORS: Configuration simplifiée pour Firebase Functions v2
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
@@ -12,59 +12,16 @@ import {
 } from './utils/paymentValidators';
 
 // =========================================
-// 🔧 FIX CORS: Configuration sécurisée + gestion manuelle des headers
+// 🔧 FIX CORS: Configuration simplifiée - Firebase v2 gère automatiquement les CORS avec onCall
 // =========================================
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5175',
-  'http://localhost:5173', 
-  'http://localhost:5196',
-  'http://localhost:8080',
-  'https://sos-urgently-ac307.web.app',
-  'https://sos-urgently-ac307.firebaseapp.com',
-];
-
 const CPU_OPTIMIZED_CONFIG = {
   memory: "256MiB" as const,
   timeoutSeconds: 60,
   maxInstances: 10,
   minInstances: 0,
   concurrency: 80,
-  // 🔧 Retirer cors: [array] car ça ne marche pas avec Firebase Functions v2
-  // On va gérer les CORS manuellement tout en gardant la sécurité
+  // ✅ CORS automatique avec onCall - pas besoin de configuration manuelle
 };
-
-/**
- * 🔒 Validation CORS sécurisée + headers
- */
-function validateAndSetCorsHeaders(request: CallableRequest<PaymentIntentRequestData>): Record<string, string> {
-  const origin = request.rawRequest?.headers?.origin as string | undefined;
-  const headers: Record<string, string> = {};
-
-  // Validation sécurisée de l'origin
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    // Origin autorisé - ajouter les headers CORS
-    headers['Access-Control-Allow-Origin'] = origin;
-    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With';
-    headers['Access-Control-Allow-Credentials'] = 'true';
-    headers['Access-Control-Max-Age'] = '86400';
-  } else if (!origin) {
-    // Pas d'origin (développement local parfois)
-    const isDev = process.env.NODE_ENV === 'development';
-    if (isDev) {
-      headers['Access-Control-Allow-Origin'] = 'http://localhost:5173';
-      headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-      headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
-    }
-  } else {
-    // Origin non autorisé - log pour sécurité
-    console.error(`🚨 Origin non autorisé: ${origin}`);
-    throw new HttpsError('permission-denied', 'Origin non autorisé');
-  }
-
-  return headers;
-}
 
 // =========================================
 // 🌍 DÉTECTION D'ENVIRONNEMENT
@@ -440,16 +397,15 @@ export const createPaymentIntent = onCall(
     const startTime = Date.now();
 
     try {
-      // 🔧 FIX CORS: Valider l'origin et préparer les headers
-      const corsHeaders = validateAndSetCorsHeaders(request);
-
+      // 🔧 FIX CORS: Firebase Functions v2 avec onCall gère automatiquement les CORS
+      // Plus besoin de validateAndSetCorsHeaders ou de gestion manuelle
+      
       logSecurityEvent('payment_intent_start', {
         requestId,
         environment: process.env.NODE_ENV,
         isDevelopment,
         isProduction,
         bypassMode: BYPASS_MODE,
-        origin: request.rawRequest?.headers?.origin,
       });
 
       // 1) AUTH
@@ -629,7 +585,7 @@ export const createPaymentIntent = onCall(
         provider: formatAmount(providerAmountInMainUnit, currency),
       });
 
-      // 🔧 FIX CORS: Retourner la réponse avec les headers CORS
+      // 🔧 FIX CORS: Retourner directement la réponse - Firebase gère les headers CORS
       const response: SuccessResponse = {
         success: true,
         clientSecret: result.clientSecret!,
@@ -641,10 +597,7 @@ export const createPaymentIntent = onCall(
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      return {
-        ...response,
-        _corsHeaders: corsHeaders, // Headers pour debug
-      };
+      return response;
 
     } catch (error: unknown) {
       const processingTime = Date.now() - startTime;

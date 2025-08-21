@@ -1,16 +1,3 @@
-// firebase/functions/src/callScheduler.ts
-import { logCallRecord } from './utils/logs/logCallRecord';
-import { logError } from './utils/logs/logError';
-import * as admin from 'firebase-admin';
-import { twilioCallManager, CallSessionState } from './TwilioCallManager';
-
-// Assurer que Firebase Admin est initialisé
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
-
 // Configuration pour la production
 const SCHEDULER_CONFIG = {
   DEFAULT_DELAY_MINUTES: 5,
@@ -22,14 +9,14 @@ const SCHEDULER_CONFIG = {
 } as const;
 
 /**
- * ✅ Interface des paramètres de création d’appel.
+ * ✅ Interface des paramètres de création d'appel.
  * IMPORTANT MONNAIE :
  * - `amount` est **toujours en EUROS** (unités réelles), **pas** en centimes.
- * - La conversion en centimes ne doit se faire **qu’au moment Stripe** (en amont,
+ * - La conversion en centimes ne doit se faire **qu'au moment Stripe** (en amont,
  *   typiquement dans la Cloud Function qui crée le PaymentIntent).
  * - Les champs `amountCents`, `currency`, `platformAmountCents` ci-dessous sont
  *   **optionnels** et purement informatifs (déjà calculés en amont). Le scheduler
- *   n’effectue **aucune** conversion supplémentaire.
+ *   n'effectue **aucune** conversion supplémentaire.
  */
 interface CreateCallParams {
   sessionId?: string;
@@ -46,8 +33,8 @@ interface CreateCallParams {
   clientLanguages?: string[];
   providerLanguages?: string[];
 
-  // Métadonnées optionnelles passées par l’étape de paiement (déjà converties/calculées)
-  amountCents?: number; // en centimes, si fourni par l’amont (non utilisé pour des calculs ici)
+  // Métadonnées optionnelles passées par l'étape de paiement (déjà converties/calculées)
+  amountCents?: number; // en centimes, si fourni par l'amont (non utilisé pour des calculs ici)
   currency?: 'eur' | 'usd' | 'EUR' | 'USD';
   platformAmountCents?: number;
   platformFeePercent?: number;
@@ -64,7 +51,7 @@ interface SchedulerStats {
 }
 
 /**
- * Classe pour gérer la planification et la surveillance des appels
+ * 🔧 FIX: Classe pour gérer la planification et la surveillance des appels avec initialisation lazy
  */
 class CallSchedulerManager {
   private scheduledCalls = new Map<string, NodeJS.Timeout>();
@@ -77,10 +64,24 @@ class CallSchedulerManager {
     averageWaitTime: 0,
     queueLength: 0,
   };
+  private isInitialized = false;
 
   constructor() {
-    this.startHealthCheck();
-    this.loadInitialStats();
+    // 🔧 FIX: Ne pas initialiser immédiatement - attendre le premier appel
+  }
+
+  private async initialize() {
+    if (!this.isInitialized) {
+      try {
+        this.startHealthCheck();
+        await this.loadInitialStats();
+        this.isInitialized = true;
+        console.log('✅ CallSchedulerManager initialisé');
+      } catch (error) {
+        console.error('❌ Erreur initialisation CallSchedulerManager:', error);
+        throw error;
+      }
+    }
   }
 
   /**
@@ -126,12 +127,13 @@ class CallSchedulerManager {
    */
   private async loadInitialStats(): Promise<void> {
     try {
+      const database = getDB();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
 
       // Compter les appels d'aujourd'hui
-      const todayQuery = await db
+      const todayQuery = await database
         .collection('call_sessions')
         .where('metadata.createdAt', '>=', todayTimestamp)
         .get();
@@ -160,6 +162,7 @@ class CallSchedulerManager {
 
     for (const [sessionId, timeout] of this.scheduledCalls.entries()) {
       try {
+        const twilioCallManager = await getTwilioCallManager();
         const session = await twilioCallManager.getCallSession(sessionId);
 
         if (!session || session.metadata.createdAt.toMillis() < expiredThreshold) {
@@ -205,7 +208,8 @@ class CallSchedulerManager {
    */
   private async getPendingSessions(): Promise<CallSessionState[]> {
     try {
-      const snapshot = await db
+      const database = getDB();
+      const snapshot = await database
         .collection('call_sessions')
         .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
         .orderBy('metadata.createdAt', 'desc')
@@ -227,6 +231,9 @@ class CallSchedulerManager {
     delayMinutes: number = SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES
   ): Promise<void> {
     try {
+      // 🔧 FIX: Initialiser si nécessaire
+      await this.initialize();
+
       // Valider les paramètres
       if (!callSessionId) {
         throw new Error('callSessionId est requis');
@@ -238,6 +245,7 @@ class CallSchedulerManager {
       );
 
       // Vérifier que la session existe et est valide
+      const twilioCallManager = await getTwilioCallManager();
       const session = await twilioCallManager.getCallSession(callSessionId);
       if (!session) {
         throw new Error(`Session d'appel non trouvée: ${callSessionId}`);
@@ -282,6 +290,7 @@ class CallSchedulerManager {
 
       // En cas d'erreur, marquer la session comme échouée
       try {
+        const twilioCallManager = await getTwilioCallManager();
         await twilioCallManager.updateCallSessionStatus(callSessionId, 'failed');
 
         await logCallRecord({
@@ -311,6 +320,7 @@ class CallSchedulerManager {
         );
 
         // Vérifier que la session est toujours valide
+        const twilioCallManager = await getTwilioCallManager();
         const session = await twilioCallManager.getCallSession(callSessionId);
         if (!session) {
           console.warn(`Session non trouvée lors de l'exécution: ${callSessionId}`);
@@ -347,6 +357,7 @@ class CallSchedulerManager {
     console.error(`❌ Échec de toutes les tentatives pour ${callSessionId}`);
 
     try {
+      const twilioCallManager = await getTwilioCallManager();
       await twilioCallManager.updateCallSessionStatus(callSessionId, 'failed');
       this.stats.failedToday++;
 
@@ -365,6 +376,9 @@ class CallSchedulerManager {
    */
   async cancelScheduledCall(callSessionId: string, reason: string): Promise<void> {
     try {
+      // 🔧 FIX: Initialiser si nécessaire
+      await this.initialize();
+
       // Annuler le timeout
       const timeout = this.scheduledCalls.get(callSessionId);
       if (timeout) {
@@ -374,6 +388,7 @@ class CallSchedulerManager {
       }
 
       // Utiliser TwilioCallManager pour annuler la session
+      const twilioCallManager = await getTwilioCallManager();
       await twilioCallManager.cancelCallSession(callSessionId, reason, 'scheduler');
 
       await logCallRecord({
@@ -423,8 +438,15 @@ class CallSchedulerManager {
   }
 }
 
-// Instance singleton du scheduler
-const callSchedulerManager = new CallSchedulerManager();
+// 🔧 FIX: Instance singleton avec lazy loading
+let callSchedulerManagerInstance: CallSchedulerManager | null = null;
+
+function getCallSchedulerManager(): CallSchedulerManager {
+  if (!callSchedulerManagerInstance) {
+    callSchedulerManagerInstance = new CallSchedulerManager();
+  }
+  return callSchedulerManagerInstance;
+}
 
 /**
  * Fonction principale pour programmer une séquence d'appel
@@ -433,13 +455,14 @@ export const scheduleCallSequence = async (
   callSessionId: string,
   delayMinutes: number = SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES
 ): Promise<void> => {
-  return callSchedulerManager.scheduleCallSequence(callSessionId, delayMinutes);
+  const manager = getCallSchedulerManager();
+  return manager.scheduleCallSequence(callSessionId, delayMinutes);
 };
 
 /**
  * ✅ Fonction pour créer et programmer un nouvel appel
  * - `amount` est **en EUROS** (unités réelles).
- * - ❌ Pas de vérification de “cohérence service/prix” ici.
+ * - ❌ Pas de vérification de "cohérence service/prix" ici.
  * - ✅ On garde uniquement la validation min/max.
  * - ❗️Aucune conversion centimes ici : la conversion unique vers centimes se fait
  *   au moment Stripe (dans la fonction de paiement en amont).
@@ -479,6 +502,7 @@ export const createAndScheduleCall = async (
     // ❌ Supprimé : validations de cohérence service/prix (49€/19€ etc.)
 
     // ✅ Créer la session avec montants EN EUROS (aucune conversion ici)
+    const twilioCallManager = await getTwilioCallManager();
     const callSession = await twilioCallManager.createCallSession({
       sessionId,
       providerId: params.providerId,
@@ -489,9 +513,6 @@ export const createAndScheduleCall = async (
       providerType: params.providerType,
       paymentIntentId: params.paymentIntentId,
       amount: params.amount, // ✅ euros
-      // Métadonnées informatives si fournies par l’amont
-      platformAmountCents: params.platformAmountCents,
-      platformFeePercent: params.platformFeePercent,
       requestId: params.requestId,
       clientLanguages: params.clientLanguages,
       providerLanguages: params.providerLanguages,
@@ -543,7 +564,8 @@ export const cancelScheduledCall = async (
   callSessionId: string,
   reason: string
 ): Promise<void> => {
-  return callSchedulerManager.cancelScheduledCall(callSessionId, reason);
+  const manager = getCallSchedulerManager();
+  return manager.cancelScheduledCall(callSessionId, reason);
 };
 
 /**
@@ -553,13 +575,14 @@ export const resumePendingCalls = async (): Promise<void> => {
   try {
     console.log('🔄 Récupération des appels en attente...');
 
+    const database = getDB();
     const now = admin.firestore.Timestamp.now();
     const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(
       now.toMillis() - 5 * 60 * 1000
     );
 
     // Chercher les sessions en attente créées il y a plus de 5 minutes
-    const pendingSessions = await db
+    const pendingSessions = await database
       .collection('call_sessions')
       .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting'])
       .where('metadata.createdAt', '<=', fiveMinutesAgo)
@@ -582,6 +605,7 @@ export const resumePendingCalls = async (): Promise<void> => {
         const paymentValid = await validatePaymentForResume(sessionData.payment.intentId);
 
         if (!paymentValid) {
+          const twilioCallManager = await getTwilioCallManager();
           await twilioCallManager.cancelCallSession(
             sessionId,
             'payment_invalid',
@@ -591,6 +615,7 @@ export const resumePendingCalls = async (): Promise<void> => {
         }
 
         // Relancer la séquence d'appel immédiatement
+        const twilioCallManager = await getTwilioCallManager();
         await twilioCallManager.initiateCallSequence(sessionId, 0);
 
         await logCallRecord({
@@ -605,6 +630,7 @@ export const resumePendingCalls = async (): Promise<void> => {
 
         // Marquer comme échoué si impossible de reprendre
         try {
+          const twilioCallManager = await getTwilioCallManager();
           await twilioCallManager.updateCallSessionStatus(sessionId, 'failed');
         } catch (updateError) {
           await logError(`resumePendingCalls:updateStatus_${sessionId}`, updateError);
@@ -624,8 +650,9 @@ export const resumePendingCalls = async (): Promise<void> => {
  */
 async function validatePaymentForResume(paymentIntentId: string): Promise<boolean> {
   try {
+    const database = getDB();
     // Vérifier dans Firestore d'abord
-    const paymentQuery = await db
+    const paymentQuery = await database
       .collection('payments')
       .where('stripePaymentIntentId', '==', paymentIntentId)
       .limit(1)
@@ -660,6 +687,7 @@ export const cleanupOldSessions = async (
   try {
     console.log(`🧹 Nettoyage des sessions de plus de ${olderThanDays} jours...`);
 
+    const twilioCallManager = await getTwilioCallManager();
     const result = await twilioCallManager.cleanupOldSessions({
       olderThanDays,
       keepCompletedDays: 7, // Garder les complétées 7 jours
@@ -693,21 +721,24 @@ export const getCallStatistics = async (
   };
 }> => {
   try {
+    const database = getDB();
     const startDate = admin.firestore.Timestamp.fromMillis(
       Date.now() - periodDays * 24 * 60 * 60 * 1000
     );
 
-    const [schedulerStats, callStats] = await Promise.all([
-      callSchedulerManager.getStats(),
-      twilioCallManager.getCallStatistics({ startDate }),
+    const [schedulerStats, twilioCallManager] = await Promise.all([
+      getCallSchedulerManager().getStats(),
+      getTwilioCallManager(),
     ]);
+
+    const callStats = await twilioCallManager.getCallStatistics({ startDate });
 
     // ✅ Calculs de revenus EN EUROS pour l'affichage
     let totalRevenueEuros = 0;
     let completedCallsWithRevenue = 0;
 
     // Récupérer les sessions complétées avec revenus
-    const completedSessionsQuery = await db
+    const completedSessionsQuery = await database
       .collection('call_sessions')
       .where('metadata.createdAt', '>=', startDate)
       .where('status', '==', 'completed')
@@ -750,7 +781,9 @@ export const getCallStatistics = async (
  */
 export const gracefulShutdown = (): void => {
   console.log('🔄 Arrêt gracieux du CallScheduler...');
-  callSchedulerManager.shutdown();
+  if (callSchedulerManagerInstance) {
+    callSchedulerManagerInstance.shutdown();
+  }
 };
 
 // Gestionnaire de signaux pour arrêt propre
@@ -758,4 +791,42 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 // Export du manager pour les tests
-export { callSchedulerManager };
+export { getCallSchedulerManager as callSchedulerManager };// firebase/functions/src/callScheduler.ts
+import { logCallRecord } from './utils/logs/logCallRecord';
+import { logError } from './utils/logs/logError';
+import * as admin from 'firebase-admin';
+import { CallSessionState } from './TwilioCallManager';
+
+// 🔧 FIX: Import mais pas d'initialisation immédiate
+let twilioCallManagerInstance: any = null;
+let stripeManagerInstance: any = null;
+
+async function getTwilioCallManager() {
+  if (!twilioCallManagerInstance) {
+    const { twilioCallManager } = await import('./TwilioCallManager');
+    twilioCallManagerInstance = twilioCallManager;
+  }
+  return twilioCallManagerInstance;
+}
+
+async function getStripeManager() {
+  if (!stripeManagerInstance) {
+    const { stripeManager } = await import('./StripeManager');
+    stripeManagerInstance = stripeManager;
+  }
+  return stripeManagerInstance;
+}
+
+// 🔧 FIX: Initialisation Firebase lazy
+let db: admin.firestore.Firestore | null = null;
+
+function getDB(): admin.firestore.Firestore {
+  if (!db) {
+    // Assurer que Firebase Admin est initialisé
+    if (!admin.apps.length) {
+      admin.initializeApp();
+    }
+    db = admin.firestore();
+  }
+  return db;
+}

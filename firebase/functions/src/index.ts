@@ -1,47 +1,16 @@
-// functions/src/index.ts - Version finale v2 avec CORS intégré et config Firebase
+// functions/src/index.ts - Version finale v2 avec LAZY LOADING et config Firebase
 
-// ====== EXPORTS PRINCIPAUX ======
-
-// Configuration globale pour toutes les fonctions
+// ====== CONFIGURATION GLOBALE ======
 import { setGlobalOptions } from 'firebase-functions/v2';
 setGlobalOptions({
   region: 'europe-west1',
 });
 
-// Export des webhooks modernisés (remplace les anciens)
-export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
-
-// Export des webhooks spécialisés
-export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook'; 
-export { twilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
-
-// Export des managers
-export { messageManager } from './MessageManager';
-export { stripeManager } from './StripeManager';
-export { twilioCallManager } from './TwilioCallManager';
-
-// Export des fonctions utilitaires
-export { scheduleCallSequence, cancelScheduledCall } from './callScheduler';
-
-// Export de l'initialisation des templates
-export { initializeMessageTemplates } from './initializeMessageTemplates';
-
-// Export des fonctions de notification (si nécessaire)
-export { notifyAfterPayment } from './notifications/notifyAfterPayment';
-
-// Export des fonctions réelles utilisées par le frontend
-export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
-export { createPaymentIntent } from './createPaymentIntent';
-
-// Export de l'API admin
-export { api } from './adminApi';
-
-// ====== IMPORTS POUR FONCTIONS ======
-
+// ====== IMPORTS SEULEMENT (PAS D'INITIALISATION) ======
 import { onRequest } from 'firebase-functions/v2/https';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import * as functions from 'firebase-functions'; // Ajouté pour config()
+import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
@@ -69,7 +38,6 @@ interface AdminBulkUpdateData {
   reason?: string;
 }
 
-// Types pour les fonctions admin v2
 interface AdminCallActionData {
   sessionId: string;
   reason?: string;
@@ -86,34 +54,92 @@ interface AdminMuteParticipantData {
   mute?: boolean;
 }
 
-// Interface pour les custom claims
 interface CustomClaims {
   role?: string;
   [key: string]: unknown;
 }
 
-// ❌ SUPPRIMÉ - dotenv ne fonctionne pas avec Firebase Functions
-// import * as dotenv from 'dotenv';
-// dotenv.config();
+// ====== INITIALISATION FIREBASE (UNE SEULE FOIS) ======
+let isFirebaseInitialized = false;
+let db: admin.firestore.Firestore;
 
-// Initialiser Firebase Admin (une seule fois)
-if (!admin.apps.length) {
-  admin.initializeApp();
+function initializeFirebase() {
+  if (!isFirebaseInitialized) {
+    try {
+      if (!admin.apps.length) {
+        admin.initializeApp();
+      }
+      
+      db = admin.firestore();
+      
+      // Configuration Firestore (une seule fois)
+      try {
+        db.settings({ ignoreUndefinedProperties: true });
+        console.log('✅ Firestore configuré');
+      } catch (settingsError) {
+        // Firestore déjà configuré, c'est normal
+        console.log('ℹ️ Firestore déjà configuré');
+      }
+      
+      isFirebaseInitialized = true;
+      console.log('✅ Firebase initialisé avec succès');
+    } catch (error) {
+      console.error('❌ Erreur initialisation Firebase:', error);
+      throw error;
+    }
+  }
+  return db;
 }
 
-const db = admin.firestore();
+// ====== LAZY LOADING DES MANAGERS ======
+let stripeManagerInstance: any = null;
+let twilioCallManagerInstance: any = null;
+let messageManagerInstance: any = null;
 
-// Configuration Firestore
-try {
-  db.settings({ ignoreUndefinedProperties: true });
-  console.log('✅ Firestore configuré pour ignorer les propriétés undefined');
-} catch (firebaseError) {
-  console.log('ℹ️ Firestore déjà configuré', firebaseError);
+async function getStripeManager() {
+  if (!stripeManagerInstance) {
+    const { stripeManager } = await import('./StripeManager');
+    stripeManagerInstance = stripeManager;
+  }
+  return stripeManagerInstance;
 }
 
-// ====== FONCTIONS PUBLIQUES SUPPRIMÉES ======
-// Ces fonctions onRequest ne sont pas utilisées par le frontend
-// Le frontend utilise les fonctions onCall directement
+async function getTwilioCallManager() {
+  if (!twilioCallManagerInstance) {
+    const { twilioCallManager } = await import('./TwilioCallManager');
+    twilioCallManagerInstance = twilioCallManager;
+  }
+  return twilioCallManagerInstance;
+}
+
+async function getMessageManager() {
+  if (!messageManagerInstance) {
+    const { messageManager } = await import('./MessageManager');
+    messageManagerInstance = messageManager;
+  }
+  return messageManagerInstance;
+}
+
+// ====== EXPORTS DIRECTS (SANS INITIALISATION) ======
+// Export des fonctions réelles utilisées par le frontend
+export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
+export { createPaymentIntent } from './createPaymentIntent';
+
+// Export de l'API admin
+export { api } from './adminApi';
+
+// Export des webhooks modernisés
+export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
+
+// Export des webhooks spécialisés
+export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook'; 
+export { twilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
+
+// Export de l'initialisation des templates
+export { initializeMessageTemplates } from './initializeMessageTemplates';
+
+// Export des fonctions de notification (si nécessaire)
+export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 
 // ========================================
 // FONCTIONS ADMIN (TOUTES EN V2 MAINTENANT)
@@ -122,6 +148,9 @@ try {
 export const adminUpdateStatus = onCall(
   { cors: true, memory: "256MiB", timeoutSeconds: 30 },
   async (request: CallableRequest<AdminUpdateStatusData>) => {
+    // Initialiser Firebase au besoin
+    const database = initializeFirebase();
+    
     // Vérifier que l'utilisateur est admin
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -129,12 +158,12 @@ export const adminUpdateStatus = onCall(
 
     const { userId, status, reason } = request.data;
     
-    await db.collection("users").doc(userId).update({
+    await database.collection("users").doc(userId).update({
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     
-    await db.collection("adminLogs").add({
+    await database.collection("adminLogs").add({
       action: "updateStatus",
       userId,
       status,
@@ -150,21 +179,22 @@ export const adminUpdateStatus = onCall(
 export const adminSoftDeleteUser = onCall(
   { cors: true, memory: "256MiB", timeoutSeconds: 30 },
   async (request: CallableRequest<AdminSoftDeleteData>) => {
-    // Vérifier que l'utilisateur est admin
+    const database = initializeFirebase();
+    
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
     const { userId, reason } = request.data;
     
-    await db.collection("users").doc(userId).update({
+    await database.collection("users").doc(userId).update({
       isDeleted: true,
       deletedAt: admin.firestore.FieldValue.serverTimestamp(),
       deletedBy: request.auth.uid,
       deletedReason: reason || null,
     });
     
-    await db.collection("adminLogs").add({
+    await database.collection("adminLogs").add({
       action: "softDelete",
       userId,
       reason: reason || null,
@@ -179,21 +209,22 @@ export const adminSoftDeleteUser = onCall(
 export const adminBulkUpdateStatus = onCall(
   { cors: true, memory: "256MiB", timeoutSeconds: 30 },
   async (request: CallableRequest<AdminBulkUpdateData>) => {
-    // Vérifier que l'utilisateur est admin
+    const database = initializeFirebase();
+    
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
     const { ids, status, reason } = request.data;
     
-    const batch = db.batch();
-    ids.forEach((id) => batch.update(db.collection("users").doc(id), {
+    const batch = database.batch();
+    ids.forEach((id) => batch.update(database.collection("users").doc(id), {
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }));
     await batch.commit();
     
-    await db.collection("adminLogs").add({
+    await database.collection("adminLogs").add({
       action: "bulkUpdateStatus",
       ids,
       status,
@@ -217,7 +248,8 @@ export const adminForceDisconnectCall = onCall(
     timeoutSeconds: 30 
   },
   async (request: CallableRequest<AdminCallActionData>) => {
-    // Vérifier que l'utilisateur est admin
+    const database = initializeFirebase();
+    
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
@@ -229,15 +261,14 @@ export const adminForceDisconnectCall = onCall(
     }
 
     try {
-      const { twilioCallManager } = await import('./TwilioCallManager');
+      const twilioCallManager = await getTwilioCallManager();
       const success = await twilioCallManager.cancelCallSession(
         sessionId, 
         reason || 'admin_force_disconnect', 
         request.auth.uid
       );
 
-      // Log l'action admin
-      await db.collection("adminLogs").add({
+      await database.collection("adminLogs").add({
         action: "forceDisconnectCall",
         sessionId,
         reason: reason || 'admin_force_disconnect',
@@ -263,6 +294,8 @@ export const adminJoinCall = onCall(
     timeoutSeconds: 30 
   },
   async (request: CallableRequest<AdminCallActionData>) => {
+    const database = initializeFirebase();
+    
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
@@ -274,19 +307,17 @@ export const adminJoinCall = onCall(
     }
 
     try {
-      const { twilioCallManager } = await import('./TwilioCallManager');
+      const twilioCallManager = await getTwilioCallManager();
       const session = await twilioCallManager.getCallSession(sessionId);
       
       if (!session || session.status !== 'active') {
         throw new HttpsError('failed-precondition', 'Call is not active');
       }
 
-      // Générer un lien vers la console Twilio pour rejoindre la conférence
       const conferenceUrl = `https://console.twilio.com/us1/develop/voice/manage/conferences/${session.conference.sid}`;
       const accessToken = `admin_${request.auth.uid}_${Date.now()}`;
 
-      // Log l'action admin
-      await db.collection("adminLogs").add({
+      await database.collection("adminLogs").add({
         action: "joinCall",
         sessionId,
         conferenceSid: session.conference.sid,
@@ -315,6 +346,8 @@ export const adminTransferCall = onCall(
     timeoutSeconds: 30 
   },
   async (request: CallableRequest<AdminTransferCallData>) => {
+    const database = initializeFirebase();
+    
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
@@ -326,8 +359,7 @@ export const adminTransferCall = onCall(
     }
 
     try {
-      // Vérifier que le nouveau prestataire existe
-      const newProviderDoc = await db.collection('users').doc(newProviderId).get();
+      const newProviderDoc = await database.collection('users').doc(newProviderId).get();
 
       if (!newProviderDoc.exists) {
         throw new HttpsError('not-found', 'New provider not found');
@@ -338,13 +370,11 @@ export const adminTransferCall = onCall(
         throw new HttpsError('failed-precondition', 'New provider has no phone number');
       }
 
-      // Vérifier que c'est bien un prestataire
       if (!['lawyer', 'expat'].includes(newProvider.role)) {
         throw new HttpsError('failed-precondition', 'User is not a provider');
       }
 
-      // Mettre à jour la session avec le nouveau prestataire
-      await db.collection('call_sessions').doc(sessionId).update({
+      await database.collection('call_sessions').doc(sessionId).update({
         'metadata.originalProviderId': admin.firestore.FieldValue.arrayUnion(newProvider.id),
         'metadata.providerId': newProviderId,
         'metadata.providerName': `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
@@ -360,8 +390,7 @@ export const adminTransferCall = onCall(
         })
       });
 
-      // Log l'action admin
-      await db.collection("adminLogs").add({
+      await database.collection("adminLogs").add({
         action: "transferCall",
         sessionId,
         newProviderId,
@@ -390,6 +419,8 @@ export const adminMuteParticipant = onCall(
     timeoutSeconds: 30 
   },
   async (request: CallableRequest<AdminMuteParticipantData>) => {
+    const database = initializeFirebase();
+    
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
@@ -405,7 +436,7 @@ export const adminMuteParticipant = onCall(
     }
 
     try {
-      const { twilioCallManager } = await import('./TwilioCallManager');
+      const twilioCallManager = await getTwilioCallManager();
       const session = await twilioCallManager.getCallSession(sessionId);
       
       if (!session || session.status !== 'active') {
@@ -418,8 +449,7 @@ export const adminMuteParticipant = onCall(
         throw new HttpsError('failed-precondition', 'Participant call SID not found');
       }
 
-      // Mettre à jour le statut de mute dans la session
-      await db.collection('call_sessions').doc(sessionId).update({
+      await database.collection('call_sessions').doc(sessionId).update({
         [`participants.${participantType}.isMuted`]: mute,
         'metadata.updatedAt': admin.firestore.Timestamp.now(),
         adminActions: admin.firestore.FieldValue.arrayUnion({
@@ -430,8 +460,7 @@ export const adminMuteParticipant = onCall(
         })
       });
 
-      // Log l'action admin
-      await db.collection("adminLogs").add({
+      await database.collection("adminLogs").add({
         action: mute ? "muteParticipant" : "unmuteParticipant",
         sessionId,
         participantType,
@@ -455,26 +484,31 @@ export const adminMuteParticipant = onCall(
 );
 
 // ========================================
-// CONFIGURATION SÉCURISÉE DES SERVICES
+// CONFIGURATION SÉCURISÉE DES SERVICES (LAZY)
 // ========================================
 
-// ✅ Configuration Stripe avec Firebase Functions Config
 let stripe: Stripe | null = null;
-const stripeConfig = functions.config().stripe;
 
-if (stripeConfig?.secret_key && stripeConfig.secret_key.startsWith('sk_')) {
-  try {
-    stripe = new Stripe(stripeConfig.secret_key, {
-      apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
-    });
-    console.log('✅ Stripe configuré avec succès');
-  } catch (stripeError) {
-    console.error('❌ Erreur configuration Stripe:', stripeError);
-    stripe = null;
+function getStripe(): Stripe | null {
+  if (!stripe) {
+    const stripeConfig = functions.config().stripe;
+    
+    if (stripeConfig?.secret_key && stripeConfig.secret_key.startsWith('sk_')) {
+      try {
+        stripe = new Stripe(stripeConfig.secret_key, {
+          apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
+        });
+        console.log('✅ Stripe configuré avec succès');
+      } catch (stripeError) {
+        console.error('❌ Erreur configuration Stripe:', stripeError);
+        stripe = null;
+      }
+    } else {
+      console.warn('⚠️ Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide');
+    }
   }
-} else {
-  console.warn('⚠️ Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide');
-  console.log('Configuration disponible:', !!stripeConfig);
+  
+  return stripe;
 }
 
 // ====== WEBHOOK STRIPE UNIFIÉ ======
@@ -489,19 +523,22 @@ export const stripeWebhook = onRequest({
     return;
   }
 
-  if (!stripe) {
+  const stripeInstance = getStripe();
+  if (!stripeInstance) {
     res.status(500).send('Service Stripe non configuré');
     return;
   }
   
   try {
+    const database = initializeFirebase();
     const rawBody = req.rawBody;
     if (!rawBody) {
       res.status(400).send('Raw body manquant');
       return;
     }
 
-    const event = stripe.webhooks.constructEvent(
+    const stripeConfig = functions.config().stripe;
+    const event = stripeInstance.webhooks.constructEvent(
       rawBody.toString(),
       signature as string,
       stripeConfig?.webhook_secret || ''
@@ -512,16 +549,16 @@ export const stripeWebhook = onRequest({
     // Traiter l'événement avec le nouveau système
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, database);
         break;
       case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, database);
         break;
       case 'payment_intent.canceled':
-        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent);
+        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent, database);
         break;
       case 'payment_intent.requires_action':
-        await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent);
+        await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent, database);
         break;
       default:
         console.log(`Type d'événement Stripe non géré: ${event.type}`);
@@ -535,13 +572,12 @@ export const stripeWebhook = onRequest({
   }
 });
 
-// Handlers pour les événements Stripe
-async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+// Handlers pour les événements Stripe (avec lazy loading)
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent, database: admin.firestore.Firestore) {
   try {
     console.log('💰 Paiement réussi:', paymentIntent.id);
     
-    // Mettre à jour le paiement dans Firestore
-    const paymentsQuery = db.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
+    const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
 
     if (!paymentsSnapshot.empty) {
@@ -553,7 +589,6 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       });
     }
 
-    // Déclencher les notifications si nécessaire
     if (paymentIntent.metadata?.callSessionId) {
       console.log('📞 Déclenchement des notifications post-paiement');
     }
@@ -565,12 +600,11 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   }
 }
 
-async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent, database: admin.firestore.Firestore) {
   try {
     console.log('❌ Paiement échoué:', paymentIntent.id);
     
-    // Mettre à jour le paiement dans Firestore
-    const paymentsQuery = db.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
+    const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
     
     if (!paymentsSnapshot.empty) {
@@ -582,9 +616,7 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
       });
     }
     
-    // Annuler l'appel associé si nécessaire
     if (paymentIntent.metadata?.callSessionId) {
-      // Import et utilisation de la fonction d'annulation
       try {
         const { cancelScheduledCall } = await import('./callScheduler');
         await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_failed');
@@ -600,12 +632,11 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   }
 }
 
-async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) {
+async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent, database: admin.firestore.Firestore) {
   try {
     console.log('🚫 Paiement annulé:', paymentIntent.id);
     
-    // Mettre à jour le paiement dans Firestore
-    const paymentsQuery = db.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
+    const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
     
     if (!paymentsSnapshot.empty) {
@@ -617,7 +648,6 @@ async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) 
       });
     }
     
-    // Annuler l'appel associé
     if (paymentIntent.metadata?.callSessionId) {
       try {
         const { cancelScheduledCall } = await import('./callScheduler');
@@ -634,12 +664,11 @@ async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) 
   }
 }
 
-async function handlePaymentIntentRequiresAction(paymentIntent: Stripe.PaymentIntent) {
+async function handlePaymentIntentRequiresAction(paymentIntent: Stripe.PaymentIntent, database: admin.firestore.Firestore) {
   try {
     console.log('⚠️ Paiement nécessite une action:', paymentIntent.id);
     
-    // Mettre à jour le statut dans Firestore
-    const paymentsQuery = db.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
+    const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
     
     if (!paymentsSnapshot.empty) {
@@ -665,30 +694,27 @@ export const scheduledFirestoreExport = onSchedule(
   },
   async () => {
     try {
+      const database = initializeFirebase();
       const projectId = process.env.GCLOUD_PROJECT;
       const bucketName = `${projectId}-backups`;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       
       console.log(`🔄 Démarrage sauvegarde automatique: ${timestamp}`);
       
-      // Créer le client pour l'API Firestore Admin
       const firestoreClient = new admin.firestore.v1.FirestoreAdminClient();
       
-      // Exporter les collections Firestore
       const firestoreExportName = `firestore-export-${timestamp}`;
       const firestoreExportPath = `gs://${bucketName}/${firestoreExportName}`;
       
       const [firestoreOperation] = await firestoreClient.exportDocuments({
         name: `projects/${projectId}/databases/(default)`,
         outputUriPrefix: firestoreExportPath,
-        // Exporter toutes les collections
         collectionIds: [],
       });
       
       console.log(`✅ Export Firestore démarré: ${firestoreOperation.name}`);
       
-      // Enregistrer les logs de sauvegarde
-      await admin.firestore().collection('logs').doc('backups').collection('entries').add({
+      await database.collection('logs').doc('backups').collection('entries').add({
         type: 'scheduled_backup',
         firestoreExportPath,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -699,9 +725,9 @@ export const scheduledFirestoreExport = onSchedule(
       console.error('❌ Erreur sauvegarde automatique:', exportError);
       
       const errorMessage = exportError instanceof Error ? exportError.message : 'Unknown error';
+      const database = initializeFirebase();
       
-      // Enregistrer l'erreur dans les logs
-      await admin.firestore().collection('logs').doc('backups').collection('entries').add({
+      await database.collection('logs').doc('backups').collection('entries').add({
         type: 'scheduled_backup',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         status: 'failed',
@@ -711,18 +737,16 @@ export const scheduledFirestoreExport = onSchedule(
   }
 );
 
-// ====== FONCTION DE NETTOYAGE PÉRIODIQUE ======
 export const scheduledCleanup = onSchedule(
   {
-    schedule: '0 3 * * 0', // Tous les dimanches à 3h
+    schedule: '0 3 * * 0',
     timeZone: 'Europe/Paris'
   },
   async () => {
     try {
       console.log('🧹 Démarrage nettoyage périodique');
       
-      // Nettoyer les anciennes sessions d'appel via TwilioCallManager
-      const { twilioCallManager } = await import('./TwilioCallManager');
+      const twilioCallManager = await getTwilioCallManager();
       const cleanupResult = await twilioCallManager.cleanupOldSessions({
         olderThanDays: 90,
         keepCompletedDays: 30,
@@ -731,8 +755,8 @@ export const scheduledCleanup = onSchedule(
       
       console.log(`✅ Nettoyage terminé: ${cleanupResult.deleted} supprimées, ${cleanupResult.errors} erreurs`);
       
-      // Enregistrer le résultat
-      await admin.firestore().collection('logs').doc('cleanup').collection('entries').add({
+      const database = initializeFirebase();
+      await database.collection('logs').doc('cleanup').collection('entries').add({
         type: 'scheduled_cleanup',
         result: cleanupResult,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -742,8 +766,9 @@ export const scheduledCleanup = onSchedule(
       console.error('❌ Erreur nettoyage périodique:', cleanupError);
       
       const errorMessage = cleanupError instanceof Error ? cleanupError.message : 'Unknown error';
+      const database = initializeFirebase();
       
-      await admin.firestore().collection('logs').doc('cleanup').collection('entries').add({
+      await database.collection('logs').doc('cleanup').collection('entries').add({
         type: 'scheduled_cleanup',
         status: 'failed',
         error: errorMessage,

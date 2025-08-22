@@ -1,5 +1,5 @@
 // firebase/functions/src/createPaymentIntent.ts
-// 🔧 FIX CORS: Configuration explicite pour Firebase Functions v2
+// 🔧 Firebase Functions v2 avec configuration simplifiée
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
@@ -12,21 +12,15 @@ import {
 } from './utils/paymentValidators';
 
 // =========================================
-// 🔧 FIX CORS: Configuration CORS explicite pour Firebase Functions v2
+// 🔧 Configuration Firebase Functions v2 simplifiée
 // =========================================
-const CPU_OPTIMIZED_CONFIG = {
+const FUNCTION_CONFIG = {
   memory: "256MiB" as const,
   timeoutSeconds: 60,
   maxInstances: 10,
   minInstances: 0,
   concurrency: 80,
-  // ✅ Configuration CORS explicite
-  cors: [
-    'http://localhost:5174',     // Développement local
-    'http://localhost:3000',     // Alternative développement
-    'https://sos-urgently-ac307.web.app',      // Firebase Hosting
-    'https://sos-urgently-ac307.firebaseapp.com'  // Alternative Firebase
-  ]
+  region: 'europe-west1'  // Explicite pour être sûr
 };
 
 // =========================================
@@ -394,10 +388,10 @@ function logSecurityEvent(event: string, data: Record<string, unknown>) {
 }
 
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE avec CORS FIXÉ
+// 🚀 CLOUD FUNCTION PRINCIPALE avec configuration simplifiée
 // =========================================
 export const createPaymentIntent = onCall(
-  CPU_OPTIMIZED_CONFIG, // ✅ Maintenant avec configuration CORS explicite
+  FUNCTION_CONFIG, // ✅ Configuration simplifiée sans CORS (géré automatiquement par onCall)
   async (request: CallableRequest<PaymentIntentRequestData>) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();

@@ -1,8 +1,7 @@
 // src/pages/CallCheckout.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar, Phone, Check } from 'lucide-react';
+import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getFunctions } from 'firebase/functions';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -262,7 +261,7 @@ const useIsMobile = () => {
       // @ts-expect-error legacy safari
       mq.addListener(update);
       // @ts-expect-error legacy safari
-      return () => mq.removeListener('change', update);
+      return () => mq.removeListener(update);
     }
   }, []);
   return isMobile;
@@ -358,7 +357,7 @@ interface PaymentFormProps {
   user: User;
   provider: Provider;
   service: ServiceData;
-  adminPricing: PricingEntryTrace; // ✅ prix issus d’admin, passés directement
+  adminPricing: PricingEntryTrace; // ✅ prix issus d'admin, passés directement
   onSuccess: (paymentIntentId: string) => void;
   onError: (error: string) => void;
   isProcessing: boolean;
@@ -446,11 +445,10 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
       validatePaymentData();
 
-      const functionsInstance = getFunctions(undefined, 'europe-west1');
-const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
-  httpsCallable(functionsInstance, 'createPaymentIntent');
+      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
+        httpsCallable(functions, 'createPaymentIntent');
 
-      // ✅ Passer DIRECTEMENT les prix admin à l’intent
+      // ✅ Passer DIRECTEMENT les prix admin à l'intent
       const paymentData: PaymentIntentData = {
         amount: adminPricing.totalAmount,
         commissionAmount: adminPricing.connectionFeeAmount,
@@ -705,16 +703,15 @@ const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentRespons
       <button
         type="submit"
         disabled={!stripe || isProcessing}
-        className={`
-          w-full py-4 rounded-xl font-bold text-white transition-all duration-300 
-          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
-          active:scale-[0.98] touch-manipulation relative overflow-hidden
-          ${(!stripe || isProcessing)
-            ? 'bg-gray-400 cursor-not-allowed opacity-60'
-            : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-lg hover:shadow-xl'
-          }
-        `}
-        aria-label={`${t('btn.pay')} ${adminPricing.totalAmount.toFixed(2)}${currencySymbol}`}
+        className={
+          "w-full py-4 rounded-xl font-bold text-white transition-all duration-300 " +
+          "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 " +
+          "active:scale-[0.98] touch-manipulation relative overflow-hidden " +
+          ((!stripe || isProcessing)
+            ? "bg-gray-400 cursor-not-allowed opacity-60"
+            : "bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-lg hover:shadow-xl")
+        }
+        aria-label={t('btn.pay') + ' ' + adminPricing.totalAmount.toFixed(2) + currencySymbol}
       >
         {isProcessing ? (
           <div className="flex items-center justify-center space-x-2">
@@ -776,7 +773,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     loading: boolean;
   };
 
-  // Devise (sélecteur conservé, branché sur l’adminPricing)
+  // Devise (sélecteur conservé, branché sur l'adminPricing)
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>('eur');
 
   useEffect(() => {
@@ -836,7 +833,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     return pricing[providerRole]?.[selectedCurrency] ?? null;
   }, [pricing, providerRole, selectedCurrency]);
 
-  // ✅ Service dérivé UNIQUEMENT de l’adminPricing (pas de reconstruct ni d’effet)
+  // ✅ Service dérivé UNIQUEMENT de l'adminPricing (pas de reconstruct ni d'effet)
   const service: ServiceData | null = useMemo(() => {
     if (!provider || !adminPricing || !providerRole) return null;
     return {
@@ -1054,12 +1051,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   /* ------------------------------ Render page ---------------------------- */
   return (
     <Layout>
-      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h=[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
+      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
         <div className="max-w-lg mx-auto px-4 py-4">
           {(pricingError) && (
             <div className="mb-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
               {language === 'fr'
-                ? 'Les tarifs affichés proviennent d’une configuration de secours. La configuration centrale sera rechargée automatiquement.'
+                ? 'Les tarifs affichés proviennent d\'une configuration de secours. La configuration centrale sera rechargée automatiquement.'
                 : 'Displayed prices are using a fallback configuration. Central pricing will be reloaded automatically.'}
             </div>
           )}
@@ -1106,9 +1103,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-gray-900 truncate text-sm">{provider.fullName || provider.name || 'Expert'}</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                    (provider.role || provider.type) === 'lawyer' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                  }`}>
+                  <span className={
+                    "px-2 py-0.5 rounded-md text-xs font-medium " +
+                    ((provider.role || provider.type) === 'lawyer' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800')
+                  }>
                     {(provider.role || provider.type) === 'lawyer' ? (language === 'fr' ? 'Avocat' : 'Lawyer') : (language === 'fr' ? 'Expert' : 'Expert')}
                   </span>
                   <span className="text-gray-600 text-xs">{provider?.country || 'FR'}</span>
@@ -1127,7 +1125,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 {...cardTraceAttrs}
               >
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                  {selectedCurrency === 'usd' ? '$' : ''}{adminPricing.totalAmount.toFixed(2)}{selectedCurrency === 'eur' ? '€' : ''}
+                  {selectedCurrency === 'usd' ? '$' : '€'}{adminPricing.totalAmount.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500">{adminPricing.duration} min</div>
               </div>
@@ -1139,21 +1137,23 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             <div className="flex items-center justify-center space-x-4">
               <button
                 onClick={() => setSelectedCurrency('eur')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  selectedCurrency === 'eur'
+                className={
+                  "px-4 py-2 rounded-lg font-medium transition-all " +
+                  (selectedCurrency === 'eur'
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                }
               >
                 EUR (€)
               </button>
               <button
                 onClick={() => setSelectedCurrency('usd')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  selectedCurrency === 'usd'
+                className={
+                  "px-4 py-2 rounded-lg font-medium transition-all " +
+                  (selectedCurrency === 'usd'
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                }
               >
                 USD ($)
               </button>

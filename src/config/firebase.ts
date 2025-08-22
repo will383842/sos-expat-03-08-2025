@@ -1,4 +1,4 @@
-// src/firebase.ts
+// src/config/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import {
@@ -73,7 +73,7 @@ const RAW_REGION_DEV = (import.meta.env.VITE_FUNCTIONS_REGION_DEV ?? "").toStrin
 const IS_DEV = !!import.meta.env.DEV;
 const REGION = (IS_DEV && RAW_REGION_DEV) ? RAW_REGION_DEV : RAW_REGION;
 
-// Instance Functions (doit être créée AVANT tout connect*)
+// ✅ Instance Functions (doit être créée AVANT tout connect*)
 export const functions = getFunctions(app, REGION);
 
 /**
@@ -95,6 +95,18 @@ const PORT_AUTH = Number(import.meta.env.VITE_EMULATOR_PORT_AUTH ?? 9099);
 const PORT_FS = Number(import.meta.env.VITE_EMULATOR_PORT_FIRESTORE ?? 8080);
 const PORT_FUNC = Number(import.meta.env.VITE_EMULATOR_PORT_FUNCTIONS ?? 5001);
 const PORT_STORAGE = Number(import.meta.env.VITE_EMULATOR_PORT_STORAGE ?? 9199);
+
+// ✅ Logs de debug détaillés (uniquement en dev)
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("🔧 Firebase Functions Debug:", {
+    region: REGION,
+    useEmulators: USE_EMULATORS,
+    emuHost: EMU_HOST,
+    emuPort: PORT_FUNC,
+    instance: functions,
+  });
+}
 
 // IMPORTANT : Les connect* doivent se faire AVANT tout appel réseau réel
 if (USE_EMULATORS && typeof window !== "undefined") {
@@ -141,7 +153,7 @@ console.log("✅ Firebase prêt :", {
  */
 export const call = <T, R = unknown>(name: string) => httpsCallable<T, R>(functions, name);
 
-// ✅ AJOUTEZ CETTE LIGNE POUR RÉSOUDRE LES ERREURS D'IMPORT
-export { httpsCallable } from 'firebase/functions';
+// ✅ Expose aussi httpsCallable si besoin d'import direct
+export { httpsCallable } from "firebase/functions";
 
 export default app;

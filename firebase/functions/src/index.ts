@@ -1,4 +1,4 @@
-// functions/src/index.ts - Version Ultra Debug avec traçage complet
+// functions/src/index.ts - Version Ultra Debug avec traçage complet et exports rectifiés
 
 // ====== ULTRA DEBUG INITIALIZATION ======
 import { ultraLogger, traceFunction, traceGlobalImport } from './utils/ultraDebugLogger';
@@ -313,71 +313,26 @@ function wrapHttpFunction(
   };
 }
 
-// ====== EXPORTS DIRECTS AVEC DEBUG ======
+// ====== EXPORTS DIRECTS RECTIFIÉS ======
 ultraLogger.info('EXPORTS', 'Début du chargement des exports directs');
 
-// Import et export des fonctions principales avec traçage
-export const createAndScheduleCallHTTPS = (async () => {
-  ultraLogger.debug('EXPORT_LOADING', 'Chargement de createAndScheduleCallHTTPS');
-  const { createAndScheduleCallHTTPS: originalFunction } = await import('./createAndScheduleCallFunction');
-  ultraLogger.info('EXPORT_LOADING', 'createAndScheduleCallHTTPS chargé');
-  return originalFunction;
-})();
-
-export const createPaymentIntent = (async () => {
-  ultraLogger.debug('EXPORT_LOADING', 'Chargement de createPaymentIntent');
-  const { createPaymentIntent: originalFunction } = await import('./createPaymentIntent');
-  ultraLogger.info('EXPORT_LOADING', 'createPaymentIntent chargé');
-  return originalFunction;
-})();
+// Import et export des fonctions principales avec exports directs simples
+export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
+export { createPaymentIntent } from './createPaymentIntent';
 
 // Export de l'API admin avec debug
-export const api = (async () => {
-  ultraLogger.debug('EXPORT_LOADING', 'Chargement de l\'API admin');
-  const { api: originalApi } = await import('./adminApi');
-  ultraLogger.info('EXPORT_LOADING', 'API admin chargée');
-  return originalApi;
-})();
+export { api } from './adminApi';
 
 // Export des webhooks avec debug
-export const twilioCallWebhook = (async () => {
-  ultraLogger.debug('EXPORT_LOADING', 'Chargement des webhooks Twilio');
-  const { twilioCallWebhook: original } = await import('./Webhooks/twilioWebhooks');
-  ultraLogger.info('EXPORT_LOADING', 'twilioCallWebhook chargé');
-  return original;
-})();
-
-export const twilioConferenceWebhook = (async () => {
-  const { twilioConferenceWebhook: original } = await import('./Webhooks/twilioWebhooks');
-  return original;
-})();
-
-export const twilioRecordingWebhook = (async () => {
-  const { twilioRecordingWebhook: original } = await import('./Webhooks/twilioWebhooks');
-  return original;
-})();
+export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
 
 // Export des webhooks modernisés
-export const modernConferenceWebhook = (async () => {
-  const { twilioConferenceWebhook: original } = await import('./Webhooks/TwilioConferenceWebhook');
-  return original;
-})();
-
-export const modernRecordingWebhook = (async () => {
-  const { twilioRecordingWebhook: original } = await import('./Webhooks/TwilioRecordingWebhook');
-  return original;
-})();
+export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook';
+export { twilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
 
 // Export des templates et notifications
-export const initializeMessageTemplates = (async () => {
-  const { initializeMessageTemplates: original } = await import('./initializeMessageTemplates');
-  return original;
-})();
-
-export const notifyAfterPayment = (async () => {
-  const { notifyAfterPayment: original } = await import('./notifications/notifyAfterPayment');
-  return original;
-})();
+export { initializeMessageTemplates } from './initializeMessageTemplates';
+export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 
 ultraLogger.info('EXPORTS', 'Exports directs configurés');
 

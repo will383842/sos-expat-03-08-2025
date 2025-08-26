@@ -516,16 +516,19 @@ export const createPaymentIntent = onCall(
         throw new HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
       }
 
+      // ✅ Get the secret value from Firebase Functions v2 secret
+      const stripeSecretKey = STRIPE_SECRET_KEY.value();
+
       // Création du paiement Stripe
       const stripePayload = {
-        amount: amountInCents,
+        amount: amountInMainUnit, // ✅ Passer en euros (unités réelles)
         currency,
         clientId,
         providerId,
         serviceType,
         providerType: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat') as 'lawyer' | 'expat',
-        commissionAmount: commissionAmountInCents,
-        providerAmount: providerAmountInCents,
+        commissionAmount: commissionAmountInMainUnit, // ✅ En euros
+        providerAmount: providerAmountInMainUnit, // ✅ En euros
         callSessionId,
         metadata: {
           clientEmail: clientEmail || '',
@@ -541,7 +544,8 @@ export const createPaymentIntent = onCall(
         },
       };
 
-      const result = await stripeManager.createPaymentIntent(stripePayload);
+      // ✅ Pass the secret key to the stripeManager method
+      const result = await stripeManager.createPaymentIntent(stripePayload, stripeSecretKey);
 
       if (!result?.success) {
         await logError('createPaymentIntent:stripe_error', {
@@ -591,7 +595,7 @@ export const createPaymentIntent = onCall(
         success: true,
         clientSecret: result.clientSecret!,
         paymentIntentId: result.paymentIntentId!,
-        amount: amountInCents,
+        amount: amountInCents, // ✅ Retourner en centimes pour compatibilité frontend
         currency,
         serviceType,
         status: 'requires_payment_method',

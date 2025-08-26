@@ -11,13 +11,6 @@ import { db } from './utils/firebase';
 export const toCents = (euros: number): number => Math.round(euros * 100);
 
 // -------------------------------------------------------------
-// Stripe client
-// -------------------------------------------------------------
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
-});
-
-// -------------------------------------------------------------
 // Types - Interface UNIFIÉE
 // -------------------------------------------------------------
 // ✅ INTERFACE UNIFIÉE : accepte à la fois connectionFeeAmount ET commissionAmount
@@ -51,14 +44,31 @@ export interface PaymentResult {
 // -------------------------------------------------------------
 export class StripeManager {
   private db = db;
+  private stripe: Stripe | null = null;
 
-  private validateConfiguration(): void {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error("STRIPE_SECRET_KEY manquante dans les variables d'environnement");
+  // ✅ Initialize Stripe dynamically with secret key
+  private initializeStripe(secretKey: string): void {
+    if (!this.stripe) {
+      this.stripe = new Stripe(secretKey, {
+        apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
+      });
     }
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      console.warn('STRIPE_WEBHOOK_SECRET manquante - les webhooks ne fonctionneront pas');
+  }
+
+  private validateConfiguration(secretKey?: string): void {
+    // ✅ Try to use provided secret key first
+    if (secretKey) {
+      this.initializeStripe(secretKey);
+      return;
     }
+
+    // ✅ Fallback to environment variable (for local development)
+    if (process.env.STRIPE_SECRET_KEY) {
+      this.initializeStripe(process.env.STRIPE_SECRET_KEY);
+      return;
+    }
+
+    throw new Error("STRIPE_SECRET_KEY manquante dans les variables d'environnement");
   }
 
   /**
@@ -111,11 +121,17 @@ export class StripeManager {
 
   /**
    * ✅ Crée un PaymentIntent avec interface unifiée
+   * @param data - Payment data
+   * @param secretKey - Optional Stripe secret key (for Firebase Functions v2 secrets)
    */
-  async createPaymentIntent(data: StripePaymentData): Promise<PaymentResult> {
+  async createPaymentIntent(data: StripePaymentData, secretKey?: string): Promise<PaymentResult> {
     try {
-      this.validateConfiguration();
+      this.validateConfiguration(secretKey);
       this.validatePaymentData(data);
+
+      if (!this.stripe) {
+        throw new Error('Stripe client not initialized');
+      }
 
       // Unicité basique
       const existingPayment = await this.findExistingPayment(data.clientId, data.providerId);
@@ -147,7 +163,7 @@ export class StripeManager {
         providerCents: providerAmountCents,
       });
 
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await this.stripe.paymentIntents.create({
         amount: amountCents,
         currency,
         capture_method: 'manual', // Capture différée
@@ -292,17 +308,24 @@ export class StripeManager {
     });
   }
 
-  async capturePayment(paymentIntentId: string, sessionId?: string): Promise<PaymentResult> {
+  // ✅ Update all other methods to accept optional secretKey parameter
+  async capturePayment(paymentIntentId: string, sessionId?: string, secretKey?: string): Promise<PaymentResult> {
     try {
+      this.validateConfiguration(secretKey);
+      
+      if (!this.stripe) {
+        throw new Error('Stripe client not initialized');
+      }
+
       // Récupérer le paiement depuis Stripe
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
       
       if (paymentIntent.status !== 'requires_capture') {
         throw new Error(`Cannot capture payment with status: ${paymentIntent.status}`);
       }
 
       // Capturer le paiement
-      const capturedPayment = await stripe.paymentIntents.capture(paymentIntentId);
+      const capturedPayment = await this.stripe.paymentIntents.capture(paymentIntentId);
       
       // Mettre à jour en DB
       await this.db.collection('payments').doc(paymentIntentId).update({
@@ -335,10 +358,17 @@ export class StripeManager {
     paymentIntentId: string,
     reason: string,
     sessionId?: string,
-    amount?: number
+    amount?: number,
+    secretKey?: string
   ): Promise<PaymentResult> {
     try {
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      this.validateConfiguration(secretKey);
+      
+      if (!this.stripe) {
+        throw new Error('Stripe client not initialized');
+      }
+
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
       
       const refundData: Stripe.RefundCreateParams = {
         payment_intent: paymentIntentId,
@@ -353,7 +383,7 @@ export class StripeManager {
         refundData.amount = toCents(amount);
       }
 
-      const refund = await stripe.refunds.create(refundData);
+      const refund = await this.stripe.refunds.create(refundData);
       
       // Mettre à jour en DB
       await this.db.collection('payments').doc(paymentIntentId).update({
@@ -385,9 +415,15 @@ export class StripeManager {
     }
   }
 
-  async cancelPayment(paymentIntentId: string, reason: string, sessionId?: string): Promise<PaymentResult> {
+  async cancelPayment(paymentIntentId: string, reason: string, sessionId?: string, secretKey?: string): Promise<PaymentResult> {
     try {
-      const canceledPayment = await stripe.paymentIntents.cancel(paymentIntentId, {
+      this.validateConfiguration(secretKey);
+      
+      if (!this.stripe) {
+        throw new Error('Stripe client not initialized');
+      }
+
+      const canceledPayment = await this.stripe.paymentIntents.cancel(paymentIntentId, {
         cancellation_reason: reason as Stripe.PaymentIntentCancelParams.CancellationReason,
       });
       
@@ -507,7 +543,7 @@ export class StripeManager {
       return null;
     }
   }
-} // ✅ ACCOLADE FERMANTE AJOUTÉE ICI
+}
 
 // Instance singleton
 export const stripeManager = new StripeManager();

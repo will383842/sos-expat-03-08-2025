@@ -1,6 +1,7 @@
 // firebase/functions/src/createPaymentIntent.ts
 // 🔧 Firebase Functions v2 avec configuration simplifiée
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from "firebase-functions/params";
 import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
@@ -23,6 +24,7 @@ const FUNCTION_CONFIG = {
   region: 'europe-west1'  // Explicite pour être sûr
 };
 
+const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
 // =========================================
 // 🌍 DÉTECTION D'ENVIRONNEMENT
 // =========================================
@@ -391,7 +393,10 @@ function logSecurityEvent(event: string, data: Record<string, unknown>) {
 // 🚀 CLOUD FUNCTION PRINCIPALE avec configuration simplifiée
 // =========================================
 export const createPaymentIntent = onCall(
-  FUNCTION_CONFIG, // ✅ Configuration simplifiée sans CORS (géré automatiquement par onCall)
+  {
+    ...FUNCTION_CONFIG,
+    secrets: [STRIPE_SECRET_KEY],
+  }, // ✅ Configuration avec secret Stripe
   async (request: CallableRequest<PaymentIntentRequestData>) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();

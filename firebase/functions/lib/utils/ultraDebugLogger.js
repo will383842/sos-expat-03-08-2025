@@ -1,43 +1,19 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ultraLogger = void 0;
 exports.traceFunction = traceFunction;
 exports.traceGlobalImport = traceGlobalImport;
 // firebase/functions/src/utils/ultraDebugLogger.ts
-const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
+const app_1 = require("firebase-admin/app");
+// Désactiver l'écriture Firestore en local
+const IS_LOCAL = process.env.FUNCTIONS_EMULATOR === "true" ||
+    process.env.FIREBASE_EMULATOR_HUB ||
+    (!process.env.GOOGLE_CLOUD_PROJECT && !process.env.GCP_PROJECT);
+// Fonction utilitaire pour nettoyer les valeurs undefined
+function clean(obj) {
+    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
 class UltraDebugLogger {
     constructor() {
         this.logs = [];
@@ -45,6 +21,9 @@ class UltraDebugLogger {
         this.db = null;
         this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         console.log(`🚀 [ULTRA DEBUG] Logger initialisé avec session: ${this.sessionId}`);
+        if (IS_LOCAL) {
+            console.log(`🔧 [ULTRA DEBUG] Mode local détecté - Firestore logs désactivés`);
+        }
         this.setupGlobalErrorHandlers();
     }
     static getInstance() {
@@ -94,19 +73,21 @@ class UltraDebugLogger {
         };
     }
     async initFirebaseIfNeeded() {
-        if (!this.isFirebaseInitialized) {
+        if (!this.isFirebaseInitialized && !IS_LOCAL) {
             try {
                 console.log('🔥 [ULTRA DEBUG] Tentative d\'initialisation Firebase...');
-                if (!admin.apps.length) {
+                if (!(0, app_1.getApps)().length) {
                     console.log('🔥 [ULTRA DEBUG] Aucune app Firebase détectée, initialisation...');
-                    admin.initializeApp();
+                    (0, app_1.initializeApp)();
                     console.log('✅ [ULTRA DEBUG] Firebase initialisé avec succès');
                 }
                 else {
                     console.log('✅ [ULTRA DEBUG] Firebase déjà initialisé');
                 }
-                this.db = admin.firestore();
-                console.log('🔥 [ULTRA DEBUG] Firestore récupéré');
+                this.db = (0, firestore_1.getFirestore)();
+                // Ignorer les propriétés undefined - DOIT être appelé AVANT la première écriture
+                this.db.settings({ ignoreUndefinedProperties: true });
+                console.log('🔥 [ULTRA DEBUG] Firestore récupéré avec ignoreUndefinedProperties');
                 // Test de connexion Firestore
                 try {
                     console.log('🔥 [ULTRA DEBUG] Test de connexion Firestore...');
@@ -132,7 +113,7 @@ class UltraDebugLogger {
         }
     }
     createLogEntry(level, source, message, data, stack) {
-        return {
+        return clean({
             timestamp: new Date().toISOString(),
             level,
             source,
@@ -140,7 +121,7 @@ class UltraDebugLogger {
             data: data ? JSON.parse(JSON.stringify(data, null, 2)) : undefined,
             stack,
             context: this.getContext()
-        };
+        });
     }
     logToConsole(entry) {
         const emoji = {
@@ -195,11 +176,19 @@ class UltraDebugLogger {
         // Ne pas sauvegarder les logs TRACE en Firestore pour éviter le spam
     }
     async saveToFirestore(entry) {
+        // Skip Firestore en local
+        if (IS_LOCAL) {
+            console.log("[ULTRA DEBUG] (local) skip Firestore log");
+            return;
+        }
         try {
             await this.initFirebaseIfNeeded();
             if (this.db) {
+                // Nettoyer l'entrée avant sauvegarde
+                const payload = clean(Object.assign(Object.assign({}, entry), { sessionId: this.sessionId, savedAt: new Date() // Utiliser Date au lieu de FieldValue pour plus de simplicité
+                 }));
                 // Sauvegarder dans une collection spéciale pour le debug
-                await this.db.collection('ultra_debug_logs').add(Object.assign(Object.assign({}, entry), { sessionId: this.sessionId, savedAt: admin.firestore.FieldValue.serverTimestamp() }));
+                await this.db.collection('ultra_debug_logs').add(payload);
             }
         }
         catch (saveError) {
@@ -246,6 +235,7 @@ class UltraDebugLogger {
         const report = {
             sessionId: this.sessionId,
             generatedAt: new Date().toISOString(),
+            localMode: DISABLE_FIRESTORE_LOG_LOCAL,
             environment: {
                 nodeVersion: process.version,
                 platform: process.platform,
@@ -255,6 +245,7 @@ class UltraDebugLogger {
                 uptime: process.uptime(),
                 env: {
                     NODE_ENV: process.env.NODE_ENV,
+                    FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
                     FUNCTION_NAME: process.env.FUNCTION_NAME,
                     FUNCTION_REGION: process.env.FUNCTION_REGION,
                     GCLOUD_PROJECT: process.env.GCLOUD_PROJECT

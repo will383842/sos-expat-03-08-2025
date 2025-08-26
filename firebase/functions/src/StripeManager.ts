@@ -7,14 +7,11 @@ import { db } from './utils/firebase';
 // -------------------------------------------------------------
 // Utils
 // -------------------------------------------------------------
-// ✅ Conversion unique EUROS → CENTIMES
 export const toCents = (euros: number): number => Math.round(euros * 100);
 
 // -------------------------------------------------------------
 // Types - Interface UNIFIÉE
 // -------------------------------------------------------------
-// ✅ INTERFACE UNIFIÉE : accepte à la fois connectionFeeAmount ET commissionAmount
-// Tous les montants sont en **EUROS (unités réelles)**
 export interface StripePaymentData {
   amount: number; // EN EUROS (ex: 49)
   currency?: 'eur' | 'usd' | 'EUR' | 'USD';
@@ -23,7 +20,6 @@ export interface StripePaymentData {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: 'lawyer' | 'expat';
   
-  // ✅ FLEXIBILITÉ : accepte les deux noms de champs
   commissionAmount?: number; // EN EUROS (legacy)
   connectionFeeAmount?: number; // EN EUROS (nouveau)
   
@@ -40,13 +36,12 @@ export interface PaymentResult {
 }
 
 // -------------------------------------------------------------
-// Manager
+// Manager avec initialisation dynamique
 // -------------------------------------------------------------
 export class StripeManager {
   private db = db;
   private stripe: Stripe | null = null;
 
-  // ✅ Initialize Stripe dynamically with secret key
   private initializeStripe(secretKey: string): void {
     if (!this.stripe) {
       this.stripe = new Stripe(secretKey, {
@@ -56,13 +51,11 @@ export class StripeManager {
   }
 
   private validateConfiguration(secretKey?: string): void {
-    // ✅ Try to use provided secret key first
     if (secretKey) {
       this.initializeStripe(secretKey);
       return;
     }
 
-    // ✅ Fallback to environment variable (for local development)
     if (process.env.STRIPE_SECRET_KEY) {
       this.initializeStripe(process.env.STRIPE_SECRET_KEY);
       return;
@@ -71,20 +64,15 @@ export class StripeManager {
     throw new Error("STRIPE_SECRET_KEY manquante dans les variables d'environnement");
   }
 
-  /**
-   * ✅ Validation unifiée avec support des deux formats
-   */
   private validatePaymentData(data: StripePaymentData): void {
     const { amount, clientId, providerId } = data;
 
-    // Bornes simples (en euros)
     if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
       throw new Error('Montant invalide');
     }
     if (amount < 5) throw new Error('Montant minimum de 5€ requis');
     if (amount > 2000) throw new Error('Montant maximum de 2000€ dépassé');
 
-    // ✅ Support flexible des deux formats de commission
     const commission = data.connectionFeeAmount ?? data.commissionAmount ?? 0;
     if (typeof commission !== 'number' || commission < 0) {
       throw new Error('Commission/frais de connexion invalide');
@@ -101,29 +89,22 @@ export class StripeManager {
       throw new Error('Le client et le prestataire ne peuvent pas être identiques');
     }
 
-    // ✅ Validation cohérence : total = commission + prestataire
     const calculatedTotal = commission + data.providerAmount;
-    const tolerance = 0.02; // 2 centimes de tolérance
+    const tolerance = 0.02;
     if (Math.abs(calculatedTotal - amount) > tolerance) {
-      console.warn('⚠️ Incohérence montants:', {
+      console.warn('Incohérence montants:', {
         total: amount,
         commission,
         providerAmount: data.providerAmount,
         calculatedTotal,
         difference: Math.abs(calculatedTotal - amount)
       });
-      // Ne pas bloquer pour de petites différences d'arrondi
       if (Math.abs(calculatedTotal - amount) > 1) {
         throw new Error(`Incohérence montants: ${amount}€ != ${calculatedTotal}€`);
       }
     }
   }
 
-  /**
-   * ✅ Crée un PaymentIntent avec interface unifiée
-   * @param data - Payment data
-   * @param secretKey - Optional Stripe secret key (for Firebase Functions v2 secrets)
-   */
   async createPaymentIntent(data: StripePaymentData, secretKey?: string): Promise<PaymentResult> {
     try {
       this.validateConfiguration(secretKey);
@@ -133,26 +114,22 @@ export class StripeManager {
         throw new Error('Stripe client not initialized');
       }
 
-      // Unicité basique
-      const existingPayment = await this.findExistingPayment(data.clientId, data.providerId);
+      // Vérification anti-doublons : bloquer seulement si paiement accepté
+      const existingPayment = await this.findExistingPayment(data.clientId, data.providerId, data.callSessionId);
       if (existingPayment) {
-        throw new Error('Un paiement est déjà en cours pour cette combinaison client/prestataire');
+        throw new Error('Un paiement a déjà été accepté pour cette demande de consultation.');
       }
 
-      // Vérifier l'existence des utilisateurs
       await this.validateUsers(data.clientId, data.providerId);
 
       const currency = (data.currency || 'eur').toLowerCase() as 'eur' | 'usd';
-
-      // ✅ Gestion unifiée des commissions
       const commissionAmount = data.connectionFeeAmount ?? data.commissionAmount ?? 0;
 
-      // ✅ Conversion unique EUROS → CENTIMES juste avant l'appel Stripe
       const amountCents = toCents(data.amount);
       const commissionAmountCents = toCents(commissionAmount);
       const providerAmountCents = toCents(data.providerAmount);
 
-      console.log('💳 Création PaymentIntent Stripe:', {
+      console.log('Création PaymentIntent Stripe:', {
         amountEuros: data.amount,
         amountCents,
         currency,
@@ -166,7 +143,7 @@ export class StripeManager {
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: amountCents,
         currency,
-        capture_method: 'manual', // Capture différée
+        capture_method: 'manual',
         automatic_payment_methods: { enabled: true },
         metadata: {
           clientId: data.clientId,
@@ -185,17 +162,16 @@ export class StripeManager {
         receipt_email: await this.getClientEmail(data.clientId),
       });
 
-      console.log('✅ PaymentIntent Stripe créé:', {
+      console.log('PaymentIntent Stripe créé:', {
         id: paymentIntent.id,
         amount: paymentIntent.amount,
         amountInEuros: paymentIntent.amount / 100,
         status: paymentIntent.status,
       });
 
-      // Sauvegarder en DB
       await this.savePaymentRecord(paymentIntent, {
         ...data,
-        commissionAmount, // ✅ Montant unifié
+        commissionAmount,
       }, {
         amountCents,
         commissionAmountCents,
@@ -217,20 +193,38 @@ export class StripeManager {
     }
   }
 
-  private async findExistingPayment(clientId: string, providerId: string): Promise<boolean> {
+  private async findExistingPayment(clientId: string, providerId: string, sessionId?: string): Promise<boolean> {
     try {
-      const snapshot = await this.db
+      // Construire la requête de base - bloquer seulement les paiements acceptés
+      let query = this.db
         .collection('payments')
         .where('clientId', '==', clientId)
         .where('providerId', '==', providerId)
-        .where('status', 'in', ['pending', 'authorized', 'requires_capture'])
-        .limit(1)
-        .get();
+        .where('status', 'in', ['succeeded', 'requires_capture']); // Seulement les paiements acceptés
 
-      return !snapshot.empty;
+      // Si un sessionId est fourni, filtrer par session pour cette demande spécifique
+      if (sessionId && sessionId.trim() !== '') {
+        query = query.where('callSessionId', '==', sessionId);
+      }
+
+      const snapshot = await query.limit(1).get();
+      const hasDuplicate = !snapshot.empty;
+
+      console.log('Vérification anti-doublons (paiements acceptés uniquement):', {
+        clientId: clientId.substring(0, 8) + '...',
+        providerId: providerId.substring(0, 8) + '...',
+        sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'non fourni',
+        hasDuplicate,
+        statusesChecked: ['succeeded', 'requires_capture'],
+        message: hasDuplicate 
+          ? 'Paiement déjà accepté trouvé - blocage'
+          : 'Aucun paiement accepté trouvé - autorisation'
+      });
+
+      return hasDuplicate;
     } catch (error) {
       await logError('StripeManager:findExistingPayment', error);
-      return false;
+      return false; // En cas d'erreur, on autorise
     }
   }
 
@@ -260,9 +254,6 @@ export class StripeManager {
     }
   }
 
-  /**
-   * ✅ Sauvegarde en DB avec support unifié
-   */
   private async savePaymentRecord(
     paymentIntent: Stripe.PaymentIntent,
     dataEuros: StripePaymentData & { commissionAmount: number },
@@ -273,12 +264,10 @@ export class StripeManager {
       clientId: dataEuros.clientId,
       providerId: dataEuros.providerId,
 
-      // Legacy + source de vérité côté stats internes (centimes)
       amount: cents.amountCents,
       commissionAmount: cents.commissionAmountCents,
       providerAmount: cents.providerAmountCents,
 
-      // Miroirs pour lisibilité
       amountInEuros: dataEuros.amount,
       commissionAmountEuros: dataEuros.commissionAmount,
       providerAmountEuros: dataEuros.providerAmount,
@@ -300,7 +289,7 @@ export class StripeManager {
 
     await this.db.collection('payments').doc(paymentIntent.id).set(paymentRecord);
 
-    console.log('✅ Enregistrement paiement sauvegardé en DB:', {
+    console.log('Enregistrement paiement sauvegardé en DB:', {
       id: paymentIntent.id,
       amountCents: cents.amountCents,
       amountEuros: dataEuros.amount,
@@ -308,7 +297,6 @@ export class StripeManager {
     });
   }
 
-  // ✅ Update all other methods to accept optional secretKey parameter
   async capturePayment(paymentIntentId: string, sessionId?: string, secretKey?: string): Promise<PaymentResult> {
     try {
       this.validateConfiguration(secretKey);
@@ -317,17 +305,14 @@ export class StripeManager {
         throw new Error('Stripe client not initialized');
       }
 
-      // Récupérer le paiement depuis Stripe
       const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
       
       if (paymentIntent.status !== 'requires_capture') {
         throw new Error(`Cannot capture payment with status: ${paymentIntent.status}`);
       }
 
-      // Capturer le paiement
       const capturedPayment = await this.stripe.paymentIntents.capture(paymentIntentId);
       
-      // Mettre à jour en DB
       await this.db.collection('payments').doc(paymentIntentId).update({
         status: capturedPayment.status,
         capturedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -335,7 +320,7 @@ export class StripeManager {
         sessionId: sessionId || null,
       });
 
-      console.log('✅ Paiement capturé:', {
+      console.log('Paiement capturé:', {
         id: paymentIntentId,
         amount: capturedPayment.amount,
         status: capturedPayment.status,
@@ -385,7 +370,6 @@ export class StripeManager {
 
       const refund = await this.stripe.refunds.create(refundData);
       
-      // Mettre à jour en DB
       await this.db.collection('payments').doc(paymentIntentId).update({
         status: 'refunded',
         refundId: refund.id,
@@ -395,7 +379,7 @@ export class StripeManager {
         sessionId: sessionId || null,
       });
 
-      console.log('✅ Paiement remboursé:', {
+      console.log('Paiement remboursé:', {
         paymentIntentId,
         refundId: refund.id,
         amount: refund.amount,
@@ -427,7 +411,6 @@ export class StripeManager {
         cancellation_reason: reason as Stripe.PaymentIntentCancelParams.CancellationReason,
       });
       
-      // Mettre à jour en DB
       await this.db.collection('payments').doc(paymentIntentId).update({
         status: canceledPayment.status,
         cancelReason: reason,
@@ -436,7 +419,7 @@ export class StripeManager {
         sessionId: sessionId || null,
       });
 
-      console.log('✅ Paiement annulé:', {
+      console.log('Paiement annulé:', {
         id: paymentIntentId,
         status: canceledPayment.status,
         reason,
@@ -504,7 +487,6 @@ export class StripeManager {
         stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
       });
 
-      // Convertir en euros pour l'affichage
       return {
         ...stats,
         totalAmount: stats.totalAmount / 100,
@@ -545,5 +527,4 @@ export class StripeManager {
   }
 }
 
-// Instance singleton
 export const stripeManager = new StripeManager();

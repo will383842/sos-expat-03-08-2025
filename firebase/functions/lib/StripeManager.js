@@ -45,37 +45,36 @@ const firebase_1 = require("./utils/firebase");
 // -------------------------------------------------------------
 // Utils
 // -------------------------------------------------------------
-// ✅ Conversion unique EUROS → CENTIMES
 const toCents = (euros) => Math.round(euros * 100);
 exports.toCents = toCents;
 // -------------------------------------------------------------
-// Stripe client
-// -------------------------------------------------------------
-const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2023-10-16',
-});
-// -------------------------------------------------------------
-// Manager
+// Manager avec initialisation dynamique
 // -------------------------------------------------------------
 class StripeManager {
     constructor() {
         this.db = firebase_1.db;
+        this.stripe = null;
     }
-    validateConfiguration() {
-        if (!process.env.STRIPE_SECRET_KEY) {
-            throw new Error("STRIPE_SECRET_KEY manquante dans les variables d'environnement");
-        }
-        if (!process.env.STRIPE_WEBHOOK_SECRET) {
-            console.warn('STRIPE_WEBHOOK_SECRET manquante - les webhooks ne fonctionneront pas');
+    initializeStripe(secretKey) {
+        if (!this.stripe) {
+            this.stripe = new stripe_1.default(secretKey, {
+                apiVersion: '2023-10-16',
+            });
         }
     }
-    /**
-     * ✅ Validation unifiée avec support des deux formats
-     */
+    validateConfiguration(secretKey) {
+        if (secretKey) {
+            this.initializeStripe(secretKey);
+            return;
+        }
+        if (process.env.STRIPE_SECRET_KEY) {
+            this.initializeStripe(process.env.STRIPE_SECRET_KEY);
+            return;
+        }
+        throw new Error("STRIPE_SECRET_KEY manquante dans les variables d'environnement");
+    }
     validatePaymentData(data) {
-        var _a, _b;
         const { amount, clientId, providerId } = data;
-        // Bornes simples (en euros)
         if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
             throw new Error('Montant invalide');
         }
@@ -83,8 +82,7 @@ class StripeManager {
             throw new Error('Montant minimum de 5€ requis');
         if (amount > 2000)
             throw new Error('Montant maximum de 2000€ dépassé');
-        // ✅ Support flexible des deux formats de commission
-        const commission = (_b = (_a = data.connectionFeeAmount) !== null && _a !== void 0 ? _a : data.commissionAmount) !== null && _b !== void 0 ? _b : 0;
+        const commission = data.connectionFeeAmount ?? data.commissionAmount ?? 0;
         if (typeof commission !== 'number' || commission < 0) {
             throw new Error('Commission/frais de connexion invalide');
         }
@@ -97,46 +95,40 @@ class StripeManager {
         if (clientId === providerId) {
             throw new Error('Le client et le prestataire ne peuvent pas être identiques');
         }
-        // ✅ Validation cohérence : total = commission + prestataire
         const calculatedTotal = commission + data.providerAmount;
-        const tolerance = 0.02; // 2 centimes de tolérance
+        const tolerance = 0.02;
         if (Math.abs(calculatedTotal - amount) > tolerance) {
-            console.warn('⚠️ Incohérence montants:', {
+            console.warn('Incohérence montants:', {
                 total: amount,
                 commission,
                 providerAmount: data.providerAmount,
                 calculatedTotal,
                 difference: Math.abs(calculatedTotal - amount)
             });
-            // Ne pas bloquer pour de petites différences d'arrondi
             if (Math.abs(calculatedTotal - amount) > 1) {
                 throw new Error(`Incohérence montants: ${amount}€ != ${calculatedTotal}€`);
             }
         }
     }
-    /**
-     * ✅ Crée un PaymentIntent avec interface unifiée
-     */
-    async createPaymentIntent(data) {
-        var _a, _b;
+    async createPaymentIntent(data, secretKey) {
         try {
-            this.validateConfiguration();
+            this.validateConfiguration(secretKey);
             this.validatePaymentData(data);
-            // Unicité basique
-            const existingPayment = await this.findExistingPayment(data.clientId, data.providerId);
-            if (existingPayment) {
-                throw new Error('Un paiement est déjà en cours pour cette combinaison client/prestataire');
+            if (!this.stripe) {
+                throw new Error('Stripe client not initialized');
             }
-            // Vérifier l'existence des utilisateurs
+            // Vérification anti-doublons : bloquer seulement si paiement accepté
+            const existingPayment = await this.findExistingPayment(data.clientId, data.providerId, data.callSessionId);
+            if (existingPayment) {
+                throw new Error('Un paiement a déjà été accepté pour cette demande de consultation.');
+            }
             await this.validateUsers(data.clientId, data.providerId);
             const currency = (data.currency || 'eur').toLowerCase();
-            // ✅ Gestion unifiée des commissions
-            const commissionAmount = (_b = (_a = data.connectionFeeAmount) !== null && _a !== void 0 ? _a : data.commissionAmount) !== null && _b !== void 0 ? _b : 0;
-            // ✅ Conversion unique EUROS → CENTIMES juste avant l'appel Stripe
+            const commissionAmount = data.connectionFeeAmount ?? data.commissionAmount ?? 0;
             const amountCents = (0, exports.toCents)(data.amount);
             const commissionAmountCents = (0, exports.toCents)(commissionAmount);
             const providerAmountCents = (0, exports.toCents)(data.providerAmount);
-            console.log('💳 Création PaymentIntent Stripe:', {
+            console.log('Création PaymentIntent Stripe:', {
                 amountEuros: data.amount,
                 amountCents,
                 currency,
@@ -146,24 +138,37 @@ class StripeManager {
                 providerEuros: data.providerAmount,
                 providerCents: providerAmountCents,
             });
-            const paymentIntent = await stripe.paymentIntents.create({
+            const paymentIntent = await this.stripe.paymentIntents.create({
                 amount: amountCents,
                 currency,
-                capture_method: 'manual', // Capture différée
+                capture_method: 'manual',
                 automatic_payment_methods: { enabled: true },
-                metadata: Object.assign({ clientId: data.clientId, providerId: data.providerId, serviceType: data.serviceType, providerType: data.providerType, commissionAmountCents: String(commissionAmountCents), providerAmountCents: String(providerAmountCents), commissionAmountEuros: commissionAmount.toFixed(2), providerAmountEuros: data.providerAmount.toFixed(2), environment: process.env.NODE_ENV || 'development' }, data.metadata),
+                metadata: {
+                    clientId: data.clientId,
+                    providerId: data.providerId,
+                    serviceType: data.serviceType,
+                    providerType: data.providerType,
+                    commissionAmountCents: String(commissionAmountCents),
+                    providerAmountCents: String(providerAmountCents),
+                    commissionAmountEuros: commissionAmount.toFixed(2),
+                    providerAmountEuros: data.providerAmount.toFixed(2),
+                    environment: process.env.NODE_ENV || 'development',
+                    ...data.metadata,
+                },
                 description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount} ${currency.toUpperCase()}`,
                 statement_descriptor_suffix: 'SOS EXPAT',
                 receipt_email: await this.getClientEmail(data.clientId),
             });
-            console.log('✅ PaymentIntent Stripe créé:', {
+            console.log('PaymentIntent Stripe créé:', {
                 id: paymentIntent.id,
                 amount: paymentIntent.amount,
                 amountInEuros: paymentIntent.amount / 100,
                 status: paymentIntent.status,
             });
-            // Sauvegarder en DB
-            await this.savePaymentRecord(paymentIntent, Object.assign(Object.assign({}, data), { commissionAmount }), {
+            await this.savePaymentRecord(paymentIntent, {
+                ...data,
+                commissionAmount,
+            }, {
                 amountCents,
                 commissionAmountCents,
                 providerAmountCents,
@@ -183,20 +188,35 @@ class StripeManager {
             };
         }
     }
-    async findExistingPayment(clientId, providerId) {
+    async findExistingPayment(clientId, providerId, sessionId) {
         try {
-            const snapshot = await this.db
+            // Construire la requête de base - bloquer seulement les paiements acceptés
+            let query = this.db
                 .collection('payments')
                 .where('clientId', '==', clientId)
                 .where('providerId', '==', providerId)
-                .where('status', 'in', ['pending', 'authorized', 'requires_capture'])
-                .limit(1)
-                .get();
-            return !snapshot.empty;
+                .where('status', 'in', ['succeeded', 'requires_capture']); // Seulement les paiements acceptés
+            // Si un sessionId est fourni, filtrer par session pour cette demande spécifique
+            if (sessionId && sessionId.trim() !== '') {
+                query = query.where('callSessionId', '==', sessionId);
+            }
+            const snapshot = await query.limit(1).get();
+            const hasDuplicate = !snapshot.empty;
+            console.log('Vérification anti-doublons (paiements acceptés uniquement):', {
+                clientId: clientId.substring(0, 8) + '...',
+                providerId: providerId.substring(0, 8) + '...',
+                sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'non fourni',
+                hasDuplicate,
+                statusesChecked: ['succeeded', 'requires_capture'],
+                message: hasDuplicate
+                    ? 'Paiement déjà accepté trouvé - blocage'
+                    : 'Aucun paiement accepté trouvé - autorisation'
+            });
+            return hasDuplicate;
         }
         catch (error) {
             await (0, logError_1.logError)('StripeManager:findExistingPayment', error);
-            return false;
+            return false; // En cas d'erreur, on autorise
         }
     }
     async validateUsers(clientId, providerId) {
@@ -210,35 +230,29 @@ class StripeManager {
             throw new Error('Prestataire non trouvé');
         const clientData = clientDoc.data();
         const providerData = providerDoc.data();
-        if ((clientData === null || clientData === void 0 ? void 0 : clientData.status) === 'suspended')
+        if (clientData?.status === 'suspended')
             throw new Error('Compte client suspendu');
-        if ((providerData === null || providerData === void 0 ? void 0 : providerData.status) === 'suspended')
+        if (providerData?.status === 'suspended')
             throw new Error('Compte prestataire suspendu');
     }
     async getClientEmail(clientId) {
-        var _a;
         try {
             const clientDoc = await this.db.collection('users').doc(clientId).get();
-            return (_a = clientDoc.data()) === null || _a === void 0 ? void 0 : _a.email;
+            return clientDoc.data()?.email;
         }
         catch (error) {
             console.warn("Impossible de récupérer l'email client:", error);
             return undefined;
         }
     }
-    /**
-     * ✅ Sauvegarde en DB avec support unifié
-     */
     async savePaymentRecord(paymentIntent, dataEuros, cents) {
         const paymentRecord = {
             stripePaymentIntentId: paymentIntent.id,
             clientId: dataEuros.clientId,
             providerId: dataEuros.providerId,
-            // Legacy + source de vérité côté stats internes (centimes)
             amount: cents.amountCents,
             commissionAmount: cents.commissionAmountCents,
             providerAmount: cents.providerAmountCents,
-            // Miroirs pour lisibilité
             amountInEuros: dataEuros.amount,
             commissionAmountEuros: dataEuros.commissionAmount,
             providerAmountEuros: dataEuros.providerAmount,
@@ -256,30 +270,31 @@ class StripeManager {
             paymentRecord.callSessionId = dataEuros.callSessionId;
         }
         await this.db.collection('payments').doc(paymentIntent.id).set(paymentRecord);
-        console.log('✅ Enregistrement paiement sauvegardé en DB:', {
+        console.log('Enregistrement paiement sauvegardé en DB:', {
             id: paymentIntent.id,
             amountCents: cents.amountCents,
             amountEuros: dataEuros.amount,
             hasCallSessionId: !!paymentRecord.callSessionId,
         });
     }
-    async capturePayment(paymentIntentId, sessionId) {
+    async capturePayment(paymentIntentId, sessionId, secretKey) {
         try {
-            // Récupérer le paiement depuis Stripe
-            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+            this.validateConfiguration(secretKey);
+            if (!this.stripe) {
+                throw new Error('Stripe client not initialized');
+            }
+            const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
             if (paymentIntent.status !== 'requires_capture') {
                 throw new Error(`Cannot capture payment with status: ${paymentIntent.status}`);
             }
-            // Capturer le paiement
-            const capturedPayment = await stripe.paymentIntents.capture(paymentIntentId);
-            // Mettre à jour en DB
+            const capturedPayment = await this.stripe.paymentIntents.capture(paymentIntentId);
             await this.db.collection('payments').doc(paymentIntentId).update({
                 status: capturedPayment.status,
                 capturedAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 sessionId: sessionId || null,
             });
-            console.log('✅ Paiement capturé:', {
+            console.log('Paiement capturé:', {
                 id: paymentIntentId,
                 amount: capturedPayment.amount,
                 status: capturedPayment.status,
@@ -297,9 +312,13 @@ class StripeManager {
             };
         }
     }
-    async refundPayment(paymentIntentId, reason, sessionId, amount) {
+    async refundPayment(paymentIntentId, reason, sessionId, amount, secretKey) {
         try {
-            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+            this.validateConfiguration(secretKey);
+            if (!this.stripe) {
+                throw new Error('Stripe client not initialized');
+            }
+            const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
             const refundData = {
                 payment_intent: paymentIntentId,
                 reason: reason,
@@ -311,8 +330,7 @@ class StripeManager {
             if (amount !== undefined) {
                 refundData.amount = (0, exports.toCents)(amount);
             }
-            const refund = await stripe.refunds.create(refundData);
-            // Mettre à jour en DB
+            const refund = await this.stripe.refunds.create(refundData);
             await this.db.collection('payments').doc(paymentIntentId).update({
                 status: 'refunded',
                 refundId: refund.id,
@@ -321,7 +339,7 @@ class StripeManager {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 sessionId: sessionId || null,
             });
-            console.log('✅ Paiement remboursé:', {
+            console.log('Paiement remboursé:', {
                 paymentIntentId,
                 refundId: refund.id,
                 amount: refund.amount,
@@ -340,12 +358,15 @@ class StripeManager {
             };
         }
     }
-    async cancelPayment(paymentIntentId, reason, sessionId) {
+    async cancelPayment(paymentIntentId, reason, sessionId, secretKey) {
         try {
-            const canceledPayment = await stripe.paymentIntents.cancel(paymentIntentId, {
+            this.validateConfiguration(secretKey);
+            if (!this.stripe) {
+                throw new Error('Stripe client not initialized');
+            }
+            const canceledPayment = await this.stripe.paymentIntents.cancel(paymentIntentId, {
                 cancellation_reason: reason,
             });
-            // Mettre à jour en DB
             await this.db.collection('payments').doc(paymentIntentId).update({
                 status: canceledPayment.status,
                 cancelReason: reason,
@@ -353,7 +374,7 @@ class StripeManager {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 sessionId: sessionId || null,
             });
-            console.log('✅ Paiement annulé:', {
+            console.log('Paiement annulé:', {
                 id: paymentIntentId,
                 status: canceledPayment.status,
                 reason,
@@ -403,8 +424,12 @@ class StripeManager {
                 const status = data.status || 'unknown';
                 stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
             });
-            // Convertir en euros pour l'affichage
-            return Object.assign(Object.assign({}, stats), { totalAmount: stats.totalAmount / 100, totalCommission: stats.totalCommission / 100, totalProvider: stats.totalProvider / 100 });
+            return {
+                ...stats,
+                totalAmount: stats.totalAmount / 100,
+                totalCommission: stats.totalCommission / 100,
+                totalProvider: stats.totalProvider / 100,
+            };
         }
         catch (error) {
             await (0, logError_1.logError)('StripeManager:getPaymentStatistics', error);
@@ -424,15 +449,18 @@ class StripeManager {
                 return null;
             }
             const data = doc.data();
-            return Object.assign(Object.assign({}, data), { amountInEuros: ((data === null || data === void 0 ? void 0 : data.amount) || 0) / 100, commissionAmountEuros: ((data === null || data === void 0 ? void 0 : data.commissionAmount) || 0) / 100, providerAmountEuros: ((data === null || data === void 0 ? void 0 : data.providerAmount) || 0) / 100 });
+            return {
+                ...data,
+                amountInEuros: (data?.amount || 0) / 100,
+                commissionAmountEuros: (data?.commissionAmount || 0) / 100,
+                providerAmountEuros: (data?.providerAmount || 0) / 100,
+            };
         }
         catch (error) {
             await (0, logError_1.logError)('StripeManager:getPayment', error);
             return null;
         }
     }
-} // ✅ ACCOLADE FERMANTE AJOUTÉE ICI
+}
 exports.StripeManager = StripeManager;
-// Instance singleton
 exports.stripeManager = new StripeManager();
-//# sourceMappingURL=StripeManager.js.map

@@ -49,4 +49,3 @@ exports.auth = admin.auth();
 // Constantes utiles pour manipuler Firestore
 exports.FieldValue = admin.firestore.FieldValue;
 exports.Timestamp = admin.firestore.Timestamp;
-//# sourceMappingURL=firebase.js.map

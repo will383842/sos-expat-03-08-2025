@@ -37,6 +37,7 @@ exports.createPaymentIntent = void 0;
 // firebase/functions/src/createPaymentIntent.ts
 // 🔧 Firebase Functions v2 avec configuration simplifiée
 const https_1 = require("firebase-functions/v2/https");
+const params_1 = require("firebase-functions/params");
 const StripeManager_1 = require("./StripeManager");
 const logError_1 = require("./utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));
@@ -52,6 +53,7 @@ const FUNCTION_CONFIG = {
     concurrency: 80,
     region: 'europe-west1' // Explicite pour être sûr
 };
+const STRIPE_SECRET_KEY = (0, params_1.defineSecret)("STRIPE_SECRET_KEY");
 // =========================================
 // 🌍 DÉTECTION D'ENVIRONNEMENT
 // =========================================
@@ -261,7 +263,6 @@ function validateAmountCoherence(totalAmount, commissionAmount, providerAmount) 
     return { valid: true, difference };
 }
 function sanitizeAndConvertInput(data) {
-    var _a, _b, _c, _d;
     const maxNameLength = isDevelopment ? 500 : 200;
     const maxDescLength = SECURITY_LIMITS.VALIDATION.MAX_DESCRIPTION_LENGTH;
     const maxMetaKeyLength = isDevelopment ? 100 : 50;
@@ -284,10 +285,10 @@ function sanitizeAndConvertInput(data) {
         serviceType: data.serviceType,
         providerId: data.providerId.trim(),
         clientId: data.clientId.trim(),
-        clientEmail: (_a = data.clientEmail) === null || _a === void 0 ? void 0 : _a.trim().toLowerCase(),
-        providerName: (_b = data.providerName) === null || _b === void 0 ? void 0 : _b.trim().substring(0, maxNameLength),
-        description: (_c = data.description) === null || _c === void 0 ? void 0 : _c.trim().substring(0, maxDescLength),
-        callSessionId: (_d = data.callSessionId) === null || _d === void 0 ? void 0 : _d.trim(),
+        clientEmail: data.clientEmail?.trim().toLowerCase(),
+        providerName: data.providerName?.trim().substring(0, maxNameLength),
+        description: data.description?.trim().substring(0, maxDescLength),
+        callSessionId: data.callSessionId?.trim(),
         metadata: data.metadata
             ? Object.fromEntries(Object.entries(data.metadata)
                 .filter(([key, value]) => key.length <= maxMetaKeyLength && value.length <= maxMetaValueLength)
@@ -301,7 +302,12 @@ function logSecurityEvent(event, data) {
         console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
     }
     else if (isProduction) {
-        const sanitizedData = Object.assign(Object.assign({}, data), { userId: data.userId ? String(data.userId).substring(0, 8) + '...' : undefined, clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined, providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined });
+        const sanitizedData = {
+            ...data,
+            userId: data.userId ? String(data.userId).substring(0, 8) + '...' : undefined,
+            clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined,
+            providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined,
+        };
         console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
     }
     else {
@@ -311,9 +317,10 @@ function logSecurityEvent(event, data) {
 // =========================================
 // 🚀 CLOUD FUNCTION PRINCIPALE avec configuration simplifiée
 // =========================================
-exports.createPaymentIntent = (0, https_1.onCall)(FUNCTION_CONFIG, // ✅ Configuration simplifiée sans CORS (géré automatiquement par onCall)
-async (request) => {
-    var _a, _b, _c, _d, _e;
+exports.createPaymentIntent = (0, https_1.onCall)({
+    ...FUNCTION_CONFIG,
+    secrets: [STRIPE_SECRET_KEY],
+}, async (request) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
     try {
@@ -391,28 +398,42 @@ async (request) => {
         if (hasDuplicate) {
             throw new https_1.HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
         }
+        // Récupération du secret Stripe
+        const stripeSecretKey = STRIPE_SECRET_KEY.value();
         // Création du paiement Stripe
         const stripePayload = {
-            amount: amountInCents,
+            amount: amountInMainUnit,
             currency,
             clientId,
             providerId,
             serviceType,
             providerType: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat'),
-            commissionAmount: commissionAmountInCents,
-            providerAmount: providerAmountInCents,
+            commissionAmount: commissionAmountInMainUnit,
+            providerAmount: providerAmountInMainUnit,
             callSessionId,
-            metadata: Object.assign({ clientEmail: clientEmail || '', providerName: providerName || '', description: description || `Service ${serviceType}`, requestId, environment: process.env.NODE_ENV || 'development', originalTotal: amountInMainUnit.toString(), originalCommission: commissionAmountInMainUnit.toString(), originalProviderAmount: providerAmountInMainUnit.toString(), originalCurrency: currency }, metadata),
+            metadata: {
+                clientEmail: clientEmail || '',
+                providerName: providerName || '',
+                description: description || `Service ${serviceType}`,
+                requestId,
+                environment: process.env.NODE_ENV || 'development',
+                originalTotal: amountInMainUnit.toString(),
+                originalCommission: commissionAmountInMainUnit.toString(),
+                originalProviderAmount: providerAmountInMainUnit.toString(),
+                originalCurrency: currency,
+                ...metadata,
+            },
         };
-        const result = await StripeManager_1.stripeManager.createPaymentIntent(stripePayload);
-        if (!(result === null || result === void 0 ? void 0 : result.success)) {
+        // Appel à StripeManager avec la clé secrète
+        const result = await StripeManager_1.stripeManager.createPaymentIntent(stripePayload, stripeSecretKey);
+        if (!result?.success) {
             await (0, logError_1.logError)('createPaymentIntent:stripe_error', {
                 requestId,
                 userId,
                 serviceType,
                 amountInMainUnit,
                 amountInCents,
-                error: result === null || result === void 0 ? void 0 : result.error,
+                error: result?.error,
             });
             throw new https_1.HttpsError('internal', 'Erreur lors de la création du paiement. Veuillez réessayer.');
         }
@@ -438,7 +459,6 @@ async (request) => {
             }
             catch (auditError) {
                 console.warn('Audit logging failed:', auditError);
-                // Ne pas faire échouer le paiement pour un problème d'audit
             }
         }
         console.log('✅ Paiement créé:', {
@@ -467,13 +487,13 @@ async (request) => {
             stack: error instanceof Error ? error.stack : undefined,
             processingTime,
             requestData: {
-                amount: (_a = request.data) === null || _a === void 0 ? void 0 : _a.amount,
-                serviceType: (_b = request.data) === null || _b === void 0 ? void 0 : _b.serviceType,
-                currency: ((_c = request.data) === null || _c === void 0 ? void 0 : _c.currency) || 'eur',
+                amount: request.data?.amount,
+                serviceType: request.data?.serviceType,
+                currency: request.data?.currency || 'eur',
                 hasAuth: !!request.auth,
-                hasCommission: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.commissionAmount) !== undefined,
+                hasCommission: request.data?.commissionAmount !== undefined,
             },
-            userAuth: ((_e = request.auth) === null || _e === void 0 ? void 0 : _e.uid) || 'not-authenticated',
+            userAuth: request.auth?.uid || 'not-authenticated',
             environment: process.env.NODE_ENV,
         };
         await (0, logError_1.logError)('createPaymentIntent:error', errorData);
@@ -489,4 +509,3 @@ async (request) => {
         throw new https_1.HttpsError('internal', errorResponse.error, errorResponse);
     }
 });
-//# sourceMappingURL=createPaymentIntent.js.map

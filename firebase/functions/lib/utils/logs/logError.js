@@ -56,4 +56,3 @@ function getSeverityLevel(context) {
     }
     return 'low';
 }
-//# sourceMappingURL=logError.js.map

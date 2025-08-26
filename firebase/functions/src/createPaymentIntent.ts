@@ -396,7 +396,7 @@ export const createPaymentIntent = onCall(
   {
     ...FUNCTION_CONFIG,
     secrets: [STRIPE_SECRET_KEY],
-  }, // ✅ Configuration avec secret Stripe
+  },
   async (request: CallableRequest<PaymentIntentRequestData>) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
@@ -516,19 +516,19 @@ export const createPaymentIntent = onCall(
         throw new HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
       }
 
-      // ✅ Get the secret value from Firebase Functions v2 secret
+      // Récupération du secret Stripe
       const stripeSecretKey = STRIPE_SECRET_KEY.value();
 
       // Création du paiement Stripe
       const stripePayload = {
-        amount: amountInMainUnit, // ✅ Passer en euros (unités réelles)
+        amount: amountInMainUnit,
         currency,
         clientId,
         providerId,
         serviceType,
         providerType: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat') as 'lawyer' | 'expat',
-        commissionAmount: commissionAmountInMainUnit, // ✅ En euros
-        providerAmount: providerAmountInMainUnit, // ✅ En euros
+        commissionAmount: commissionAmountInMainUnit,
+        providerAmount: providerAmountInMainUnit,
         callSessionId,
         metadata: {
           clientEmail: clientEmail || '',
@@ -544,7 +544,7 @@ export const createPaymentIntent = onCall(
         },
       };
 
-      // ✅ Pass the secret key to the stripeManager method
+      // Appel à StripeManager avec la clé secrète
       const result = await stripeManager.createPaymentIntent(stripePayload, stripeSecretKey);
 
       if (!result?.success) {
@@ -580,7 +580,6 @@ export const createPaymentIntent = onCall(
           }, db);
         } catch (auditError) {
           console.warn('Audit logging failed:', auditError);
-          // Ne pas faire échouer le paiement pour un problème d'audit
         }
       }
 
@@ -595,7 +594,7 @@ export const createPaymentIntent = onCall(
         success: true,
         clientSecret: result.clientSecret!,
         paymentIntentId: result.paymentIntentId!,
-        amount: amountInCents, // ✅ Retourner en centimes pour compatibilité frontend
+        amount: amountInCents,
         currency,
         serviceType,
         status: 'requires_payment_method',

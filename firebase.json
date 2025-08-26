@@ -10,13 +10,13 @@
     {
       "source": "firebase/functions",
       "codebase": "default",
-      "runtime": "nodejs22",
+      "runtime": "nodejs20",
       "region": "europe-west1"
     },
     {
       "source": "backup-functions",
       "codebase": "backup",
-      "runtime": "nodejs22",
+      "runtime": "nodejs20",
       "region": "europe-west1",
       "environmentVariables": { 
         "BACKUP_BUCKET": "sos-expat-backup" 
@@ -31,6 +31,14 @@
         "source": "/api/**", 
         "function": { 
           "functionId": "api", 
+          "region": "europe-west1", 
+          "codebase": "default" 
+        } 
+      },
+      { 
+        "source": "/stripe-webhook", 
+        "function": { 
+          "functionId": "stripeWebhook", 
           "region": "europe-west1", 
           "codebase": "default" 
         } 
@@ -85,7 +93,15 @@
     },
     "ui": { 
       "enabled": true,
-      "port": 4000
-    }
+      "port": 4002,
+      "host": "127.0.0.1"
+    },
+    "hub": {
+      "port": 4402
+    },
+    "logging": {
+      "port": 4502
+    },
+    "singleProjectMode": true
   }
 }

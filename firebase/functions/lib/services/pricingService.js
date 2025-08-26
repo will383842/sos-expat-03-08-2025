@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pricingConfigCache = exports.convertCurrency = exports.validateAndCalculateAmounts = exports.getServiceAmounts = exports.getPricingConfig = void 0;
 // firebase/functions/src/services/pricingService.ts
-const firebase_1 = require("../config/firebase");
+const firebase_1 = require("../utils/firebase");
 // Configuration par défaut (fallback backend)
 const DEFAULT_PRICING_CONFIG = {
     lawyer: {
@@ -19,7 +19,7 @@ const DEFAULT_PRICING_CONFIG = {
  */
 const getPricingConfig = async () => {
     try {
-        const configDoc = await firebase_1.firestore.doc('admin_config/pricing').get();
+        const configDoc = await firebase_1.db.doc('admin_config/pricing').get();
         if (configDoc.exists) {
             const data = configDoc.data();
             if (isValidPricingConfig(data)) {

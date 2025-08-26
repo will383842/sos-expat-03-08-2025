@@ -35,65 +35,23 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPaymentIntent = void 0;
 // firebase/functions/src/createPaymentIntent.ts
-// 🔧 FIX CORS: Configuration sécurisée
+// 🔧 Firebase Functions v2 avec configuration simplifiée
 const https_1 = require("firebase-functions/v2/https");
 const StripeManager_1 = require("./StripeManager");
 const logError_1 = require("./utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));
 const paymentValidators_1 = require("./utils/paymentValidators");
 // =========================================
-// 🔧 FIX CORS: Configuration sécurisée + gestion manuelle des headers
+// 🔧 Configuration Firebase Functions v2 simplifiée
 // =========================================
-const ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5175',
-    'http://localhost:5173',
-    'http://localhost:5196',
-    'http://localhost:8080',
-    'https://sos-urgently-ac307.web.app',
-    'https://sos-urgently-ac307.firebaseapp.com',
-];
-const CPU_OPTIMIZED_CONFIG = {
+const FUNCTION_CONFIG = {
     memory: "256MiB",
     timeoutSeconds: 60,
     maxInstances: 10,
     minInstances: 0,
     concurrency: 80,
-    // 🔧 Retirer cors: [array] car ça ne marche pas avec Firebase Functions v2
-    // On va gérer les CORS manuellement tout en gardant la sécurité
+    region: 'europe-west1' // Explicite pour être sûr
 };
-/**
- * 🔒 Validation CORS sécurisée + headers
- */
-function validateAndSetCorsHeaders(request) {
-    var _a, _b;
-    const origin = (_b = (_a = request.rawRequest) === null || _a === void 0 ? void 0 : _a.headers) === null || _b === void 0 ? void 0 : _b.origin;
-    const headers = {};
-    // Validation sécurisée de l'origin
-    if (origin && ALLOWED_ORIGINS.includes(origin)) {
-        // Origin autorisé - ajouter les headers CORS
-        headers['Access-Control-Allow-Origin'] = origin;
-        headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-        headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With';
-        headers['Access-Control-Allow-Credentials'] = 'true';
-        headers['Access-Control-Max-Age'] = '86400';
-    }
-    else if (!origin) {
-        // Pas d'origin (développement local parfois)
-        const isDev = process.env.NODE_ENV === 'development';
-        if (isDev) {
-            headers['Access-Control-Allow-Origin'] = 'http://localhost:5173';
-            headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-            headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
-        }
-    }
-    else {
-        // Origin non autorisé - log pour sécurité
-        console.error(`🚨 Origin non autorisé: ${origin}`);
-        throw new https_1.HttpsError('permission-denied', 'Origin non autorisé');
-    }
-    return headers;
-}
 // =========================================
 // 🌍 DÉTECTION D'ENVIRONNEMENT
 // =========================================
@@ -351,22 +309,20 @@ function logSecurityEvent(event, data) {
     }
 }
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE avec FIX CORS
+// 🚀 CLOUD FUNCTION PRINCIPALE avec configuration simplifiée
 // =========================================
-exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (request) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+exports.createPaymentIntent = (0, https_1.onCall)(FUNCTION_CONFIG, // ✅ Configuration simplifiée sans CORS (géré automatiquement par onCall)
+async (request) => {
+    var _a, _b, _c, _d, _e;
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
     try {
-        // 🔧 FIX CORS: Valider l'origin et préparer les headers
-        const corsHeaders = validateAndSetCorsHeaders(request);
         logSecurityEvent('payment_intent_start', {
             requestId,
             environment: process.env.NODE_ENV,
             isDevelopment,
             isProduction,
             bypassMode: BYPASS_MODE,
-            origin: (_b = (_a = request.rawRequest) === null || _a === void 0 ? void 0 : _a.headers) === null || _b === void 0 ? void 0 : _b.origin,
         });
         // 1) AUTH
         if (!request.auth) {
@@ -491,7 +447,6 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
             commission: (0, paymentValidators_1.formatAmount)(commissionAmountInMainUnit, currency),
             provider: (0, paymentValidators_1.formatAmount)(providerAmountInMainUnit, currency),
         });
-        // 🔧 FIX CORS: Retourner la réponse avec les headers CORS
         const response = {
             success: true,
             clientSecret: result.clientSecret,
@@ -502,7 +457,7 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
             status: 'requires_payment_method',
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         };
-        return Object.assign(Object.assign({}, response), { _corsHeaders: corsHeaders });
+        return response;
     }
     catch (error) {
         const processingTime = Date.now() - startTime;
@@ -512,13 +467,13 @@ exports.createPaymentIntent = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (r
             stack: error instanceof Error ? error.stack : undefined,
             processingTime,
             requestData: {
-                amount: (_c = request.data) === null || _c === void 0 ? void 0 : _c.amount,
-                serviceType: (_d = request.data) === null || _d === void 0 ? void 0 : _d.serviceType,
-                currency: ((_e = request.data) === null || _e === void 0 ? void 0 : _e.currency) || 'eur',
+                amount: (_a = request.data) === null || _a === void 0 ? void 0 : _a.amount,
+                serviceType: (_b = request.data) === null || _b === void 0 ? void 0 : _b.serviceType,
+                currency: ((_c = request.data) === null || _c === void 0 ? void 0 : _c.currency) || 'eur',
                 hasAuth: !!request.auth,
-                hasCommission: ((_f = request.data) === null || _f === void 0 ? void 0 : _f.commissionAmount) !== undefined,
+                hasCommission: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.commissionAmount) !== undefined,
             },
-            userAuth: ((_g = request.auth) === null || _g === void 0 ? void 0 : _g.uid) || 'not-authenticated',
+            userAuth: ((_e = request.auth) === null || _e === void 0 ? void 0 : _e.uid) || 'not-authenticated',
             environment: process.env.NODE_ENV,
         };
         await (0, logError_1.logError)('createPaymentIntent:error', errorData);

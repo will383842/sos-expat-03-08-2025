@@ -1,5 +1,12 @@
 // firebase/functions/src/utils/ultraDebugLogger.ts
-import * as admin from 'firebase-admin';
+import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
+
+// Désactiver l'écriture Firestore en local
+const IS_LOCAL =
+  process.env.FUNCTIONS_EMULATOR === "true" ||
+  process.env.FIREBASE_EMULATOR_HUB ||
+  (!process.env.GOOGLE_CLOUD_PROJECT && !process.env.GCP_PROJECT);
 
 interface DebugLogEntry {
   timestamp: string;
@@ -19,15 +26,25 @@ interface DebugLogEntry {
   };
 }
 
+// Fonction utilitaire pour nettoyer les valeurs undefined
+function clean<T extends Record<string, any>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 class UltraDebugLogger {
   private static instance: UltraDebugLogger | null = null;
   private logs: DebugLogEntry[] = [];
   private isFirebaseInitialized = false;
-  private db: admin.firestore.Firestore | null = null;
+  private db: FirebaseFirestore.Firestore | null = null;
   private sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   private constructor() {
     console.log(`🚀 [ULTRA DEBUG] Logger initialisé avec session: ${this.sessionId}`);
+    if (IS_LOCAL) {
+      console.log(`🔧 [ULTRA DEBUG] Mode local détecté - Firestore logs désactivés`);
+    }
     this.setupGlobalErrorHandlers();
   }
 
@@ -83,20 +100,22 @@ class UltraDebugLogger {
   }
 
   private async initFirebaseIfNeeded() {
-    if (!this.isFirebaseInitialized) {
+    if (!this.isFirebaseInitialized && !IS_LOCAL) {
       try {
         console.log('🔥 [ULTRA DEBUG] Tentative d\'initialisation Firebase...');
         
-        if (!admin.apps.length) {
+        if (!getApps().length) {
           console.log('🔥 [ULTRA DEBUG] Aucune app Firebase détectée, initialisation...');
-          admin.initializeApp();
+          initializeApp();
           console.log('✅ [ULTRA DEBUG] Firebase initialisé avec succès');
         } else {
           console.log('✅ [ULTRA DEBUG] Firebase déjà initialisé');
         }
 
-        this.db = admin.firestore();
-        console.log('🔥 [ULTRA DEBUG] Firestore récupéré');
+        this.db = getFirestore();
+        // Ignorer les propriétés undefined - DOIT être appelé AVANT la première écriture
+        this.db.settings({ ignoreUndefinedProperties: true });
+        console.log('🔥 [ULTRA DEBUG] Firestore récupéré avec ignoreUndefinedProperties');
 
         // Test de connexion Firestore
         try {
@@ -123,7 +142,7 @@ class UltraDebugLogger {
   }
 
   private createLogEntry(level: DebugLogEntry['level'], source: string, message: string, data?: any, stack?: string): DebugLogEntry {
-    return {
+    return clean({
       timestamp: new Date().toISOString(),
       level,
       source,
@@ -131,7 +150,7 @@ class UltraDebugLogger {
       data: data ? JSON.parse(JSON.stringify(data, null, 2)) : undefined,
       stack,
       context: this.getContext()
-    };
+    });
   }
 
   private logToConsole(entry: DebugLogEntry) {
@@ -198,16 +217,25 @@ class UltraDebugLogger {
   }
 
   private async saveToFirestore(entry: DebugLogEntry) {
+    // Skip Firestore en local
+    if (IS_LOCAL) {
+      console.log("[ULTRA DEBUG] (local) skip Firestore log");
+      return;
+    }
+
     try {
       await this.initFirebaseIfNeeded();
       
       if (this.db) {
-        // Sauvegarder dans une collection spéciale pour le debug
-        await this.db.collection('ultra_debug_logs').add({
+        // Nettoyer l'entrée avant sauvegarde
+        const payload = clean({
           ...entry,
           sessionId: this.sessionId,
-          savedAt: admin.firestore.FieldValue.serverTimestamp()
+          savedAt: new Date() // Utiliser Date au lieu de FieldValue pour plus de simplicité
         });
+
+        // Sauvegarder dans une collection spéciale pour le debug
+        await this.db.collection('ultra_debug_logs').add(payload);
       }
     } catch (saveError) {
       // Ne pas faire planter le système si on ne peut pas sauvegarder les logs
@@ -259,6 +287,7 @@ class UltraDebugLogger {
     const report = {
       sessionId: this.sessionId,
       generatedAt: new Date().toISOString(),
+      localMode: DISABLE_FIRESTORE_LOG_LOCAL,
       environment: {
         nodeVersion: process.version,
         platform: process.platform,
@@ -268,6 +297,7 @@ class UltraDebugLogger {
         uptime: process.uptime(),
         env: {
           NODE_ENV: process.env.NODE_ENV,
+          FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
           FUNCTION_NAME: process.env.FUNCTION_NAME,
           FUNCTION_REGION: process.env.FUNCTION_REGION,
           GCLOUD_PROJECT: process.env.GCLOUD_PROJECT

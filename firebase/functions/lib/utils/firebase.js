@@ -34,18 +34,19 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Timestamp = exports.FieldValue = exports.auth = exports.messaging = exports.storage = exports.db = void 0;
+// firebase/functions/src/utils/firebase.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialiser Firebase Admin une seule fois
 if (!admin.apps.length) {
     admin.initializeApp();
 }
-// AJOUT CRITIQUE : Configuration Firestore avec ignoreUndefinedProperties
+// Firestore (⚠️ pas de db.settings() ici, ça sera appliqué dans index.ts)
 exports.db = admin.firestore();
-exports.db.settings({ ignoreUndefinedProperties: true });
+// Autres services Firebase disponibles via Admin SDK
 exports.storage = admin.storage();
 exports.messaging = admin.messaging();
 exports.auth = admin.auth();
-// Constantes utiles
+// Constantes utiles pour manipuler Firestore
 exports.FieldValue = admin.firestore.FieldValue;
 exports.Timestamp = admin.firestore.Timestamp;
 //# sourceMappingURL=firebase.js.map

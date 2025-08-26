@@ -1,4 +1,4 @@
-// src/pages/CallCheckout.tsx
+// src/pages/CallCheckout.tsx - Version corrigée
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -75,6 +75,7 @@ interface PaymentIntentResponse {
   expiresAt: string;
 }
 
+// ✅ CORRECTION: Interface corrigée sans currency
 interface CreateAndScheduleCallData {
   providerId: string;
   clientId: string;
@@ -84,11 +85,10 @@ interface CreateAndScheduleCallData {
   providerType: ServiceKind;
   paymentIntentId: string;
   amount: number; // unités réelles
-  currency: 'EUR' | 'USD';
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
-  clientWhatsapp?: string;
+  clientWhatsapp?: string; // ✅ AJOUTÉ: champ manquant
 }
 
 type StepType = 'payment' | 'calling' | 'completed';
@@ -175,6 +175,8 @@ const useTranslation = () => {
     'err.unexpectedStatus': { fr: 'Statut de paiement inattendu', en: 'Unexpected payment status' },
     'err.genericPayment': { fr: 'Une erreur est survenue lors du paiement', en: 'An error occurred during payment' },
     'err.invalidPhone': { fr: 'Numéro de téléphone invalide', en: 'Invalid phone number' },
+    'err.missingProviderPhone': { fr: 'Numéro de téléphone du prestataire manquant', en: 'Provider phone number missing' },
+    'err.missingClientPhone': { fr: 'Numéro de téléphone client manquant', en: 'Client phone number missing' },
   };
 
   const t = (key: keyof typeof dict, fallback?: string) =>
@@ -357,7 +359,7 @@ interface PaymentFormProps {
   user: User;
   provider: Provider;
   service: ServiceData;
-  adminPricing: PricingEntryTrace; // ✅ prix issus d'admin, passés directement
+  adminPricing: PricingEntryTrace;
   onSuccess: (paymentIntentId: string) => void;
   onError: (error: string) => void;
   isProcessing: boolean;
@@ -445,6 +447,27 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
       validatePaymentData();
 
+      // ✅ VALIDATION SUPPLÉMENTAIRE: Vérifier les numéros de téléphone
+      const providerPhone = provider.phoneNumber || provider.phone || provider.telephone || '';
+      if (!providerPhone || providerPhone.length < 8) {
+        console.error('❌ Numéro prestataire invalide:', {
+          phoneNumber: provider.phoneNumber,
+          phone: provider.phone,
+          provider: provider
+        });
+        throw new Error(t('err.missingProviderPhone'));
+      }
+
+      if (!service.clientPhone || service.clientPhone.length < 8) {
+        console.error('❌ Numéro client invalide:', service.clientPhone);
+        throw new Error(t('err.missingClientPhone'));
+      }
+
+      console.log('✅ Validation des téléphones réussie:', {
+        providerPhone,
+        clientPhone: service.clientPhone
+      });
+
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
 
@@ -510,21 +533,63 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
       const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
         httpsCallable(functions, 'createAndScheduleCall');
 
-      const callData: CreateAndScheduleCallData = {
+      // ✅ DONNÉES POUR DEBUG - Log avant l'envoi
+      const debugData = {
         providerId: provider.id,
         clientId: user.uid!,
-        providerPhone: provider.phoneNumber || provider.phone || '',
+        providerPhone,
         clientPhone: service.clientPhone,
-        clientWhatsapp: '',
         serviceType: service.serviceType,
         providerType: (provider.role || provider.type || 'expat') as ServiceKind,
         paymentIntentId: paymentIntent.id,
         amount: adminPricing.totalAmount,
-        currency: serviceCurrency.toUpperCase() as 'EUR' | 'USD',
+        delayMinutes: 5,
+        clientLanguages: [language],
+        providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
+        clientWhatsapp: service.clientPhone // ✅ Utiliser le même numéro
+      };
+
+      console.log('🔍 Debug createAndScheduleCall - Données envoyées :', debugData);
+
+      // ✅ VALIDATION SUPPLÉMENTAIRE: Vérifier que tous les champs requis sont présents
+      const requiredFields = {
+        providerId: provider.id,
+        clientId: user.uid!,
+        providerPhone,
+        clientPhone: service.clientPhone,
+        serviceType: service.serviceType,
+        providerType: (provider.role || provider.type || 'expat'),
+        paymentIntentId: paymentIntent.id,
+        amount: adminPricing.totalAmount
+      };
+
+      const missingFields = Object.entries(requiredFields)
+        .filter(([key, value]) => !value || value === '')
+        .map(([key]) => key);
+
+      if (missingFields.length > 0) {
+        console.error('❌ Champs manquants pour createAndScheduleCall:', missingFields);
+        throw new Error(`Champs manquants: ${missingFields.join(', ')}`);
+      }
+
+      console.log('✅ Tous les champs requis sont présents');
+
+      const callData: CreateAndScheduleCallData = {
+        providerId: provider.id,
+        clientId: user.uid!,
+        providerPhone,
+        clientPhone: service.clientPhone,
+        clientWhatsapp: service.clientPhone, // ✅ CORRECTION: Ajouté
+        serviceType: service.serviceType,
+        providerType: (provider.role || provider.type || 'expat') as ServiceKind,
+        paymentIntentId: paymentIntent.id,
+        amount: adminPricing.totalAmount,
         delayMinutes: 5,
         clientLanguages: [language],
         providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
       };
+
+      console.log('📞 Appel createAndScheduleCall avec:', callData);
 
       await createAndScheduleCall(callData);
 
@@ -1125,7 +1190,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 {...cardTraceAttrs}
               >
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                  {selectedCurrency === 'usd' ? '$' : '€'}{adminPricing.totalAmount.toFixed(2)}
+                  {selectedCurrency === 'usd' ? ' : '€'}{adminPricing.totalAmount.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500">{adminPricing.duration} min</div>
               </div>

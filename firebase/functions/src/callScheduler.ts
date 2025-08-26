@@ -9,7 +9,7 @@ const SCHEDULER_CONFIG = {
 } as const;
 
 /**
- * ✅ Interface des paramètres de création d'appel.
+ * ✅ Interface des paramètres de création d'appel CORRIGÉE.
  * IMPORTANT MONNAIE :
  * - `amount` est **toujours en EUROS** (unités réelles), **pas** en centimes.
  * - La conversion en centimes ne doit se faire **qu'au moment Stripe** (en amont,
@@ -32,6 +32,8 @@ interface CreateCallParams {
   requestId?: string;
   clientLanguages?: string[];
   providerLanguages?: string[];
+  // ✅ CORRECTION: Ajouter le champ clientWhatsapp qui est maintenant envoyé par le frontend
+  clientWhatsapp?: string;
 
   // Métadonnées optionnelles passées par l'étape de paiement (déjà converties/calculées)
   amountCents?: number; // en centimes, si fourni par l'amont (non utilisé pour des calculs ici)
@@ -460,7 +462,7 @@ export const scheduleCallSequence = async (
 };
 
 /**
- * ✅ Fonction pour créer et programmer un nouvel appel
+ * ✅ Fonction pour créer et programmer un nouvel appel CORRIGÉE
  * - `amount` est **en EUROS** (unités réelles).
  * - ❌ Pas de vérification de "cohérence service/prix" ici.
  * - ✅ On garde uniquement la validation min/max.
@@ -479,16 +481,32 @@ export const createAndScheduleCall = async (
     console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
     console.log(`💰 Montant (EUROS): ${params.amount} pour ${params.serviceType}`);
 
-    // Champs obligatoires
-    if (
-      !params.providerId ||
-      !params.clientId ||
-      !params.providerPhone ||
-      !params.clientPhone ||
-      !params.paymentIntentId ||
-      params.amount == null
-    ) {
-      throw new Error("Paramètres obligatoires manquants pour créer l'appel");
+    // ✅ VALIDATION AMÉLIORÉE - Champs obligatoires avec messages spécifiques
+    const requiredFields = {
+      providerId: params.providerId,
+      clientId: params.clientId,
+      providerPhone: params.providerPhone,
+      clientPhone: params.clientPhone,
+      paymentIntentId: params.paymentIntentId,
+      amount: params.amount
+    };
+
+    const missingFields = Object.entries(requiredFields)
+      .filter(([key, value]) => !value || (typeof value === 'string' && value.trim() === ''))
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      console.error(`❌ [createAndScheduleCall] Champs manquants:`, missingFields);
+      throw new Error(`Paramètres obligatoires manquants pour créer l'appel: ${missingFields.join(', ')}`);
+    }
+
+    // ✅ Validation montant numérique
+    if (typeof params.amount !== 'number' || isNaN(params.amount) || params.amount <= 0) {
+      console.error(`❌ [createAndScheduleCall] Montant invalide:`, {
+        amount: params.amount,
+        type: typeof params.amount
+      });
+      throw new Error(`Montant invalide: ${params.amount} (type: ${typeof params.amount})`);
     }
 
     // ✅ Validation min/max (toujours en euros)
@@ -499,7 +517,28 @@ export const createAndScheduleCall = async (
       throw new Error('Montant maximum de 500€ dépassé');
     }
 
-    // ❌ Supprimé : validations de cohérence service/prix (49€/19€ etc.)
+    // ✅ VALIDATION NUMÉROS DE TÉLÉPHONE
+    const phoneRegex = /^\+[1-9]\d{8,14}$/;
+    
+    if (!phoneRegex.test(params.providerPhone)) {
+      console.error(`❌ [createAndScheduleCall] Numéro prestataire invalide:`, params.providerPhone);
+      throw new Error(`Numéro de téléphone prestataire invalide: ${params.providerPhone}`);
+    }
+
+    if (!phoneRegex.test(params.clientPhone)) {
+      console.error(`❌ [createAndScheduleCall] Numéro client invalide:`, params.clientPhone);
+      throw new Error(`Numéro de téléphone client invalide: ${params.clientPhone}`);
+    }
+
+    if (params.providerPhone === params.clientPhone) {
+      console.error(`❌ [createAndScheduleCall] Numéros identiques:`, {
+        providerPhone: params.providerPhone,
+        clientPhone: params.clientPhone
+      });
+      throw new Error('Les numéros du prestataire et du client doivent être différents');
+    }
+
+    console.log(`✅ [createAndScheduleCall] Validation réussie pour ${sessionId}`);
 
     // ✅ Créer la session avec montants EN EUROS (aucune conversion ici)
     const twilioCallManager = await getTwilioCallManager();
@@ -538,6 +577,10 @@ export const createAndScheduleCall = async (
         serviceType: params.serviceType,
         amountInEuros: params.amount, // audit humain
         delayMinutes,
+        // ✅ AJOUT: Log des numéros pour debug
+        hasProviderPhone: !!params.providerPhone,
+        hasClientPhone: !!params.clientPhone,
+        hasClientWhatsapp: !!params.clientWhatsapp,
         // infos additionnelles si disponibles (purement indicatives)
         currency: params.currency,
         amountCents: params.amountCents,
@@ -791,7 +834,9 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 // Export du manager pour les tests
-export { getCallSchedulerManager as callSchedulerManager };// firebase/functions/src/callScheduler.ts
+export { getCallSchedulerManager as callSchedulerManager };
+
+// firebase/functions/src/callScheduler.ts
 import { logCallRecord } from './utils/logs/logCallRecord';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';

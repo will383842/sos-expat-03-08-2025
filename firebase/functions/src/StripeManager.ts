@@ -195,6 +195,14 @@ export class StripeManager {
 
   private async findExistingPayment(clientId: string, providerId: string, sessionId?: string): Promise<boolean> {
     try {
+      console.log('🔍 DÉBUT vérification anti-doublons StripeManager:', {
+        clientId: clientId.substring(0, 8) + '...',
+        providerId: providerId.substring(0, 8) + '...',
+        sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'non fourni',
+        fullClientId: clientId, // TEMPORAIRE pour debug
+        fullProviderId: providerId // TEMPORAIRE pour debug
+      });
+
       // Construire la requête de base - bloquer seulement les paiements acceptés
       let query = this.db
         .collection('payments')
@@ -202,27 +210,55 @@ export class StripeManager {
         .where('providerId', '==', providerId)
         .where('status', 'in', ['succeeded', 'requires_capture']); // Seulement les paiements acceptés
 
+      console.log('🔍 Requête de base construite pour statuts:', ['succeeded', 'requires_capture']);
+
       // Si un sessionId est fourni, filtrer par session pour cette demande spécifique
       if (sessionId && sessionId.trim() !== '') {
+        console.log('🔍 Ajout du filtre sessionId:', sessionId);
         query = query.where('callSessionId', '==', sessionId);
       }
 
-      const snapshot = await query.limit(1).get();
+      console.log('🔍 Exécution de la requête...');
+      const snapshot = await query.limit(5).get(); // Limit 5 pour voir plusieurs résultats
+      
+      console.log('🔍 Résultats de la requête:', {
+        nombreDocuments: snapshot.size,
+        isEmpty: snapshot.empty
+      });
+
+      // LOG DÉTAILLÉ des documents trouvés
+      if (!snapshot.empty) {
+        snapshot.docs.forEach((doc, index) => {
+          const data = doc.data();
+          console.log(`🔍 Document ${index + 1} trouvé:`, {
+            docId: doc.id,
+            clientId: data.clientId,
+            providerId: data.providerId,
+            status: data.status,
+            amount: data.amountInEuros || data.amount,
+            callSessionId: data.callSessionId,
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || 'pas de date',
+            stripePaymentIntentId: data.stripePaymentIntentId
+          });
+        });
+      }
+
       const hasDuplicate = !snapshot.empty;
 
-      console.log('Vérification anti-doublons (paiements acceptés uniquement):', {
-        clientId: clientId.substring(0, 8) + '...',
-        providerId: providerId.substring(0, 8) + '...',
-        sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'non fourni',
+      console.log('🔍 RÉSULTAT vérification anti-doublons:', {
         hasDuplicate,
         statusesChecked: ['succeeded', 'requires_capture'],
         message: hasDuplicate 
-          ? 'Paiement déjà accepté trouvé - blocage'
-          : 'Aucun paiement accepté trouvé - autorisation'
+          ? 'Paiement déjà accepté trouvé - BLOCAGE'
+          : 'Aucun paiement accepté trouvé - AUTORISATION'
       });
 
       return hasDuplicate;
     } catch (error) {
+      console.error('❌ ERREUR dans findExistingPayment:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       await logError('StripeManager:findExistingPayment', error);
       return false; // En cas d'erreur, on autorise
     }

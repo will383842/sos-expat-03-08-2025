@@ -1,4 +1,4 @@
-// functions/src/index.ts - Version Ultra Debug avec traçage complet et exports rectifiés
+// functions/src/index.ts - Version rectifiée avec migration functions.config() → secrets
 
 // ====== ULTRA DEBUG INITIALIZATION ======
 import { ultraLogger, traceFunction, traceGlobalImport } from './utils/ultraDebugLogger';
@@ -19,11 +19,11 @@ import { setGlobalOptions } from 'firebase-functions/v2';
 
 setGlobalOptions({
   region: 'europe-west1',
-  cpu: 'gcf_gen1',          // ← GEN1 utilise moins de quota
-  memory: '256MiB',         // ← Réduit la mémoire
+  cpu: 'gcf_gen1',
+  memory: '256MiB',
   minInstances: 0,
-  maxInstances: 1,          // ← Réduit les instances
-  concurrency: 50,          // ← Réduit la concurrence
+  maxInstances: 1,
+  concurrency: 50,
 });
 
 const globalConfig = {
@@ -40,12 +40,16 @@ ultraLogger.info('GLOBAL_CONFIG', 'Configuration globale Firebase Functions appl
 import { onRequest } from 'firebase-functions/v2/https';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import * as functions from 'firebase-functions';
+import { defineSecret } from 'firebase-functions/params'; // ✅ AJOUTÉ pour secrets
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
 
 ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
+
+// ====== SECRETS FIREBASE (NOUVEAU) ======
+const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 
 // ====== INTERFACES DE DEBUGGING ======
 interface UltraDebugMetadata {
@@ -168,13 +172,9 @@ const initializeFirebase = traceFunction(() => {
 }, 'initializeFirebase', 'INDEX');
 
 // ====== LAZY LOADING DES MANAGERS ULTRA-DEBUGGÉ ======
-let stripeManagerInstance: any = null;
-let twilioCallManagerInstance: any = null;
-let messageManagerInstance: any = null;
-
-
-  return stripeManagerInstance;
-}, 'getStripeManager', 'INDEX');
+const stripeManagerInstance: unknown = null;
+const twilioCallManagerInstance: unknown = null;
+const messageManagerInstance: unknown = null;
 
 const getTwilioCallManager = traceFunction(async () => {
   if (!twilioCallManagerInstance) {
@@ -192,8 +192,6 @@ const getTwilioCallManager = traceFunction(async () => {
   return twilioCallManagerInstance;
 }, 'getTwilioCallManager', 'INDEX');
 
-
-
 // ====== MIDDLEWARE DE DEBUG POUR TOUTES LES FONCTIONS ======
 function createDebugMetadata(functionName: string, userId?: string): UltraDebugMetadata {
   return {
@@ -206,7 +204,7 @@ function createDebugMetadata(functionName: string, userId?: string): UltraDebugM
   };
 }
 
-function logFunctionStart(metadata: UltraDebugMetadata, data?: any) {
+function logFunctionStart(metadata: UltraDebugMetadata, data?: unknown) {
   ultraLogger.info(`FUNCTION_${metadata.functionName.toUpperCase()}_START`, 
     `Début d'exécution de ${metadata.functionName}`, {
       sessionId: metadata.sessionId,
@@ -217,7 +215,7 @@ function logFunctionStart(metadata: UltraDebugMetadata, data?: any) {
     });
 }
 
-function logFunctionEnd(metadata: UltraDebugMetadata, result?: any, error?: Error) {
+function logFunctionEnd(metadata: UltraDebugMetadata, result?: unknown, error?: Error) {
   const executionTime = Date.now() - metadata.startTime;
   
   if (error) {
@@ -247,7 +245,7 @@ function logFunctionEnd(metadata: UltraDebugMetadata, result?: any, error?: Erro
 // ====== WRAPPER POUR FONCTIONS CALLABLE ======
 function wrapCallableFunction<T>(
   functionName: string,
-  originalFunction: (request: CallableRequest<T>) => Promise<any>
+  originalFunction: (request: CallableRequest<T>) => Promise<unknown>
 ) {
   return async (request: CallableRequest<T>) => {
     const metadata = createDebugMetadata(functionName, request.auth?.uid);
@@ -513,24 +511,40 @@ export const adminForceDisconnectCall = onCall(
 );
 
 // ========================================
-// CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE
+// CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE (MIGRÉ)
 // ========================================
 
 let stripe: Stripe | null = null;
 
-const getStripe = traceFunction((): Stripe | null => {
+const getStripe = traceFunction((secretKey?: string): Stripe | null => {
   if (!stripe) {
     ultraLogger.info('STRIPE_INIT', 'Initialisation de Stripe');
     
-    const stripeConfig = functions.config().stripe;
+    let stripeSecretKey: string;
     
-    if (stripeConfig?.secret_key && stripeConfig.secret_key.startsWith('sk_')) {
+    // ✅ MIGRATION : Utiliser le secret ou le paramètre
+    if (secretKey) {
+      stripeSecretKey = secretKey;
+      ultraLogger.debug('STRIPE_INIT', 'Utilisation de la clé fournie en paramètre');
+    } else {
       try {
-        stripe = new Stripe(stripeConfig.secret_key, {
+        stripeSecretKey = STRIPE_SECRET_KEY.value();
+        ultraLogger.debug('STRIPE_INIT', 'Utilisation du secret Firebase');
+      } catch (secretError) {
+        ultraLogger.error('STRIPE_INIT', 'Secret Stripe non configuré', {
+          error: secretError instanceof Error ? secretError.message : String(secretError)
+        });
+        return null;
+      }
+    }
+    
+    if (stripeSecretKey && stripeSecretKey.startsWith('sk_')) {
+      try {
+        stripe = new Stripe(stripeSecretKey, {
           apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
         });
         ultraLogger.info('STRIPE_INIT', 'Stripe configuré avec succès', {
-          keyPrefix: stripeConfig.secret_key.substring(0, 7) + '...'
+          keyPrefix: stripeSecretKey.substring(0, 7) + '...'
         });
       } catch (stripeError) {
         ultraLogger.error('STRIPE_INIT', 'Erreur configuration Stripe', {
@@ -546,10 +560,11 @@ const getStripe = traceFunction((): Stripe | null => {
   return stripe;
 }, 'getStripe', 'INDEX');
 
-// ====== WEBHOOK STRIPE UNIFIÉ ULTRA-DEBUGGÉ ======
+// ====== WEBHOOK STRIPE UNIFIÉ ULTRA-DEBUGGÉ (MIGRÉ) ======
 export const stripeWebhook = onRequest({
   memory: "256MiB",
-  timeoutSeconds: 30
+  timeoutSeconds: 30,
+  secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] // ✅ MIGRATION : Ajout des secrets
 }, wrapHttpFunction('stripeWebhook', async (req: FirebaseRequest, res: Response) => {
   const signature = req.headers['stripe-signature'];
   
@@ -565,7 +580,8 @@ export const stripeWebhook = onRequest({
     return;
   }
 
-  const stripeInstance = getStripe();
+  // ✅ MIGRATION : Utiliser le secret Firebase
+  const stripeInstance = getStripe(STRIPE_SECRET_KEY.value());
   if (!stripeInstance) {
     ultraLogger.error('STRIPE_WEBHOOK', 'Service Stripe non configuré');
     res.status(500).send('Service Stripe non configuré');
@@ -581,11 +597,11 @@ export const stripeWebhook = onRequest({
       return;
     }
 
-    const stripeConfig = functions.config().stripe;
+    // ✅ MIGRATION : Utiliser le secret webhook
     const event = stripeInstance.webhooks.constructEvent(
       rawBody.toString(),
       signature as string,
-      stripeConfig?.webhook_secret || ''
+      STRIPE_WEBHOOK_SECRET.value() // ✅ Nouveau : secret Firebase au lieu de config
     );
     
     ultraLogger.info('STRIPE_WEBHOOK', 'Événement Stripe validé', {
@@ -1177,7 +1193,7 @@ export const scheduledCleanup = onSchedule(
 
 export const generateSystemDebugReport = onCall(
   { cors: true, memory: "512MiB", timeoutSeconds: 120 },
-  wrapCallableFunction('generateSystemDebugReport', async (request: CallableRequest<{}>) => {
+  wrapCallableFunction('generateSystemDebugReport', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
@@ -1210,9 +1226,9 @@ export const generateSystemDebugReport = onCall(
 
       // État des managers
       const managersState = {
-        stripe: !!stripeManagerInstance,
-        twilioCallManager: !!twilioCallManagerInstance,
-        messageManager: !!messageManagerInstance,
+        stripeManagerInstance: !!stripeManagerInstance,
+        twilioCallManagerInstance: !!twilioCallManagerInstance,
+        messageManagerInstance: !!messageManagerInstance,
         firebaseInitialized: isFirebaseInitialized
       };
 
@@ -1275,7 +1291,7 @@ export const generateSystemDebugReport = onCall(
 
 export const getSystemHealthStatus = onCall(
   { cors: true, memory: "256MiB", timeoutSeconds: 30 },
-  wrapCallableFunction('getSystemHealthStatus', async (request: CallableRequest<{}>) => {
+  wrapCallableFunction('getSystemHealthStatus', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
@@ -1325,7 +1341,7 @@ export const getSystemHealthStatus = onCall(
 
       recentLogsQuery.docs.forEach(doc => {
         const data = doc.data();
-        if (logsByLevel.hasOwnProperty(data.level)) {
+        if (Object.prototype.hasOwnProperty.call(logsByLevel, data.level)) {
           logsByLevel[data.level as keyof typeof logsByLevel]++;
         }
       });

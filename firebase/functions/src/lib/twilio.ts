@@ -1,63 +1,96 @@
 // firebase/functions/src/lib/twilio.ts
 import { Twilio } from 'twilio';
-import * as functions from 'firebase-functions';
+import { defineSecret } from 'firebase-functions/params';
 
-// 🔐 Lecture depuis functions.config() (votre méthode actuelle)
-const config = functions.config();
+// 🔐 Définir les secrets Firebase (nouvelle méthode)
+const TWILIO_ACCOUNT_SID = defineSecret('TWILIO_ACCOUNT_SID');
+const TWILIO_AUTH_TOKEN = defineSecret('TWILIO_AUTH_TOKEN');
+const TWILIO_PHONE_NUMBER = defineSecret('TWILIO_PHONE_NUMBER');
+const TWILIO_WHATSAPP_NUMBER = defineSecret('TWILIO_WHATSAPP_NUMBER');
 
-const accountSid = config.twilio?.account_sid;
-const authToken = config.twilio?.auth_token;
-const phoneNumber = config.twilio?.phone_number;
-const whatsappNumber = config.twilio?.whatsapp_number;
+// Mode développement : permettre l'utilisation de process.env comme fallback
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
-console.log('🔍 Configuration Twilio détectée:', {
-  hasAccountSid: !!accountSid,
-  accountSidPreview: accountSid ? accountSid.substring(0, 8) + '...' : 'MANQUANT',
-  hasAuthToken: !!authToken,
-  phoneNumber: phoneNumber || 'MANQUANT',
-  hasWhatsApp: !!whatsappNumber
-});
+let twilioClientInstance: Twilio | null = null;
+let phoneNumberCache: string | null = null;
+let whatsappNumberCache: string | null = null;
 
-// ✅ Mode build-safe : ne pas bloquer si les variables manquent au build
-const isBuildTime = !accountSid && !authToken;
+// Fonction d'initialisation lazy pour éviter les erreurs au build
+export function getTwilioClient(): Twilio {
+  if (!twilioClientInstance) {
+    let accountSid: string;
+    let authToken: string;
 
-if (!isBuildTime) {
-  // Validation seulement à l'exécution
-  if (!accountSid || !authToken) {
-    console.error('❌ Variables Twilio manquantes dans functions.config():', { 
-      hasSid: !!accountSid, 
-      hasToken: !!authToken,
-      configKeys: Object.keys(config.twilio || {})
-    });
-    throw new Error('Configuration Twilio manquante: account_sid et auth_token requis');
+    try {
+      accountSid = TWILIO_ACCOUNT_SID.value();
+      authToken = TWILIO_AUTH_TOKEN.value();
+    } catch (error) {
+      if (isDevelopment) {
+        // Fallback vers process.env en développement
+        accountSid = process.env.TWILIO_ACCOUNT_SID || 'ACfake_build_placeholder';
+        authToken = process.env.TWILIO_AUTH_TOKEN || 'fake_build_placeholder_token';
+        console.log('🔧 Développement: utilisation de process.env pour Twilio');
+      } else {
+        console.error('❌ Secrets Twilio non configurés');
+        throw new Error('Configuration Twilio manquante: secrets non définis');
+      }
+    }
+
+    if (!accountSid || accountSid.startsWith('ACfake') || !authToken || authToken.startsWith('fake')) {
+      throw new Error('Configuration Twilio invalide');
+    }
+
+    twilioClientInstance = new Twilio(accountSid, authToken);
+    console.log('✅ Client Twilio initialisé avec secrets');
   }
-
-  if (!phoneNumber) {
-    console.error('❌ twilio.phone_number manquant dans functions.config()');
-    throw new Error('Configuration Twilio manquante: phone_number requis');
-  }
-
-  if (!phoneNumber.startsWith('+')) {
-    throw new Error(`twilio.phone_number doit être au format international. Reçu: ${phoneNumber}`);
-  }
-
-  console.log('✅ Configuration Twilio valide depuis functions.config()');
-} else {
-  console.log('🔧 Mode build détecté - validation Twilio reportée à l\'exécution');
+  
+  return twilioClientInstance;
 }
 
-// 📞 Créer le client Twilio
-export const twilioClient = new Twilio(
-  accountSid || 'ACfake_build_placeholder', 
-  authToken || 'fake_build_placeholder_token'
-);
+export function getTwilioPhoneNumber(): string {
+  if (!phoneNumberCache) {
+    try {
+      phoneNumberCache = TWILIO_PHONE_NUMBER.value();
+    } catch (error) {
+      if (isDevelopment) {
+        phoneNumberCache = process.env.TWILIO_PHONE_NUMBER || '+447427874305';
+        console.log('🔧 Développement: utilisation de process.env pour numéro');
+      } else {
+        throw new Error('Numéro Twilio non configuré');
+      }
+    }
 
-// 📱 Export des numéros
-export const twilioPhoneNumber = phoneNumber || '+447427874305';
-export const twilioWhatsAppNumber = whatsappNumber ? `whatsapp:${whatsappNumber}` : undefined;
-
-if (!isBuildTime) {
-  console.log('✅ Client Twilio initialisé avec functions.config()');
+    if (!phoneNumberCache?.startsWith('+')) {
+      throw new Error(`Numéro Twilio doit être au format international. Reçu: ${phoneNumberCache}`);
+    }
+  }
+  
+  return phoneNumberCache;
 }
+
+export function getTwilioWhatsAppNumber(): string | undefined {
+  if (!whatsappNumberCache) {
+    try {
+      const number = TWILIO_WHATSAPP_NUMBER.value();
+      whatsappNumberCache = number ? `whatsapp:${number}` : undefined;
+    } catch (error) {
+      // WhatsApp optionnel
+      if (isDevelopment) {
+        const envNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+        whatsappNumberCache = envNumber ? `whatsapp:${envNumber}` : undefined;
+      }
+    }
+  }
+  
+  return whatsappNumberCache;
+}
+
+// Exports compatibles avec votre code existant
+export const twilioClient = getTwilioClient();
+export const twilioPhoneNumber = getTwilioPhoneNumber();
+export const twilioWhatsAppNumber = getTwilioWhatsAppNumber();
+
+// Export des secrets pour d'autres fonctions qui en auraient besoin
+export { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, TWILIO_WHATSAPP_NUMBER };
 
 export default twilioClient;

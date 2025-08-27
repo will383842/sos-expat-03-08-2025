@@ -19,11 +19,11 @@ import { setGlobalOptions } from 'firebase-functions/v2';
 
 setGlobalOptions({
   region: 'europe-west1',
-  cpu: 1,
-  memory: '512MiB',
+  cpu: 'gcf_gen1',          // ← GEN1 utilise moins de quota
+  memory: '256MiB',         // ← Réduit la mémoire
   minInstances: 0,
-  maxInstances: 2,
-  concurrency: 80,
+  maxInstances: 1,          // ← Réduit les instances
+  concurrency: 50,          // ← Réduit la concurrence
 });
 
 const globalConfig = {

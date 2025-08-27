@@ -81,9 +81,9 @@ export interface CallSessionState {
 // =============================
 const CALL_CONFIG = {
   MAX_RETRIES: 3,
-  CALL_TIMEOUT: 30,
-  CONNECTION_WAIT_TIME: 45_000, // 45 s
-  MIN_CALL_DURATION: 120,       // 2 min
+  CALL_TIMEOUT: 60,           // 60 secondes (augmenté)
+  CONNECTION_WAIT_TIME: 90_000, // 90 secondes (cohérent)
+  MIN_CALL_DURATION: 120,     // 2 minutes
   MAX_CONCURRENT_CALLS: 50,
   WEBHOOK_VALIDATION: true
 } as const;
@@ -419,22 +419,21 @@ export class TwilioCallManager {
 private async validatePaymentStatus(paymentIntentId: string): Promise<boolean> {
   try {
     const payment = await stripeManager.getPayment(paymentIntentId);
-
-    // 🔒 Narrowing sûr: on extrait un string si présent, sinon null
-    let status: string | null = null;
-    if (payment && typeof payment === 'object') {
-      const stripe = (payment as Record<string, unknown>).stripe;
-      if (stripe && typeof stripe === 'object') {
-        const s = (stripe as Record<string, unknown>).status;
-        status = typeof s === 'string' ? s : null;
-      }
+    
+    if (!payment || typeof payment !== 'object') {
+      return false;
     }
 
-    if (!status) return false;
+    // Accès direct au statut (pas via .stripe qui n'existe pas)
+    const status = (payment as Record<string, unknown>).status;
+    
+    if (typeof status !== 'string') {
+      return false;
+    }
 
     const validStatuses = new Set<string>([
       'requires_payment_method',
-      'requires_confirmation',
+      'requires_confirmation', 
       'requires_action',
       'processing',
       'requires_capture',

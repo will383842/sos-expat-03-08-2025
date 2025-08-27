@@ -458,15 +458,30 @@ function getCallSchedulerManager(): CallSchedulerManager {
 
 // 🔧 FIX: Import mais pas d'initialisation immédiate avec typage précis
 let twilioCallManagerInstance: import('./TwilioCallManager').TwilioCallManager | null = null;
+let isInitializing = false;
 
 async function getTwilioCallManager(): Promise<import('./TwilioCallManager').TwilioCallManager> {
-  if (!twilioCallManagerInstance) {
-    const { twilioCallManager } = await import('./TwilioCallManager');
-    twilioCallManagerInstance = twilioCallManager;
+  // Éviter les initialisations multiples
+  if (isInitializing) {
+    // Attendre que l'initialisation en cours se termine
+    while (isInitializing) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    return twilioCallManagerInstance!;
   }
+
+  if (!twilioCallManagerInstance) {
+    isInitializing = true;
+    try {
+      const { twilioCallManager } = await import('./TwilioCallManager');
+      twilioCallManagerInstance = twilioCallManager;
+    } finally {
+      isInitializing = false;
+    }
+  }
+  
   return twilioCallManagerInstance;
 }
-
 // 🔧 FIX: Initialisation Firebase lazy
 let db: admin.firestore.Firestore | null = null;
 

@@ -254,51 +254,33 @@ const createSOSProfile = async (
                      (userData.languagesSpoken as string[] | undefined) ||
                      ['Français'];
 
-    const baseProfile: Record<string, unknown> = {
-      uid,
-      id: uid,
-      type: role,
-      role: role,
-      fullName: userData.fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-      name: userData.fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
-      emailLower: userData.email?.toLowerCase(),
-      phone: userData.phone || '',
-      phoneNumber: userData.phone || '',
-      phoneCountryCode: userData.phoneCountryCode || '+33',
-      whatsapp: userData.whatsapp || '',
-      whatsappNumber: userData.whatsappNumber || '',
-      whatsappCountryCode: userData.whatsappCountryCode || '+33',
-      languages,
-      languagesSpoken: languages,
-      country,
-      currentCountry: userData.currentCountry || country,
-      currentPresenceCountry: userData.currentPresenceCountry || country,
-      interventionCountry: userData.interventionCountry || country,
-      practiceCountries: userData.practiceCountries || [country],
-      description: userData.bio || userData.description || '',
-      bio: userData.bio || userData.description || '',
-      profilePhoto: userData.profilePhoto,
-      photoURL: userData.profilePhoto,
-      avatar: userData.profilePhoto,
-      isActive: false,
-      isApproved: role !== 'lawyer',
-      isVerified: false,
-      isVisible: true,
-      isVisibleOnMap: true,
-      isOnline: false,
-      availability: 'available',
-      rating: 5.0,
-      reviewCount: 0,
-      responseTime: '< 5 minutes',
-      price: role === 'lawyer' ? 49 : 19,
-      duration: 30,
-      yearsOfExperience: userData.yearsOfExperience || 0,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
+const baseProfile: Record<string, unknown> = {
+  id: uid,
+  fullName: userData.fullName || '',
+  name: userData.name || '',
+  email: userData.email,
+  emailLower: userData.email?.toLowerCase(),
+  phone: userData.phone || '',
+  languages,
+  country,
+  currentCountry: userData.currentCountry || country,
+  currentPresenceCountry: userData.currentPresenceCountry || country,
+  interventionCountry: userData.interventionCountry || country,
+  practiceCountries: userData.practiceCountries || [country],
+  description: userData.bio || userData.description || '',
+  profilePhoto: userData.profilePhoto,
+  isActive: false,
+  isVisible: true,
+  isVisibleOnMap: true,
+  isOnline: false,
+  availability: 'available',
+  rating: 5.0,
+  reviewCount: 0,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+};
+
+
 
     if (role === 'lawyer') {
       Object.assign(baseProfile, {
@@ -378,40 +360,31 @@ const createUserDocumentInFirestore = async (
   const affiliateCode = generateAffiliateCode(firebaseUser.uid, firebaseUser.email ?? '');
 
   const baseUserData = {
-    id: firebaseUser.uid,
-    uid: firebaseUser.uid,
-    email: emailLower,
-    emailLower,
-    firstName,
-    lastName,
-    displayName: fullName,
-    fullName,
-    name: fullName,
-    profilePhoto,
-    photoURL: profilePhoto,
-    avatar: profilePhoto,
-    role,
-    type: role,
-    isApproved: role === 'client' || providerId === 'google.com',
-    isActive: true,
-    isVerified: firebaseUser.emailVerified,
-    isVerifiedEmail: firebaseUser.emailVerified,
-    preferredLanguage: userData.preferredLanguage || 'fr',
-    lang: userData.preferredLanguage || 'fr',
-    isOnline: role === 'client',
-    isSOS: role === 'lawyer' || role === 'expat',
-    rating: 5.0,
-    reviewCount: 0,
-    totalCalls: 0,
-    points: 0,
-    provider: providerId || 'password',
-    affiliateCode,
-    languages: userData.languages || userData.languagesSpoken || ['fr'],
-    languagesSpoken: userData.languages || userData.languagesSpoken || ['fr'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastLoginAt: new Date(),
-  };
+  id: firebaseUser.uid,
+  email: emailLower,
+  emailLower,
+  firstName,
+  lastName,
+  displayName: fullName,
+  fullName,
+  name: fullName,
+  profilePhoto,
+  photoURL: profilePhoto,
+  avatar: profilePhoto,
+  preferredLanguage: userData.preferredLanguage || 'fr',
+  lang: userData.preferredLanguage || 'fr',
+  rating: 5.0,
+  reviewCount: 0,
+  totalCalls: 0,
+  points: 0,
+  provider: providerId || 'password',
+  affiliateCode,
+  languages: userData.languages || userData.languagesSpoken || ['fr'],
+  languagesSpoken: userData.languages || userData.languagesSpoken || ['fr'],
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastLoginAt: new Date(),
+};
 
   const newUser: Partial<User> & {
     id: string;
@@ -546,23 +519,18 @@ const writeSosPresence = async (
     await updateDoc(sosRef, payload);
   } catch {
     await setDoc(
-      sosRef,
-      {
-        uid: userId,
-        id: userId,
-        type: role || 'expat',
-        role: role || 'expat',
-        fullName: '',
-        rating: 5,
-        reviewCount: 0,
-        isActive: true,
-        isApproved: role !== 'lawyer',
-        isVerified: false,
-        createdAt: serverTimestamp(),
-        ...payload,
-      },
-      { merge: true }
-    );
+  sosRef,
+  {
+    id: userId,
+    fullName: '',
+    rating: 5,
+    reviewCount: 0,
+    isActive: true,
+    createdAt: serverTimestamp(),
+    ...payload,
+  },
+  { merge: true }
+);
   }
 };
 
@@ -1095,61 +1063,75 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     return { date: user.lastLoginAt || null, device: `${deviceType} (${os})` };
   }, [user, deviceInfo]);
 
-  const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
-    if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
+const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
+  if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
 
-    setAuthMetrics((m) => ({ ...m, profileUpdateAttempts: m.profileUpdateAttempts + 1 }));
+  setAuthMetrics((m) => ({ ...m, profileUpdateAttempts: m.profileUpdateAttempts + 1 }));
 
-    try {
-      const userRef = doc(db, 'users', firebaseUser.uid);
+  try {
+    const userRef = doc(db, 'users', firebaseUser.uid);
 
-      const finalUpdates = { ...updates };
-      if (updates.profilePhoto && updates.profilePhoto.startsWith('data:image')) {
-        finalUpdates.profilePhoto = await processProfilePhoto(
-          updates.profilePhoto,
-          firebaseUser.uid,
-          'manual'
-        );
-        finalUpdates.photoURL = finalUpdates.profilePhoto;
-        finalUpdates.avatar = finalUpdates.profilePhoto;
-      }
+    // ✅ Liste des champs modifiables par un utilisateur
+    const allowedFields = [
+      "firstName", "lastName", "fullName", "displayName",
+      "profilePhoto", "photoURL", "avatar",
+      "phone", "phoneNumber", "phoneCountryCode",
+      "whatsapp", "whatsappNumber", "whatsappCountryCode",
+      "languages", "languagesSpoken", "bio", "description"
+    ];
 
-      await updateDoc(userRef, {
-        ...finalUpdates,
+    // ✅ On garde uniquement les champs autorisés
+    const safeUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => allowedFields.includes(key))
+    );
+
+    // ✅ Gestion spéciale de la photo
+    if (updates.profilePhoto && updates.profilePhoto.startsWith('data:image')) {
+      const processed = await processProfilePhoto(updates.profilePhoto, firebaseUser.uid, 'manual');
+      safeUpdates.profilePhoto = processed;
+      safeUpdates.photoURL = processed;
+      safeUpdates.avatar = processed;
+    }
+
+    await updateDoc(userRef, {
+      ...safeUpdates,
+      updatedAt: serverTimestamp(),
+    });
+
+    // ✅ Met à jour displayName Firebase Auth si prénom/nom/photo changés
+    if (updates.firstName || updates.lastName || updates.profilePhoto) {
+      const displayName = `${updates.firstName || user.firstName || ''} ${updates.lastName || user.lastName || ''}`.trim();
+      await updateProfile(firebaseUser, {
+        displayName,
+        photoURL: safeUpdates.profilePhoto || user.profilePhoto || null,
+      });
+    }
+
+    // ✅ Si avocat ou expat → synchro dans sos_profiles
+    if (user.role === 'lawyer' || user.role === 'expat') {
+      const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
+      await updateDoc(sosRef, {
+        ...safeUpdates,
         updatedAt: serverTimestamp(),
       });
-
-      if (updates.firstName || updates.lastName || updates.profilePhoto) {
-        const displayName = `${updates.firstName || user.firstName || ''} ${updates.lastName || user.lastName || ''}`.trim();
-        await updateProfile(firebaseUser, {
-          displayName,
-          photoURL: finalUpdates.profilePhoto || user.profilePhoto || null,
-        });
-      }
-
-      if (user.role === 'lawyer' || user.role === 'expat') {
-        const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
-        await updateDoc(sosRef, {
-          ...finalUpdates,
-          updatedAt: serverTimestamp(),
-        });
-      }
-
-      await logAuthEvent('profile_updated', {
-        userId: firebaseUser.uid,
-        updatedFields: Object.keys(finalUpdates),
-        deviceInfo
-      });
-
-    } catch (error) {
-      await logAuthEvent('profile_update_failed', {
-        userId: firebaseUser.uid,
-        error: error instanceof Error ? error.message : String(error),
-        deviceInfo
-      });
-      throw error;
     }
-  }, [firebaseUser, user, deviceInfo]);
+
+    await logAuthEvent('profile_updated', {
+      userId: firebaseUser.uid,
+      updatedFields: Object.keys(safeUpdates),
+      deviceInfo
+    });
+
+  } catch (error) {
+    await logAuthEvent('profile_update_failed', {
+      userId: firebaseUser.uid,
+      error: error instanceof Error ? error.message : String(error),
+      deviceInfo
+    });
+    throw error;
+  }
+}, [firebaseUser, user, deviceInfo]);
+
 
   const updateUserEmail = useCallback(async (newEmail: string): Promise<void> => {
     if (!firebaseUser) throw new Error('Utilisateur non connecté');
@@ -1382,22 +1364,19 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         updatedAt: now,
         lastStatusChange: now,
       });
-      batch.set(
-        sosRef,
-        {
-          isOnline,
-          availability: isOnline ? 'available' : 'unavailable',
-          updatedAt: now,
-          lastStatusChange: now,
-          isVisible: true,
-          isVisibleOnMap: true,
-          uid: firebaseUser.uid,
-          id: firebaseUser.uid,
-          role: user.role,
-          type: user.role,
-        },
-        { merge: true }
-      );
+batch.set(
+  sosRef,
+  {
+    isOnline,
+    availability: isOnline ? 'available' : 'unavailable',
+    updatedAt: now,
+    lastStatusChange: now,
+    isVisible: true,
+    isVisibleOnMap: true,
+  },
+  { merge: true }
+);
+
 
       await batch.commit();
 

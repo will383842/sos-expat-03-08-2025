@@ -386,7 +386,7 @@ const scheduleCallSequence = async (callSessionId, delayMinutes = SCHEDULER_CONF
 };
 exports.scheduleCallSequence = scheduleCallSequence;
 /**
- * ✅ Fonction pour créer et programmer un nouvel appel
+ * ✅ Fonction pour créer et programmer un nouvel appel CORRIGÉE
  * - `amount` est **en EUROS** (unités réelles).
  * - ❌ Pas de vérification de "cohérence service/prix" ici.
  * - ✅ On garde uniquement la validation min/max.
@@ -401,14 +401,29 @@ const createAndScheduleCall = async (params) => {
             `call_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         console.log(`🆕 Création et planification d'un nouvel appel: ${sessionId}`);
         console.log(`💰 Montant (EUROS): ${params.amount} pour ${params.serviceType}`);
-        // Champs obligatoires
-        if (!params.providerId ||
-            !params.clientId ||
-            !params.providerPhone ||
-            !params.clientPhone ||
-            !params.paymentIntentId ||
-            params.amount == null) {
-            throw new Error("Paramètres obligatoires manquants pour créer l'appel");
+        // ✅ VALIDATION AMÉLIORÉE - Champs obligatoires avec messages spécifiques
+        const requiredFields = {
+            providerId: params.providerId,
+            clientId: params.clientId,
+            providerPhone: params.providerPhone,
+            clientPhone: params.clientPhone,
+            paymentIntentId: params.paymentIntentId,
+            amount: params.amount
+        };
+        const missingFields = Object.entries(requiredFields)
+            .filter(([key, value]) => !value || (typeof value === 'string' && value.trim() === ''))
+            .map(([key]) => key);
+        if (missingFields.length > 0) {
+            console.error(`❌ [createAndScheduleCall] Champs manquants:`, missingFields);
+            throw new Error(`Paramètres obligatoires manquants pour créer l'appel: ${missingFields.join(', ')}`);
+        }
+        // ✅ Validation montant numérique
+        if (typeof params.amount !== 'number' || isNaN(params.amount) || params.amount <= 0) {
+            console.error(`❌ [createAndScheduleCall] Montant invalide:`, {
+                amount: params.amount,
+                type: typeof params.amount
+            });
+            throw new Error(`Montant invalide: ${params.amount} (type: ${typeof params.amount})`);
         }
         // ✅ Validation min/max (toujours en euros)
         if (params.amount < 5) {
@@ -417,7 +432,24 @@ const createAndScheduleCall = async (params) => {
         if (params.amount > 500) {
             throw new Error('Montant maximum de 500€ dépassé');
         }
-        // ❌ Supprimé : validations de cohérence service/prix (49€/19€ etc.)
+        // ✅ VALIDATION NUMÉROS DE TÉLÉPHONE
+        const phoneRegex = /^\+[1-9]\d{8,14}$/;
+        if (!phoneRegex.test(params.providerPhone)) {
+            console.error(`❌ [createAndScheduleCall] Numéro prestataire invalide:`, params.providerPhone);
+            throw new Error(`Numéro de téléphone prestataire invalide: ${params.providerPhone}`);
+        }
+        if (!phoneRegex.test(params.clientPhone)) {
+            console.error(`❌ [createAndScheduleCall] Numéro client invalide:`, params.clientPhone);
+            throw new Error(`Numéro de téléphone client invalide: ${params.clientPhone}`);
+        }
+        if (params.providerPhone === params.clientPhone) {
+            console.error(`❌ [createAndScheduleCall] Numéros identiques:`, {
+                providerPhone: params.providerPhone,
+                clientPhone: params.clientPhone
+            });
+            throw new Error('Les numéros du prestataire et du client doivent être différents');
+        }
+        console.log(`✅ [createAndScheduleCall] Validation réussie pour ${sessionId}`);
         // ✅ Créer la session avec montants EN EUROS (aucune conversion ici)
         const twilioCallManager = await getTwilioCallManager();
         const callSession = await twilioCallManager.createCallSession({
@@ -453,6 +485,10 @@ const createAndScheduleCall = async (params) => {
                 serviceType: params.serviceType,
                 amountInEuros: params.amount, // audit humain
                 delayMinutes,
+                // ✅ AJOUT: Log des numéros pour debug
+                hasProviderPhone: !!params.providerPhone,
+                hasClientPhone: !!params.clientPhone,
+                hasClientWhatsapp: !!params.clientWhatsapp,
                 // infos additionnelles si disponibles (purement indicatives)
                 currency: params.currency,
                 amountCents: params.amountCents,
@@ -652,6 +688,7 @@ exports.gracefulShutdown = gracefulShutdown;
 // Gestionnaire de signaux pour arrêt propre
 process.on('SIGTERM', exports.gracefulShutdown);
 process.on('SIGINT', exports.gracefulShutdown);
+// firebase/functions/src/callScheduler.ts
 const logCallRecord_1 = require("./utils/logs/logCallRecord");
 const logError_1 = require("./utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));

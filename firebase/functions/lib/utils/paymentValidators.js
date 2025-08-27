@@ -153,11 +153,12 @@ let pricingCache = null;
 let pricingCacheExpiry = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 async function getPricingConfig(type, currency = 'eur', db) {
+    var _a, _b, _c, _d;
     try {
         // Utiliser le cache si valide
         const now = Date.now();
         if (pricingCache && now < pricingCacheExpiry) {
-            const cached = pricingCache[type]?.[currency];
+            const cached = (_a = pricingCache[type]) === null || _a === void 0 ? void 0 : _a[currency];
             if (cached)
                 return cached;
         }
@@ -169,15 +170,13 @@ async function getPricingConfig(type, currency = 'eur', db) {
                 // Mettre en cache
                 pricingCache = adminPricing;
                 pricingCacheExpiry = now + CACHE_DURATION;
-                const adminConfig = adminPricing?.[type]?.[currency];
+                const adminConfig = (_b = adminPricing === null || adminPricing === void 0 ? void 0 : adminPricing[type]) === null || _b === void 0 ? void 0 : _b[currency];
                 if (adminConfig && typeof adminConfig.totalAmount === 'number') {
                     return {
                         totalAmount: adminConfig.totalAmount,
                         connectionFeeAmount: adminConfig.connectionFeeAmount || 0,
-                        providerAmount: adminConfig.providerAmount ??
-                            (adminConfig.totalAmount - (adminConfig.connectionFeeAmount || 0)),
-                        duration: adminConfig.duration ??
-                            exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
+                        providerAmount: (_c = adminConfig.providerAmount) !== null && _c !== void 0 ? _c : (adminConfig.totalAmount - (adminConfig.connectionFeeAmount || 0)),
+                        duration: (_d = adminConfig.duration) !== null && _d !== void 0 ? _d : exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
                         currency
                     };
                 }
@@ -356,12 +355,7 @@ function isSuspiciousAmount(amount, type, currency = 'eur', previousPayments = [
  */
 async function logPaymentAudit(data, db) {
     try {
-        await db.collection('payment_audit').add({
-            ...data,
-            amountCents: toCents(data.amount, data.currency),
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            environment: process.env.NODE_ENV || 'development'
-        });
+        await db.collection('payment_audit').add(Object.assign(Object.assign({}, data), { amountCents: toCents(data.amount, data.currency), timestamp: admin.firestore.FieldValue.serverTimestamp(), environment: process.env.NODE_ENV || 'development' }));
     }
     catch (error) {
         console.error('Erreur log audit:', error);
@@ -376,3 +370,4 @@ function generatePaymentId() {
     const random = Math.random().toString(36).substring(2, 9);
     return `pay_${timestamp}_${random}`;
 }
+//# sourceMappingURL=paymentValidators.js.map

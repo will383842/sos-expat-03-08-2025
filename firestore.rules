@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -11,16 +12,9 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // mode dev (laisse "prod" dans settings/env pour rester bridé)
     function isDevMode() {
       return exists(/databases/$(database)/documents/settings/env)
         && get(/databases/$(database)/documents/settings/env).data.mode == 'dev';
-    }
-
-    function isNotBanned() {
-      return isAuthenticated() &&
-        (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true);
     }
 
     function isDocOwner() { return isAuthenticated() && resource.data.uid == request.auth.uid; }
@@ -29,37 +23,33 @@ service cloud.firestore {
     function changedKeys() { return request.resource.data.diff(resource.data).changedKeys(); }
     function affectedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
-    // Champs sensibles communs que l'utilisateur ne doit pas toucher
     function hasSensitiveChanges() {
       return affectedKeys().hasAny(['role','isAdmin','isApproved','isBanned','uid','type','isVerified']);
     }
 
-    // Exception sécurisée: l'email Firestore doit matcher l'email du token
     function emailSelfSynced() {
-      // Autorise si SEULES ces clés changent...
       return changedKeys().hasOnly(['email','emailLower','updatedAt']) &&
-             // ...et si l'email écrit == email du token (après refresh du token côté client)
              request.resource.data.email == request.auth.token.email &&
-             request.resource.data.emailLower == (request.auth.token.email == null ? null : lower(request.auth.token.email));
+             request.resource.data.emailLower == (
+               request.auth.token.email == null ? null : request.auth.token.email.lower()
+             );
+    }
+
+    function presenceKeysOnly() {
+      return affectedKeys().hasOnly([
+        'isOnline','availability','lastStatusChange','updatedAt','isVisible','isVisibleOnMap'
+      ]);
     }
 
     // =============== USERS ===============
     match /users/{userId} {
       allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin() || isDevMode();
-
       allow create: if (isAuthenticated() && request.auth.uid == userId && creatingOwnDoc())
                     || isAdmin() || isDevMode();
-
-      // Autorise MAJ par le propriétaire :
-      //  - soit MAJ e-mail "self-synced" (cf. emailSelfSynced)
-      //  - soit MAJ classique sans toucher aux champs sensibles
       allow update: if (
-                      isAuthenticated() && request.auth.uid == userId && isNotBanned() && (
-                        emailSelfSynced() ||
-                        !hasSensitiveChanges()
-                      )
-                    ) || isAdmin() || isDevMode();
-
+        isAuthenticated() && request.auth.uid == userId &&
+        (emailSelfSynced() || presenceKeysOnly() || !hasSensitiveChanges())
+      ) || isAdmin() || isDevMode();
       allow delete: if isAdmin() || isDevMode();
     }
 
@@ -72,20 +62,41 @@ service cloud.firestore {
         && request.resource.data.type in ['lawyer','expat'])
         || isAdmin() || isDevMode();
 
-      // Autorise update par le propriétaire. Email interdit SAUF si self-synced.
-      function sosSensitive() { return affectedKeys().hasAny(['uid','role','type','isAdmin','isApproved','isBanned']); }
+      function sosSensitive() {
+        return affectedKeys().hasAny(['uid','role','type','isAdmin','isApproved','isBanned']);
+      }
       function sosEmailSelfSynced() {
         return changedKeys().hasOnly(['email','emailLower','updatedAt']) &&
                request.resource.data.email == request.auth.token.email &&
-               request.resource.data.emailLower == (request.auth.token.email == null ? null : lower(request.auth.token.email));
+               request.resource.data.emailLower == (
+                 request.auth.token.email == null ? null : request.auth.token.email.lower()
+               );
       }
 
       allow update: if (
         isAuthenticated() &&
         (profileId == request.auth.uid || resource.data.uid == request.auth.uid) &&
-        (
-          sosEmailSelfSynced() || !sosSensitive()
-        )
+        ( sosEmailSelfSynced() || presenceKeysOnly() || !sosSensitive() )
+      ) || isAdmin() || isDevMode();
+
+      allow delete: if isAdmin() || isDevMode();
+    }
+
+    // =============== USERS PRESENCE ===============
+    match /usersPresence/{uid} {
+      allow read: if true;
+
+      allow create: if (
+        isAuthenticated() &&
+        request.auth.uid == uid &&
+        request.resource.data.uid == request.auth.uid &&
+        presenceKeysOnly()
+      ) || isAdmin() || isDevMode();
+
+      allow update: if (
+        isAuthenticated() &&
+        request.auth.uid == uid &&
+        presenceKeysOnly()
       ) || isAdmin() || isDevMode();
 
       allow delete: if isAdmin() || isDevMode();
@@ -101,15 +112,11 @@ service cloud.firestore {
       }
 
       allow read: if isDocOwner() || isAdmin() || isDevMode();
-
       allow create: if ((creatingOwnDoc() && hasValidProviderFields()) || isAdmin()) || isDevMode();
-
       allow update: if isAdmin()
-                    || (
-                         isDocOwner() && isNotBanned()
-                         && !affectedKeys().hasAny(['uid','role','email','isAdmin','isApproved','isBanned','type'])
-                       ) || isDevMode();
-
+                    || (isDocOwner()
+                        && !affectedKeys().hasAny(['uid','role','email','isAdmin','isApproved','isBanned','type']))
+                    || isDevMode();
       allow delete: if isAdmin() || isDevMode();
     }
 
@@ -119,39 +126,33 @@ service cloud.firestore {
                       (request.auth.uid == resource.data.clientId ||
                        request.auth.uid == resource.data.providerId) ||
                      isAdmin()) || isDevMode();
-
-      allow create: if (isAuthenticated() && isNotBanned() &&
-                        request.resource.data.clientId == request.auth.uid &&
-                        request.resource.data.keys().hasAll(['clientId','providerId','serviceType'])) || isDevMode();
-
-      allow update: if ((isAuthenticated() && isNotBanned() &&
-                         (request.auth.uid == resource.data.clientId ||
-                          request.auth.uid == resource.data.providerId)) ||
-                        isAdmin()) || isDevMode();
-
-      allow delete: if isAdmin() || isDevMode();
+      allow create, update, delete: if isAdmin() || isDevMode();
     }
 
-    // ============ PAYMENTS =============
+    // ============ PAYMENTS ============
     match /payments/{paymentId} {
       function hasValidPaymentFields() {
         return request.resource.data.keys().hasAll(['clientId','providerId','amount','status']) &&
                request.resource.data.amount is number &&
                request.resource.data.amount > 0 &&
-               request.resource.data.status in ['pending','authorized','captured','failed','refunded','canceled'];
+               request.resource.data.status in ['pending','authorized','captured','succeeded','failed','refunded','canceled'];
       }
 
       allow read: if (isAuthenticated() &&
                       (request.auth.uid == resource.data.clientId ||
                        request.auth.uid == resource.data.providerId) ||
                      isAdmin()) || isDevMode();
+      allow create, update, delete: if (isAdmin() && hasValidPaymentFields()) || isDevMode();
+    }
 
-      allow create: if (isAuthenticated() && isNotBanned() &&
-                        request.resource.data.clientId == request.auth.uid &&
-                        hasValidPaymentFields()) || isDevMode();
+    match /users/{userId}/payments/{paymentId} {
+      allow read: if request.auth.uid == userId || isAdmin() || isDevMode();
+      allow create, update, delete: if isAdmin() || isDevMode();
+    }
 
-      allow update: if (isAdmin() && hasValidPaymentFields()) || isDevMode();
-      allow delete: if isAdmin() || isDevMode();
+    match /providers/{providerId}/payments/{paymentId} {
+      allow read: if request.auth.uid == providerId || isAdmin() || isDevMode();
+      allow create, update, delete: if isAdmin() || isDevMode();
     }
 
     // ========== REVIEWS ==========
@@ -161,41 +162,42 @@ service cloud.firestore {
                     (request.auth.uid == resource.data.clientId ||
                      request.auth.uid == resource.data.providerId)) ||
                    isAdmin() || isDevMode();
-
-      allow create: if (isAuthenticated() && isNotBanned() &&
+      allow create: if (isAuthenticated() &&
                         request.resource.data.clientId == request.auth.uid) || isDevMode();
-
       allow update: if ((isAuthenticated() && request.auth.uid == resource.data.clientId &&
                          !affectedKeys().hasAny(['clientId','providerId','isPublic'])) ||
                         isAdmin()) || isDevMode();
-
       allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin()) || isDevMode();
     }
 
-    // ========== BOOKING_REQUESTS ==========
-    match /booking_requests/{bookingId} {
-      function hasValidBookingFields() {
-        return request.resource.data.keys().hasAll(['clientId','providerId','serviceType','status']) &&
-               request.resource.data.clientId is string &&
-               request.resource.data.providerId is string &&
-               request.resource.data.serviceType is string &&
-               request.resource.data.status in ['pending','confirmed','cancelled','completed'];
-      }
-
-      allow read: if (isAuthenticated() &&
-                      (request.auth.uid == resource.data.clientId ||
-                       request.auth.uid == resource.data.providerId) ||
-                     isAdmin()) || isDevMode();
-
-      allow create: if (isAuthenticated() && isNotBanned() &&
-                        request.resource.data.clientId == request.auth.uid &&
-                        hasValidBookingFields()) || isDevMode();
-
-      allow update: if ((isAuthenticated() && isNotBanned() &&
-                         (request.auth.uid == resource.data.clientId ||
-                          request.auth.uid == resource.data.providerId)) ||
+    match /providerReviews/{reviewId} {
+      allow read: if resource.data.isPublic == true ||
+                   (isAuthenticated() &&
+                    (request.auth.uid == resource.data.clientId ||
+                     request.auth.uid == resource.data.providerId)) ||
+                   isAdmin() || isDevMode();
+      allow create: if (isAuthenticated() &&
+                        request.resource.data.clientId == request.auth.uid) || isDevMode();
+      allow update: if ((isAuthenticated() && request.auth.uid == resource.data.clientId &&
+                         !affectedKeys().hasAny(['clientId','providerId','isPublic'])) ||
                         isAdmin()) || isDevMode();
+      allow delete: if ((isAuthenticated() && request.auth.uid == resource.data.clientId) || isAdmin()) || isDevMode();
+    }
 
+    // ============ BOOKING_REQUESTS ============
+    match /booking_requests/{bookingId} {
+      allow read: if isAuthenticated() &&
+                     (request.auth.uid == resource.data.clientId ||
+                      request.auth.uid == resource.data.providerId) ||
+                   isAdmin() || isDevMode();
+
+      // Création stricte : clientId == auth.uid et status == "pending"
+      allow create: if (isAuthenticated() &&
+                        request.resource.data.clientId == request.auth.uid &&
+                        request.resource.data.status == "pending")
+                    || isDevMode();
+
+      allow update: if false;
       allow delete: if isAdmin() || isDevMode();
     }
 
@@ -219,48 +221,36 @@ service cloud.firestore {
     match /call_sessions/{sessionId} {
       allow read: if ((isAuthenticated() &&
                       (request.auth.uid == resource.data.clientId ||
-                       request.auth.uid == resource.data.providerId) ||
-                     isAdmin())) || isDevMode();
+                       request.auth.uid == resource.data.providerId) || isAdmin())) || isDevMode();
+      allow create, update, delete: if isAdmin() || isDevMode();
+    }
 
-      allow create: if (isAuthenticated() && isNotBanned() &&
-                        request.resource.data.clientId == request.auth.uid) || isDevMode();
-
-      allow update: if ((isAuthenticated() && isNotBanned() &&
-                         (request.auth.uid == resource.data.clientId ||
-                          request.auth.uid == resource.data.providerId)) ||
-                        isAdmin()) || isDevMode();
-
-      allow delete: if isAdmin() || isDevMode();
+    match /callSessions/{sessionId} {
+      allow read: if ((isAuthenticated() &&
+                      (request.auth.uid == resource.data.clientId ||
+                       request.auth.uid == resource.data.providerId) || isAdmin())) || isDevMode();
+      allow create, update, delete: if isAdmin() || isDevMode();
     }
 
     // ================== INVOICE_RECORDS ==================
     match /invoice_records/{invoiceId} {
       allow read: if ((isAuthenticated() &&
                       (request.auth.uid == resource.data.clientId ||
-                       request.auth.uid == resource.data.providerId) ||
-                     isAdmin())) || isDevMode();
-
-      allow create: if (isAuthenticated() &&
-                        (request.auth.uid == request.resource.data.clientId || isAdmin())) || isDevMode();
-
-      allow update: if isAdmin() || isDevMode();
-      allow delete: if isAdmin() || isDevMode();
+                       request.auth.uid == resource.data.providerId) || isAdmin())) || isDevMode();
+      allow create, update, delete: if isAdmin() || isDevMode();
     }
 
     // =================== NOTIFICATION_LOGS ===================
     match /notification_logs/{logId} {
       allow read: if ((isAuthenticated() &&
                       (request.auth.uid == resource.data.recipientId || isAdmin()))) || isDevMode();
-      allow create: if (isAuthenticated() && isNotBanned()) || isDevMode();
+      allow create: if (isAuthenticated()) || isDevMode();
       allow update: if isAdmin() || isDevMode();
       allow delete: if isAdmin() || isDevMode();
     }
 
     // ======================= Collections Admin =======================
-    match /logs/{logId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin() || isDevMode();
-    }
+    match /logs/{logId} { allow create: if true; allow read, update, delete: if isAdmin() || isDevMode(); }
     match /analytics/{analyticsId}     { allow read, write: if isAdmin() || isDevMode(); }
     match /app_settings/{settingId}    { allow read, write: if isAdmin() || isDevMode(); }
     match /admin_settings/{settingId}  { allow read, write: if isAdmin() || isDevMode(); }
@@ -288,15 +278,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || isDevMode();
     }
 
-    // ============ ADMIN_CONFIG ============
     match /admin_config/{docId} {
       allow read: if true;
       allow write: if isAdmin() || isDevMode();
     }
 
-    // Catch-all (prod fermée si pas dev)
-    match /{document=**} {
-      allow read, write: if false || isDevMode();
-    }
+    // ======================= Catch-all =======================
+    match /{document=**} { allow read, write: if false || isDevMode(); }
   }
 }

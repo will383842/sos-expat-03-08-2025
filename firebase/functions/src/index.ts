@@ -17,6 +17,15 @@ ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index
 // ====== CONFIGURATION GLOBALE ======
 import { setGlobalOptions } from 'firebase-functions/v2';
 
+setGlobalOptions({
+  region: 'europe-west1',
+  cpu: 1,
+  memory: '512MiB',
+  minInstances: 0,
+  maxInstances: 2,
+  concurrency: 80,
+});
+
 const globalConfig = {
   region: 'europe-west1',
 };
@@ -163,19 +172,7 @@ let stripeManagerInstance: any = null;
 let twilioCallManagerInstance: any = null;
 let messageManagerInstance: any = null;
 
-const getStripeManager = traceFunction(async () => {
-  if (!stripeManagerInstance) {
-    ultraLogger.info('LAZY_LOADING', 'Chargement du StripeManager');
-    const startTime = Date.now();
-    
-    const { stripeManager } = await import('./StripeManager');
-    stripeManagerInstance = stripeManager;
-    
-    const loadTime = Date.now() - startTime;
-    ultraLogger.info('LAZY_LOADING', 'StripeManager chargé avec succès', {
-      loadTime: `${loadTime}ms`
-    });
-  }
+
   return stripeManagerInstance;
 }, 'getStripeManager', 'INDEX');
 
@@ -195,21 +192,7 @@ const getTwilioCallManager = traceFunction(async () => {
   return twilioCallManagerInstance;
 }, 'getTwilioCallManager', 'INDEX');
 
-const getMessageManager = traceFunction(async () => {
-  if (!messageManagerInstance) {
-    ultraLogger.info('LAZY_LOADING', 'Chargement du MessageManager');
-    const startTime = Date.now();
-    
-    const { messageManager } = await import('./MessageManager');
-    messageManagerInstance = messageManager;
-    
-    const loadTime = Date.now() - startTime;
-    ultraLogger.info('LAZY_LOADING', 'MessageManager chargé avec succès', {
-      loadTime: `${loadTime}ms`
-    });
-  }
-  return messageManagerInstance;
-}, 'getMessageManager', 'INDEX');
+
 
 // ====== MIDDLEWARE DE DEBUG POUR TOUTES LES FONCTIONS ======
 function createDebugMetadata(functionName: string, userId?: string): UltraDebugMetadata {
@@ -318,6 +301,7 @@ ultraLogger.info('EXPORTS', 'Début du chargement des exports directs');
 
 // Import et export des fonctions principales avec exports directs simples
 export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
+export { createAndScheduleCallHTTPS as createAndScheduleCall } from './createAndScheduleCallFunction';
 export { createPaymentIntent } from './createPaymentIntent';
 
 // Export de l'API admin avec debug

@@ -170,22 +170,22 @@ const useAvailabilityToggle = () => {
     try {
       const snap = await getDoc(sosRef);
       if (!snap.exists()) {
-        const newProfileData = {
-          uid: userId,
-          type: (user as any).role || (user as any).type,
-          fullName:
-            (user as any).fullName ||
-            `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
-            'Expert',
-          ...updateData,
-          isActive: true,
-          isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
-          isVerified: !!(user as any).isVerified,
-          rating: 5.0,
-          reviewCount: 0,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(sosRef, newProfileData, { merge: true });
+const newProfileData = {
+  type: (user as any).role || (user as any).type,
+  fullName:
+    (user as any).fullName ||
+    `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
+    'Expert',
+  ...updateData,
+  isActive: true,
+  isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
+  isVerified: !!(user as any).isVerified,
+  rating: 5.0,
+  reviewCount: 0,
+  createdAt: serverTimestamp(),
+};
+await setDoc(sosRef, newProfileData, { merge: true });
+
         return;
       }
     } catch {
@@ -203,21 +203,20 @@ const useAvailabilityToggle = () => {
     }
 
     // 4) Dernier recours : créer doc {uid}
-    await setDoc(sosRef, {
-      uid: userId,
-      type: (user as any).role || (user as any).type,
-      fullName:
-        (user as any).fullName ||
-        `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
-        'Expert',
-      ...updateData,
-      isActive: true,
-      isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
-      isVerified: !!(user as any).isVerified,
-      rating: 5.0,
-      reviewCount: 0,
-      createdAt: serverTimestamp(),
-    }, { merge: true });
+await setDoc(sosRef, {
+  type: (user as any).role || (user as any).type,
+  fullName:
+    (user as any).fullName ||
+    `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
+    'Expert',
+  ...updateData,
+  isActive: true,
+  isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
+  isVerified: !!(user as any).isVerified,
+  rating: 5.0,
+  reviewCount: 0,
+  createdAt: serverTimestamp(),
+}, { merge: true });
   }, [user, isProvider]);
 
   const writeUsersPresenceBestEffort = useCallback(async (newStatus: boolean) => {

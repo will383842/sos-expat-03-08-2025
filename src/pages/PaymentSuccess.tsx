@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Phone, CheckCircle, FileText, Scale, Users, Star } from 'lucide-react';
+import { Phone, CheckCircle, Scale, Users, Star } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import ReviewModal from '../components/review/ReviewModal';
-import { logAnalyticsEvent, createInvoiceRecord } from '../utils/firestore';
-import { useAuth } from '../contexts/AuthContext';
-import Modal from '../components/common/Modal';
+
+// 🔁 Firestore (lecture seule côté client)
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 interface ProviderInfo {
   id: string;
@@ -17,13 +18,7 @@ interface ProviderInfo {
   role: string;
 }
 
-interface InvoiceUrls {
-  platformInvoiceUrl?: string;
-  providerInvoiceUrl?: string;
-}
-
 type CallState = 'connecting' | 'in_progress' | 'completed' | 'failed';
-type InvoiceType = 'platform' | 'provider';
 
 const PROVIDER_DEFAULTS = {
   '1': { type: 'lawyer', price: 49, duration: 20, role: 'lawyer' },
@@ -41,42 +36,33 @@ const PaymentSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useApp();
-  const { user } = useAuth();
 
   // URL Parameters
   const callStatus = searchParams.get('call');
   const providerId = searchParams.get('providerId') || searchParams.get('provider') || '1';
   const callId = searchParams.get('callId') || `call_${Date.now()}`;
-  const paymentIntentId = searchParams.get('paymentIntentId');
 
-  // State
+  // UI state
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [callState, setCallState] = useState<CallState>(
-    callStatus === 'failed' ? 'failed' : 'completed'
+    callStatus === 'failed' ? 'failed' : 'connecting'
   );
-  const [isGeneratingInvoices, setIsGeneratingInvoices] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
-  const [activeInvoiceType, setActiveInvoiceType] = useState<InvoiceType>('platform');
-  const [invoiceUrls, setInvoiceUrls] = useState<InvoiceUrls>({});
-  
+
   // Service data
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paidServiceType, setPaidServiceType] = useState<string>('');
   const [paidDuration, setPaidDuration] = useState<number>(0);
-  const [platformFee, setPlatformFee] = useState<number>(0);
-  const [providerAmount, setProviderAmount] = useState<number>(0);
   const [providerRole, setProviderRole] = useState<string>('');
 
-  const isLawyer = useMemo(() => 
-    paidServiceType === 'lawyer_call' || providerRole === 'lawyer', 
+  const isLawyer = useMemo(
+    () => paidServiceType === 'lawyer_call' || providerRole === 'lawyer',
     [paidServiceType, providerRole]
   );
 
-  // ✅ CORRECTION - Récupérer les données depuis les sources correctes
+  // ----- Helpers pour récupérer le provider depuis le storage (fallback) -----
   const getProviderFromStorage = useCallback((): ProviderInfo | null => {
     try {
-      // ✅ Essayer d'abord selectedProvider (nom correct)
       const savedProvider = sessionStorage.getItem('selectedProvider');
       if (savedProvider) {
         const providerData = JSON.parse(savedProvider);
@@ -89,8 +75,7 @@ const PaymentSuccess: React.FC = () => {
           role: providerData.type
         };
       }
-      
-      // ✅ Essayer ensuite bookingRequest
+
       const savedRequest = sessionStorage.getItem('bookingRequest');
       if (savedRequest) {
         const requestData = JSON.parse(savedRequest);
@@ -104,7 +89,6 @@ const PaymentSuccess: React.FC = () => {
         };
       }
 
-      // ✅ Fallback - ancien format pour compatibilité
       const legacyProvider = sessionStorage.getItem('providerData');
       if (legacyProvider) {
         const providerData = JSON.parse(legacyProvider);
@@ -123,131 +107,55 @@ const PaymentSuccess: React.FC = () => {
     return null;
   }, [providerId]);
 
-  // Initialize service data
+  // ----- Init des infos service (montant/durée) depuis URL ou storage -----
   const initializeServiceData = useCallback(() => {
-    // ✅ Prioriser les paramètres URL (plus fiables)
     const urlAmount = searchParams.get('amount');
     const urlServiceType = searchParams.get('serviceType') || searchParams.get('service');
     const urlDuration = searchParams.get('duration');
-    const urlPlatformFee = searchParams.get('platformFee');
-    const urlProviderAmount = searchParams.get('providerAmount');
     const urlProviderRole = searchParams.get('providerRole');
-    
+
     if (urlAmount && urlServiceType) {
-      // Use URL parameters
       setPaidAmount(parseFloat(urlAmount));
       setPaidServiceType(urlServiceType);
-      setPaidDuration(urlDuration ? parseInt(urlDuration) : 0);
-      setPlatformFee(urlPlatformFee ? parseFloat(urlPlatformFee) : 0);
-      setProviderAmount(urlProviderAmount ? parseFloat(urlProviderAmount) : 0);
+      const d = urlDuration ? parseInt(urlDuration) : 0;
+      setPaidDuration(d);
       setProviderRole(urlProviderRole || '');
-      setTimeRemaining((urlDuration ? parseInt(urlDuration) : 0) * 60);
-      console.log('✅ Données récupérées depuis URL params:', {
-        amount: parseFloat(urlAmount),
-        serviceType: urlServiceType,
-        duration: urlDuration
-      });
+      setTimeRemaining(d * 60);
       return;
     }
-    
-    // ✅ Essayer de récupérer depuis storage avec les bons noms
+
     const providerInfo = getProviderFromStorage();
     if (providerInfo) {
       const price = providerInfo.price || (providerInfo.type === 'lawyer' ? 49 : 19);
       const duration = providerInfo.duration || (providerInfo.type === 'lawyer' ? 20 : 30);
-      const commission = providerInfo.type === 'lawyer' ? COMMISSION_RATES.lawyer : COMMISSION_RATES.expat;
-      
+
       setPaidAmount(price);
       setPaidServiceType(providerInfo.type === 'lawyer' ? 'lawyer_call' : 'expat_call');
       setPaidDuration(duration);
       setProviderRole(providerInfo.type);
       setTimeRemaining(duration * 60);
-      setPlatformFee(commission);
-      setProviderAmount(price - commission);
-      
-      console.log('✅ Données récupérées depuis storage:', {
-        provider: providerInfo.name,
-        price,
-        duration,
-        type: providerInfo.type
-      });
       return;
     }
-    
-    // ✅ Fallback vers les défauts
+
     const fallbackProvider = PROVIDER_DEFAULTS[providerId as keyof typeof PROVIDER_DEFAULTS];
     if (fallbackProvider) {
-      const commission = fallbackProvider.role === 'lawyer' ? COMMISSION_RATES.lawyer : COMMISSION_RATES.expat;
-      
       setPaidAmount(fallbackProvider.price);
-      setPaidServiceType(fallbackProvider.type === 'lawyer' ? 'lawyer_call' : 'expat_call');
+      setPaidServiceType(
+        fallbackProvider.type === 'lawyer' ? 'lawyer_call' : 'expat_call'
+      );
       setPaidDuration(fallbackProvider.duration);
       setProviderRole(fallbackProvider.role);
       setTimeRemaining(fallbackProvider.duration * 60);
-      setPlatformFee(commission);
-      setProviderAmount(fallbackProvider.price - commission);
-      
-      console.log('✅ Données récupérées depuis fallback:', fallbackProvider);
     }
   }, [searchParams, providerId, getProviderFromStorage]);
 
-  // Generate invoices
-  const generateInvoices = useCallback(async () => {
-    if (isGeneratingInvoices) return;
-    
-    try {
-      setIsGeneratingInvoices(true);
-      
-      const timestamp = Date.now();
-      const urls = {
-        platformInvoiceUrl: `https://example.com/invoices/platform_${timestamp}.pdf`,
-        providerInvoiceUrl: `https://example.com/invoices/provider_${timestamp}.pdf`
-      };
-      
-      setTimeout(() => {
-        setInvoiceUrls(urls);
-        
-        if (user?.id) {
-          const invoiceData = {
-            callId,
-            clientId: user.id,
-            providerId: providerId || '',
-            createdAt: new Date(),
-            status: 'issued' as const
-          };
-          
-          createInvoiceRecord({
-            ...invoiceData,
-            invoiceNumber: `INV-${timestamp}`,
-            type: 'platform',
-            amount: platformFee || (isLawyer ? 9 : 5),
-            downloadUrl: urls.platformInvoiceUrl
-          });
-          
-          createInvoiceRecord({
-            ...invoiceData,
-            invoiceNumber: `INV-PRV-${timestamp}`,
-            type: 'provider',
-            amount: providerAmount || (isLawyer ? 40 : 14),
-            downloadUrl: urls.providerInvoiceUrl
-          });
-        }
-      }, 2000);
-    } catch (error) {
-      console.error('Error generating invoices:', error);
-    } finally {
-      setIsGeneratingInvoices(false);
-    }
-  }, [isGeneratingInvoices, user, callId, providerId, platformFee, providerAmount, isLawyer]);
-
-  // Timer effect
+  // ----- Timer d'affichage local pendant l'état "in_progress" (optionnel) -----
   useEffect(() => {
     if (callState !== 'in_progress' || timeRemaining <= 0) return;
-    
+
     const timer = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          setCallState('completed');
           return 0;
         }
         return prev - 1;
@@ -257,109 +165,109 @@ const PaymentSuccess: React.FC = () => {
     return () => clearInterval(timer);
   }, [callState, timeRemaining]);
 
-  // Initialize data and generate invoices
+  // ----- Init des données -----
   useEffect(() => {
     initializeServiceData();
   }, [initializeServiceData]);
 
+  // ----- Écoute Firestore : état de l'appel -----
   useEffect(() => {
-    if (callState === 'completed' && user && paymentIntentId && !isGeneratingInvoices) {
-      generateInvoices();
+    if (!callId) return;
 
-      // Show review modal after 2 seconds
-      const reviewTimer = setTimeout(() => {
-        if (!showReviewModal && !showInvoiceModal) {
-          setShowReviewModal(true);
-        }
-      }, 2000);
+    const ref = doc(db, 'calls', callId);
+    const unsub = onSnapshot(ref, snap => {
+      const data = snap.data();
+      if (!data) return;
 
-      return () => clearTimeout(reviewTimer);
-    }
-  }, [callState, user, paymentIntentId, generateInvoices, showReviewModal, showInvoiceModal, isGeneratingInvoices]);
+      // Statuts poussés par la Cloud Function (webhook Twilio)
+      switch (data.status) {
+        case 'scheduled':
+          setCallState('connecting');
+          break;
+        case 'in_progress':
+          setCallState('in_progress');
+          break;
+        case 'completed':
+          setCallState('completed');
+          break;
+        case 'failed':
+          setCallState('failed');
+          break;
+        default:
+          break;
+      }
 
-  // Utility functions
+      // Ouvrir l'avis seulement après complétion
+      if (data.status === 'completed' && !showReviewModal) {
+        setTimeout(() => setShowReviewModal(true), 1500);
+      }
+    });
+
+    return () => unsub();
+  }, [callId, showReviewModal]);
+
+  // ----- Utils -----
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const downloadInvoice = useCallback(() => {
-    const invoiceData = `
-FACTURE SOS-${Date.now()}
-Date: ${new Date().toLocaleDateString()}
-Service: ${paidServiceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}
-Montant: ${paidAmount}€
-    `;
-    
-    const blob = new Blob([invoiceData], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `facture_${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [paidAmount, paidServiceType]);
+  // ----- i18n -----
+  const t = useMemo(
+    () => ({
+      serviceNotFound: language === 'fr' ? 'Service non trouvé' : 'Service not found',
+      backToHome: language === 'fr' ? "Retour à l'accueil" : 'Back to home',
+      callFailed: language === 'fr' ? 'Appel non établi' : 'Call failed',
+      paymentSuccessful: language === 'fr' ? 'Paiement réussi !' : 'Payment successful!',
+      autoRefund:
+        language === 'fr'
+          ? 'Vous serez automatiquement remboursé'
+          : 'You will be automatically refunded',
+      connecting:
+        language === 'fr'
+          ? 'Votre paiement est validé. Veuillez rester en ligne : nous contactons votre expert.'
+          : 'Your payment is confirmed. Please stay by your phone: we’re contacting your expert.',
+      connectingTitle:
+        language === 'fr'
+          ? 'Paiement validé — appel dans moins de 5 minutes'
+          : 'Payment confirmed — call in under 5 minutes',
+      contactingExpert:
+        language === 'fr'
+          ? 'Vous allez recevoir un appel téléphonique dans moins de 5 minutes. Pensez à bien décrocher.'
+          : 'You will receive a phone call in under 5 minutes. Please be ready to answer.',
+      callInProgress: language === 'fr' ? 'Appel en cours' : 'Call in progress',
+      timeRemaining: language === 'fr' ? 'Temps restant' : 'Time remaining',
+      callCompleted: language === 'fr' ? 'Appel terminé' : 'Call completed',
+      thankYou:
+        language === 'fr'
+          ? 'Merci d\'avoir utilisé nos services !'
+          : 'Thank you for using our services!',
+      expertNoAnswer:
+        language === 'fr'
+          ? "L'expert n'a pas répondu après 3 tentatives. Vous serez automatiquement remboursé."
+          : 'The expert did not answer after 3 attempts. You will be automatically refunded.',
+      chooseAnother: language === 'fr' ? 'Choisir un autre expert' : 'Choose another expert',
+      serviceDetails: language === 'fr' ? 'Détails du service' : 'Service details',
+      service: language === 'fr' ? 'Service' : 'Service',
+      duration: language === 'fr' ? 'Durée' : 'Duration',
+      price: language === 'fr' ? 'Prix' : 'Price',
+      date: language === 'fr' ? 'Date' : 'Date',
+      lawyerCall: language === 'fr' ? 'Appel Avocat' : 'Lawyer Call',
+      expatCall: language === 'fr' ? 'Appel Expatrié' : 'Expat Call',
+      leaveReview: language === 'fr' ? 'Laisser un avis' : 'Leave a review',
+      goToDashboard: language === 'fr' ? 'Aller au tableau de bord' : 'Go to dashboard'
+    }),
+    [language]
+  );
 
-  const viewInvoice = useCallback((type: InvoiceType) => {
-    setActiveInvoiceType(type);
-    setShowInvoiceModal(true);
-    
-    if (user) {
-      logAnalyticsEvent({
-        eventType: 'invoice_viewed',
-        userId: user.id,
-        eventData: {
-          invoiceType: type,
-          paymentId: paymentIntentId
-        }
-      });
-    }
-  }, [user, paymentIntentId]);
-
-  // Text translations
-  const t = useMemo(() => ({
-    serviceNotFound: language === 'fr' ? 'Service non trouvé' : 'Service not found',
-    backToHome: language === 'fr' ? 'Retour à l\'accueil' : 'Back to home',
-    callFailed: language === 'fr' ? 'Appel non établi' : 'Call failed',
-    paymentSuccessful: language === 'fr' ? 'Paiement réussi !' : 'Payment successful!',
-    autoRefund: language === 'fr' ? 'Vous serez automatiquement remboursé' : 'You will be automatically refunded',
-    connecting: language === 'fr' ? 'Votre appel est en cours de connexion...' : 'Your call is being connected...',
-    connectingTitle: language === 'fr' ? 'Connexion en cours...' : 'Connecting...',
-    contactingExpert: language === 'fr' ? 'Nous contactons votre expert. Veuillez patienter.' : 'We are contacting your expert. Please wait.',
-    callInProgress: language === 'fr' ? 'Appel en cours' : 'Call in progress',
-    timeRemaining: language === 'fr' ? 'Temps restant' : 'Time remaining',
-    callCompleted: language === 'fr' ? 'Appel terminé' : 'Call completed',
-    thankYou: language === 'fr' ? 'Merci d\'avoir utilisé nos services !' : 'Thank you for using our services!',
-    expertNoAnswer: language === 'fr' ? 'L\'expert n\'a pas répondu après 3 tentatives. Vous serez automatiquement remboursé.' : 'The expert did not answer after 3 attempts. You will be automatically refunded.',
-    chooseAnother: language === 'fr' ? 'Choisir un autre expert' : 'Choose another expert',
-    serviceDetails: language === 'fr' ? 'Détails du service' : 'Service details',
-    service: language === 'fr' ? 'Service' : 'Service',
-    duration: language === 'fr' ? 'Durée' : 'Duration',
-    price: language === 'fr' ? 'Prix' : 'Price',
-    date: language === 'fr' ? 'Date' : 'Date',
-    lawyerCall: language === 'fr' ? 'Appel Avocat' : 'Lawyer Call',
-    expatCall: language === 'fr' ? 'Appel Expatrié' : 'Expat Call',
-    generatingInvoices: language === 'fr' ? 'Génération des factures...' : 'Generating invoices...',
-    viewInvoices: language === 'fr' ? 'Voir les factures' : 'View invoices',
-    leaveReview: language === 'fr' ? 'Laisser un avis' : 'Leave a review',
-    goToDashboard: language === 'fr' ? 'Aller au tableau de bord' : 'Go to dashboard',
-    close: language === 'fr' ? 'Fermer' : 'Close',
-    platformInvoice: language === 'fr' ? 'Facture plateforme' : 'Platform invoice',
-    providerInvoice: language === 'fr' ? 'Facture prestataire' : 'Provider invoice'
-  }), [language]);
-
-  // Early return if no service data
+  // ----- Early return si pas d'infos service -----
   if (!paidAmount && !paidServiceType) {
     return (
       <Layout>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              {t.serviceNotFound}
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{t.serviceNotFound}</h1>
             <a href="/" className="text-red-600 hover:text-red-700">
               {t.backToHome}
             </a>
@@ -369,6 +277,7 @@ Montant: ${paidAmount}€
     );
   }
 
+  // ----- Rendu de l'état d'appel -----
   const renderCallStatus = () => {
     const statusConfig: {
       [key in CallState]: {
@@ -376,7 +285,7 @@ Montant: ${paidAmount}€
         title: string | React.ReactElement;
         description: string;
         extra?: React.ReactElement;
-      }
+      };
     } = {
       connecting: {
         icon: <Phone size={48} className="mx-auto text-blue-600 mb-4 animate-pulse" />,
@@ -391,22 +300,14 @@ Montant: ${paidAmount}€
         ),
         title: t.callInProgress,
         description: t.timeRemaining,
-        extra: (
-          <div className="text-3xl font-bold text-red-600 mb-2">
-            {formatTime(timeRemaining)}
-          </div>
-        )
+        extra: <div className="text-3xl font-bold text-red-600 mb-2">{formatTime(timeRemaining)}</div>
       },
       completed: {
         icon: <CheckCircle size={48} className="mx-auto text-green-600 mb-4" />,
         title: (
           <div className="flex items-center justify-center">
             {t.callCompleted}
-            {isLawyer ? (
-              <Scale className="ml-2 w-5 h-5 text-blue-600" />
-            ) : (
-              <Users className="ml-2 w-5 h-5 text-green-600" />
-            )}
+            {isLawyer ? <Scale className="ml-2 w-5 h-5 text-blue-600" /> : <Users className="ml-2 w-5 h-5 text-green-600" />}
           </div>
         ),
         description: t.thankYou
@@ -420,7 +321,7 @@ Montant: ${paidAmount}€
         title: t.callFailed,
         description: t.expertNoAnswer,
         extra: (
-          <button 
+          <button
             onClick={() => navigate('/prestataires')}
             className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors mt-4"
           >
@@ -436,13 +337,9 @@ Montant: ${paidAmount}€
     return (
       <div className="text-center mb-8">
         {config.icon}
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          {config.title}
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">{config.title}</h2>
         {config.extra}
-        <p className="text-gray-600">
-          {config.description}
-        </p>
+        <p className="text-gray-600">{config.description}</p>
       </div>
     );
   };
@@ -480,31 +377,19 @@ Montant: ${paidAmount}€
 
               {/* Service Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  {t.serviceDetails}
-                </h3>
+                <h3 className="font-semibold text-gray-900 mb-3">{t.serviceDetails}</h3>
                 <div className="space-y-2 text-sm">
                   {serviceDetailRows.map((row, index) => (
                     <div key={index} className="flex justify-between">
                       <span className="text-gray-600">{row.label}:</span>
-                      <span className={row.bold ? 'font-semibold' : ''}>
-                        {row.value}
-                      </span>
+                      <span className={row.bold ? 'font-semibold' : ''}>{row.value}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-3">
-                <button
-                  onClick={downloadInvoice}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
-                  disabled={isGeneratingInvoices}
-                >
-                  <FileText size={20} className="mr-2" />
-                  {isGeneratingInvoices ? t.generatingInvoices : t.viewInvoices}
-                </button>
-
+                {/* Laisser un avis -> uniquement quand l'appel est terminé */}
                 {callState === 'completed' && (
                   <button
                     onClick={() => setShowReviewModal(true)}
@@ -516,7 +401,7 @@ Montant: ${paidAmount}€
                 )}
 
                 <button
-                  onClick={() => window.location.href = '/dashboard'}
+                  onClick={() => (window.location.href = '/dashboard')}
                   className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
                 >
                   {t.goToDashboard}
@@ -526,7 +411,7 @@ Montant: ${paidAmount}€
           </div>
         </div>
       </div>
-      
+
       {/* Review Modal */}
       <ReviewModal
         isOpen={showReviewModal}
@@ -536,54 +421,8 @@ Montant: ${paidAmount}€
         callId={callId}
         serviceType={isLawyer ? 'lawyer_call' : 'expat_call'}
       />
-      
-      {/* Invoice Modal */}
-      <Modal
-        isOpen={showInvoiceModal}
-        onClose={() => {
-          setShowInvoiceModal(false);
-          setActiveInvoiceType('platform');
-        }}
-        title={activeInvoiceType === 'platform' ? 'Facture Plateforme' : 'Facture Prestataire'}
-        size="large"
-      >
-        <div className="space-y-6">
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
-            <iframe 
-              src={activeInvoiceType === 'platform' ? invoiceUrls.platformInvoiceUrl : invoiceUrls.providerInvoiceUrl} 
-              className="w-full h-[600px]" 
-              title={`Facture ${activeInvoiceType === 'platform' ? 'Plateforme' : 'Prestataire'}`}
-            />
-          </div>
-          
-          <div className="flex justify-end space-x-3">
-            <button
-              onClick={() => setShowInvoiceModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-            >
-              {t.close}
-            </button>
-            <button
-              onClick={() => viewInvoice('platform')}
-              disabled={isGeneratingInvoices || !invoiceUrls.platformInvoiceUrl}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {t.platformInvoice}
-            </button>
-            
-            <button
-              onClick={() => viewInvoice('provider')}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-              disabled={isGeneratingInvoices || !invoiceUrls.providerInvoiceUrl}
-            >
-              {t.providerInvoice}
-            </button>
-          </div>
-        </div>
-      </Modal>
     </Layout>
   );
 };
 
 export default PaymentSuccess;
-

@@ -8,7 +8,9 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "resolveJsonModule": true,   // ✅ Permet d'importer voicePrompts.json
+    "allowSyntheticDefaultImports": true // ✅ option utile avec les JSON + import default
   },
   "compileOnSave": true,
   "include": ["src"]

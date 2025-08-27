@@ -177,7 +177,10 @@ interface LocalizedText {
 interface Education { institution?: string | LocalizedText; degree?: string | LocalizedText; year?: number; [key: string]: unknown; }
 interface Certification { name?: string | LocalizedText; issuer?: string | LocalizedText; year?: number; [key: string]: unknown; }
 interface User { id: string; [key: string]: unknown; }
-interface AuthUser extends User { uid?: string; }
+interface AuthUser extends User {
+  uid?: string;
+  id?: string;
+}
 interface LocationState { selectedProvider?: Partial<SosProfile>; providerData?: Partial<SosProfile>; navigationSource?: string; }
 interface SosProfile {
   uid: string; id?: string; type: 'lawyer' | 'expat'; fullName: string; firstName: string; lastName: string;
@@ -633,10 +636,10 @@ const ProviderProfile: React.FC = () => {
         provider_id: provider.id, provider_uid: provider.uid, provider_type: provider.type, provider_country: provider.country, is_online: onlineStatus.isOnline,
       });
     }
-    if ((user as AuthUser)?.id) {
+    if (((user as AuthUser)?.uid ?? (user as AuthUser)?.id)) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
-        userId: (user as AuthUser).id,
+        userId: (user as AuthUser).uid ?? (user as AuthUser).id,
         eventData: {
           providerId: provider.id, providerUid: provider.uid, providerType: provider.type, providerName: provider.fullName, providerOnlineStatus: onlineStatus.isOnline,
         },
@@ -776,7 +779,7 @@ const ProviderProfile: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        {user && provider && (user as AuthUser)?.id === provider.uid && (
+        {user && provider && ((user as AuthUser)?.uid ?? (user as AuthUser)?.id) === provider.uid && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
@@ -859,7 +862,7 @@ const ProviderProfile: React.FC = () => {
                         onClick={() => setShowImageModal(true)}
                         onError={handleImageError}
                         loading="eager"
-                        fetchpriority="high"
+                        fetchPriority="high"
                       />
                     </div>
                     {/* Online status */}

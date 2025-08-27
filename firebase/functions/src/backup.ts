@@ -1,8 +1,8 @@
 // functions/src/backup.ts
 import * as admin from "firebase-admin";
-import * as functions from "firebase-functions";
 import { google } from "googleapis";
 import { Storage } from "@google-cloud/storage";
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -185,57 +185,86 @@ async function runBackupInternal(type: "manual" | "automatic", createdBy: string
 
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
 
-// 1) Bouton "Sauvegarder maintenant" (depuis ton admin)
-export const manualBackup = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+// 1) Fonction v2 pour backup manuel depuis l'admin
+export const startBackup = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required.');
   }
   
-  // Vérifier les permissions admin (optionnel)
-  const claims = context.auth.token as Record<string, unknown>;
-  if (!claims.admin && !claims.isAdmin) {
-    throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
-  }
+  // Vérifier les permissions admin
+  const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+  const userData = userDoc.data();
   
-  return await runBackupInternal("manual", context.auth.uid);
+  if (!userData || userData.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Droits administrateur requis.');
+  }
+
+  return await runBackupInternal('manual', request.auth.uid);
 });
 
-// 2) Pour l'automatique (Scheduler OU scheduler Firebase)
-export const scheduledBackup = functions.https.onRequest(async (_req, res) => {
-  try {
-    await runBackupInternal("automatic", "system");
-    res.status(200).send("ok");
-  } catch (e: unknown) {
-    const errorMessage = e instanceof Error ? e.message : "error";
-    res.status(500).send(errorMessage);
+// 2) Fonction v2 pour backup manuel (remplace la v1)
+export const manualBackup = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Connexion requise.");
+  }
+  
+  // Vérifier les permissions admin
+  const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+  const userData = userDoc.data();
+  
+  if (!userData || userData.role !== 'admin') {
+    throw new HttpsError("permission-denied", "Droits administrateur requis.");
+  }
+  
+  return await runBackupInternal("manual", request.auth.uid);
+});
+
+// 3) Pour l'automatique (Scheduler) - v2
+export const scheduledBackup = onRequest(async (req, res) => {
+  // Vérifier que la requête vient du scheduler (optionnel - vérifier headers ou token)
+  const authHeader = req.get('Authorization');
+  if (req.get('User-Agent')?.includes('Google-Cloud-Scheduler') || authHeader?.includes('Bearer')) {
+    try {
+      await runBackupInternal("automatic", "system");
+      res.status(200).send("Backup completed successfully");
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error occurred";
+      console.error('Scheduled backup failed:', errorMessage);
+      res.status(500).send(`Backup failed: ${errorMessage}`);
+    }
+  } else {
+    res.status(403).send("Unauthorized - Scheduler only");
   }
 });
 
-// 3) Fonction pour lister les sauvegardes (optionnel)
-export const listBackups = functions.https.onCall(async (data: { limit?: number } | null, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+// 4) Fonction pour lister les sauvegardes
+export const listBackups = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required.');
   }
   
-  const claims = context.auth.token as Record<string, unknown>;
-  if (!claims.admin && !claims.isAdmin) {
-    throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+  // Vérifier les permissions admin
+  const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+  const userData = userDoc.data();
+  
+  if (!userData || userData.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Droits administrateur requis.');
   }
   
-  try {
-    const limit = data?.limit || 10;
-    const snap = await db.collection("backups")
-      .orderBy("createdAt", "desc")
-      .limit(limit)
-      .get();
-    
-    const backups = snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    return { backups };
-  } catch {
-    throw new functions.https.HttpsError("internal", "Erreur lors de la récupération des sauvegardes.");
-  }
+  const { limit } = (request.data || {}) as { limit?: number };
+
+  const snap = await admin.firestore()
+    .collection('backups')
+    .orderBy('createdAt', 'desc')
+    .limit(typeof limit === 'number' ? limit : 20)
+    .get();
+
+  return { 
+    backups: snap.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate?.()?.toISOString() || null,
+      completedAt: d.data().completedAt?.toDate?.()?.toISOString() || null
+    })) 
+  };
 });

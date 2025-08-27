@@ -1,4 +1,3 @@
-// src/pages/CallCheckout.tsx - Version corrigée
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +18,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
 import { detectUserCurrency, usePricingConfig } from '../services/pricingService';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 /* ------------------------------ Stripe init ------------------------------ */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
@@ -26,6 +26,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as strin
 /* --------------------------------- Types --------------------------------- */
 type Currency = 'eur' | 'usd';
 type ServiceKind = 'lawyer' | 'expat';
+type Lang = 'fr' | 'en';
 
 interface ServiceData {
   providerId: string;
@@ -50,8 +51,8 @@ interface User {
 }
 
 interface PaymentIntentData {
-  amount: number; // unités réelles
-  currency?: string; // "eur" | "usd"
+  amount: number;
+  currency?: string;
   serviceType: 'lawyer_call' | 'expat_call';
   providerId: string;
   clientId: string;
@@ -75,7 +76,6 @@ interface PaymentIntentResponse {
   expiresAt: string;
 }
 
-// ✅ CORRECTION: Interface corrigée sans currency
 interface CreateAndScheduleCallData {
   providerId: string;
   clientId: string;
@@ -84,11 +84,12 @@ interface CreateAndScheduleCallData {
   serviceType: 'lawyer_call' | 'expat_call';
   providerType: ServiceKind;
   paymentIntentId: string;
-  amount: number; // unités réelles
+  amount: number;
+  currency: 'EUR' | 'USD';
   delayMinutes?: number;
   clientLanguages?: string[];
   providerLanguages?: string[];
-  clientWhatsapp?: string; // ✅ AJOUTÉ: champ manquant
+  clientWhatsapp?: string;
 }
 
 type StepType = 'payment' | 'calling' | 'completed';
@@ -106,7 +107,6 @@ const getGtag = (): GtagFunction | undefined =>
   (typeof window !== 'undefined' ? (window as unknown as GtagWindow).gtag : undefined);
 
 /* -------------------------------- i18n ----------------------------------- */
-type Lang = 'fr' | 'en';
 const useTranslation = () => {
   const { language: ctxLang } = { language: 'fr' as Lang };
   const language: Lang = (ctxLang === 'en' ? 'en' : 'fr');
@@ -175,8 +175,6 @@ const useTranslation = () => {
     'err.unexpectedStatus': { fr: 'Statut de paiement inattendu', en: 'Unexpected payment status' },
     'err.genericPayment': { fr: 'Une erreur est survenue lors du paiement', en: 'An error occurred during payment' },
     'err.invalidPhone': { fr: 'Numéro de téléphone invalide', en: 'Invalid phone number' },
-    'err.missingProviderPhone': { fr: 'Numéro de téléphone du prestataire manquant', en: 'Provider phone number missing' },
-    'err.missingClientPhone': { fr: 'Numéro de téléphone client manquant', en: 'Client phone number missing' },
   };
 
   const t = (key: keyof typeof dict, fallback?: string) =>
@@ -248,6 +246,13 @@ const useSEO = (meta: {
 
 /* ------------------------ Helpers: device & phone utils ------------------ */
 const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
+
+// E.164 normalizer (critique pour la CF)
+const toE164 = (raw?: string) => {
+  if (!raw) return '';
+  const p = parsePhoneNumberFromString(raw);
+  return p?.isValid() ? p.number : '';
+};
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -355,12 +360,17 @@ const singleCardElementOptions = {
 } as const;
 
 /* ------------------------------ Payment Form ----------------------------- */
+interface PaymentFormSuccessPayload {
+  paymentIntentId: string;
+  call: 'scheduled' | 'skipped';
+  callId?: string;
+}
 interface PaymentFormProps {
   user: User;
   provider: Provider;
   service: ServiceData;
   adminPricing: PricingEntryTrace;
-  onSuccess: (paymentIntentId: string) => void;
+  onSuccess: (payload: PaymentFormSuccessPayload) => void;
   onError: (error: string) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
@@ -384,7 +394,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
     [getTraceAttributes, service.serviceType, serviceCurrency]
   );
 
-  // ✅ Validation simplifiée : le montant DOIT être égal au prix admin (pas de décomposition)
   const validatePaymentData = useCallback(() => {
     if (!stripe || !elements) throw new Error(t('err.invalidConfig'));
     if (!user?.uid) throw new Error(t('err.unauth'));
@@ -422,7 +431,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         commissionAmount: adminPricing.connectionFeeAmount,
         providerAmount: adminPricing.providerAmount,
         currency: serviceCurrency,
-        status: 'succeeded',
+        status: 'pending',
         createdAt: serverTimestamp(),
       };
 
@@ -447,31 +456,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
       validatePaymentData();
 
-      // ✅ VALIDATION SUPPLÉMENTAIRE: Vérifier les numéros de téléphone
-      const providerPhone = provider.phoneNumber || provider.phone || provider.telephone || '';
-      if (!providerPhone || providerPhone.length < 8) {
-        console.error('❌ Numéro prestataire invalide:', {
-          phoneNumber: provider.phoneNumber,
-          phone: provider.phone,
-          provider: provider
-        });
-        throw new Error(t('err.missingProviderPhone'));
-      }
-
-      if (!service.clientPhone || service.clientPhone.length < 8) {
-        console.error('❌ Numéro client invalide:', service.clientPhone);
-        throw new Error(t('err.missingClientPhone'));
-      }
-
-      console.log('✅ Validation des téléphones réussie:', {
-        providerPhone,
-        clientPhone: service.clientPhone
-      });
-
       const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
         httpsCallable(functions, 'createPaymentIntent');
 
-      // ✅ Passer DIRECTEMENT les prix admin à l'intent
       const paymentData: PaymentIntentData = {
         amount: adminPricing.totalAmount,
         commissionAmount: adminPricing.connectionFeeAmount,
@@ -530,68 +517,49 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 
       await persistPaymentDocs(paymentIntent.id);
 
-      const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean }> =
-        httpsCallable(functions, 'createAndScheduleCall');
+      const rawClientPhone   = service.clientPhone || user?.phone || '';
+      const rawProviderPhone = provider.phoneNumber || provider.phone || '';
 
-      // ✅ DONNÉES POUR DEBUG - Log avant l'envoi
-      const debugData = {
-        providerId: provider.id,
-        clientId: user.uid!,
-        providerPhone,
-        clientPhone: service.clientPhone,
-        serviceType: service.serviceType,
-        providerType: (provider.role || provider.type || 'expat') as ServiceKind,
-        paymentIntentId: paymentIntent.id,
-        amount: adminPricing.totalAmount,
-        delayMinutes: 5,
-        clientLanguages: [language],
-        providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
-        clientWhatsapp: service.clientPhone // ✅ Utiliser le même numéro
-      };
+      const clientPhoneE164   = toE164(rawClientPhone);
+      const providerPhoneE164 = toE164(rawProviderPhone);
 
-      console.log('🔍 Debug createAndScheduleCall - Données envoyées :', debugData);
+      let callScheduled: 'scheduled' | 'skipped' = 'skipped';
+      let createdCallId: string | undefined;
 
-      // ✅ VALIDATION SUPPLÉMENTAIRE: Vérifier que tous les champs requis sont présents
-      const requiredFields = {
-        providerId: provider.id,
-        clientId: user.uid!,
-        providerPhone,
-        clientPhone: service.clientPhone,
-        serviceType: service.serviceType,
-        providerType: (provider.role || provider.type || 'expat'),
-        paymentIntentId: paymentIntent.id,
-        amount: adminPricing.totalAmount
-      };
+      if (clientPhoneE164 && providerPhoneE164) {
+        try {
+          const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean; callId?: string }> =
+            httpsCallable(functions, 'createAndScheduleCall');
 
-      const missingFields = Object.entries(requiredFields)
-        .filter(([key, value]) => !value || value === '')
-        .map(([key]) => key);
+          const callData: CreateAndScheduleCallData = {
+            providerId: provider.id,
+            clientId: user.uid!,
+            providerPhone: providerPhoneE164,
+            clientPhone: clientPhoneE164,
+            clientWhatsapp: '',
+            serviceType: service.serviceType,
+            providerType: (provider.role || provider.type || 'expat') as ServiceKind,
+            paymentIntentId: paymentIntent.id,
+            amount: adminPricing.totalAmount,
+            currency: serviceCurrency.toUpperCase() as 'EUR' | 'USD',
+            delayMinutes: 5,
+            clientLanguages: [language],
+            providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
+          };
 
-      if (missingFields.length > 0) {
-        console.error('❌ Champs manquants pour createAndScheduleCall:', missingFields);
-        throw new Error(`Champs manquants: ${missingFields.join(', ')}`);
+          const callRes = await createAndScheduleCall(callData);
+          if (callRes?.data?.success) {
+            callScheduled = 'scheduled';
+            createdCallId = callRes?.data?.callId;
+          }
+        } catch (cfErr) {
+          console.warn('createAndScheduleCall failed (will continue to success page):', cfErr);
+          callScheduled = 'skipped';
+        }
+      } else {
+        console.warn('Missing/invalid phone(s). Skipping call scheduling.');
+        callScheduled = 'skipped';
       }
-
-      console.log('✅ Tous les champs requis sont présents');
-
-      const callData: CreateAndScheduleCallData = {
-        providerId: provider.id,
-        clientId: user.uid!,
-        providerPhone,
-        clientPhone: service.clientPhone,
-        clientWhatsapp: service.clientPhone, // ✅ CORRECTION: Ajouté
-        serviceType: service.serviceType,
-        providerType: (provider.role || provider.type || 'expat') as ServiceKind,
-        paymentIntentId: paymentIntent.id,
-        amount: adminPricing.totalAmount,
-        delayMinutes: 5,
-        clientLanguages: [language],
-        providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
-      };
-
-      console.log('📞 Appel createAndScheduleCall avec:', callData);
-
-      await createAndScheduleCall(callData);
 
       const gtag = getGtag();
       gtag?.('event', 'checkout_success', {
@@ -600,12 +568,14 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         payment_intent: paymentIntent.id,
         currency: serviceCurrency,
         amount: adminPricing.totalAmount,
+        call_status: callScheduled,
       });
 
-      onSuccess(paymentIntent.id);
-    } catch (err) {
+      onSuccess({ paymentIntentId: paymentIntent.id, call: callScheduled, callId: createdCallId });
+    } catch (err: any) {
       console.error('Payment error:', err);
-      const msg = err instanceof Error ? err.message : t('err.genericPayment');
+      const msg =
+        err?.message || err?.details || (typeof err === 'string' ? err : t('err.genericPayment'));
       onError(msg);
     } finally {
       setIsProcessing(false);
@@ -720,12 +690,11 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         )}
       </div>
 
-      {/* Récapitulatif simplifié */}
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-        <h4 className="font-semibold text-gray-900 mb-3 text-sm">{t('summary.title')}</h4>
+        <h4 className="font-semibold text-gray-900 mb-3 text-sm">Summary</h4>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between items-center">
-            <span className="text-gray-600">{t('summary.expert')}</span>
+            <span className="text-gray-600">Expert</span>
             <div className="flex items-center space-x-2">
               <img
                 src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
@@ -742,17 +711,17 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
             </div>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-600">{t('summary.service')}</span>
+            <span className="text-gray-600">Service</span>
             <span className="font-medium text-gray-800 text-xs">{serviceTypeDisplay}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-600">{t('summary.duration')}</span>
+            <span className="text-gray-600">Durée</span>
             <span className="font-medium text-gray-800 text-xs">{adminPricing.duration} min</span>
           </div>
 
           <div className="border-t-2 border-gray-400 pt-2 mt-2">
             <div className="flex justify-between items-center">
-              <span className="font-bold text-gray-900">{t('summary.total')}</span>
+              <span className="font-bold text-gray-900">Total</span>
               <span
                 className="text-lg font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent"
                 {...priceInfo}
@@ -764,7 +733,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         </div>
       </div>
 
-      {/* Bouton payer */}
       <button
         type="submit"
         disabled={!stripe || isProcessing}
@@ -776,7 +744,14 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
             ? "bg-gray-400 cursor-not-allowed opacity-60"
             : "bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 shadow-lg hover:shadow-xl")
         }
-        aria-label={t('btn.pay') + ' ' + adminPricing.totalAmount.toFixed(2) + currencySymbol}
+        aria-label={`${
+          language === 'fr' ? 'Payer ' : 'Pay '
+        }${new Intl.NumberFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
+          style: 'currency',
+          currency: serviceCurrency.toUpperCase(),
+          minimumFractionDigits: 2,
+        }).format(adminPricing.totalAmount)}`}
+
       >
         {isProcessing ? (
           <div className="flex items-center justify-center space-x-2">
@@ -786,12 +761,18 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
         ) : (
           <div className="flex items-center justify-center space-x-2">
             <Lock className="w-5 h-5" aria-hidden="true" />
-            <span>{t('btn.pay')} {adminPricing.totalAmount.toFixed(2)}{currencySymbol}</span>
+            <span>
+            {language === 'fr' ? 'Payer ' : 'Pay '}
+            {new Intl.NumberFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
+              style: 'currency',
+              currency: serviceCurrency.toUpperCase(),
+              minimumFractionDigits: 2,
+            }).format(adminPricing.totalAmount)}
+          </span>
           </div>
         )}
       </button>
 
-      {/* Badge sécurité */}
       <div className="flex items-center justify-center">
         <div className="flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
           <Shield className="w-3 h-3 text-green-600" aria-hidden="true" />
@@ -804,7 +785,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
 });
 PaymentForm.displayName = 'PaymentForm';
 
-/* ------------------------------ Debug pricing types ---------------------- */
 interface DebugPriceEntry {
   element: Element;
   source: string;
@@ -823,7 +803,6 @@ declare global {
   }
 }
 
-/* ------------------------------ Page wrapper ----------------------------- */
 const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceData, onGoBack }) => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
@@ -831,14 +810,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const isMobile = useIsMobile();
   const { getTraceAttributes } = usePriceTracing();
 
-  // Config prix admin (hook central)
   const { pricing, error: pricingError, loading: pricingLoading } = usePricingConfig() as {
     pricing?: { lawyer: Record<Currency, PricingEntryTrace>; expat: Record<Currency, PricingEntryTrace> };
     error?: unknown;
     loading: boolean;
   };
 
-  // Devise (sélecteur conservé, branché sur l'adminPricing)
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>('eur');
 
   useEffect(() => {
@@ -874,7 +851,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     } catch { /* no-op */ }
   }, [selectedCurrency]);
 
-  // Provider
   const provider = useMemo<Provider | null>(() => {
     if (selectedProvider?.id) return normalizeProvider(selectedProvider);
     try {
@@ -892,13 +868,15 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     return ((provider.role || provider.type || 'expat') as ServiceKind);
   }, [provider]);
 
-  // ✅ Sélection des prix depuis la config admin (aucun recalcul côté composant)
+  const storedClientPhone = useMemo(() => {
+    try { return sessionStorage.getItem('clientPhone') || ''; } catch { return ''; }
+  }, []);
+
   const adminPricing: PricingEntryTrace | null = useMemo(() => {
     if (!pricing || !providerRole) return null;
     return pricing[providerRole]?.[selectedCurrency] ?? null;
   }, [pricing, providerRole, selectedCurrency]);
 
-  // ✅ Service dérivé UNIQUEMENT de l'adminPricing (pas de reconstruct ni d'effet)
   const service: ServiceData | null = useMemo(() => {
     if (!provider || !adminPricing || !providerRole) return null;
     return {
@@ -907,19 +885,18 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
       providerRole,
       amount: adminPricing.totalAmount,
       duration: adminPricing.duration,
-      clientPhone: normalizePhone(user?.phone || ''),
+      clientPhone: toE164(storedClientPhone || user?.phone || ''),
       commissionAmount: adminPricing.connectionFeeAmount,
       providerAmount: adminPricing.providerAmount,
       currency: selectedCurrency,
     };
-  }, [provider, adminPricing, providerRole, user?.phone, selectedCurrency]);
+  }, [provider, adminPricing, providerRole, user?.phone, selectedCurrency, storedClientPhone]);
 
   const cardTraceAttrs = useMemo(
     () => getTraceAttributes(providerRole || 'expat', selectedCurrency),
     [getTraceAttributes, providerRole, selectedCurrency]
   );
 
-  // expose debug helper
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     if (!window.debugPricing) {
       window.debugPricing = {
@@ -958,11 +935,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
           });
         }
       };
-      console.log('🔍 Debug pricing disponible: window.debugPricing');
+      console.log('Debug pricing disponible: window.debugPricing');
     }
   }
 
-  /* --------------------------------- SEO --------------------------------- */
   useSEO({
     title: t('meta.title'),
     description: t('meta.description'),
@@ -1012,7 +988,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     }
   });
 
-  /* ------------------------------- Handlers ------------------------------ */
   const goBack = useCallback(() => {
     if (onGoBack) return onGoBack();
     if (window.history.length > 1) navigate(-1);
@@ -1021,15 +996,22 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
   const [currentStep, setCurrentStep] = useState<StepType>('payment');
   const [callProgress, setCallProgress] = useState<number>(0);
-  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string>('');
 
-  const handlePaymentSuccess = useCallback((pid: string) => {
-    setPaymentIntentId(pid);
+  const handlePaymentSuccess = useCallback((payload: { paymentIntentId: string; call: 'scheduled' | 'skipped'; callId?: string }) => {
     setCurrentStep('calling');
     setCallProgress(1);
-  }, []);
+
+    const params = new URLSearchParams({
+      paymentIntentId: payload.paymentIntentId,
+      providerId: (provider?.id || ''),
+      call: payload.call,
+    });
+    if (payload.callId) params.set('callId', payload.callId);
+
+    navigate(`/payment-success?${params.toString()}`, { replace: true });
+  }, [navigate, provider?.id]);
 
   const handlePaymentError = useCallback((msg: string) => setError(msg), []);
 
@@ -1046,7 +1028,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     }
   }, [currentStep, callProgress]);
 
-  /* ------------------------- Guards minimales ------------------------- */
   if (pricingLoading || !providerRole) {
     return (
       <Layout>
@@ -1113,7 +1094,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     );
   }
 
-  /* ------------------------------ Render page ---------------------------- */
   return (
     <Layout>
       <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
@@ -1126,7 +1106,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             </div>
           )}
 
-          {/* Header */}
           <div className="mb-4">
             <button
               onClick={goBack}
@@ -1147,7 +1126,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             </div>
           </div>
 
-          {/* Provider card */}
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
             <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">
@@ -1184,20 +1162,23 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
               </div>
 
-              {/* Traçabilité prix */}
               <div
                 className="text-right flex-shrink-0"
                 {...cardTraceAttrs}
               >
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-                  {selectedCurrency === 'usd' ? ' : '€'}{adminPricing.totalAmount.toFixed(2)}
+                  {new Intl.NumberFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
+                  style: 'currency',
+                  currency: selectedCurrency.toUpperCase(),
+                  minimumFractionDigits: 2,
+                }).format(adminPricing.totalAmount)}
+
                 </div>
                 <div className="text-xs text-gray-500">{adminPricing.duration} min</div>
               </div>
             </div>
           </section>
 
-          {/* Sélecteur devise simple */}
           <section className="bg-white rounded-xl shadow-md border p-4 mb-4">
             <div className="flex items-center justify-center space-x-4">
               <button
@@ -1225,7 +1206,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             </div>
           </section>
 
-          {/* Contenu principal */}
           <section className="bg-white rounded-xl shadow-md overflow-hidden">
             <div className="p-4">
               <div className="flex items-center gap-2 mb-4">
@@ -1263,7 +1243,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             </div>
           </section>
 
-          {/* Bandeau sécurité */}
           <aside className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Shield className="w-4 h-4 text-blue-600 mt-0.5" aria-hidden="true" />

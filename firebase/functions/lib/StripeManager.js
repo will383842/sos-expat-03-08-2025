@@ -74,6 +74,7 @@ class StripeManager {
         throw new Error("STRIPE_SECRET_KEY manquante dans les variables d'environnement");
     }
     validatePaymentData(data) {
+        var _a, _b;
         const { amount, clientId, providerId } = data;
         if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
             throw new Error('Montant invalide');
@@ -82,7 +83,7 @@ class StripeManager {
             throw new Error('Montant minimum de 5€ requis');
         if (amount > 2000)
             throw new Error('Montant maximum de 2000€ dépassé');
-        const commission = data.connectionFeeAmount ?? data.commissionAmount ?? 0;
+        const commission = (_b = (_a = data.connectionFeeAmount) !== null && _a !== void 0 ? _a : data.commissionAmount) !== null && _b !== void 0 ? _b : 0;
         if (typeof commission !== 'number' || commission < 0) {
             throw new Error('Commission/frais de connexion invalide');
         }
@@ -111,6 +112,7 @@ class StripeManager {
         }
     }
     async createPaymentIntent(data, secretKey) {
+        var _a, _b;
         try {
             this.validateConfiguration(secretKey);
             this.validatePaymentData(data);
@@ -124,7 +126,7 @@ class StripeManager {
             }
             await this.validateUsers(data.clientId, data.providerId);
             const currency = (data.currency || 'eur').toLowerCase();
-            const commissionAmount = data.connectionFeeAmount ?? data.commissionAmount ?? 0;
+            const commissionAmount = (_b = (_a = data.connectionFeeAmount) !== null && _a !== void 0 ? _a : data.commissionAmount) !== null && _b !== void 0 ? _b : 0;
             const amountCents = (0, exports.toCents)(data.amount);
             const commissionAmountCents = (0, exports.toCents)(commissionAmount);
             const providerAmountCents = (0, exports.toCents)(data.providerAmount);
@@ -143,18 +145,7 @@ class StripeManager {
                 currency,
                 capture_method: 'manual',
                 automatic_payment_methods: { enabled: true },
-                metadata: {
-                    clientId: data.clientId,
-                    providerId: data.providerId,
-                    serviceType: data.serviceType,
-                    providerType: data.providerType,
-                    commissionAmountCents: String(commissionAmountCents),
-                    providerAmountCents: String(providerAmountCents),
-                    commissionAmountEuros: commissionAmount.toFixed(2),
-                    providerAmountEuros: data.providerAmount.toFixed(2),
-                    environment: process.env.NODE_ENV || 'development',
-                    ...data.metadata,
-                },
+                metadata: Object.assign({ clientId: data.clientId, providerId: data.providerId, serviceType: data.serviceType, providerType: data.providerType, commissionAmountCents: String(commissionAmountCents), providerAmountCents: String(providerAmountCents), commissionAmountEuros: commissionAmount.toFixed(2), providerAmountEuros: data.providerAmount.toFixed(2), environment: process.env.NODE_ENV || 'development' }, data.metadata),
                 description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount} ${currency.toUpperCase()}`,
                 statement_descriptor_suffix: 'SOS EXPAT',
                 receipt_email: await this.getClientEmail(data.clientId),
@@ -165,10 +156,7 @@ class StripeManager {
                 amountInEuros: paymentIntent.amount / 100,
                 status: paymentIntent.status,
             });
-            await this.savePaymentRecord(paymentIntent, {
-                ...data,
-                commissionAmount,
-            }, {
+            await this.savePaymentRecord(paymentIntent, Object.assign(Object.assign({}, data), { commissionAmount }), {
                 amountCents,
                 commissionAmountCents,
                 providerAmountCents,
@@ -218,6 +206,7 @@ class StripeManager {
             // LOG DÉTAILLÉ des documents trouvés
             if (!snapshot.empty) {
                 snapshot.docs.forEach((doc, index) => {
+                    var _a, _b, _c, _d;
                     const data = doc.data();
                     console.log(`🔍 Document ${index + 1} trouvé:`, {
                         docId: doc.id,
@@ -226,7 +215,7 @@ class StripeManager {
                         status: data.status,
                         amount: data.amountInEuros || data.amount,
                         callSessionId: data.callSessionId,
-                        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || 'pas de date',
+                        createdAt: ((_d = (_c = (_b = (_a = data.createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) === null || _c === void 0 ? void 0 : _c.toISOString) === null || _d === void 0 ? void 0 : _d.call(_c)) || 'pas de date',
                         stripePaymentIntentId: data.stripePaymentIntentId
                     });
                 });
@@ -261,15 +250,16 @@ class StripeManager {
             throw new Error('Prestataire non trouvé');
         const clientData = clientDoc.data();
         const providerData = providerDoc.data();
-        if (clientData?.status === 'suspended')
+        if ((clientData === null || clientData === void 0 ? void 0 : clientData.status) === 'suspended')
             throw new Error('Compte client suspendu');
-        if (providerData?.status === 'suspended')
+        if ((providerData === null || providerData === void 0 ? void 0 : providerData.status) === 'suspended')
             throw new Error('Compte prestataire suspendu');
     }
     async getClientEmail(clientId) {
+        var _a;
         try {
             const clientDoc = await this.db.collection('users').doc(clientId).get();
-            return clientDoc.data()?.email;
+            return (_a = clientDoc.data()) === null || _a === void 0 ? void 0 : _a.email;
         }
         catch (error) {
             console.warn("Impossible de récupérer l'email client:", error);
@@ -455,12 +445,7 @@ class StripeManager {
                 const status = data.status || 'unknown';
                 stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
             });
-            return {
-                ...stats,
-                totalAmount: stats.totalAmount / 100,
-                totalCommission: stats.totalCommission / 100,
-                totalProvider: stats.totalProvider / 100,
-            };
+            return Object.assign(Object.assign({}, stats), { totalAmount: stats.totalAmount / 100, totalCommission: stats.totalCommission / 100, totalProvider: stats.totalProvider / 100 });
         }
         catch (error) {
             await (0, logError_1.logError)('StripeManager:getPaymentStatistics', error);
@@ -480,12 +465,7 @@ class StripeManager {
                 return null;
             }
             const data = doc.data();
-            return {
-                ...data,
-                amountInEuros: (data?.amount || 0) / 100,
-                commissionAmountEuros: (data?.commissionAmount || 0) / 100,
-                providerAmountEuros: (data?.providerAmount || 0) / 100,
-            };
+            return Object.assign(Object.assign({}, data), { amountInEuros: ((data === null || data === void 0 ? void 0 : data.amount) || 0) / 100, commissionAmountEuros: ((data === null || data === void 0 ? void 0 : data.commissionAmount) || 0) / 100, providerAmountEuros: ((data === null || data === void 0 ? void 0 : data.providerAmount) || 0) / 100 });
         }
         catch (error) {
             await (0, logError_1.logError)('StripeManager:getPayment', error);
@@ -495,3 +475,4 @@ class StripeManager {
 }
 exports.StripeManager = StripeManager;
 exports.stripeManager = new StripeManager();
+//# sourceMappingURL=StripeManager.js.map

@@ -1,7 +1,11 @@
 // firebase/functions/src/utils/ultraDebugLogger.ts
 import { getFirestore } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
+import * as admin from 'firebase-admin';
 
+const DISABLE_FIRESTORE_LOG_LOCAL =
+  process.env.DISABLE_FIRESTORE_LOG_LOCAL === '1' ||
+  process.env.NODE_ENV === 'development';
 // Désactiver l'écriture Firestore en local
 const IS_LOCAL =
   process.env.FUNCTIONS_EMULATOR === "true" ||
@@ -120,7 +124,8 @@ class UltraDebugLogger {
         // Test de connexion Firestore
         try {
           console.log('🔥 [ULTRA DEBUG] Test de connexion Firestore...');
-          const testDoc = await this.db.collection('_test').limit(1).get();
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+const testDoc = await this.db.collection('_test').limit(1).get();
           console.log('✅ [ULTRA DEBUG] Connexion Firestore OK');
         } catch (firestoreError) {
           console.error('❌ [ULTRA DEBUG] Erreur connexion Firestore:', firestoreError);
@@ -302,10 +307,11 @@ class UltraDebugLogger {
           FUNCTION_REGION: process.env.FUNCTION_REGION,
           GCLOUD_PROJECT: process.env.GCLOUD_PROJECT
         }
+        
       },
       firebase: {
         isInitialized: this.isFirebaseInitialized,
-        apps: admin.apps.map(app => ({
+        apps: (admin.apps ?? []).map((app: admin.app.App) => ({
           name: app.name,
           options: {
             projectId: app.options.projectId,

@@ -1,3 +1,9 @@
+// firebase/functions/src/callScheduler.ts
+import { logCallRecord } from './utils/logs/logCallRecord';
+import { logError } from './utils/logs/logError';
+import * as admin from 'firebase-admin';
+import { CallSessionState } from './TwilioCallManager';
+
 // Configuration pour la production
 const SCHEDULER_CONFIG = {
   DEFAULT_DELAY_MINUTES: 5,
@@ -450,6 +456,31 @@ function getCallSchedulerManager(): CallSchedulerManager {
   return callSchedulerManagerInstance;
 }
 
+// 🔧 FIX: Import mais pas d'initialisation immédiate avec typage précis
+let twilioCallManagerInstance: import('./TwilioCallManager').TwilioCallManager | null = null;
+
+async function getTwilioCallManager(): Promise<import('./TwilioCallManager').TwilioCallManager> {
+  if (!twilioCallManagerInstance) {
+    const { twilioCallManager } = await import('./TwilioCallManager');
+    twilioCallManagerInstance = twilioCallManager;
+  }
+  return twilioCallManagerInstance;
+}
+
+// 🔧 FIX: Initialisation Firebase lazy
+let db: admin.firestore.Firestore | null = null;
+
+function getDB(): admin.firestore.Firestore {
+  if (!db) {
+    // Assurer que Firebase Admin est initialisé
+    if (!admin.apps.length) {
+      admin.initializeApp();
+    }
+    db = admin.firestore();
+  }
+  return db;
+}
+
 /**
  * Fonction principale pour programmer une séquence d'appel
  */
@@ -492,7 +523,7 @@ export const createAndScheduleCall = async (
     };
 
     const missingFields = Object.entries(requiredFields)
-      .filter(([key, value]) => !value || (typeof value === 'string' && value.trim() === ''))
+      .filter(([, value]) => !value || (typeof value === 'string' && value.trim() === ''))
       .map(([key]) => key);
 
     if (missingFields.length > 0) {
@@ -835,43 +866,3 @@ process.on('SIGINT', gracefulShutdown);
 
 // Export du manager pour les tests
 export { getCallSchedulerManager as callSchedulerManager };
-
-// firebase/functions/src/callScheduler.ts
-import { logCallRecord } from './utils/logs/logCallRecord';
-import { logError } from './utils/logs/logError';
-import * as admin from 'firebase-admin';
-import { CallSessionState } from './TwilioCallManager';
-
-// 🔧 FIX: Import mais pas d'initialisation immédiate
-let twilioCallManagerInstance: any = null;
-let stripeManagerInstance: any = null;
-
-async function getTwilioCallManager() {
-  if (!twilioCallManagerInstance) {
-    const { twilioCallManager } = await import('./TwilioCallManager');
-    twilioCallManagerInstance = twilioCallManager;
-  }
-  return twilioCallManagerInstance;
-}
-
-async function getStripeManager() {
-  if (!stripeManagerInstance) {
-    const { stripeManager } = await import('./StripeManager');
-    stripeManagerInstance = stripeManager;
-  }
-  return stripeManagerInstance;
-}
-
-// 🔧 FIX: Initialisation Firebase lazy
-let db: admin.firestore.Firestore | null = null;
-
-function getDB(): admin.firestore.Firestore {
-  if (!db) {
-    // Assurer que Firebase Admin est initialisé
-    if (!admin.apps.length) {
-      admin.initializeApp();
-    }
-    db = admin.firestore();
-  }
-  return db;
-}

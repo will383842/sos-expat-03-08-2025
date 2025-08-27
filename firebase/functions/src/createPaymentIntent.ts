@@ -518,6 +518,9 @@ export const createPaymentIntent = onCall(
 
       // Récupération du secret Stripe
       const stripeSecretKey = STRIPE_SECRET_KEY.value();
+// Derive providerType once (no literal assertions)
+const providerType: 'lawyer' | 'expat' =
+  serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
 
       // Création du paiement Stripe
       const stripePayload = {
@@ -526,7 +529,7 @@ export const createPaymentIntent = onCall(
         clientId,
         providerId,
         serviceType,
-        providerType: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat') as 'lawyer' | 'expat',
+        providerType,
         commissionAmount: commissionAmountInMainUnit,
         providerAmount: providerAmountInMainUnit,
         callSessionId,
@@ -568,7 +571,7 @@ export const createPaymentIntent = onCall(
             amount: amountInMainUnit,
             currency: currency as 'eur' | 'usd',
             type: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat') as 'lawyer' | 'expat',
-            action: 'create' as 'create',
+            action: 'create' as const,
             metadata: {
               commissionAmountInMainUnit,
               providerAmountInMainUnit,

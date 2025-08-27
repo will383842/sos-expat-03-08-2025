@@ -1,9 +1,12 @@
 // firebase/functions/src/adminApi.ts
 import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
 import { stripeManager } from './StripeManager';
-
+import * as admin from 'firebase-admin';
+const asDate = (d: Date | admin.firestore.Timestamp) =>
+  (d && typeof (d as admin.firestore.Timestamp).toDate === 'function')
+    ? (d as admin.firestore.Timestamp).toDate()
+    : (d as Date);
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
@@ -52,14 +55,14 @@ export const api = onRequest(
 
           // Stats 30 derniers jours
           const curr = await stripeManager.getPaymentStatistics({
-            startDate: d30,
+            startDate: asDate(d30),
           });
           console.log('✅ Stats courantes récupérées:', curr);
 
           // Période précédente
           const prev = await stripeManager.getPaymentStatistics({
-            startDate: prevStart,
-            endDate: prevEnd,
+            startDate: asDate(prevStart),
+          endDate: asDate(prevEnd),
           });
           console.log('✅ Stats précédentes récupérées:', prev);
 
@@ -75,7 +78,8 @@ export const api = onRequest(
             ])
             .get();
 
-          const monthlyRevenue = curr.totalRevenue || 0;
+          const monthlyRevenue = curr.totalAmount || 0;
+
           const totalCommissions = curr.totalCommission || 0;
           const activeTransactions = pendingSnap.size;
           const conversionRate = curr.count
@@ -88,7 +92,7 @@ export const api = onRequest(
             activeTransactions,
             conversionRate,
             changes: {
-              revenue: pctChange(monthlyRevenue, prev.totalRevenue || 0),
+              revenue: pctChange(monthlyRevenue, prev.totalAmount || 0),
               commissions: pctChange(
                 totalCommissions,
                 prev.totalCommission || 0

@@ -21,20 +21,22 @@ import {
   Languages as LanguagesIcon,
   Sparkles,
 } from 'lucide-react';
+
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { createBookingRequest } from '../utils/firestore';
+
 import { logLanguageMismatch } from '../services/analytics';
 import languages from '../data/languages-spoken';
+
+import { db, functions } from '../config/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { functions, db } from '../config/firebase';
-import type { Provider } from '../types/provider';
-import { normalizeProvider } from '../types/provider';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 
-/** ---- PRICING (ADMIN + fallback) ---- */
+import type { Provider } from '../types/provider';
+import { normalizeProvider } from '../types/provider';
+
 import {
   usePricingConfig,
   calculateServiceAmounts,
@@ -43,6 +45,9 @@ import {
   type Currency,
 } from '../services/pricingService';
 
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+// ✅ Service centralisé
+import { createBookingRequest } from '../services/booking';
 /** ===== Types complémentaires ===== */
 type LangKey = keyof typeof I18N;
 type Language = { code: string; name: string };
@@ -76,10 +81,7 @@ const THEME = {
   button: 'from-red-600 via-orange-600 to-rose-600',
 } as const;
 
-/** ===== Fallbacks (si admin indisponible) =====
- *  - Prix de secours (total)
- *  - Frais de service par défaut (commission)
- */
+/** ===== Fallbacks (si admin indisponible) ===== */
 const FALLBACK_TOTALS = {
   lawyer: { eur: 49, usd: 55, duration: 20 },
   expat: { eur: 19, usd: 25, duration: 30 },
@@ -243,34 +245,34 @@ const I18N = {
 } as const;
 
 const countries = [
-  'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne', 'Andorre', 'Angola',
-  'Antigua-et-Barbuda', 'Arabie saoudite', 'Argentine', 'Arménie', 'Australie', 'Autriche',
-  'Azerbaïdjan', 'Bahamas', 'Bahreïn', 'Bangladesh', 'Barbade', 'Belgique', 'Belize', 'Bénin',
-  'Bhoutan', 'Biélorussie', 'Birmanie', 'Bolivie', 'Bosnie-Herzégovine', 'Botswana', 'Brésil',
-  'Brunei', 'Bulgarie', 'Burkina Faso', 'Burundi', 'Cambodge', 'Cameroun', 'Canada', 'Cap-Vert',
-  'Chili', 'Chine', 'Chypre', 'Colombie', 'Comores', 'Congo', 'Congo (RDC)',
-  'Corée du Nord', 'Corée du Sud', 'Costa Rica', "Côte d'Ivoire", 'Croatie', 'Cuba', 'Danemark',
-  'Djibouti', 'Dominique', 'Égypte', 'Émirats arabes unis', 'Équateur', 'Érythrée', 'Espagne',
-  'Estonie', 'États-Unis', 'Éthiopie', 'Fidji', 'Finlande', 'France', 'Gabon', 'Gambie',
-  'Géorgie', 'Ghana', 'Grèce', 'Grenade', 'Guatemala', 'Guinée', 'Guinée-Bissau',
-  'Guinée équatoriale', 'Guyana', 'Haïti', 'Honduras', 'Hongrie', 'Îles Cook', 'Îles Marshall',
-  'Îles Salomon', 'Inde', 'Indonésie', 'Irak', 'Iran', 'Irlande', 'Islande', 'Israël', 'Italie',
-  'Jamaïque', 'Japon', 'Jordanie', 'Kazakhstan', 'Kenya', 'Kirghizistan', 'Kiribati', 'Koweït',
-  'Laos', 'Lesotho', 'Lettonie', 'Liban', 'Liberia', 'Libye', 'Liechtenstein', 'Lituanie',
-  'Luxembourg', 'Macédoine du Nord', 'Madagascar', 'Malaisie', 'Malawi', 'Maldives', 'Mali',
-  'Malte', 'Maroc', 'Maurice', 'Mauritanie', 'Mexique', 'Micronésie', 'Moldavie', 'Monaco',
-  'Mongolie', 'Monténégro', 'Mozambique', 'Namibie', 'Nauru', 'Népal', 'Nicaragua', 'Niger',
-  'Nigeria', 'Norvège', 'Nouvelle-Zélande', 'Oman', 'Ouganda', 'Ouzbékistan', 'Pakistan',
-  'Palaos', 'Palestine', 'Panama', 'Papouasie-Nouvelle-Guinée', 'Paraguay', 'Pays-Bas', 'Pérou',
-  'Philippines', 'Pologne', 'Portugal', 'Qatar', 'République centrafricaine',
-  'République dominicaine', 'République tchèque', 'Roumanie', 'Royaume-Uni', 'Russie', 'Rwanda',
-  'Saint-Christophe-et-Niévès', 'Saint-Marin', 'Saint-Vincent-et-les-Grenadines', 'Sainte-Lucie',
-  'Salvador', 'Samoa', 'São Tomé-et-Principe', 'Sénégal', 'Serbie', 'Seychelles', 'Sierra Leone',
-  'Singapour', 'Slovaquie', 'Slovénie', 'Somalie', 'Soudan', 'Soudan du Sud', 'Sri Lanka',
-  'Suède', 'Suisse', 'Suriname', 'Syrie', 'Tadjikistan', 'Tanzanie', 'Tchad', 'Thaïlande',
-  'Timor oriental', 'Togo', 'Tonga', 'Trinité-et-Tobago', 'Tunisie', 'Turkménistan', 'Turquie',
-  'Tuvalu', 'Ukraine', 'Uruguay', 'Vanuatu', 'Vatican', 'Venezuela', 'Vietnam', 'Yémen',
-  'Zambie', 'Zimbabwe',
+  'Afghanistan','Afrique du Sud','Albanie','Algérie','Allemagne','Andorre','Angola',
+  'Antigua-et-Barbuda','Arabie saoudite','Argentine','Arménie','Australie','Autriche',
+  'Azerbaïdjan','Bahamas','Bahreïn','Bangladesh','Barbade','Belgique','Belize','Bénin',
+  'Bhoutan','Biélorussie','Birmanie','Bolivie','Bosnie-Herzégovine','Botswana','Brésil',
+  'Brunei','Bulgarie','Burkina Faso','Burundi','Cambodge','Cameroun','Canada','Cap-Vert',
+  'Chili','Chine','Chypre','Colombie','Comores','Congo','Congo (RDC)',
+  'Corée du Nord','Corée du Sud','Costa Rica',"Côte d'Ivoire",'Croatie','Cuba','Danemark',
+  'Djibouti','Dominique','Égypte','Émirats arabes unis','Équateur','Érythrée','Espagne',
+  'Estonie','États-Unis','Éthiopie','Fidji','Finlande','France','Gabon','Gambie',
+  'Géorgie','Ghana','Grèce','Grenade','Guatemala','Guinée','Guinée-Bissau',
+  'Guinée équatoriale','Guyana','Haïti','Honduras','Hongrie','Îles Cook','Îles Marshall',
+  'Îles Salomon','Inde','Indonésie','Irak','Iran','Irlande','Islande','Israël','Italie',
+  'Jamaïque','Japon','Jordanie','Kazakhstan','Kenya','Kirghizistan','Kiribati','Koweït',
+  'Laos','Lesotho','Lettonie','Liban','Liberia','Libye','Liechtenstein','Lituanie',
+  'Luxembourg','Macédoine du Nord','Madagascar','Malaisie','Malawi','Maldives','Mali',
+  'Malte','Maroc','Maurice','Mauritanie','Mexique','Micronésie','Moldavie','Monaco',
+  'Mongolie','Monténégro','Mozambique','Namibie','Nauru','Népal','Nicaragua','Niger',
+  'Nigeria','Norvège','Nouvelle-Zélande','Oman','Ouganda','Ouzbékistan','Pakistan',
+  'Palaos','Palestine','Panama','Papouasie-Nouvelle-Guinée','Paraguay','Pays-Bas','Pérou',
+  'Philippines','Pologne','Portugal','Qatar','République centrafricaine',
+  'République dominicaine','République tchèque','Roumanie','Royaume-Uni','Russie','Rwanda',
+  'Saint-Christophe-et-Niévès','Saint-Marin','Saint-Vincent-et-les-Grenadines','Sainte-Lucie',
+  'Salvador','Samoa','São Tomé-et-Principe','Sénégal','Serbie','Seychelles','Sierra Leone',
+  'Singapour','Slovaquie','Slovénie','Somalie','Soudan','Soudan du Sud','Sri Lanka',
+  'Suède','Suisse','Suriname','Syrie','Tadjikistan','Tanzanie','Tchad','Thaïlande',
+  'Timor oriental','Togo','Tonga','Trinité-et-Tobago','Tunisie','Turkménistan','Turquie',
+  'Tuvalu','Ukraine','Uruguay','Vanuatu','Vatican','Venezuela','Vietnam','Yémen',
+  'Zambie','Zimbabwe',
 ];
 
 interface NotificationData {
@@ -311,7 +313,6 @@ interface BookingRequestData {
   duration: number;
   serviceType: string;
   status: string;
-  createdAt: Date;
   ip: string;
   userAgent: string;
   providerEmail?: string;
@@ -337,13 +338,7 @@ type BookingFormData = {
 type FirestoreProviderDoc = Partial<Provider> & { id: string };
 
 /** ====== Petits composants UI ====== */
-const FieldSuccess = ({
-  show,
-  children,
-}: {
-  show: boolean;
-  children: React.ReactNode;
-}) =>
+const FieldSuccess = ({ show, children }: { show: boolean; children: React.ReactNode }) =>
   show ? (
     <div className="mt-1 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1 inline-flex items-center">
       <CheckCircle className="w-4 h-4 mr-1" /> {children}
@@ -360,20 +355,12 @@ const SectionHeader = ({
   subtitle?: string;
 }) => (
   <div className="flex items-center space-x-3 mb-5">
-    <div
-      className={`bg-gradient-to-br ${THEME.gradFrom} ${THEME.gradVia} ${THEME.gradTo} rounded-2xl p-3 shadow-md text-white`}
-    >
+    <div className={`bg-gradient-to-br ${THEME.gradFrom} ${THEME.gradVia} ${THEME.gradTo} rounded-2xl p-3 shadow-md text-white`}>
       {icon}
     </div>
     <div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-        {title}
-      </h2>
-      {subtitle && (
-        <p className="text-gray-600 text-sm sm:text-base mt-0.5">
-          {subtitle}
-        </p>
-      )}
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
+      {subtitle && <p className="text-gray-600 text-sm sm:text-base mt-0.5">{subtitle}</p>}
     </div>
   </div>
 );
@@ -418,10 +405,7 @@ const PreviewCard = ({
           <LanguagesIcon className={`w-4 h-4 ${THEME.icon}`} />
           <div className="flex flex-wrap gap-1">
             {langs.map((l) => (
-              <span
-                key={l}
-                className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 text-xs border border-rose-200"
-              >
+              <span key={l} className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 text-xs border border-rose-200">
                 {l.toUpperCase()}
               </span>
             ))}
@@ -449,6 +433,7 @@ const PreviewCard = ({
   </div>
 );
 
+/** 📞 Codes & pays (utilisé pour déduire le pays par défaut) */
 const countryCodeOptions = [
   { code: '+33', flag: '🇫🇷', country: 'FR' },
   { code: '+1', flag: '🇺🇸', country: 'US' },
@@ -461,6 +446,16 @@ const countryCodeOptions = [
   { code: '+81', flag: '🇯🇵', country: 'JP' },
   { code: '+86', flag: '🇨🇳', country: 'CN' },
 ];
+
+/** 🔧 util E.164 */
+const toE164 = (raw: string, defaultCountry?: string) => {
+  try {
+    const p = parsePhoneNumberFromString(raw, defaultCountry as any);
+    return p?.isValid() ? p.number : '';
+  } catch {
+    return '';
+  }
+};
 
 /** ===== Page ===== */
 const BookingRequest: React.FC = () => {
@@ -498,8 +493,7 @@ const BookingRequest: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [formError, setFormError] = useState('');
-  const [hasLanguageMatchRealTime, setHasLanguageMatchRealTime] =
-    useState(true);
+  const [hasLanguageMatchRealTime, setHasLanguageMatchRealTime] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
 
   // Refs pour scroll ciblé vers erreurs
@@ -524,9 +518,7 @@ const BookingRequest: React.FC = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       const currentUrl = `/booking-request/${providerId}`;
-      navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`, {
-        replace: true,
-      });
+      navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`, { replace: true });
     }
   }, [user, authLoading, providerId, navigate]);
 
@@ -545,7 +537,7 @@ const BookingRequest: React.FC = () => {
     return null;
   }, [providerId]);
 
-  // Chargement live du provider (session -> onSnapshot -> fallback getDoc)
+  // Chargement live du provider
   useEffect(() => {
     let unsub: (() => void) | undefined;
     const boot = async () => {
@@ -573,13 +565,8 @@ const BookingRequest: React.FC = () => {
               } as FirestoreProviderDoc);
               setProvider(normalized);
               try {
-                sessionStorage.setItem(
-                  'selectedProvider',
-                  JSON.stringify(normalized),
-                );
-              } catch (e) {
-                console.warn('Failed to cache provider in session', e);
-              }
+                sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
+              } catch {}
             } else {
               setProvider(null);
             }
@@ -602,13 +589,8 @@ const BookingRequest: React.FC = () => {
               } as FirestoreProviderDoc);
               setProvider(normalized);
               try {
-                sessionStorage.setItem(
-                  'selectedProvider',
-                  JSON.stringify(normalized),
-                );
-              } catch (e) {
-                console.warn('Failed to cache provider in session', e);
-              }
+                sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
+              } catch {}
             } else {
               setProvider(null);
             }
@@ -622,9 +604,7 @@ const BookingRequest: React.FC = () => {
       }
     };
     void boot();
-    return () => {
-      if (unsub) unsub();
-    };
+    return () => { if (unsub) unsub(); };
   }, [providerId, readProviderFromSession]);
 
   // Matching live des langues
@@ -637,12 +617,34 @@ const BookingRequest: React.FC = () => {
       setHasLanguageMatchRealTime(false);
       return;
     }
-    const providerLanguages =
-      provider.languages || provider.languagesSpoken || [];
+    const providerLanguages = provider.languages || provider.languagesSpoken || [];
     const clientCodes = languagesSpoken.map((l) => l.code);
     const hasMatch = providerLanguages.some((pl) => clientCodes.includes(pl));
     setHasLanguageMatchRealTime(hasMatch);
   }, [languagesSpoken, provider]);
+
+  /** 📞 E.164 live (pour la validation et l’aperçu) */
+  const selectedDial = useMemo(
+    () => countryCodeOptions.find(c => c.code === formData.phoneCountryCode) || countryCodeOptions[0],
+    [formData.phoneCountryCode]
+  );
+  const phoneRaw = useMemo(
+    () => `${formData.phoneCountryCode}${formData.phoneNumber.replace(/\s+/g, '')}`,
+    [formData.phoneCountryCode, formData.phoneNumber]
+  );
+  const phoneE164 = useMemo(() => toE164(phoneRaw, selectedDial.country), [phoneRaw, selectedDial.country]);
+
+  const whatsappRaw = useMemo(
+    () =>
+      formData.whatsappNumber
+        ? `${formData.whatsappCountryCode}${formData.whatsappNumber.replace(/\s+/g, '')}`
+        : '',
+    [formData.whatsappCountryCode, formData.whatsappNumber]
+  );
+  const whatsappE164 = useMemo(
+    () => (formData.whatsappNumber ? toE164(whatsappRaw) : ''),
+    [whatsappRaw, formData.whatsappNumber]
+  );
 
   // Validation / progression
   const valid = useMemo(
@@ -653,16 +655,13 @@ const BookingRequest: React.FC = () => {
       description: formData.description.trim().length >= 50,
       nationality: !!formData.nationality.trim(),
       currentCountry: !!formData.currentCountry.trim(),
-      autrePays:
-        formData.currentCountry !== 'Autre'
-          ? true
-          : !!formData.autrePays.trim(),
+      autrePays: formData.currentCountry !== 'Autre' ? true : !!formData.autrePays.trim(),
       langs: languagesSpoken.length > 0,
-      phone: formData.phoneNumber.trim().length >= 6,
+      phone: !!phoneE164,                       // ✅ E.164 sinon invalide
       accept: formData.acceptTerms,
       sharedLang: hasLanguageMatchRealTime,
     }),
-    [formData, languagesSpoken, hasLanguageMatchRealTime],
+    [formData, languagesSpoken, hasLanguageMatchRealTime, phoneE164],
   );
 
   const formProgress = useMemo(() => {
@@ -700,15 +699,9 @@ const BookingRequest: React.FC = () => {
   const displayEUR = eurAdmin?.totalAmount ?? FALLBACK_TOTALS[role].eur;
   const displayUSD = usdAdmin?.totalAmount ?? FALLBACK_TOTALS[role].usd;
   const displayDuration =
-    eurAdmin?.duration ??
-    usdAdmin?.duration ??
-    provider.duration ??
-    FALLBACK_TOTALS[role].duration;
+    eurAdmin?.duration ?? usdAdmin?.duration ?? provider.duration ?? FALLBACK_TOTALS[role].duration;
 
-  const sanitizeText = (
-    input: string,
-    opts: { trim?: boolean } = {},
-  ): string => {
+  const sanitizeText = (input: string, opts: { trim?: boolean } = {}): string => {
     const out = input
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -718,9 +711,7 @@ const BookingRequest: React.FC = () => {
     return opts.trim ? out.trim() : out;
   };
 
-  // Alias pratique pour les champs texte « simples »
-  const sanitizeInput = (input: string): string =>
-    sanitizeText(input, { trim: true });
+  const sanitizeInput = (input: string): string => sanitizeText(input, { trim: true });
 
   const handleInputChange = (
     e:
@@ -750,27 +741,16 @@ const BookingRequest: React.FC = () => {
   ): Promise<{ success: boolean; result?: unknown; error?: unknown }> => {
     try {
       if (!requestData.providerEmail && !requestData.providerPhone) {
-        return {
-          success: false,
-          error: 'Aucun contact disponible pour le prestataire',
-        };
+        return { success: false, error: 'Aucun contact disponible pour le prestataire' };
       }
-      if (!requestData.title?.trim())
-        return { success: false, error: 'Titre de la demande manquant' };
-      if (!requestData.description?.trim())
-        return {
-          success: false,
-          error: 'Description de la demande manquante',
-        };
+      if (!requestData.title?.trim()) return { success: false, error: 'Titre de la demande manquant' };
+      if (!requestData.description?.trim()) return { success: false, error: 'Description de la demande manquante' };
 
       const notificationData: NotificationData = {
         type: 'provider_booking_request',
         providerId: targetProviderId,
         recipientName: requestData.providerName || 'Prestataire',
-        emailSubject: `SOS Expat - Nouvelle demande: ${requestData.title.substring(
-          0,
-          50,
-        )}`,
+        emailSubject: `SOS Expat - Nouvelle demande: ${requestData.title.substring(0, 50)}`,
         emailHtml: `
 <h2>Nouvelle demande de consultation</h2>
 <p><strong>Client:</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
@@ -781,17 +761,12 @@ const BookingRequest: React.FC = () => {
 <p><strong>Description:</strong> ${requestData.description}</p>
 <hr>
 <p>Connectez-vous à votre espace prestataire pour répondre.</p>`.trim(),
-        smsMessage: `SOS Expat: Nouvelle demande de ${requestData.clientFirstName}. Titre: "${requestData.title.substring(
-          0,
-          30,
-        )}...". Consultez votre espace.`,
+        smsMessage: `SOS Expat: Nouvelle demande de ${requestData.clientFirstName}. Titre: "${requestData.title.substring(0, 30)}...". Consultez votre espace.`,
         whatsappMessage: `🔔 SOS Expat: Nouvelle demande de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire.`,
       };
 
-      if (requestData.providerEmail?.includes('@'))
-        notificationData.recipientEmail = requestData.providerEmail;
-      if (requestData.providerPhone && requestData.providerPhone.length > 5)
-        notificationData.recipientPhone = requestData.providerPhone;
+      if (requestData.providerEmail?.includes('@')) notificationData.recipientEmail = requestData.providerEmail;
+      if (requestData.providerPhone && requestData.providerPhone.length > 5) notificationData.recipientPhone = requestData.providerPhone;
 
       if (!functions) throw new Error('Firebase Functions non initialisé');
       const sendNotification = httpsCallable(functions, 'sendEmail');
@@ -809,17 +784,13 @@ const BookingRequest: React.FC = () => {
     currentUser: { id?: string; firstName?: string; lastName?: string } | null,
     eurTotalForDisplay: number,
     durationForDisplay: number,
+    clientPhoneE164: string,
+    clientWhatsappE164: string,
   ): {
-    selectedProvider: Partial<Provider> & {
-      id: string;
-      type: 'lawyer' | 'expat';
-    };
+    selectedProvider: Partial<Provider> & { id: string; type: 'lawyer' | 'expat' };
     bookingRequest: BookingRequestData;
   } => {
-    const selectedProvider: Partial<Provider> & {
-      id: string;
-      type: 'lawyer' | 'expat';
-    } = {
+    const selectedProvider: Partial<Provider> & { id: string; type: 'lawyer' | 'expat' } = {
       id: p.id,
       name: p.name,
       firstName: p.firstName,
@@ -839,32 +810,15 @@ const BookingRequest: React.FC = () => {
       phone: p.phone,
     };
 
-    const clientPhone = `${state.phoneCountryCode}${state.phoneNumber.replace(
-      /\s+/g,
-      '',
-    )}`;
-    const clientWhatsapp = state.whatsappNumber
-      ? `${state.whatsappCountryCode}${state.whatsappNumber.replace(
-          /\s+/g,
-          '',
-        )}`
-      : '';
-
     const bookingRequest: BookingRequestData = {
-      clientPhone,
-      clientId: currentUser?.id,
-      clientName: `${sanitizeInput(state.firstName)} ${sanitizeInput(
-        state.lastName,
-      )}`.trim(),
+      clientPhone: clientPhoneE164,
+      clientId: (currentUser as any)?.uid ?? (currentUser as any)?.id,
+      clientName: `${sanitizeInput(state.firstName)} ${sanitizeInput(state.lastName)}`.trim(),
       clientFirstName: sanitizeInput(state.firstName),
       clientLastName: sanitizeInput(state.lastName),
       clientNationality: sanitizeInput(state.nationality),
-      clientCurrentCountry: sanitizeInput(
-        state.currentCountry === 'Autre'
-          ? state.autrePays
-          : state.currentCountry,
-      ),
-      clientWhatsapp,
+      clientCurrentCountry: sanitizeInput(state.currentCountry === 'Autre' ? state.autrePays : state.currentCountry),
+      clientWhatsapp: clientWhatsappE164,
       providerId: selectedProvider.id,
       providerName: selectedProvider.name || '',
       providerType: selectedProvider.type,
@@ -872,23 +826,16 @@ const BookingRequest: React.FC = () => {
       providerAvatar: selectedProvider.avatar || '',
       providerRating: selectedProvider.rating,
       providerReviewCount: selectedProvider.reviewCount,
-      providerLanguages:
-        (selectedProvider.languages ||
-          selectedProvider.languagesSpoken) as string[] | undefined,
+      providerLanguages: (selectedProvider.languages || selectedProvider.languagesSpoken) as string[] | undefined,
       providerSpecialties: selectedProvider.specialties as string[] | undefined,
       title: sanitizeText(state.title, { trim: true }),
       description: sanitizeText(state.description, { trim: true }),
       clientLanguages: languagesSpoken.map((l) => l.code),
-      clientLanguagesDetails: languagesSpoken.map((l) => ({
-        code: l.code,
-        name: l.name,
-      })),
-      // Prix enregistré côté requête: EUR affiché (cohérent avec l'historique)
+      clientLanguagesDetails: languagesSpoken.map((l) => ({ code: l.code, name: l.name })),
       price: eurTotalForDisplay,
       duration: durationForDisplay,
       status: 'pending',
       serviceType: isLawyer ? 'lawyer_call' : 'expat_call',
-      createdAt: new Date(),
       ip: window.location.hostname,
       userAgent: navigator.userAgent,
       providerEmail: selectedProvider.email,
@@ -898,9 +845,7 @@ const BookingRequest: React.FC = () => {
   };
 
   const scrollToFirstIncomplete = () => {
-    const pairs: Array<
-      [boolean, React.MutableRefObject<HTMLDivElement | null>]
-    > = [
+    const pairs: Array<[boolean, React.MutableRefObject<HTMLDivElement | null>]> = [
       [!valid.firstName, refFirstName],
       [!valid.lastName, refLastName],
       [!valid.nationality, refNationality],
@@ -918,72 +863,37 @@ const BookingRequest: React.FC = () => {
   const validateForm = () => {
     const e: Record<string, string> = {};
     const global: string[] = [];
-    if (!valid.firstName) {
-      e.firstName = t.validators.firstName;
-      global.push(`– ${t.validators.firstName}`);
-    }
-    if (!valid.lastName) {
-      e.lastName = t.validators.lastName;
-      global.push(`– ${t.validators.lastName}`);
-    }
-    if (!valid.title) {
-      e.title = t.validators.title;
-      global.push(`– ${t.validators.title}`);
-    }
-    if (!valid.description) {
-      e.description = t.validators.description;
-      global.push(`– ${t.validators.description}`);
-    }
-    if (!valid.nationality) {
-      e.nationality = t.validators.nationality;
-      global.push(`– ${t.validators.nationality}`);
-    }
-    if (!valid.currentCountry) {
-      e.currentCountry = t.validators.currentCountry;
-      global.push(`– ${t.validators.currentCountry}`);
-    }
-    if (formData.currentCountry === 'Autre' && !valid.autrePays) {
-      e.autrePays = t.validators.otherCountry;
-      global.push(`– ${t.validators.otherCountry}`);
-    }
-    if (!valid.langs) {
-      e.languages = t.validators.languages;
-      global.push(`– ${t.validators.languages}`);
-    }
-    if (!valid.sharedLang) {
-      global.push(`– ${t.validators.langMismatch}`);
-    }
-    if (!valid.phone) {
-      e.phoneNumber = t.validators.phone;
-      global.push(`– ${t.validators.phone}`);
-    }
-    if (!valid.accept) {
-      global.push(`– ${t.validators.accept}`);
-    }
+    if (!valid.firstName) { e.firstName = t.validators.firstName; global.push(`– ${t.validators.firstName}`); }
+    if (!valid.lastName) { e.lastName = t.validators.lastName; global.push(`– ${t.validators.lastName}`); }
+    if (!valid.title) { e.title = t.validators.title; global.push(`– ${t.validators.title}`); }
+    if (!valid.description) { e.description = t.validators.description; global.push(`– ${t.validators.description}`); }
+    if (!valid.nationality) { e.nationality = t.validators.nationality; global.push(`– ${t.validators.nationality}`); }
+    if (!valid.currentCountry) { e.currentCountry = t.validators.currentCountry; global.push(`– ${t.validators.currentCountry}`); }
+    if (formData.currentCountry === 'Autre' && !valid.autrePays) { e.autrePays = t.validators.otherCountry; global.push(`– ${t.validators.otherCountry}`); }
+    if (!valid.langs) { e.languages = t.validators.languages; global.push(`– ${t.validators.languages}`); }
+    if (!valid.sharedLang) { global.push(`– ${t.validators.langMismatch}`); }
+    if (!valid.phone) { e.phoneNumber = t.validators.phone; global.push(`– ${t.validators.phone}`); }
+    if (!valid.accept) { global.push(`– ${t.validators.accept}`); }
     setFieldErrors(e);
     setFormErrors(global);
-    if (global.length) return false;
-    return true;
+    return global.length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+ 
     if (!hasLanguageMatchRealTime) {
       try {
         await logLanguageMismatch({
           clientLanguages: languagesSpoken.map((l) => l.code),
           customLanguage: undefined,
           providerId: provider?.id || '',
-          providerLanguages:
-            provider?.languages || provider?.languagesSpoken || [],
+          providerLanguages: provider?.languages || provider?.languagesSpoken || [],
           formData: {
             title: formData.title,
             description: formData.description,
             nationality: formData.nationality,
-            currentCountry:
-              formData.currentCountry === 'Autre'
-                ? formData.autrePays
-                : formData.currentCountry,
+            currentCountry: formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry,
           },
           source: 'booking_request_form',
         });
@@ -1001,27 +911,71 @@ const BookingRequest: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Prix affichés pour l’aperçu / stockage côté bookingRequest (EUR)
       const eurTotalForDisplay = displayEUR;
       const durationForDisplay = displayDuration;
 
-      const { selectedProvider, bookingRequest } = prepareStandardizedData(
-        formData,
-        provider,
-        user,
-        eurTotalForDisplay,
-        durationForDisplay,
-      );
+      const clientPhoneE164 = phoneE164;
+      const clientWhatsappE164 = whatsappE164;
 
-      if (user) {
-        try {
-          await createBookingRequest(
-            bookingRequest as unknown as Record<string, unknown>,
-          );
-        } catch (error) {
-          console.error('createBookingRequest failed', error);
-        }
-      }
+const { selectedProvider, bookingRequest } = prepareStandardizedData(
+  formData,
+  provider,
+  user,
+  eurTotalForDisplay,
+  durationForDisplay,
+  clientPhoneE164,
+  clientWhatsappE164,
+);
+
+// 🔐 UID de l'utilisateur connecté (NE PAS déplacer)
+const uid = user?.uid;
+if (!uid) {
+  setFormError("Session expirée. Reconnectez-vous.");
+  setIsLoading(false);
+  return;
+}
+
+
+
+// ————————————————————————————
+// Création du booking request via le service centralisé
+// ————————————————————————————
+await createBookingRequest({
+  clientId: uid,
+  providerId: selectedProvider.id,
+
+        serviceType: role === 'lawyer' ? 'lawyer_call' : 'expat_call',
+        status: 'pending',
+
+        title: bookingRequest.title,
+        description: bookingRequest.description,
+        clientPhone: bookingRequest.clientPhone,
+        clientWhatsapp: bookingRequest.clientWhatsapp,
+        price: bookingRequest.price,
+        duration: bookingRequest.duration,
+        clientLanguages: bookingRequest.clientLanguages,
+        clientLanguagesDetails: bookingRequest.clientLanguagesDetails,
+        providerName: bookingRequest.providerName,
+        providerType: bookingRequest.providerType,
+        providerCountry: bookingRequest.providerCountry,
+        providerAvatar: bookingRequest.providerAvatar,
+        providerRating: bookingRequest.providerRating,
+        providerReviewCount: bookingRequest.providerReviewCount,
+        providerLanguages: bookingRequest.providerLanguages,
+        providerSpecialties: bookingRequest.providerSpecialties,
+        clientName: bookingRequest.clientName,
+        clientFirstName: bookingRequest.clientFirstName,
+        clientLastName: bookingRequest.clientLastName,
+        clientNationality: bookingRequest.clientNationality,
+        clientCurrentCountry: bookingRequest.clientCurrentCountry,
+        ip: bookingRequest.ip,
+        userAgent: bookingRequest.userAgent,
+        providerEmail: bookingRequest.providerEmail,
+        providerPhone: bookingRequest.providerPhone,
+      });
+
+      // (optionnel) notifier le prestataire
+      // void notifyProviderOfRequest(selectedProvider.id, bookingRequest);
 
       // ————————————————————————————
       // ServiceData (admin = vérité ; fallback = prix secours + frais défaut)
@@ -1041,35 +995,27 @@ const BookingRequest: React.FC = () => {
         svcCommission = p.connectionFeeAmount;
         svcProviderAmount = p.providerAmount;
       } catch {
-        // fallback cohérent avec la règle demandée
         const total =
-          selectedCurrency === 'usd'
-            ? FALLBACK_TOTALS[roleForPricing].usd
-            : FALLBACK_TOTALS[roleForPricing].eur;
+          selectedCurrency === 'usd' ? FALLBACK_TOTALS[roleForPricing].usd : FALLBACK_TOTALS[roleForPricing].eur;
         const fee =
-          selectedCurrency === 'usd'
-            ? DEFAULT_SERVICE_FEES[roleForPricing].usd
-            : DEFAULT_SERVICE_FEES[roleForPricing].eur;
+          selectedCurrency === 'usd' ? DEFAULT_SERVICE_FEES[roleForPricing].usd : DEFAULT_SERVICE_FEES[roleForPricing].eur;
         svcAmount = total;
         svcCommission = fee;
         svcProviderAmount = Math.max(0, Math.round((total - fee) * 100) / 100);
       }
 
       try {
-        sessionStorage.setItem(
-          'selectedProvider',
-          JSON.stringify(selectedProvider),
-        );
+        sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
+        sessionStorage.setItem('clientPhone', clientPhoneE164);
         sessionStorage.setItem(
           'serviceData',
           JSON.stringify({
             providerId: selectedProvider.id,
-            serviceType:
-              roleForPricing === 'lawyer' ? 'lawyer_call' : 'expat_call',
+            serviceType: roleForPricing === 'lawyer' ? 'lawyer_call' : 'expat_call',
             providerRole: roleForPricing,
             amount: svcAmount,
             duration: svcDuration,
-            clientPhone: bookingRequest.clientPhone,
+            clientPhone: clientPhoneE164,
             commissionAmount: svcCommission,
             providerAmount: svcProviderAmount,
             currency: selectedCurrency,
@@ -1078,7 +1024,6 @@ const BookingRequest: React.FC = () => {
       } catch (error) {
         console.warn('Failed to save serviceData in session', error);
       }
-
 
       navigate(`/call-checkout/${providerId}`);
     } catch (err) {
@@ -1110,7 +1055,7 @@ const BookingRequest: React.FC = () => {
         <header className="px-4 max-w-3xl mx-auto mb-4 sm:mb-6">
           <div className="flex items-center gap-3 text-gray-700 mb-2">
             <button
-              onClick={() => navigate(`/provider/${provider.id}`)}
+              onClick={() => navigate(`/provider/${provider!.id}`)}
               className="p-2 rounded-lg hover:bg-gray-100"
               aria-label="Retour"
             >
@@ -1118,9 +1063,7 @@ const BookingRequest: React.FC = () => {
             </button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-900">
-                <span
-                  className={`bg-gradient-to-r ${THEME.gradFrom} ${THEME.gradVia} ${THEME.gradTo} bg-clip-text text-transparent`}
-                >
+                <span className={`bg-gradient-to-r ${THEME.gradFrom} ${THEME.gradVia} ${THEME.gradTo} bg-clip-text text-transparent`}>
                   {t.heroTitle}
                 </span>
               </h1>
@@ -1131,18 +1074,11 @@ const BookingRequest: React.FC = () => {
           {/* Progress */}
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-bold text-gray-700">
-                {t.progress}
-              </span>
-              <span className="text-sm font-bold text-red-600">
-                {formProgress}%
-              </span>
+              <span className="text-sm font-bold text-gray-700">{t.progress}</span>
+              <span className="text-sm font-bold text-red-600">{formProgress}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="h-2.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 transition-all duration-700"
-                style={{ width: `${formProgress}%` }}
-              />
+              <div className="h-2.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 transition-all duration-700" style={{ width: `${formProgress}%` }} />
             </div>
           </div>
         </header>
@@ -1156,28 +1092,18 @@ const BookingRequest: React.FC = () => {
                   src={provider.avatar}
                   alt={`Photo de ${provider.name}`}
                   className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/default-avatar.png';
-                  }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
                 />
               ) : (
-                <img
-                  src="/default-avatar.png"
-                  alt="Avatar par défaut"
-                  className="w-full h-full object-cover"
-                />
+                <img src="/default-avatar.png" alt="Avatar par défaut" className="w-full h-full object-cover" />
               )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 truncate">
-                  {provider?.name || '—'}
-                </h3>
+                <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 truncate">{provider?.name || '—'}</h3>
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    isLawyer
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-green-100 text-green-800 border border-green-200'
+                    isLawyer ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'
                   }`}
                 >
                   {isLawyer ? '⚖️ Avocat' : '🌍 Expatrié aidant'}
@@ -1190,31 +1116,22 @@ const BookingRequest: React.FC = () => {
               {!!provider?.languages?.length && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {(provider.languages || []).slice(0, 3).map((code, idx) => {
-                    const l = (languages as Language[]).find(
-                      (x) => x.code === code,
-                    );
+                    const l = (languages as Language[]).find((x) => x.code === code);
                     return (
-                      <span
-                        key={`${code}-${idx}`}
-                        className="inline-block px-2 py-0.5 bg-blue-50 text-blue-800 text-xs rounded border border-blue-200"
-                      >
+                      <span key={`${code}-${idx}`} className="inline-block px-2 py-0.5 bg-blue-50 text-blue-800 text-xs rounded border border-blue-200">
                         {l ? l.name : code}
                       </span>
                     );
                   })}
                   {(provider.languages || []).length > 3 && (
-                    <span className="text-xs text-gray-500">
-                      +{(provider.languages || []).length - 3}
-                    </span>
+                    <span className="text-xs text-gray-500">+{(provider.languages || []).length - 3}</span>
                   )}
                 </div>
               )}
             </div>
             <div className="text-center sm:text-right bg-white rounded-xl p-3 sm:p-4 border border-gray-200 w-auto min-w-[120px]">
               <div className="text-2xl sm:text-3xl font-extrabold text-red-600">{`${displayEUR}€ / $${displayUSD}`}</div>
-              <div className="text-sm text-gray-600 mt-1">
-                {displayDuration} min
-              </div>
+              <div className="text-sm text-gray-600 mt-1">{displayDuration} min</div>
               <div className="mt-1 text-xs text-gray-500">💳 {t.securePay}</div>
             </div>
           </div>
@@ -1229,128 +1146,84 @@ const BookingRequest: React.FC = () => {
                 <form onSubmit={handleSubmit} noValidate>
                   {/* Section Perso */}
                   <section className="p-5 sm:p-6">
-                    <SectionHeader
-                      icon={<MapPin className="w-5 h-5" />}
-                      title={t.personal}
-                    />
+                    <SectionHeader icon={<MapPin className="w-5 h-5" />} title={t.personal} />
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Prénom */}
                       <div ref={refFirstName}>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">
-                          {t.fields.firstName}{' '}
-                          <span className="text-red-500">*</span>
+                          {t.fields.firstName} <span className="text-red-500">*</span>
                         </label>
                         <input
                           name="firstName"
                           value={formData.firstName}
                           onChange={handleInputChange}
-                          className={`${inputClass('firstName')} ${
-                            fieldErrors.firstName ? 'bg-red-50' : ''
-                          }`}
+                          className={`${inputClass('firstName')} ${fieldErrors.firstName ? 'bg-red-50' : ''}`}
                           placeholder={t.placeholders.firstName}
                         />
-                        <FieldSuccess show={valid.firstName}>
-                          Parfait ! ✨
-                        </FieldSuccess>
-                        {fieldErrors.firstName && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {fieldErrors.firstName}
-                          </p>
-                        )}
+                        <FieldSuccess show={valid.firstName}>Parfait ! ✨</FieldSuccess>
+                        {fieldErrors.firstName && <p className="mt-1 text-sm text-red-600">{fieldErrors.firstName}</p>}
                       </div>
                       {/* Nom */}
                       <div ref={refLastName}>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">
-                          {t.fields.lastName}{' '}
-                          <span className="text-red-500">*</span>
+                          {t.fields.lastName} <span className="text-red-500">*</span>
                         </label>
                         <input
                           name="lastName"
                           value={formData.lastName}
                           onChange={handleInputChange}
-                          className={`${inputClass('lastName')} ${
-                            fieldErrors.lastName ? 'bg-red-50' : ''
-                          }`}
+                          className={`${inputClass('lastName')} ${fieldErrors.lastName ? 'bg-red-50' : ''}`}
                           placeholder={t.placeholders.lastName}
                         />
-                        <FieldSuccess show={valid.lastName}>
-                          Parfait ! ✨
-                        </FieldSuccess>
-                        {fieldErrors.lastName && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {fieldErrors.lastName}
-                          </p>
-                        )}
+                        <FieldSuccess show={valid.lastName}>Parfait ! ✨</FieldSuccess>
+                        {fieldErrors.lastName && <p className="mt-1 text-sm text-red-600">{fieldErrors.lastName}</p>}
                       </div>
                     </div>
 
                     {/* Nationalité */}
                     <div className="mt-4" ref={refNationality}>
                       <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.nationality}{' '}
-                        <span className="text-red-500">*</span>
+                        {t.fields.nationality} <span className="text-red-500">*</span>
                       </label>
                       <input
                         name="nationality"
                         value={formData.nationality}
                         onChange={handleInputChange}
-                        className={`${inputClass('nationality')} ${
-                          fieldErrors.nationality ? 'bg-red-50' : ''
-                        }`}
+                        className={`${inputClass('nationality')} ${fieldErrors.nationality ? 'bg-red-50' : ''}`}
                         placeholder={t.placeholders.nationality}
                       />
-                      {fieldErrors.nationality && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {fieldErrors.nationality}
-                        </p>
-                      )}
+                      {fieldErrors.nationality && <p className="mt-1 text-sm text-red-600">{fieldErrors.nationality}</p>}
                     </div>
 
                     {/* Pays d'intervention */}
                     <div className="mt-4" ref={refCountry}>
                       <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.currentCountry}{' '}
-                        <span className="text-red-500">*</span>
+                        {t.fields.currentCountry} <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="currentCountry"
                         value={formData.currentCountry}
                         onChange={handleInputChange}
-                        className={`${inputClass('currentCountry')} ${
-                          fieldErrors.currentCountry ? 'bg-red-50' : ''
-                        }`}
+                        className={`${inputClass('currentCountry')} ${fieldErrors.currentCountry ? 'bg-red-50' : ''}`}
                       >
                         <option value="">-- Sélectionnez un pays --</option>
                         {countries.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
+                          <option key={c} value={c}>{c}</option>
                         ))}
                         <option value="Autre">Autre</option>
                       </select>
-                      {fieldErrors.currentCountry && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {fieldErrors.currentCountry}
-                        </p>
-                      )}
-
+                      {fieldErrors.currentCountry && <p className="mt-1 text-sm text-red-600">{fieldErrors.currentCountry}</p>}
                       {formData.currentCountry === 'Autre' && (
                         <div className="mt-3">
                           <input
                             name="autrePays"
                             value={formData.autrePays}
                             onChange={handleInputChange}
-                            className={`${inputClass('autrePays')} ${
-                              fieldErrors.autrePays ? 'bg-red-50' : ''
-                            }`}
+                            className={`${inputClass('autrePays')} ${fieldErrors.autrePays ? 'bg-red-50' : ''}`}
                             placeholder={t.placeholders.otherCountry}
                           />
-                          {fieldErrors.autrePays && (
-                            <p className="mt-1 text-sm text-red-600">
-                              {fieldErrors.autrePays}
-                            </p>
-                          )}
+                          {fieldErrors.autrePays && <p className="mt-1 text-sm text-red-600">{fieldErrors.autrePays}</p>}
                         </div>
                       )}
                     </div>
@@ -1358,139 +1231,79 @@ const BookingRequest: React.FC = () => {
 
                   {/* Section Demande */}
                   <section className="p-5 sm:p-6 border-t border-gray-50">
-                    <SectionHeader
-                      icon={<Globe className="w-5 h-5" />}
-                      title={t.request}
-                    />
+                    <SectionHeader icon={<Globe className="w-5 h-5" />} title={t.request} />
 
                     {/* Titre */}
                     <div ref={refTitle}>
                       <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.title}{' '}
-                        <span className="text-red-500">*</span>
+                        {t.fields.title} <span className="text-red-500">*</span>
                       </label>
                       <input
                         name="title"
                         value={formData.title}
                         onChange={handleInputChange}
-                        className={`${inputClass('title')} ${
-                          fieldErrors.title ? 'bg-red-50' : ''
-                        }`}
+                        className={`${inputClass('title')} ${fieldErrors.title ? 'bg-red-50' : ''}`}
                         placeholder={t.placeholders.title}
                       />
-                      <div className="mt-1 text-xs text-gray-500">
-                        💡 {t.hints.title}
-                      </div>
+                      <div className="mt-1 text-xs text-gray-500">💡 {t.hints.title}</div>
                       <FieldSuccess show={valid.title}>C’est clair 👍</FieldSuccess>
-                      {fieldErrors.title && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {fieldErrors.title}
-                        </p>
-                      )}
+                      {fieldErrors.title && <p className="mt-1 text-sm text-red-600">{fieldErrors.title}</p>}
                     </div>
 
                     {/* Description */}
                     <div className="mt-4" ref={refDesc}>
                       <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.description}{' '}
-                        <span className="text-red-500">*</span>
+                        {t.fields.description} <span className="text-red-500">*</span>
                       </label>
                       <textarea
                         name="description"
                         rows={5}
                         value={formData.description}
                         onChange={handleInputChange}
-                        className={`resize-none ${inputClass('description')} ${
-                          fieldErrors.description ? 'bg-red-50' : ''
-                        }`}
+                        className={`resize-none ${inputClass('description')} ${fieldErrors.description ? 'bg-red-50' : ''}`}
                         placeholder={t.placeholders.description}
                       />
-                      <div className="mt-1 text-xs text-gray-500">
-                        🔎 {t.hints.desc}
-                      </div>
-                      <FieldSuccess show={valid.description}>
-                        On y voit clair 👀
-                      </FieldSuccess>
-                      {fieldErrors.description && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {fieldErrors.description}
-                        </p>
-                      )}
+                      <div className="mt-1 text-xs text-gray-500">🔎 {t.hints.desc}</div>
+                      <FieldSuccess show={valid.description}>On y voit clair 👀</FieldSuccess>
+                      {fieldErrors.description && <p className="mt-1 text-sm text-red-600">{fieldErrors.description}</p>}
                     </div>
                   </section>
 
                   {/* Section Langues */}
-                  <section
-                    className="p-5 sm:p-6 border-t border-gray-50"
-                    ref={refLangs}
-                  >
-                    <SectionHeader
-                      icon={<LanguagesIcon className="w-5 h-5" />}
-                      title={t.languages}
-                    />
+                  <section className="p-5 sm:p-6 border-t border-gray-50" ref={refLangs}>
+                    <SectionHeader icon={<LanguagesIcon className="w-5 h-5" />} title={t.languages} />
 
                     <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      🗣️{' '}
-                      {lang === 'en' ? 'Spoken languages' : 'Langues parlées'}{' '}
-                      <span className="text-red-500">*</span>
+                      🗣️ {lang === 'en' ? 'Spoken languages' : 'Langues parlées'} <span className="text-red-500">*</span>
                     </label>
 
-                    <Suspense
-                      fallback={
-                        <div className="h-10 rounded-lg bg-gray-100 animate-pulse" />
-                      }
-                    >
+                    <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
                       <MultiLanguageSelect
-                        value={languagesSpoken.map((l) => ({
-                          value: l.code,
-                          label: l.name,
-                        }))}
+                        value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
                         onChange={(selected: MultiLanguageOption[]) => {
                           const options = selected || [];
                           const allLanguages = languages as Language[];
                           const selectedLangs = options
-                            .map((opt) =>
-                              allLanguages.find(
-                                (langItem) => langItem.code === opt.value,
-                              ),
-                            )
+                            .map((opt) => allLanguages.find((langItem) => langItem.code === opt.value))
                             .filter((v): v is Language => Boolean(v));
                           setLanguagesSpoken(selectedLangs);
-                          if (fieldErrors.languages)
-                            setFieldErrors((prev) => {
-                              const r = { ...prev };
-                              delete r.languages;
-                              return r;
-                            });
+                          if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });
                         }}
-                        providerLanguages={
-                          provider?.languages || provider?.languagesSpoken || []
-                        }
+                        providerLanguages={provider?.languages || provider?.languagesSpoken || []}
                         highlightShared
                         locale={lang}
                       />
                     </Suspense>
 
-                    {fieldErrors.languages && (
-                      <p className="mt-2 text-sm text-red-600">
-                        {fieldErrors.languages}
-                      </p>
-                    )}
+                    {fieldErrors.languages && <p className="mt-2 text-sm text-red-600">{fieldErrors.languages}</p>}
 
                     {/* Compatibilité */}
                     {languagesSpoken.length > 0 && (
                       <div className="mt-4 space-y-3">
                         {(() => {
-                          const providerLanguages =
-                            provider?.languages ||
-                            provider?.languagesSpoken ||
-                            [];
-                          const compatible = languagesSpoken.filter((l) =>
-                            providerLanguages.includes(l.code),
-                          );
-                          const incompatible = languagesSpoken.filter(
-                            (l) => !providerLanguages.includes(l.code),
-                          );
+                          const providerLanguages = provider?.languages || provider?.languagesSpoken || [];
+                          const compatible = languagesSpoken.filter((l) => providerLanguages.includes(l.code));
+                          const incompatible = languagesSpoken.filter((l) => !providerLanguages.includes(l.code));
                           return (
                             <>
                               {!!compatible.length && (
@@ -1498,15 +1311,10 @@ const BookingRequest: React.FC = () => {
                                   <div className="flex">
                                     <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
                                     <div className="ml-3">
-                                      <p className="text-green-900 font-semibold mb-2">
-                                        ✅ {t.labels.compatible} :
-                                      </p>
+                                      <p className="text-green-900 font-semibold mb-2">✅ {t.labels.compatible} :</p>
                                       <div className="flex flex-wrap gap-2">
                                         {compatible.map((l) => (
-                                          <span
-                                            key={l.code}
-                                            className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full border border-green-200"
-                                          >
+                                          <span key={l.code} className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full border border-green-200">
                                             🌐 {l.name}
                                           </span>
                                         ))}
@@ -1520,15 +1328,10 @@ const BookingRequest: React.FC = () => {
                                   <div className="flex">
                                     <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                                     <div className="ml-3">
-                                      <p className="text-red-700 font-semibold mb-2">
-                                        ⚠️ {t.labels.incompatible} :
-                                      </p>
+                                      <p className="text-red-700 font-semibold mb-2">⚠️ {t.labels.incompatible} :</p>
                                       <div className="flex flex-wrap gap-2">
                                         {incompatible.map((l) => (
-                                          <span
-                                            key={l.code}
-                                            className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full border border-red-200"
-                                          >
+                                          <span key={l.code} className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full border border-red-200">
                                             🌐 {l.name}
                                           </span>
                                         ))}
@@ -1548,12 +1351,8 @@ const BookingRequest: React.FC = () => {
                         <div className="flex">
                           <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                           <div className="ml-3">
-                            <p className="text-red-700 font-semibold">
-                              🚫 {t.labels.communicationImpossible}
-                            </p>
-                            <p className="text-red-600 text-sm mt-1">
-                              {t.labels.needShared}
-                            </p>
+                            <p className="text-red-700 font-semibold">🚫 {t.labels.communicationImpossible}</p>
+                            <p className="text-red-600 text-sm mt-1">{t.labels.needShared}</p>
                           </div>
                         </div>
                       </div>
@@ -1561,20 +1360,13 @@ const BookingRequest: React.FC = () => {
                   </section>
 
                   {/* Section Contact */}
-                  <section
-                    className="p-5 sm:p-6 border-t border-gray-50"
-                    ref={refPhone}
-                  >
-                    <SectionHeader
-                      icon={<Phone className="w-5 h-5" />}
-                      title={t.contact}
-                    />
+                  <section className="p-5 sm:p-6 border-t border-gray-50" ref={refPhone}>
+                    <SectionHeader icon={<Phone className="w-5 h-5" />} title={t.contact} />
 
                     {/* Numéro */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Phone size={16} className="inline mr-1" />{' '}
-                        {t.fields.phone} <span className="text-red-500">*</span>
+                        <Phone size={16} className="inline mr-1" /> {t.fields.phone} <span className="text-red-500">*</span>
                       </label>
 
                       <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
@@ -1595,32 +1387,27 @@ const BookingRequest: React.FC = () => {
                           type="tel"
                           value={formData.phoneNumber}
                           onChange={handleInputChange}
-                          className={`w-full sm:flex-1 ${inputClass('phoneNumber')} ${
-                            fieldErrors.phoneNumber ? 'bg-red-50' : ''
-                          }`}
+                          className={`w-full sm:flex-1 ${inputClass('phoneNumber')} ${fieldErrors.phoneNumber ? 'bg-red-50' : ''}`}
                           placeholder={t.placeholders.phone}
                           maxLength={20}
                         />
                       </div>
                       <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
-                        <Info className={`w-4 h-4 ${THEME.icon}`} />{' '}
-                        {t.hints.phone}
+                        <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.phone}
                       </div>
-                      {fieldErrors.phoneNumber && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {fieldErrors.phoneNumber}
-                        </p>
+                      {fieldErrors.phoneNumber && <p className="mt-1 text-sm text-red-600">{fieldErrors.phoneNumber}</p>}
+                      {!!phoneE164 && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          ➜ International: <span className="font-mono">{phoneE164}</span>
+                        </div>
                       )}
-                      <div className="mt-2 text-sm text-gray-700">
-                        ⏱️ <strong>{t.callTiming}</strong>
-                      </div>
+                      <div className="mt-2 text-sm text-gray-700">⏱️ <strong>{t.callTiming}</strong></div>
                     </div>
 
                     {/* WhatsApp */}
                     <div className="mt-5">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <MessageCircle size={16} className="inline mr-1" />{' '}
-                        {t.fields.whatsapp}
+                        <MessageCircle size={16} className="inline mr-1" /> {t.fields.whatsapp}
                       </label>
                       <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
                         <select
@@ -1640,25 +1427,24 @@ const BookingRequest: React.FC = () => {
                           type="tel"
                           value={formData.whatsappNumber}
                           onChange={handleInputChange}
-                          className={`w-full sm:flex-1 ${inputClass(
-                            'whatsappNumber',
-                          )}`}
+                          className={`w-full sm:flex-1 ${inputClass('whatsappNumber')}`}
                           placeholder={t.placeholders.phone}
                           maxLength={20}
                         />
                       </div>
+                      {!!whatsappE164 && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          ➜ WhatsApp (E.164): <span className="font-mono">{whatsappE164}</span>
+                        </div>
+                      )}
                       <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
-                        <Info className={`w-4 h-4 ${THEME.icon}`} />{' '}
-                        {t.hints.whatsapp}
+                        <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.whatsapp}
                       </div>
                     </div>
                   </section>
 
                   {/* CGU */}
-                  <section
-                    className="p-5 sm:p-6 border-t border-gray-50"
-                    ref={refCGU}
-                  >
+                  <section className="p-5 sm:p-6 border-t border-gray-50" ref={refCGU}>
                     <div className="bg-gray-50 rounded-xl p-4 sm:p-5 border border-gray-200">
                       <div className="flex items-start gap-3">
                         <input
@@ -1670,15 +1456,9 @@ const BookingRequest: React.FC = () => {
                           className="h-5 w-5 mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500 flex-shrink-0"
                           required
                         />
-                        <label
-                          htmlFor="acceptTerms"
-                          className="text-sm text-gray-700 leading-relaxed"
-                        >
+                        <label htmlFor="acceptTerms" className="text-sm text-gray-700 leading-relaxed">
                           {t.fields.accept}
-                          <Link
-                            to="/cgu-clients"
-                            className="text-red-600 hover:text-red-700 underline font-medium"
-                          >
+                          <Link to="/cgu-clients" className="text-red-600 hover:text-red-700 underline font-medium">
                             {t.cgu}
                           </Link>
                           {t.fields.andConfirm}
@@ -1694,19 +1474,11 @@ const BookingRequest: React.FC = () => {
                         <div className="flex">
                           <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
                           <div className="ml-3">
-                            <p className="font-semibold text-red-800">
-                              {t.errorsTitle}
-                            </p>
-                            {formError && (
-                              <p className="text-sm text-red-700 mt-1">
-                                {formError}
-                              </p>
-                            )}
+                            <p className="font-semibold text-red-800">{t.errorsTitle}</p>
+                            {formError && <p className="text-sm text-red-700 mt-1">{formError}</p>}
                             {!!formErrors.length && (
                               <ul className="list-disc list-inside text-sm text-red-700 mt-2 space-y-1">
-                                {formErrors.map((err, i) => (
-                                  <li key={i}>{err}</li>
-                                ))}
+                                {formErrors.map((err, i) => (<li key={i}>{err}</li>))}
                               </ul>
                             )}
                           </div>
@@ -1722,22 +1494,16 @@ const BookingRequest: React.FC = () => {
                       onClick={() => setShowPreview((v) => !v)}
                       className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50"
                     >
-                      {showPreview
-                        ? 'Masquer l’aperçu'
-                        : 'Afficher l’aperçu rapide'}
+                      {showPreview ? 'Masquer l’aperçu' : 'Afficher l’aperçu rapide'}
                     </button>
 
                     {showPreview && (
                       <div className="mt-3">
                         <PreviewCard
                           title={formData.title}
-                          country={
-                            formData.currentCountry === 'Autre'
-                              ? formData.autrePays
-                              : formData.currentCountry
-                          }
+                          country={formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry}
                           langs={languagesSpoken.map((l) => l.code)}
-                          phone={`${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
+                          phone={phoneE164 || `${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
                           priceLabel={`${displayEUR}€ / $${displayUSD}`}
                           duration={displayDuration}
                           langPack={t}

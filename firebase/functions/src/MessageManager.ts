@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-import { twilioClient, twilioPhoneNumber } from './lib/twilio';
+import { twilioClient, twilioPhoneNumber, getTwilioPhoneNumber, getTwilioWhatsAppNumber } from './lib/twilio'; // ✅ AJOUT des imports manquants
 import { logError } from './utils/logs/logError';
 
 export interface MessageTemplate {
@@ -172,13 +172,15 @@ export class MessageManager {
    */
   async sendNotificationCall(phoneNumber: string, message: string): Promise<boolean> {
     try {
-      if (!process.env.TWILIO_PHONE_NUMBER) {
+      // ✅ CORRIGÉ : Utiliser la fonction Firebase Secrets
+      const twilioPhone = getTwilioPhoneNumber();
+      if (!twilioPhone) {
         throw new Error('Configuration Twilio manquante');
       }
 
       await twilioClient.calls.create({
         to: phoneNumber,
-        from: process.env.TWILIO_PHONE_NUMBER,
+        from: twilioPhone, // ✅ CORRIGÉ : Firebase Secrets
         twiml: `<Response><Say voice="alice" language="fr-FR">${message}</Say></Response>`,
         timeout: 20
       });
@@ -207,13 +209,15 @@ export class MessageManager {
    */
   private async sendWhatsAppDirect(to: string, message: string): Promise<boolean> {
     try {
-      if (!process.env.TWILIO_WHATSAPP_NUMBER) {
+      // ✅ CORRIGÉ : Utiliser la fonction Firebase Secrets
+      const whatsappNumber = getTwilioWhatsAppNumber();
+      if (!whatsappNumber) {
         throw new Error('Numéro WhatsApp Twilio non configuré');
       }
 
       await twilioClient.messages.create({
         body: message,
-        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+        from: whatsappNumber, // ✅ CORRIGÉ : Firebase Secrets (déjà formaté avec whatsapp:)
         to: `whatsapp:${to}`
       });
       return true;
@@ -225,13 +229,15 @@ export class MessageManager {
 
   private async sendSMSDirect(to: string, message: string): Promise<boolean> {
     try {
-      if (!process.env.TWILIO_PHONE_NUMBER) {
+      // ✅ CORRIGÉ : Utiliser la fonction Firebase Secrets
+      const twilioPhone = getTwilioPhoneNumber();
+      if (!twilioPhone) {
         throw new Error('Numéro SMS Twilio non configuré');
       }
 
       await twilioClient.messages.create({
         body: message,
-        from: process.env.TWILIO_PHONE_NUMBER,
+        from: twilioPhone, // ✅ CORRIGÉ : Firebase Secrets
         to: to
       });
       return true;

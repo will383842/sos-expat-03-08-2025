@@ -22,6 +22,13 @@ interface VoicePrompts {
 import _prompts from './content/voicePrompts.json';
 const prompts = _prompts as unknown as VoicePrompts;
 
+// =============================
+// URL Configuration
+// =============================
+const REGION = process.env.GCLOUD_REGION || 'europe-west1';
+const PROJECT = process.env.GCP_PROJECT;
+const BASE = process.env.FUNCTIONS_BASE_URL || `https://${REGION}-${PROJECT}.cloudfunctions.net`;
+
 export interface CallSessionState {
   id: string;
   status: 'pending' | 'provider_connecting' | 'client_connecting' | 'both_connecting' | 'active' | 'completed' | 'failed' | 'cancelled';
@@ -486,12 +493,12 @@ private async validatePaymentStatus(paymentIntentId: string): Promise<boolean> {
           from: twilioPhoneNumber,
           twiml,
           // 🔁 Callback d'ÉTAT D'APPEL (pas conférence)
-          statusCallback: `${process.env.FUNCTION_URL}/twilioCallWebhook`,
+          statusCallback: `${BASE}/twilioCallWebhook`,
           statusCallbackMethod: 'POST',
           statusCallbackEvent: ['ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer'],
           timeout: CALL_CONFIG.CALL_TIMEOUT,
           record: true,
-          recordingStatusCallback: `${process.env.FUNCTION_URL}/twilioRecordingWebhook`,
+          recordingStatusCallback: `${BASE}/twilioRecordingWebhook`,
           recordingStatusCallbackMethod: 'POST',
           machineDetection: 'Enable',
           machineDetectionTimeout: 10
@@ -613,11 +620,11 @@ private async validatePaymentStatus(paymentIntentId: string): Promise<boolean> {
   <Say voice="alice" language="${ttsLocale}">${escapeXml(welcomeMessage)}</Say>
   <Dial timeout="${CALL_CONFIG.CALL_TIMEOUT}" timeLimit="${timeLimit}">
     <Conference
-      statusCallback="${process.env.FUNCTION_URL}/twilioConferenceWebhook"
+      statusCallback="${BASE}/twilioConferenceWebhook"
       statusCallbackMethod="POST"
       statusCallbackEvent="start end join leave mute hold"
       record="record-from-start"
-      recordingStatusCallback="${process.env.FUNCTION_URL}/twilioRecordingWebhook"
+      recordingStatusCallback="${BASE}/twilioRecordingWebhook"
       recordingStatusCallbackMethod="POST"
       participantLabel="${participantLabel}"
       sessionId="${sessionId}"

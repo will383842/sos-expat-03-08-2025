@@ -84,7 +84,8 @@
     "tsx": "^4.20.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.39.0",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "vite-plugin-mkcert": "^1.17.8"
   },
   "description": "Plateforme web destinée à mettre en relation des **expatriés**, **avocats** et **clients**, pour une aide juridique, administrative ou humaine à distance, par appel.",
   "main": "build-nationalities.js",

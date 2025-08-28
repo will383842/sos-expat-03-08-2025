@@ -1,18 +1,30 @@
-[
+﻿[
   {
     "origin": [
       "http://localhost:5173",
-      "https://sos-expat.com"
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "http://localhost:5176",
+      "http://localhost:5177",
+      "https://sos-expat.com",
+      "https://www.sos-expat.com",
+      "https://sos-expat.web.app",
+      "https://sos-expat.firebaseapp.com"
     ],
-    "method": ["GET", "POST", "PUT", "HEAD", "DELETE"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
     "responseHeader": [
       "Content-Type",
+      "Content-Length",
       "Authorization",
       "x-goog-resumable",
       "X-Goog-Upload-Protocol",
       "X-Goog-Upload-Command",
       "X-Goog-Upload-Header-Content-Length",
       "X-Goog-Upload-Offset",
+      "x-goog-api-client",
+      "x-client-version",
+      "x-firebase-gmpid",
+      "x-firebase-storage-version",
       "x-goog-meta-*"
     ],
     "maxAgeSeconds": 3600

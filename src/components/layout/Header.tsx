@@ -42,12 +42,15 @@ interface AppUser {
   id?: string;
   email?: string;
   firstName?: string;
+  lastName?: string;
   displayName?: string;
+  fullName?: string;
   profilePhoto?: string;
   photoURL?: string;
-  role?: string;
-  type?: string;
+  role?: 'lawyer' | 'expat' | 'admin' | 'user';
+  type?: 'lawyer' | 'expat' | 'admin' | 'user';
   isOnline?: boolean;
+  isVerified?: boolean;
 }
 
 /** ================================
@@ -95,14 +98,14 @@ const SUPPORTED_LANGUAGES: Language[] = [
 ];
 
 const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/', labelKey: 'nav.home',         mobileIcon: '🏠', desktopIcon: '🏠' },
+  { path: '/', labelKey: 'nav.home', mobileIcon: '🏠', desktopIcon: '🏠' },
   { path: '/sos-appel', labelKey: 'nav.viewProfiles', mobileIcon: '👥', desktopIcon: '👥' },
   { path: '/testimonials', labelKey: 'nav.testimonials', mobileIcon: '💬', desktopIcon: '💬' },
 ];
 
 const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
   { path: '/how-it-works', labelKey: 'nav.howItWorks', mobileIcon: '⚡', desktopIcon: '⚡' },
-  { path: '/pricing',      labelKey: 'nav.pricing',     mobileIcon: '💎', desktopIcon: '💎' },
+  { path: '/pricing', labelKey: 'nav.pricing', mobileIcon: '💎', desktopIcon: '💎' },
 ];
 
 const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
@@ -136,10 +139,11 @@ const useAvailabilityToggle = () => {
   const { user } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(!!user?.isOnline);
   const [isUpdating, setIsUpdating] = useState(false);
+  const sosSnapshotSubscribed = useRef(false);
 
   const isProvider =
     user?.role === 'lawyer' ||
-    user?.role === 'expat'  ||
+    user?.role === 'expat' ||
     user?.type === 'lawyer' ||
     user?.type === 'expat';
 
@@ -147,7 +151,10 @@ const useAvailabilityToggle = () => {
   const writeSosProfile = useCallback(async (newStatus: boolean) => {
     if (!user || !isProvider) return;
 
-    const userId = (user as any).uid || (user as any).id;
+    const typedUser = user as AppUser;
+    const userId = typedUser.uid || typedUser.id;
+    if (!userId) return;
+
     const sosRef = doc(db, 'sos_profiles', userId);
     const updateData = {
       isOnline: newStatus,
@@ -170,22 +177,21 @@ const useAvailabilityToggle = () => {
     try {
       const snap = await getDoc(sosRef);
       if (!snap.exists()) {
-const newProfileData = {
-  type: (user as any).role || (user as any).type,
-  fullName:
-    (user as any).fullName ||
-    `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
-    'Expert',
-  ...updateData,
-  isActive: true,
-  isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
-  isVerified: !!(user as any).isVerified,
-  rating: 5.0,
-  reviewCount: 0,
-  createdAt: serverTimestamp(),
-};
-await setDoc(sosRef, newProfileData, { merge: true });
-
+        const newProfileData = {
+          type: typedUser.role || typedUser.type,
+          fullName:
+            typedUser.fullName ||
+            `${typedUser.firstName || ''} ${typedUser.lastName || ''}`.trim() ||
+            'Expert',
+          ...updateData,
+          isActive: true,
+          isApproved: (typedUser.role || typedUser.type) !== 'lawyer',
+          isVerified: !!typedUser.isVerified,
+          rating: 5.0,
+          reviewCount: 0,
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(sosRef, newProfileData, { merge: true });
         return;
       }
     } catch {
@@ -203,25 +209,28 @@ await setDoc(sosRef, newProfileData, { merge: true });
     }
 
     // 4) Dernier recours : créer doc {uid}
-await setDoc(sosRef, {
-  type: (user as any).role || (user as any).type,
-  fullName:
-    (user as any).fullName ||
-    `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() ||
-    'Expert',
-  ...updateData,
-  isActive: true,
-  isApproved: ((user as any).role || (user as any).type) !== 'lawyer',
-  isVerified: !!(user as any).isVerified,
-  rating: 5.0,
-  reviewCount: 0,
-  createdAt: serverTimestamp(),
-}, { merge: true });
+    await setDoc(sosRef, {
+      type: typedUser.role || typedUser.type,
+      fullName:
+        typedUser.fullName ||
+        `${typedUser.firstName || ''} ${typedUser.lastName || ''}`.trim() ||
+        'Expert',
+      ...updateData,
+      isActive: true,
+      isApproved: (typedUser.role || typedUser.type) !== 'lawyer',
+      isVerified: !!typedUser.isVerified,
+      rating: 5.0,
+      reviewCount: 0,
+      createdAt: serverTimestamp(),
+    }, { merge: true });
   }, [user, isProvider]);
 
   const writeUsersPresenceBestEffort = useCallback(async (newStatus: boolean) => {
     if (!user) return;
-    const userId = (user as any).uid || (user as any).id;
+    const typedUser = user as AppUser;
+    const userId = typedUser.uid || typedUser.id;
+    if (!userId) return;
+
     const userRef = doc(db, 'users', userId);
     const payload = {
       isOnline: newStatus,
@@ -232,30 +241,44 @@ await setDoc(sosRef, {
     try {
       await updateDoc(userRef, payload);
     } catch (e) {
-      // Ne bloque pas si rules refusent (ex: email non vérifié)
-      console.warn('Users presence update ignorée (règles/email) :', e);
+      // Tentative avec setDoc merge si updateDoc échoue
+      try {
+        await setDoc(userRef, { uid: userId, ...payload }, { merge: true });
+      } catch (e2) {
+        console.warn('Users presence update ignorée (règles/email) :', e2);
+      }
     }
   }, [user]);
 
   // --- Ecoute temps réel : sos_profiles = source de vérité pour l'UI ---
   useEffect(() => {
     if (!user || !isProvider) return;
-    const userId = (user as any).uid || (user as any).id;
+    if (sosSnapshotSubscribed.current) return;
+    sosSnapshotSubscribed.current = true;
+
+    const typedUser = user as AppUser;
+    const userId = typedUser.uid || typedUser.id;
+    if (!userId) return;
+
     const sosRef = doc(db, 'sos_profiles', userId);
 
     const un = onSnapshot(
       sosRef,
       (snap) => {
         if (!snap.exists()) return;
-        const data = snap.data() as any;
-        const next = data?.isOnline === true;
+        const data = snap.data();
+        if (!data) return;
+        const next = data.isOnline === true;
         setIsOnline(prev => (prev !== next ? next : prev));
       },
       (err) => console.error('Erreur snapshot sos_profiles:', err)
     );
 
-    return () => un();
-  }, [user, isProvider]);
+    return () => {
+      sosSnapshotSubscribed.current = false;
+      un();
+    };
+  }, [user?.uid, isProvider]);
 
   // Garde en phase avec un éventuel changement externe du user
   useEffect(() => {
@@ -263,13 +286,16 @@ await setDoc(sosRef, {
   }, [user?.isOnline]);
 
   const toggle = useCallback(async () => {
-    if ((!user || (!(user as any).uid && !(user as any).id)) || isUpdating) return;
+    if (!user || isUpdating) return;
+    const typedUser = user as AppUser;
+    const userId = typedUser.uid || typedUser.id;
+    if (!userId) return;
 
     const newStatus = !isOnline;
     setIsUpdating(true);
 
     try {
-      // 1) Écrire d’abord dans sos_profiles (vérité)
+      // 1) Écrire d'abord dans sos_profiles (vérité)
       await writeSosProfile(newStatus);
       // 2) Puis essayer users (best-effort)
       await writeUsersPresenceBestEffort(newStatus);
@@ -278,7 +304,7 @@ await setDoc(sosRef, {
 
       // Broadcast (on émet les DEUX événements pour compatibilité)
       window.dispatchEvent(new CustomEvent('availability:changed', { detail: { isOnline: newStatus } }));
-      window.dispatchEvent(new CustomEvent('availabilityChanged',   { detail: { isOnline: newStatus } }));
+      window.dispatchEvent(new CustomEvent('availabilityChanged', { detail: { isOnline: newStatus } }));
 
       // Analytics
       window.gtag?.('event', 'online_status_change', {
@@ -492,7 +518,7 @@ const PWAInstallArea = memo(({ scrolled }: { scrolled: boolean }) => {
           <span className={`font-extrabold text-xl ${scrolled ? 'text-white' : 'text-gray-900'}`}>SOS Expat</span>
           <span className="text-sm font-semibold">
             <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-              {language === 'fr' ? 'd’Ulixai' : 'by Ulixai'}
+              {language === 'fr' ? "d'Ulixai" : 'by Ulixai'}
             </span>
           </span>
         </div>
@@ -509,12 +535,35 @@ const PWAInstallArea = memo(({ scrolled }: { scrolled: boolean }) => {
 PWAInstallArea.displayName = 'PWAInstallArea';
 
 /** ================================
+ *  PWA icon button (mobile)
+ *  ================================ */
+const PWAIconButton = memo(() => {
+  const { install } = usePWAInstall();
+  const { language } = useApp();
+
+  const handleClick = async () => { await install(); };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="w-16 h-16 rounded-2xl overflow-hidden bg-transparent focus:outline-none focus:ring-0 touch-manipulation"
+      aria-label={language === 'fr' ? "Installer l'application" : 'Install the app'}
+      title={language === 'fr' ? "Installer l'application" : 'Install the app'}
+    >
+      <img src="/icons/icon-512x512-maskable.png" alt="SOS Expat App Icon" className="w-full h-full object-cover" />
+    </button>
+  );
+});
+PWAIconButton.displayName = 'PWAIconButton';
+
+/** ================================
  *  User Menu (uses navigate on logout)
  *  ================================ */
 const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = false, scrolled = false }) => {
   const { user, logout } = useAuth();
   const { language } = useApp();
-  const navigate = useNavigate(); // ← redirect after logout
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -530,9 +579,7 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     try {
       await logout();
       setOpen(false);
-      // analytics
       window.gtag?.('event', 'logout', { event_category: 'engagement' });
-      // navigate home
       try {
         navigate('/', { replace: true });
       } catch {
@@ -540,7 +587,6 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
       }
     } catch (error) {
       console.error('Logout error:', error);
-      // ensure user lands home even on error
       try {
         navigate('/', { replace: true });
       } catch {
@@ -589,7 +635,6 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     return isMobile ? <div className="space-y-4">{authLinks}</div> : <div className="flex items-center space-x-4">{authLinks}</div>;
   }
 
-  
   if (isMobile) {
     const mobileContainer = scrolled
       ? 'flex items-center space-x-4 p-4 bg-white/20 backdrop-blur-sm rounded-xl'
@@ -612,9 +657,9 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     return (
       <div className="space-y-4">
         <div className={mobileContainer}>
-          <UserAvatar user={user as AppUser} />
+          <UserAvatar user={user} />
           <div>
-            <div className={nameClass}>{user.firstName || (user as any).displayName || user.email}</div>
+            <div className={nameClass}>{user.firstName || user.displayName || user.email}</div>
             <div className={roleClass}>{user.role || 'Utilisateur'}</div>
           </div>
         </div>
@@ -639,7 +684,6 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     );
   }
 
-
   return (
     <div className="relative" ref={ref}>
       <button
@@ -649,8 +693,8 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
         aria-haspopup="true"
         aria-label="Menu utilisateur"
       >
-        <UserAvatar user={user as AppUser} />
-        <span className="text-sm font-medium hidden md:inline">{user.firstName || (user as any).displayName || 'User'}</span>
+        <UserAvatar user={user} />
+        <span className="text-sm font-medium hidden md:inline">{user.firstName || user.displayName || 'User'}</span>
         <ChevronDown className={`w-4 h-4 transition-all duration-300 ${open ? 'rotate-180 text-yellow-300' : ''}`} />
       </button>
 
@@ -658,9 +702,9 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
         <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 animate-in slide-in-from-top-2 duration-300">
           <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-red-50 to-orange-50 rounded-t-2xl">
             <div className="flex items-center space-x-3">
-              <UserAvatar user={user as AppUser} />
+              <UserAvatar user={user} />
               <div>
-                <div className="font-semibold text-gray-900">{user.firstName || (user as any).displayName || user.email}</div>
+                <div className="font-semibold text-gray-900">{user.firstName || user.displayName || user.email}</div>
                 <div className="text-xs text-gray-500 capitalize">{user.role || 'Utilisateur'}</div>
               </div>
             </div>
@@ -706,11 +750,11 @@ const Header: React.FC = () => {
 
   const getNavigationLabel = useCallback((labelKey: string): string => {
     const translations: Record<string, Record<'fr' | 'en', string>> = {
-      'nav.home':         { fr: 'Accueil',          en: 'Home' },
-      'nav.viewProfiles': { fr: 'Profils aidants',  en: 'Helper profiles' },
-      'nav.testimonials': { fr: 'Avis',             en: 'Reviews' },
-      'nav.howItWorks':   { fr: 'Comment ça marche', en: 'How it Works' },
-      'nav.pricing':      { fr: 'Tarifs',           en: 'Pricing' },
+      'nav.home': { fr: 'Accueil', en: 'Home' },
+      'nav.viewProfiles': { fr: 'Profils aidants', en: 'Helper profiles' },
+      'nav.testimonials': { fr: 'Avis', en: 'Reviews' },
+      'nav.howItWorks': { fr: 'Comment ça marche', en: 'How it Works' },
+      'nav.pricing': { fr: 'Tarifs', en: 'Pricing' },
     };
     return translations[labelKey]?.[language] || labelKey;
   }, [language]);
@@ -886,7 +930,7 @@ const Header: React.FC = () => {
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'Organization',
-              name: 'SOS Expat d’Ulixai',
+              name: 'SOS Expat d\'Ulixai',
               description: language === 'fr' ? "Service d'assistance pour expatriés et voyageurs" : 'Assistance service for expats and travelers',
               url: window.location.origin,
               logo: `${window.location.origin}/icons/icon-512x512-maskable.png`,
@@ -920,7 +964,7 @@ const Header: React.FC = () => {
             meta.content = content;
           };
           const currentPage = location.pathname;
-          const baseTitle = 'SOS Expat d’Ulixai';
+          const baseTitle = 'SOS Expat d\'Ulixai';
           const baseDescription = language === 'fr'
             ? "Service d'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés."
             : 'Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.';
@@ -945,25 +989,3 @@ const Header: React.FC = () => {
 
 Header.displayName = 'Header';
 export default memo(Header);
-
-/** ================================
- *  PWA icon button (mobile)
- *  ================================ */
-function PWAIconButton() {
-  const { install } = usePWAInstall();
-  const { language } = useApp();
-
-  const handleClick = async () => { await install(); };
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="w-16 h-16 rounded-2xl overflow-hidden bg-transparent focus:outline-none focus:ring-0 touch-manipulation"
-      aria-label={language === 'fr' ? "Installer l'application" : 'Install the app'}
-      title={language === 'fr' ? "Installer l'application" : 'Install the app'}
-    >
-      <img src="/icons/icon-512x512-maskable.png" alt="SOS Expat App Icon" className="w-full h-full object-cover" />
-    </button>
-  );
-}

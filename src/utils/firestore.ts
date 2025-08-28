@@ -654,15 +654,17 @@ export const getAllReviews = async (options?: {
   });
 };
 
-// IMPORTANT FIX: tolerant fetch by providerId or providerUid, with subcollection fallback.
+// IMPORTANT FIX: tolerant fetch by providerId or providerUid, with subcollection fallback + filtrage isPublic
 export const getProviderReviews = async (providerIdOrUid: string): Promise<Review[]> => {
   try {
     const reviewsCol = collection(db, 'reviews');
 
+    // Ajout du filtre isPublic == true dans les deux requêtes principales
     const q1 = query(
       reviewsCol,
       where('providerId', '==', providerIdOrUid),
       where('status', '==', 'published'),
+      where('isPublic', '==', true),
       orderBy('createdAt', 'desc'),
       fsLimit(100)
     );
@@ -673,6 +675,7 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
         reviewsCol,
         where('providerUid', '==', providerIdOrUid),
         where('status', '==', 'published'),
+        where('isPublic', '==', true),
         orderBy('createdAt', 'desc'),
         fsLimit(100)
       );
@@ -680,7 +683,7 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
     }
 
     if (snap.empty) {
-      // fallback sous-collection
+      // fallback sous-collection - on filtre côté client pour isPublic
       try {
         const sub = await getDocs(collection(db, 'sos_profiles', providerIdOrUid, 'reviews'));
         return sub.docs
@@ -692,6 +695,10 @@ export const getProviderReviews = async (providerIdOrUid: string): Promise<Revie
               createdAt: toDate(data?.createdAt) || new Date(0),
               helpfulVotes: typeof data?.helpfulVotes === 'number' ? (data.helpfulVotes as number) : 0,
             } as Review;
+          })
+          .filter((review) => {
+            // Filtrage côté client : ne garder que les avis publics
+            return review.isPublic === true || review.status === 'published';
           })
           .sort((a, b) => {
             const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;

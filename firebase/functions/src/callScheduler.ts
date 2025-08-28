@@ -3,6 +3,7 @@ import { logCallRecord } from './utils/logs/logCallRecord';
 import { logError } from './utils/logs/logError';
 import * as admin from 'firebase-admin';
 import { CallSessionState } from './TwilioCallManager';
+import { scheduleCallTask, cancelCallTask } from './lib/tasks';
 
 // Configuration pour la production
 const SCHEDULER_CONFIG = {
@@ -59,10 +60,11 @@ interface SchedulerStats {
 }
 
 /**
- * 🔧 FIX: Classe pour gérer la planification et la surveillance des appels avec initialisation lazy
+ * 🔧 FIX: Classe pour gérer la planification et la surveillance des appels avec Cloud Tasks
  */
 class CallSchedulerManager {
-  private scheduledCalls = new Map<string, NodeJS.Timeout>();
+  // 🔄 CHANGEMENT: Plus de Map pour les timeouts, Cloud Tasks gère la planification
+  private scheduledTaskIds = new Map<string, string>(); // sessionId -> taskId
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private stats: SchedulerStats = {
     totalScheduled: 0,
@@ -84,7 +86,7 @@ class CallSchedulerManager {
         this.startHealthCheck();
         await this.loadInitialStats();
         this.isInitialized = true;
-        console.log('✅ CallSchedulerManager initialisé');
+        console.log('✅ CallSchedulerManager initialisé avec Cloud Tasks');
       } catch (error) {
         console.error('❌ Erreur initialisation CallSchedulerManager:', error);
         throw error;
@@ -113,7 +115,8 @@ class CallSchedulerManager {
       // Vérifier les sessions en attente
       const pendingSessions = await this.getPendingSessions();
       this.stats.currentlyPending = pendingSessions.length;
-      this.stats.queueLength = this.scheduledCalls.size;
+      // 🔄 CHANGEMENT: Plus de timeout local, mais on peut compter les tâches planifiées
+      this.stats.queueLength = this.scheduledTaskIds.size;
 
       // Nettoyer les sessions expirées
       await this.cleanupExpiredSessions();
@@ -123,7 +126,7 @@ class CallSchedulerManager {
 
       // Log des métriques pour monitoring
       console.log(
-        `📊 Scheduler Health: ${this.stats.currentlyPending} pending, ${this.stats.queueLength} queued`
+        `📊 Scheduler Health: ${this.stats.currentlyPending} pending, ${this.stats.queueLength} scheduled tasks`
       );
     } catch (error) {
       await logError('CallScheduler:performHealthCheck', error);
@@ -168,14 +171,21 @@ class CallSchedulerManager {
   private async cleanupExpiredSessions(): Promise<void> {
     const expiredThreshold = Date.now() - 30 * 60 * 1000; // 30 minutes
 
-    for (const [sessionId, timeout] of this.scheduledCalls.entries()) {
+    // 🔄 CHANGEMENT: Nettoyer les tâches expirées aussi
+    for (const [sessionId, taskId] of this.scheduledTaskIds.entries()) {
       try {
         const twilioCallManager = await getTwilioCallManager();
         const session = await twilioCallManager.getCallSession(sessionId);
 
         if (!session || session.metadata.createdAt.toMillis() < expiredThreshold) {
-          clearTimeout(timeout);
-          this.scheduledCalls.delete(sessionId);
+          // Annuler la tâche Cloud Tasks
+          try {
+            await cancelCallTask(taskId);
+          } catch (taskError) {
+            console.warn(`Erreur annulation tâche ${taskId}:`, taskError);
+          }
+
+          this.scheduledTaskIds.delete(sessionId);
 
           if (session && session.status === 'pending') {
             await twilioCallManager.cancelCallSession(sessionId, 'expired', 'scheduler');
@@ -198,7 +208,7 @@ class CallSchedulerManager {
     for (const session of pendingSessions) {
       if (
         session.metadata.createdAt.toMillis() < stuckThreshold &&
-        !this.scheduledCalls.has(session.id)
+        !this.scheduledTaskIds.has(session.id)
       ) {
         console.log(`🔄 Redémarrage session bloquée: ${session.id}`);
 
@@ -232,7 +242,7 @@ class CallSchedulerManager {
   }
 
   /**
-   * Programme une séquence d'appel
+   * 🔄 REFACTORISÉ: Programme une séquence d'appel avec Cloud Tasks
    */
   async scheduleCallSequence(
     callSessionId: string,
@@ -264,11 +274,16 @@ class CallSchedulerManager {
         return;
       }
 
-      // Annuler toute planification existante
-      const existingTimeout = this.scheduledCalls.get(callSessionId);
-      if (existingTimeout) {
-        clearTimeout(existingTimeout);
-        this.scheduledCalls.delete(callSessionId);
+      // 🔄 CHANGEMENT: Annuler toute tâche Cloud Tasks existante
+      const existingTaskId = this.scheduledTaskIds.get(callSessionId);
+      if (existingTaskId) {
+        try {
+          await cancelCallTask(existingTaskId);
+          console.log(`🚫 Tâche existante annulée: ${existingTaskId}`);
+        } catch (cancelError) {
+          console.warn(`Erreur annulation tâche existante:`, cancelError);
+        }
+        this.scheduledTaskIds.delete(callSessionId);
       }
 
       await logCallRecord({
@@ -278,21 +293,23 @@ class CallSchedulerManager {
         additionalData: {
           delayMinutes: sanitizedDelay,
           scheduledAt: new Date().toISOString(),
+          method: 'cloud_tasks',
         },
       });
 
       console.log(
-        `⏰ Séquence d'appel programmée pour ${callSessionId} dans ${sanitizedDelay} minutes`
+        `⏰ Séquence d'appel programmée avec Cloud Tasks pour ${callSessionId} dans ${sanitizedDelay} minutes`
       );
 
-      // Programmer l'exécution
-      const timeout = setTimeout(async () => {
-        this.scheduledCalls.delete(callSessionId);
-        await this.executeScheduledCall(callSessionId);
-      }, sanitizedDelay * 60 * 1000);
+      // 🔄 NOUVEAU: Programmer avec Cloud Tasks au lieu de setTimeout
+      const delaySeconds = sanitizedDelay * 60; // Conversion en secondes
+      const taskId = await scheduleCallTask(callSessionId, delaySeconds);
 
-      this.scheduledCalls.set(callSessionId, timeout);
+      // Stocker l'ID de la tâche pour pouvoir l'annuler si nécessaire
+      this.scheduledTaskIds.set(callSessionId, taskId);
       this.stats.totalScheduled++;
+
+      console.log(`✅ Tâche Cloud Tasks créée: ${taskId} pour session ${callSessionId}`);
     } catch (error) {
       await logError('CallScheduler:scheduleCallSequence', error);
 
@@ -314,15 +331,19 @@ class CallSchedulerManager {
   }
 
   /**
-   * Exécute un appel programmé avec gestion de retry
+   * 🆕 NOUVEAU: Exécute un appel programmé (appelé par Cloud Tasks webhook)
+   * Cette méthode sera appelée par la Cloud Function qui reçoit le webhook de Cloud Tasks
    */
-  private async executeScheduledCall(callSessionId: string): Promise<void> {
+  async executeScheduledCall(callSessionId: string): Promise<void> {
     let retryCount = 0;
+
+    // Nettoyer le tracking de la tâche puisqu'elle s'exécute maintenant
+    this.scheduledTaskIds.delete(callSessionId);
 
     while (retryCount < SCHEDULER_CONFIG.RETRY_ATTEMPTS) {
       try {
         console.log(
-          `🚀 Exécution appel programmé: ${callSessionId} (tentative ${
+          `🚀 Exécution appel programmé par Cloud Tasks: ${callSessionId} (tentative ${
             retryCount + 1
           }/${SCHEDULER_CONFIG.RETRY_ATTEMPTS})`
         );
@@ -345,7 +366,7 @@ class CallSchedulerManager {
         // Utiliser le TwilioCallManager pour la gestion robuste des appels
         await twilioCallManager.initiateCallSequence(callSessionId, 0);
 
-        console.log(`✅ Appel initié avec succès: ${callSessionId}`);
+        console.log(`✅ Appel initié avec succès par Cloud Tasks: ${callSessionId}`);
         return;
       } catch (error) {
         retryCount++;
@@ -380,19 +401,23 @@ class CallSchedulerManager {
   }
 
   /**
-   * Annule un appel programmé
+   * 🔄 MODIFIÉ: Annule un appel programmé (Cloud Tasks)
    */
   async cancelScheduledCall(callSessionId: string, reason: string): Promise<void> {
     try {
       // 🔧 FIX: Initialiser si nécessaire
       await this.initialize();
 
-      // Annuler le timeout
-      const timeout = this.scheduledCalls.get(callSessionId);
-      if (timeout) {
-        clearTimeout(timeout);
-        this.scheduledCalls.delete(callSessionId);
-        console.log(`🚫 Planification annulée pour: ${callSessionId}`);
+      // 🔄 CHANGEMENT: Annuler la tâche Cloud Tasks
+      const taskId = this.scheduledTaskIds.get(callSessionId);
+      if (taskId) {
+        try {
+          await cancelCallTask(taskId);
+          console.log(`🚫 Tâche Cloud Tasks annulée: ${taskId} pour session ${callSessionId}`);
+        } catch (cancelError) {
+          console.warn(`Erreur annulation tâche Cloud Tasks:`, cancelError);
+        }
+        this.scheduledTaskIds.delete(callSessionId);
       }
 
       // Utiliser TwilioCallManager pour annuler la session
@@ -420,7 +445,7 @@ class CallSchedulerManager {
   }
 
   /**
-   * Ferme proprement le scheduler
+   * 🔄 MODIFIÉ: Ferme proprement le scheduler (Cloud Tasks)
    */
   shutdown(): void {
     console.log('🔄 Arrêt du CallScheduler...');
@@ -431,14 +456,14 @@ class CallSchedulerManager {
       this.healthCheckInterval = null;
     }
 
-    // Annuler tous les appels programmés
-    for (const [sessionId, timeout] of this.scheduledCalls.entries()) {
-      clearTimeout(timeout);
-      console.log(`🚫 Appel programmé annulé lors de l'arrêt: ${sessionId}`);
+    // 🔄 CHANGEMENT: Plus de clearTimeout, mais on peut logger les tâches en cours
+    for (const [sessionId, taskId] of this.scheduledTaskIds.entries()) {
+      console.log(`📋 Tâche Cloud Tasks en cours lors de l'arrêt: ${taskId} pour session ${sessionId}`);
+      // Note: Les tâches Cloud Tasks continuent de s'exécuter même après l'arrêt de cette instance
     }
 
-    this.scheduledCalls.clear();
-    console.log('✅ CallScheduler arrêté proprement');
+    this.scheduledTaskIds.clear();
+    console.log('✅ CallScheduler arrêté proprement (Cloud Tasks continuent)');
   }
 
   private delay(ms: number): Promise<void> {
@@ -482,6 +507,7 @@ async function getTwilioCallManager(): Promise<import('./TwilioCallManager').Twi
   
   return twilioCallManagerInstance;
 }
+
 // 🔧 FIX: Initialisation Firebase lazy
 let db: admin.firestore.Firestore | null = null;
 
@@ -505,6 +531,14 @@ export const scheduleCallSequence = async (
 ): Promise<void> => {
   const manager = getCallSchedulerManager();
   return manager.scheduleCallSequence(callSessionId, delayMinutes);
+};
+
+/**
+ * 🆕 NOUVEAU: Fonction pour exécuter un appel programmé (appelée par Cloud Tasks webhook)
+ */
+export const executeScheduledCall = async (callSessionId: string): Promise<void> => {
+  const manager = getCallSchedulerManager();
+  return manager.executeScheduledCall(callSessionId);
 };
 
 /**
@@ -603,7 +637,7 @@ export const createAndScheduleCall = async (
       providerLanguages: params.providerLanguages,
     });
 
-    // Programmer la séquence d'appel
+    // 🔄 CHANGEMENT: Programmer la séquence d'appel avec Cloud Tasks
     const delayMinutes = params.delayMinutes ?? SCHEDULER_CONFIG.DEFAULT_DELAY_MINUTES;
 
     // Utiliser setImmediate pour éviter de bloquer la réponse
@@ -623,6 +657,7 @@ export const createAndScheduleCall = async (
         serviceType: params.serviceType,
         amountInEuros: params.amount, // audit humain
         delayMinutes,
+        schedulingMethod: 'cloud_tasks',
         // ✅ AJOUT: Log des numéros pour debug
         hasProviderPhone: !!params.providerPhone,
         hasClientPhone: !!params.clientPhone,
@@ -636,7 +671,7 @@ export const createAndScheduleCall = async (
     });
 
     console.log(
-      `✅ Appel créé et programmé: ${sessionId} dans ${delayMinutes} minutes (montant gardé en euros)`
+      `✅ Appel créé et programmé avec Cloud Tasks: ${sessionId} dans ${delayMinutes} minutes (montant gardé en euros)`
     );
 
     return callSession;
@@ -658,11 +693,12 @@ export const cancelScheduledCall = async (
 };
 
 /**
- * Fonction pour reprendre les appels en attente au redémarrage
+ * 🔄 MODIFIÉ: Fonction pour reprendre les appels en attente au redémarrage
+ * Avec Cloud Tasks, cette fonction est moins critique car les tâches survivent aux redémarrages
  */
 export const resumePendingCalls = async (): Promise<void> => {
   try {
-    console.log('🔄 Récupération des appels en attente...');
+    console.log('🔄 Récupération des appels en attente (Cloud Tasks)...');
 
     const database = getDB();
     const now = admin.firestore.Timestamp.now();
@@ -683,7 +719,7 @@ export const resumePendingCalls = async (): Promise<void> => {
       return;
     }
 
-    console.log(`🔄 Récupération de ${pendingSessions.size} sessions d'appel en attente`);
+    console.log(`🔄 Vérification de ${pendingSessions.size} sessions d'appel en attente`);
 
     const resumePromises = pendingSessions.docs.map(async (doc) => {
       const sessionId = doc.id;
@@ -703,17 +739,25 @@ export const resumePendingCalls = async (): Promise<void> => {
           return;
         }
 
-        // Relancer la séquence d'appel immédiatement
-        const twilioCallManager = await getTwilioCallManager();
-        await twilioCallManager.initiateCallSequence(sessionId, 0);
+        // 🔄 CHANGEMENT: Avec Cloud Tasks, on peut juste vérifier si une tâche existe déjà
+        // Si pas de tâche programmée, on peut en créer une nouvelle
+        const manager = getCallSchedulerManager();
+        const hasScheduledTask = manager['scheduledTaskIds'].has(sessionId);
 
-        await logCallRecord({
-          callId: sessionId,
-          status: 'call_resumed_after_restart',
-          retryCount: 0,
-        });
+        if (!hasScheduledTask) {
+          // Aucune tâche en cours, on peut en programmer une nouvelle immédiatement
+          await scheduleCallSequence(sessionId, 0); // Immédiat
 
-        console.log(`✅ Session reprise: ${sessionId}`);
+          await logCallRecord({
+            callId: sessionId,
+            status: 'call_resumed_after_restart',
+            retryCount: 0,
+          });
+
+          console.log(`✅ Session reprise avec nouvelle tâche Cloud Tasks: ${sessionId}`);
+        } else {
+          console.log(`📋 Tâche Cloud Tasks déjà programmée pour: ${sessionId}`);
+        }
       } catch (error) {
         await logError(`resumePendingCalls:session_${sessionId}`, error);
 
@@ -728,7 +772,7 @@ export const resumePendingCalls = async (): Promise<void> => {
     });
 
     await Promise.allSettled(resumePromises);
-    console.log(`✅ Récupération des sessions terminée`);
+    console.log(`✅ Vérification des sessions terminée (Cloud Tasks)`);
   } catch (error) {
     await logError('resumePendingCalls:error', error);
   }
@@ -866,13 +910,14 @@ export const getCallStatistics = async (
 };
 
 /**
- * Gestionnaire pour l'arrêt propre du service
+ * 🔄 MODIFIÉ: Gestionnaire pour l'arrêt propre du service
  */
 export const gracefulShutdown = (): void => {
-  console.log('🔄 Arrêt gracieux du CallScheduler...');
+  console.log('🔄 Arrêt gracieux du CallScheduler (Cloud Tasks)...');
   if (callSchedulerManagerInstance) {
     callSchedulerManagerInstance.shutdown();
   }
+  // Note: Les tâches Cloud Tasks continuent de s'exécuter indépendamment
 };
 
 // Gestionnaire de signaux pour arrêt propre

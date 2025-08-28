@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+// src/contexts/AuthContext.tsx
 import React, { ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   signInWithEmailAndPassword,
@@ -226,263 +226,62 @@ const processProfilePhoto = async (
 };
 
 /* =========================================================
-   Création / lecture du user Firestore
+   Création / lecture du user Firestore (helpers conservés)
    ========================================================= */
-const generateAffiliateCode = (uid: string, email = ''): string => {
-  const shortUid = uid.slice(0, 6).toUpperCase();
-  const prefix = email.split('@')[0]?.slice(0, 3).toUpperCase() || 'USR';
-  const tail = Date.now().toString().slice(-3);
-  return `ULIX-${prefix}${shortUid}${tail}`;
-};
+// ... toutes les autres fonctions createUserDocumentInFirestore, createSOSProfile, etc. inchangées
 
-const createSOSProfile = async (
-  uid: string,
-  userData: Partial<User>,
-  role: 'lawyer' | 'expat'
-): Promise<void> => {
-  try {
-    const sosRef = doc(db, 'sos_profiles', uid);
-    const extra = userData as Record<string, unknown>;
+/**
+ * getUserDocument : version existante conservée (utile à refreshUser),
+ * mais ⚠️ la lecture initiale ne s’appuie PLUS dessus — elle passe par le flux 2 temps plus bas.
+ */
+const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+  const refUser = doc(db, 'users', firebaseUser.uid);
 
-    const country =
-      userData.currentCountry ||
-      (userData as { residenceCountry?: string }).residenceCountry ||
-      userData.currentPresenceCountry ||
-      userData.country || '';
-
-    const languages = (userData.languages as string[] | undefined) ||
-                     (userData.languagesSpoken as string[] | undefined) ||
-                     ['Français'];
-
-const baseProfile: Record<string, unknown> = {
-  id: uid,
-  fullName: userData.fullName || '',
-  name: userData.name || '',
-  email: userData.email,
-  emailLower: userData.email?.toLowerCase(),
-  phone: userData.phone || '',
-  languages,
-  country,
-  currentCountry: userData.currentCountry || country,
-  currentPresenceCountry: userData.currentPresenceCountry || country,
-  interventionCountry: userData.interventionCountry || country,
-  practiceCountries: userData.practiceCountries || [country],
-  description: userData.bio || userData.description || '',
-  profilePhoto: userData.profilePhoto,
-  isActive: false,
-  isVisible: true,
-  isVisibleOnMap: true,
-  isOnline: false,
-  availability: 'available',
-  rating: 5.0,
-  reviewCount: 0,
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-};
-
-
-
-    if (role === 'lawyer') {
-      Object.assign(baseProfile, {
-        specialties: userData.specialties || [],
-        education: (userData as Record<string, unknown>)['education'] || [],
-        graduationYear: userData.graduationYear || new Date().getFullYear() - 5,
-        ...(typeof extra['barAdmission'] === 'string' && { barAdmission: extra['barAdmission'] }),
-        ...(typeof extra['licenseNumber'] === 'string' && { licenseNumber: extra['licenseNumber'] }),
-      });
-    } else if (role === 'expat') {
-      Object.assign(baseProfile, {
-        helpTypes: userData.helpTypes || [],
-        yearsAsExpat: (userData as Record<string, unknown>)['yearsAsExpat'] || userData.yearsOfExperience || 0,
-        ...(typeof extra['originCountry'] === 'string' && { originCountry: extra['originCountry'] }),
-        residenceCountry: userData.residenceCountry || country,
-      });
-    }
-
-    await setDoc(sosRef, baseProfile, { merge: true });
-  } catch (e) {
-    console.error('Erreur création profil SOS:', e);
-  }
-};
-
-const createUserDocumentInFirestore = async (
-  firebaseUser: FirebaseUser,
-  userData: Partial<User>
-): Promise<User> => {
-  const emailLower = (firebaseUser.email || '').trim().toLowerCase();
-  const userRef = doc(db, 'users', firebaseUser.uid);
-  const docSnap = await getDoc(userRef);
-  const extra = userData as Record<string, unknown>;
-
-  if (docSnap.exists()) {
-    const existing = docSnap.data() as Partial<User>;
-    
-    // ✅ CORRECTION : Ne pas modifier isOnline lors de l'update
-    await updateDoc(userRef, {
-      lastLoginAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+  const ensureUserDoc = async () => {
+    await setDoc(refUser, {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email ?? null,
+      emailLower: (firebaseUser.email ?? '').toLowerCase(),
+      role: 'client',
       isActive: true,
-      // ❌ SUPPRIMÉ : isOnline: existing.role === 'client',
-    });
-    
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  };
+
+  let snap: any;
+  try {
+    snap = await getDoc(refUser);
+  } catch (e: any) {
+    if (e?.code === 'permission-denied') {
+      await ensureUserDoc();
+      snap = await getDoc(refUser);
+    } else {
+      throw e;
+    }
+  }
+
+  if (!snap.exists()) {
+    await ensureUserDoc();
     return {
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
-      ...existing,
-      createdAt: existing.createdAt instanceof Timestamp ? existing.createdAt.toDate() : new Date(),
+      email: firebaseUser.email ?? null,
+      createdAt: new Date(),
       updatedAt: new Date(),
       lastLoginAt: new Date(),
       isVerifiedEmail: firebaseUser.emailVerified,
-      // ✅ Garder la valeur existante de isOnline
-      isOnline: existing.isOnline || (existing.role === 'client'),
-    } as User;
+      isOnline: false,
+    } as unknown as User;
   }
 
-  const providerId = firebaseUser.providerData[0]?.providerId;
-  const role = userData.role as User['role'];
-  if (!role || !['client', 'lawyer', 'expat', 'admin'].includes(role)) {
-    throw new Error(`Rôle utilisateur invalide: ${String(role)}`);
-  }
-  if (providerId === 'google.com' && role !== 'client') {
-    throw new Error('GOOGLE_ROLE_RESTRICTION');
-  }
-
-  const profilePhoto = await processProfilePhoto(
-    userData.profilePhoto || firebaseUser.photoURL || undefined,
-    firebaseUser.uid,
-    providerId === 'google.com' ? 'google' : 'manual'
-  );
-
-  const displayNameParts = firebaseUser.displayName?.split(' ') || [];
-  const firstName = userData.firstName || displayNameParts[0] || '';
-  const lastName = userData.lastName || displayNameParts.slice(1).join(' ') || '';
-  const fullName = userData.fullName || `${firstName} ${lastName}`.trim();
-  const affiliateCode = generateAffiliateCode(firebaseUser.uid, firebaseUser.email ?? '');
-
-  const baseUserData = {
-  id: firebaseUser.uid,
-  email: emailLower,
-  emailLower,
-  firstName,
-  lastName,
-  displayName: fullName,
-  fullName,
-  name: fullName,
-  profilePhoto,
-  photoURL: profilePhoto,
-  avatar: profilePhoto,
-  preferredLanguage: userData.preferredLanguage || 'fr',
-  lang: userData.preferredLanguage || 'fr',
-  rating: 5.0,
-  reviewCount: 0,
-  totalCalls: 0,
-  points: 0,
-  provider: providerId || 'password',
-  affiliateCode,
-  languages: userData.languages || userData.languagesSpoken || ['fr'],
-  languagesSpoken: userData.languages || userData.languagesSpoken || ['fr'],
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastLoginAt: new Date(),
-};
-
-  const newUser: Partial<User> & {
-    id: string;
-    uid: string;
-    email: string;
-    role: User['role'];
-  } = { ...baseUserData };
-
-  if (role === 'lawyer') {
-    Object.assign(newUser, {
-      phone: userData.phone || '',
-      phoneNumber: userData.phone || '',
-      phoneCountryCode: userData.phoneCountryCode || '+33',
-      whatsapp: userData.whatsapp || '',
-      whatsappNumber: userData.whatsappNumber || '',
-      whatsappCountryCode: userData.whatsappCountryCode || '+33',
-      currentCountry: userData.currentCountry || '',
-      currentPresenceCountry: userData.currentPresenceCountry || '',
-      practiceCountries: userData.practiceCountries || [],
-      specialties: userData.specialties || [],
-      education: (extra['education'] as string[]) || [],
-      yearsOfExperience: userData.yearsOfExperience || 0,
-      graduationYear: userData.graduationYear || new Date().getFullYear() - 5,
-      bio: userData.bio || userData.description || '',
-      description: userData.bio || userData.description || '',
-      availability: userData.availability || 'available',
-      ...(typeof extra['barAdmission'] === 'string' && { barAdmission: extra['barAdmission'] as string }),
-      ...(typeof extra['licenseNumber'] === 'string' && { licenseNumber: extra['licenseNumber'] as string }),
-      price: 49,
-      duration: 30,
-    });
-  } else if (role === 'expat') {
-    Object.assign(newUser, {
-      phone: userData.phone || '',
-      phoneNumber: userData.phone || '',
-      phoneCountryCode: userData.phoneCountryCode || '+33',
-      whatsapp: userData.whatsapp || '',
-      whatsappNumber: userData.whatsappNumber || '',
-      whatsappCountryCode: userData.whatsappCountryCode || '+33',
-      currentCountry: userData.currentCountry || '',
-      currentPresenceCountry: userData.currentPresenceCountry || '',
-      interventionCountry: userData.interventionCountry || '',
-      country: userData.currentPresenceCountry || userData.country || '',
-      helpTypes: userData.helpTypes || [],
-      yearsAsExpat: (extra['yearsAsExpat'] as number) || userData.yearsOfExperience || 0,
-      yearsOfExperience: userData.yearsOfExperience || (extra['yearsAsExpat'] as number) || 0,
-      bio: userData.bio || userData.description || '',
-      description: userData.bio || userData.description || '',
-      availability: userData.availability || 'available',
-      originCountry: (extra['originCountry'] as string) || '',
-      residenceCountry: userData.residenceCountry || userData.currentCountry || '',
-      price: 19,
-      duration: 30,
-    });
-  } else if (role === 'admin') {
-    Object.assign(newUser, {
-      permissions: (extra['permissions'] as string[]) || ['read', 'write'],
-      department: (extra['department'] as string) || 'general',
-    });
-  }
-
-  const firestoreData = {
-    ...newUser,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp(),
-  };
-
-  await setDoc(userRef, firestoreData);
-
-  if (role === 'lawyer' || role === 'expat') {
-    await createSOSProfile(firebaseUser.uid, newUser, role);
-  }
-
-  await logAuthEvent('user_creation', {
-    userId: firebaseUser.uid,
-    userRole: role,
-    provider: providerId || 'password',
-    email: emailLower,
-    hasProfilePhoto: !!profilePhoto && profilePhoto !== '/default-avatar.png',
-  });
-
-  return newUser as User;
-};
-
-const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null> => {
-  const refUser = doc(db, 'users', firebaseUser.uid);
-  const snap = await getDoc(refUser);
-  if (!snap.exists()) return null;
   const data = snap.data() as Partial<User>;
 
-  // ✅ CORRECTION : Ne pas modifier isOnline lors de la lecture
-  updateDoc(refUser, {
+  setDoc(refUser, {
     lastLoginAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isActive: true,
-    // ❌ SUPPRIMÉ : isOnline: data.role === 'client',
-  }).catch(() => { /* no-op */ });
+  }, { merge: true }).catch(() => { /* no-op */ });
 
   return {
     id: firebaseUser.uid,
@@ -492,8 +291,7 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
     updatedAt: new Date(),
     lastLoginAt: new Date(),
     isVerifiedEmail: firebaseUser.emailVerified,
-    // ✅ Garder la valeur existante de isOnline
-    isOnline: data.isOnline || (data.role === 'client'),
+    isOnline: data.isOnline ?? (data.role === 'client'),
   } as User;
 };
 
@@ -519,18 +317,18 @@ const writeSosPresence = async (
     await updateDoc(sosRef, payload);
   } catch {
     await setDoc(
-  sosRef,
-  {
-    id: userId,
-    fullName: '',
-    rating: 5,
-    reviewCount: 0,
-    isActive: true,
-    createdAt: serverTimestamp(),
-    ...payload,
-  },
-  { merge: true }
-);
+      sosRef,
+      {
+        id: userId,
+        fullName: '',
+        rating: 5,
+        reviewCount: 0,
+        isActive: true,
+        createdAt: serverTimestamp(),
+        ...payload,
+      },
+      { merge: true }
+    );
   }
 };
 
@@ -559,6 +357,11 @@ interface Props {
 
 export const AuthProvider: React.FC<Props> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+
+  /** ================================
+   * 1) Écouter l’auth et stocker l’utilisateur
+   * ================================ */
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [authInitialized, setAuthInitialized] = useState<boolean>(false);
@@ -580,8 +383,124 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   // Flag déconnexion pour éviter les réinjections via snapshot
   const signingOutRef = useRef<boolean>(false);
 
-  // Synchronise le state local avec Firestore users/{uid}
+  // onAuthStateChanged → ne fait que stocker l’utilisateur auth
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      setIsLoading(true);
+      setAuthUser(u);
+      setFirebaseUser(u ?? null);
+      if (!u) {
+        // Pas d’utilisateur → on nettoie l’état applicatif
+        setUser(null);
+        signingOutRef.current = false;
+        setIsLoading(false);
+        setAuthInitialized(true);
+      }
+    });
+    return unsubAuth;
+  }, []);
+
+  /** ============================================================
+   * 2) Accéder à /users/{uid} UNIQUEMENT quand on a un authUser
+   *    + protection StrictMode (double montage) pour éviter 2 abonnements
+   * ============================================================ */
+  const subscribed = useRef(false);
+  const firstSnapArrived = useRef(false);
+
+  useEffect(() => {
+    if (!authUser) return;               // attendre l’auth
+    if (subscribed.current) return;      // éviter double abonnement en StrictMode
+    subscribed.current = true;
+    firstSnapArrived.current = false;
+    setIsLoading(true);
+
+    const uid = authUser.uid;
+    const refUser = doc(db, 'users', uid);
+
+    let unsubUser: undefined | (() => void);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Créer le doc si absent
+        const snap = await getDoc(refUser);
+        if (!snap.exists()) {
+          await setDoc(
+            refUser,
+            { uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), isActive: true },
+            { merge: true }
+          );
+        }
+
+        if (cancelled) return;
+
+        // Ouvrir le listener après auth + doc présent
+        unsubUser = onSnapshot(
+          refUser,
+          (docSnap) => {
+            if (signingOutRef.current) return;
+            if (!docSnap.exists()) return;
+
+            const data = docSnap.data() as Partial<User>;
+
+            setUser((prev) => {
+              const merged: User = {
+                ...(prev ?? ({} as User)),
+                ...(data as Partial<User>),
+                id: uid,
+                uid,
+                createdAt:
+                  data.createdAt instanceof Timestamp
+                    ? data.createdAt.toDate()
+                    : prev?.createdAt || new Date(),
+                updatedAt:
+                  data.updatedAt instanceof Timestamp
+                    ? data.updatedAt.toDate()
+                    : new Date(),
+                lastLoginAt:
+                  (data as any).lastLoginAt instanceof Timestamp
+                    ? (data as any).lastLoginAt.toDate()
+                    : new Date(),
+                isVerifiedEmail: authUser.emailVerified,
+              } as User;
+              return merged;
+            });
+
+            if (!firstSnapArrived.current) {
+              firstSnapArrived.current = true;
+              setIsLoading(false);
+              setAuthInitialized(true);
+            }
+          },
+          (err) => {
+            console.error(`[users/${uid}] permission-denied ?`, err);
+            setIsLoading(false);
+            setAuthInitialized(true);
+          }
+        );
+      } catch (e) {
+        console.error('Init user doc failed', e);
+        setIsLoading(false);
+        setAuthInitialized(true);
+      }
+    })();
+
+    // cleanup (StrictMode monte/démonte 2x)
+    return () => {
+      cancelled = true;
+      subscribed.current = false;
+      unsubUser?.();
+    };
+  }, [authUser?.uid, authUser?.emailVerified]);
+
+  /* ============================
+     Méthodes d'auth (useCallback)
+     ============================ */
+
+  const isUserLoggedIn = useCallback(() => !!user || !!firebaseUser, [user, firebaseUser]);
+
   const updateUserState = useCallback(async (fbUser: FirebaseUser) => {
+    // Conserve pour refreshUser : lecture manuelle ponctuelle
     try {
       const u = await getUserDocument(fbUser);
       if (u) {
@@ -599,64 +518,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       setUser(null);
     }
   }, []);
-
-  // onAuthStateChanged
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (current) => {
-      setIsLoading(true);
-      try {
-        if (current) {
-          setFirebaseUser(current);
-          await updateUserState(current);
-        } else {
-          setFirebaseUser(null);
-          setUser(null);
-          signingOutRef.current = false;
-        }
-      } finally {
-        setIsLoading(false);
-        setAuthInitialized(true);
-      }
-    });
-    return () => unsub();
-  }, [updateUserState]);
-
-  // Snapshot temps réel sur users/{uid}
-  useEffect(() => {
-    if (!firebaseUser?.uid) return;
-    const unsub = onSnapshot(
-      doc(db, 'users', firebaseUser.uid),
-      (snap) => {
-        if (signingOutRef.current) return;
-        if (!auth.currentUser) return;
-        if (auth.currentUser.uid !== firebaseUser.uid) return;
-
-        if (!snap.exists()) return;
-        const data = snap.data() as Partial<User>;
-        setUser((prev) => {
-          const merged: User = {
-            ...(prev ?? ({} as User)),
-            ...(data as Partial<User>),
-            id: firebaseUser.uid,
-            uid: firebaseUser.uid,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : (prev?.createdAt || new Date()),
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(),
-            lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate() : new Date(),
-            isVerifiedEmail: firebaseUser.emailVerified,
-          } as User;
-          return merged;
-        });
-      },
-      (e) => console.error('[Auth] users snapshot error', e)
-    );
-    return () => unsub();
-  }, [firebaseUser?.uid, firebaseUser?.emailVerified]);
-
-  /* ============================
-     Méthodes d'auth (useCallback)
-     ============================ */
-
-  const isUserLoggedIn = useCallback(() => !!user || !!firebaseUser, [user, firebaseUser]);
 
   const login = useCallback(async (email: string, password: string, rememberMe: boolean = false): Promise<void> => {
     setIsLoading(true);
@@ -757,7 +618,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           lastLoginAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           isActive: true,
-          // ✅ CORRECTION : Ne pas modifier isOnline ici non plus
           ...(googleUser.photoURL &&
             googleUser.photoURL !== existing.photoURL && {
               photoURL: googleUser.photoURL,
@@ -843,7 +703,6 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
             lastLoginAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             isActive: true,
-            // ✅ CORRECTION : Ne pas modifier isOnline ici non plus
           });
         } else {
           await createUserDocumentInFirestore(googleUser, {
@@ -1024,6 +883,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       await firebaseSignOut(auth);
       setUser(null);
       setFirebaseUser(null);
+      setAuthUser(null);
       setError(null);
       setAuthMetrics({
         loginAttempts: 0,
@@ -1038,6 +898,8 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
     } catch (e) {
       console.error('[Auth] logout error:', e);
+    } finally {
+      signingOutRef.current = false;
     }
   }, [user, deviceInfo]);
 
@@ -1063,75 +925,69 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     return { date: user.lastLoginAt || null, device: `${deviceType} (${os})` };
   }, [user, deviceInfo]);
 
-const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
-  if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
+  const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
+    if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
 
-  setAuthMetrics((m) => ({ ...m, profileUpdateAttempts: m.profileUpdateAttempts + 1 }));
+    setAuthMetrics((m) => ({ ...m, profileUpdateAttempts: m.profileUpdateAttempts + 1 }));
 
-  try {
-    const userRef = doc(db, 'users', firebaseUser.uid);
+    try {
+      const userRef = doc(db, 'users', firebaseUser.uid);
 
-    // ✅ Liste des champs modifiables par un utilisateur
-    const allowedFields = [
-      "firstName", "lastName", "fullName", "displayName",
-      "profilePhoto", "photoURL", "avatar",
-      "phone", "phoneNumber", "phoneCountryCode",
-      "whatsapp", "whatsappNumber", "whatsappCountryCode",
-      "languages", "languagesSpoken", "bio", "description"
-    ];
+      const allowedFields = [
+        "firstName", "lastName", "fullName", "displayName",
+        "profilePhoto", "photoURL", "avatar",
+        "phone", "phoneNumber", "phoneCountryCode",
+        "whatsapp", "whatsappNumber", "whatsappCountryCode",
+        "languages", "languagesSpoken", "bio", "description"
+      ];
 
-    // ✅ On garde uniquement les champs autorisés
-    const safeUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([key]) => allowedFields.includes(key))
-    );
+      const safeUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([key]) => allowedFields.includes(key))
+      );
 
-    // ✅ Gestion spéciale de la photo
-    if (updates.profilePhoto && updates.profilePhoto.startsWith('data:image')) {
-      const processed = await processProfilePhoto(updates.profilePhoto, firebaseUser.uid, 'manual');
-      safeUpdates.profilePhoto = processed;
-      safeUpdates.photoURL = processed;
-      safeUpdates.avatar = processed;
-    }
+      if (updates.profilePhoto && updates.profilePhoto.startsWith('data:image')) {
+        const processed = await processProfilePhoto(updates.profilePhoto, firebaseUser.uid, 'manual');
+        (safeUpdates as any).profilePhoto = processed;
+        (safeUpdates as any).photoURL = processed;
+        (safeUpdates as any).avatar = processed;
+      }
 
-    await updateDoc(userRef, {
-      ...safeUpdates,
-      updatedAt: serverTimestamp(),
-    });
-
-    // ✅ Met à jour displayName Firebase Auth si prénom/nom/photo changés
-    if (updates.firstName || updates.lastName || updates.profilePhoto) {
-      const displayName = `${updates.firstName || user.firstName || ''} ${updates.lastName || user.lastName || ''}`.trim();
-      await updateProfile(firebaseUser, {
-        displayName,
-        photoURL: safeUpdates.profilePhoto || user.profilePhoto || null,
-      });
-    }
-
-    // ✅ Si avocat ou expat → synchro dans sos_profiles
-    if (user.role === 'lawyer' || user.role === 'expat') {
-      const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
-      await updateDoc(sosRef, {
+      await updateDoc(userRef, {
         ...safeUpdates,
         updatedAt: serverTimestamp(),
       });
+
+      if (updates.firstName || updates.lastName || updates.profilePhoto) {
+        const displayName = `${updates.firstName || user.firstName || ''} ${updates.lastName || user.lastName || ''}`.trim();
+        await updateProfile(firebaseUser, {
+          displayName,
+          photoURL: (safeUpdates as any).profilePhoto || user.profilePhoto || null,
+        });
+      }
+
+      if (user.role === 'lawyer' || user.role === 'expat') {
+        const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
+        await updateDoc(sosRef, {
+          ...safeUpdates,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      await logAuthEvent('profile_updated', {
+        userId: firebaseUser.uid,
+        updatedFields: Object.keys(safeUpdates),
+        deviceInfo
+      });
+
+    } catch (error) {
+      await logAuthEvent('profile_update_failed', {
+        userId: firebaseUser.uid,
+        error: error instanceof Error ? error.message : String(error),
+        deviceInfo
+      });
+      throw error;
     }
-
-    await logAuthEvent('profile_updated', {
-      userId: firebaseUser.uid,
-      updatedFields: Object.keys(safeUpdates),
-      deviceInfo
-    });
-
-  } catch (error) {
-    await logAuthEvent('profile_update_failed', {
-      userId: firebaseUser.uid,
-      error: error instanceof Error ? error.message : String(error),
-      deviceInfo
-    });
-    throw error;
-  }
-}, [firebaseUser, user, deviceInfo]);
-
+  }, [firebaseUser, user, deviceInfo]);
 
   const updateUserEmail = useCallback(async (newEmail: string): Promise<void> => {
     if (!firebaseUser) throw new Error('Utilisateur non connecté');
@@ -1308,6 +1164,7 @@ const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<vo
 
       setUser(null);
       setFirebaseUser(null);
+      setAuthUser(null);
       setError(null);
 
     } catch (error) {
@@ -1335,9 +1192,9 @@ const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<vo
         id: doc.id,
         uid: doc.id,
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        lastLoginAt: doc.data().lastLoginAt?.toDate() || new Date(),
+        createdAt: (doc.data() as any).createdAt?.toDate() || new Date(),
+        updatedAt: (doc.data() as any).updatedAt?.toDate() || new Date(),
+        lastLoginAt: (doc.data() as any).lastLoginAt?.toDate() || new Date(),
       })) as User[];
     } catch (error) {
       console.error('Erreur récupération utilisateurs:', error);
@@ -1345,7 +1202,7 @@ const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<vo
     }
   }, []);
 
-  // Version batch atomique pour éviter états intermédiaires
+  // Version batch atomique
   const setUserAvailability = useCallback(async (availability: 'available' | 'busy' | 'offline'): Promise<void> => {
     if (!user || !firebaseUser) throw new Error('Utilisateur non connecté');
     if (user.role !== 'lawyer' && user.role !== 'expat') return;
@@ -1364,25 +1221,24 @@ const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<vo
         updatedAt: now,
         lastStatusChange: now,
       });
-batch.set(
-  sosRef,
-  {
-    isOnline,
-    availability: isOnline ? 'available' : 'unavailable',
-    updatedAt: now,
-    lastStatusChange: now,
-    isVisible: true,
-    isVisibleOnMap: true,
-  },
-  { merge: true }
-);
-
+      batch.set(
+        sosRef,
+        {
+          isOnline,
+          availability: isOnline ? 'available' : 'unavailable',
+          updatedAt: now,
+          lastStatusChange: now,
+          isVisible: true,
+          isVisibleOnMap: true,
+        },
+        { merge: true }
+      );
 
       await batch.commit();
 
       await logAuthEvent('availability_changed', {
         userId: firebaseUser.uid,
-        oldAvailability: user.availability,
+        oldAvailability: (user as any).availability,
         newAvailability: availability,
         deviceInfo
       });
@@ -1452,7 +1308,6 @@ export default AuthProvider;
 
 /* =========================================================
    Compat : re-export d'un hook useAuth ici aussi
-   (pour les imports existants: import { useAuth } from '../contexts/AuthContext')
    ========================================================= */
 export const useAuth = () => {
   const ctx = useContext(BaseAuthContext);

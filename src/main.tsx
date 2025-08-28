@@ -46,13 +46,13 @@ const resources = {
           goOffline: "Se rendre indisponible"
         },
         errors: {
-          notApproved: "Votre profil n'est pas encore approuvé.",
-          updateFailed: "Échec de la mise à jour de votre statut.",
+          notApproved: "Votre profil n'est pas encore approuvï¿½.",
+          updateFailed: "ï¿½chec de la mise ï¿½ jour de votre statut.",
           syncFailed: "Erreur de synchronisation du statut."
         }
       },
       common: {
-        refresh: "Rafraîchir"
+        refresh: "Rafraï¿½chir"
       }
     }
   }
@@ -70,6 +70,7 @@ i18n
   });
 
 export default i18n;
+
 
 // Initialiser la capture d'erreurs globale
 setupGlobalErrorLogging();

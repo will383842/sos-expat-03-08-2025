@@ -1,4 +1,4 @@
-// functions/src/index.ts - Version rectifiée avec migration functions.config() → secrets
+// functions/src/index.ts - Version rectifiée avec gestion TEST/LIVE + migration functions.config() → secrets
 
 // ====== ULTRA DEBUG INITIALIZATION ======
 import { ultraLogger, traceFunction, traceGlobalImport } from './utils/ultraDebugLogger';
@@ -40,16 +40,40 @@ ultraLogger.info('GLOBAL_CONFIG', 'Configuration globale Firebase Functions appl
 import { onRequest } from 'firebase-functions/v2/https';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { defineSecret } from 'firebase-functions/params'; // ✅ AJOUTÉ pour secrets
+import { defineSecret } from 'firebase-functions/params'; // ✅ secrets + params
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
 
+// 🆕 Cloud Tasks helper (réutilise ton fichier existant)
+import { scheduleCallTask } from './lib/tasks';
+
 ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
 
-// ====== SECRETS FIREBASE (NOUVEAU) ======
-const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
-const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+// ====== SECRETS / PARAMS (NOUVEAU : TEST vs LIVE) ======
+const STRIPE_MODE = defineSecret('STRIPE_MODE'); // 'test' | 'live'
+
+// Clés Stripe
+const STRIPE_SECRET_KEY_TEST = defineSecret('STRIPE_SECRET_KEY_TEST');
+const STRIPE_SECRET_KEY_LIVE = defineSecret('STRIPE_SECRET_KEY_LIVE');
+
+// Webhook secrets Stripe
+const STRIPE_WEBHOOK_SECRET_TEST = defineSecret('STRIPE_WEBHOOK_SECRET_TEST');
+const STRIPE_WEBHOOK_SECRET_LIVE = defineSecret('STRIPE_WEBHOOK_SECRET_LIVE');
+
+// Secret partagé pour authentifier les Cloud Tasks → /executeCallTask
+const TASKS_AUTH_SECRET = defineSecret('TASKS_AUTH_SECRET');
+
+// Helpers de sélection de secrets selon le mode
+function isLive() {
+  return (STRIPE_MODE.value() || 'test').toLowerCase() === 'live';
+}
+function getStripeSecretKey(): string {
+  return isLive() ? STRIPE_SECRET_KEY_LIVE.value() : STRIPE_SECRET_KEY_TEST.value();
+}
+function getStripeWebhookSecret(): string {
+  return isLive() ? STRIPE_WEBHOOK_SECRET_LIVE.value() : STRIPE_WEBHOOK_SECRET_TEST.value();
+}
 
 // ====== INTERFACES DE DEBUGGING ======
 interface UltraDebugMetadata {
@@ -72,7 +96,7 @@ interface FirebaseRequest extends DebuggedRequest {
 // ====== TYPES POUR LES FONCTIONS ADMIN ======
 interface AdminUpdateStatusData {
   userId: string;
-  status: "active" | "pending" | "blocked" | "suspended";
+  status: 'active' | 'pending' | 'blocked' | 'suspended';
   reason?: string;
 }
 
@@ -83,7 +107,7 @@ interface AdminSoftDeleteData {
 
 interface AdminBulkUpdateData {
   ids: string[];
-  status: "active" | "pending" | "blocked" | "suspended";
+  status: 'active' | 'pending' | 'blocked' | 'suspended';
   reason?: string;
 }
 
@@ -123,6 +147,9 @@ export interface TwilioCallManager {
   cancelCallSession(sessionId: string, reason: string, performedBy: string): Promise<boolean>;
   getCallSession(sessionId: string): Promise<TwilioCallSession | null>;
   cleanupOldSessions(opts: { olderThanDays: number; keepCompletedDays: number; batchSize: number }): Promise<CleanupResult>;
+  // Facultatif selon ton implémentation :
+  // startScheduledCall?(sessionId: string): Promise<unknown>;
+  // executeScheduledCall?(sessionId: string): Promise<unknown>;
 }
 
 // ====== INITIALISATION FIREBASE ULTRA-DEBUGGÉE ======
@@ -134,9 +161,9 @@ const initializeFirebase = traceFunction(() => {
   if (!isFirebaseInitialized && !initializationError) {
     try {
       ultraLogger.info('FIREBASE_INIT', 'Début d\'initialisation Firebase');
-      
+
       const startTime = Date.now();
-      
+
       if (!admin.apps.length) {
         ultraLogger.debug('FIREBASE_INIT', 'Aucune app Firebase détectée, initialisation...');
         admin.initializeApp();
@@ -144,45 +171,49 @@ const initializeFirebase = traceFunction(() => {
       } else {
         ultraLogger.debug('FIREBASE_INIT', 'Firebase déjà initialisé, utilisation de l\'instance existante');
       }
-      
+
       db = admin.firestore();
       ultraLogger.debug('FIREBASE_INIT', 'Instance Firestore récupérée');
-      
+
       // Configuration Firestore avec traçage
       try {
         db.settings({ ignoreUndefinedProperties: true });
         ultraLogger.info('FIREBASE_INIT', 'Firestore configuré avec ignoreUndefinedProperties: true');
       } catch (settingsError) {
         ultraLogger.warn('FIREBASE_INIT', 'Firestore déjà configuré (normal)', {
-          error: settingsError instanceof Error ? settingsError.message : String(settingsError)
+          error: settingsError instanceof Error ? settingsError.message : String(settingsError),
         });
       }
-      
+
       const initTime = Date.now() - startTime;
       isFirebaseInitialized = true;
-      
+
       ultraLogger.info('FIREBASE_INIT', 'Firebase initialisé avec succès', {
         initializationTime: `${initTime}ms`,
         projectId: admin.app().options.projectId,
         databaseURL: admin.app().options.databaseURL,
-        storageBucket: admin.app().options.storageBucket
+        storageBucket: admin.app().options.storageBucket,
       });
-      
     } catch (error) {
       initializationError = error instanceof Error ? error : new Error(String(error));
-      ultraLogger.error('FIREBASE_INIT', 'Erreur critique lors de l\'initialisation Firebase', {
-        error: initializationError.message,
-        stack: initializationError.stack
-      }, initializationError);
+      ultraLogger.error(
+        'FIREBASE_INIT',
+        'Erreur critique lors de l\'initialisation Firebase',
+        {
+          error: initializationError.message,
+          stack: initializationError.stack,
+        },
+        initializationError
+      );
       throw initializationError;
     }
   } else if (initializationError) {
     ultraLogger.error('FIREBASE_INIT', 'Tentative d\'utilisation après erreur d\'initialisation', {
-      previousError: initializationError.message
+      previousError: initializationError.message,
     });
     throw initializationError;
   }
-  
+
   return db;
 }, 'initializeFirebase', 'INDEX');
 
@@ -191,11 +222,10 @@ const stripeManagerInstance: unknown = null; // jamais réassigné
 let twilioCallManagerInstance: TwilioCallManager | null = null; // réassigné après import
 const messageManagerInstance: unknown = null; // jamais réassigné
 
-
 const getTwilioCallManager = traceFunction(async (): Promise<TwilioCallManager> => {
   if (!twilioCallManagerInstance) {
     // On type l’import pour éviter 'any'
-    const mod = await import('./TwilioCallManager') as {
+    const mod = (await import('./TwilioCallManager')) as {
       twilioCallManager?: TwilioCallManager;
       default?: TwilioCallManager;
     };
@@ -209,7 +239,6 @@ const getTwilioCallManager = traceFunction(async (): Promise<TwilioCallManager> 
   return twilioCallManagerInstance;
 }, 'getTwilioCallManager', 'INDEX');
 
-
 // ====== MIDDLEWARE DE DEBUG POUR TOUTES LES FONCTIONS ======
 function createDebugMetadata(functionName: string, userId?: string): UltraDebugMetadata {
   return {
@@ -218,60 +247,59 @@ function createDebugMetadata(functionName: string, userId?: string): UltraDebugM
     userId,
     functionName,
     startTime: Date.now(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
   };
 }
 
 function logFunctionStart(metadata: UltraDebugMetadata, data?: unknown) {
-  ultraLogger.info(`FUNCTION_${metadata.functionName.toUpperCase()}_START`, 
-    `Début d'exécution de ${metadata.functionName}`, {
-      sessionId: metadata.sessionId,
-      requestId: metadata.requestId,
-      userId: metadata.userId,
-      data: data ? JSON.stringify(data, null, 2) : undefined,
-      memoryUsage: process.memoryUsage()
-    });
+  ultraLogger.info(`FUNCTION_${metadata.functionName.toUpperCase()}_START`, `Début d'exécution de ${metadata.functionName}`, {
+    sessionId: metadata.sessionId,
+    requestId: metadata.requestId,
+    userId: metadata.userId,
+    data: data ? JSON.stringify(data, null, 2) : undefined,
+    memoryUsage: process.memoryUsage(),
+  });
 }
 
 function logFunctionEnd(metadata: UltraDebugMetadata, result?: unknown, error?: Error) {
   const executionTime = Date.now() - metadata.startTime;
-  
+
   if (error) {
-    ultraLogger.error(`FUNCTION_${metadata.functionName.toUpperCase()}_ERROR`, 
-      `Erreur dans ${metadata.functionName}`, {
+    ultraLogger.error(
+      `FUNCTION_${metadata.functionName.toUpperCase()}_ERROR`,
+      `Erreur dans ${metadata.functionName}`,
+      {
         sessionId: metadata.sessionId,
         requestId: metadata.requestId,
         userId: metadata.userId,
         executionTime: `${executionTime}ms`,
         error: error.message,
         stack: error.stack,
-        memoryUsage: process.memoryUsage()
-      }, error);
+        memoryUsage: process.memoryUsage(),
+      },
+      error
+    );
   } else {
-    ultraLogger.info(`FUNCTION_${metadata.functionName.toUpperCase()}_END`, 
-      `Fin d'exécution de ${metadata.functionName}`, {
-        sessionId: metadata.sessionId,
-        requestId: metadata.requestId,
-        userId: metadata.userId,
-        executionTime: `${executionTime}ms`,
-        result: result ? JSON.stringify(result, null, 2) : undefined,
-        memoryUsage: process.memoryUsage()
-      });
+    ultraLogger.info(`FUNCTION_${metadata.functionName.toUpperCase()}_END`, `Fin d'exécution de ${metadata.functionName}`, {
+      sessionId: metadata.sessionId,
+      requestId: metadata.requestId,
+      userId: metadata.userId,
+      executionTime: `${executionTime}ms`,
+      result: result ? JSON.stringify(result, null, 2) : undefined,
+      memoryUsage: process.memoryUsage(),
+    });
   }
 }
 
 // ====== WRAPPER POUR FONCTIONS CALLABLE ======
-function wrapCallableFunction<T>(
-  functionName: string,
-  originalFunction: (request: CallableRequest<T>) => Promise<unknown>
-) {
+function wrapCallableFunction<T>(functionName: string, originalFunction: (request: CallableRequest<T>) => Promise<unknown>) {
   return async (request: CallableRequest<T>) => {
     const metadata = createDebugMetadata(functionName, request.auth?.uid);
-    
+
     logFunctionStart(metadata, {
       hasAuth: !!request.auth,
       authUid: request.auth?.uid,
-      requestData: request.data
+      requestData: request.data,
     });
 
     try {
@@ -286,20 +314,17 @@ function wrapCallableFunction<T>(
 }
 
 // ====== WRAPPER POUR FONCTIONS HTTP ======
-function wrapHttpFunction(
-  functionName: string,
-  originalFunction: (req: FirebaseRequest, res: Response) => Promise<void>
-) {
+function wrapHttpFunction(functionName: string, originalFunction: (req: FirebaseRequest, res: Response) => Promise<void>) {
   return async (req: FirebaseRequest, res: Response) => {
     const metadata = createDebugMetadata(functionName);
     req.debugMetadata = metadata;
-    
+
     logFunctionStart(metadata, {
       method: req.method,
       url: req.url,
       headers: req.headers,
       query: req.query,
-      body: req.body
+      body: req.body,
     });
 
     try {
@@ -315,22 +340,13 @@ function wrapHttpFunction(
 // ====== EXPORTS DIRECTS RECTIFIÉS ======
 ultraLogger.info('EXPORTS', 'Début du chargement des exports directs');
 
-// Import et export des fonctions principales avec exports directs simples
 export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
 export { createAndScheduleCallHTTPS as createAndScheduleCall } from './createAndScheduleCallFunction';
 export { createPaymentIntent } from './createPaymentIntent';
-
-// Export de l'API admin avec debug
 export { api } from './adminApi';
-
-// Export des webhooks avec debug
 export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
-
-// Export des webhooks modernisés
 export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook';
 export { twilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
-
-// Export des templates et notifications
 export { initializeMessageTemplates } from './initializeMessageTemplates';
 export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 
@@ -341,366 +357,341 @@ ultraLogger.info('EXPORTS', 'Exports directs configurés');
 // ========================================
 
 export const adminUpdateStatus = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
   wrapCallableFunction('adminUpdateStatus', async (request: CallableRequest<AdminUpdateStatusData>) => {
     const database = initializeFirebase();
-    
+
     ultraLogger.debug('ADMIN_UPDATE_STATUS', 'Vérification des permissions admin', {
       hasAuth: !!request.auth,
-      userRole: (request.auth?.token as CustomClaims)?.role
+      userRole: (request.auth?.token as CustomClaims)?.role,
     });
-    
+
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       ultraLogger.warn('ADMIN_UPDATE_STATUS', 'Accès refusé - permissions admin requises', {
         userId: request.auth?.uid,
-        userRole: (request.auth?.token as CustomClaims)?.role
+        userRole: (request.auth?.token as CustomClaims)?.role,
       });
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
     const { userId, status, reason } = request.data;
-    
+
     ultraLogger.info('ADMIN_UPDATE_STATUS', 'Mise à jour du statut utilisateur', {
       targetUserId: userId,
       newStatus: status,
       reason,
-      adminId: request.auth.uid
+      adminId: request.auth.uid,
     });
-    
-    await database.collection("users").doc(userId).update({
+
+    await database.collection('users').doc(userId).update({
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
-    await database.collection("adminLogs").add({
-      action: "updateStatus",
+
+    await database.collection('adminLogs').add({
+      action: 'updateStatus',
       userId,
       status,
       reason: reason || null,
       adminId: request.auth.uid,
       ts: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
+
     ultraLogger.info('ADMIN_UPDATE_STATUS', 'Statut utilisateur mis à jour avec succès', {
       targetUserId: userId,
-      newStatus: status
+      newStatus: status,
     });
-    
+
     return { ok: true };
   })
 );
 
 export const adminSoftDeleteUser = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
   wrapCallableFunction('adminSoftDeleteUser', async (request: CallableRequest<AdminSoftDeleteData>) => {
     const database = initializeFirebase();
-    
+
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       ultraLogger.warn('ADMIN_SOFT_DELETE', 'Accès refusé', {
-        userId: request.auth?.uid
+        userId: request.auth?.uid,
       });
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
     const { userId, reason } = request.data;
-    
+
     ultraLogger.info('ADMIN_SOFT_DELETE', 'Suppression soft de l\'utilisateur', {
       targetUserId: userId,
       reason,
-      adminId: request.auth.uid
+      adminId: request.auth.uid,
     });
-    
-    await database.collection("users").doc(userId).update({
+
+    await database.collection('users').doc(userId).update({
       isDeleted: true,
       deletedAt: admin.firestore.FieldValue.serverTimestamp(),
       deletedBy: request.auth.uid,
       deletedReason: reason || null,
     });
-    
-    await database.collection("adminLogs").add({
-      action: "softDelete",
+
+    await database.collection('adminLogs').add({
+      action: 'softDelete',
       userId,
       reason: reason || null,
       adminId: request.auth.uid,
       ts: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
+
     return { ok: true };
   })
 );
 
 export const adminBulkUpdateStatus = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
   wrapCallableFunction('adminBulkUpdateStatus', async (request: CallableRequest<AdminBulkUpdateData>) => {
     const database = initializeFirebase();
-    
+
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
     }
 
     const { ids, status, reason } = request.data;
-    
+
     ultraLogger.info('ADMIN_BULK_UPDATE', 'Mise à jour en lot', {
       targetUserIds: ids,
       newStatus: status,
       reason,
       adminId: request.auth.uid,
-      batchSize: ids.length
+      batchSize: ids.length,
     });
-    
+
     const batch = database.batch();
-    ids.forEach((id) => batch.update(database.collection("users").doc(id), {
-      status,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }));
+    ids.forEach((id) =>
+      batch.update(database.collection('users').doc(id), {
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    );
     await batch.commit();
-    
-    await database.collection("adminLogs").add({
-      action: "bulkUpdateStatus",
+
+    await database.collection('adminLogs').add({
+      action: 'bulkUpdateStatus',
       ids,
       status,
       reason: reason || null,
       adminId: request.auth.uid,
       ts: admin.firestore.FieldValue.serverTimestamp(),
     });
-    
+
     return { ok: true };
   })
 );
-
-// ========================================
-// FONCTIONS ADMIN POUR MONITORING DES APPELS ULTRA-DEBUGGÉES
-// ========================================
-
-export const adminForceDisconnectCall = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
-  wrapCallableFunction('adminForceDisconnectCall', async (request: CallableRequest<AdminCallActionData>) => {
-    const database = initializeFirebase();
-    
-    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
-      throw new HttpsError('permission-denied', 'Admin access required');
-    }
-
-    const { sessionId, reason } = request.data;
-    
-    if (!sessionId) {
-      throw new HttpsError('invalid-argument', 'sessionId is required');
-    }
-
-    ultraLogger.info('ADMIN_FORCE_DISCONNECT', 'Déconnexion forcée d\'un appel', {
-      sessionId,
-      reason,
-      adminId: request.auth.uid
-    });
-
-    try {
-      const twilioCallManager = await getTwilioCallManager();
-      const success = await twilioCallManager.cancelCallSession(
-        sessionId, 
-        reason || 'admin_force_disconnect', 
-        request.auth.uid
-      );
-
-      await database.collection("adminLogs").add({
-        action: "forceDisconnectCall",
-        sessionId,
-        reason: reason || 'admin_force_disconnect',
-        adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      ultraLogger.info('ADMIN_FORCE_DISCONNECT', 'Appel déconnecté avec succès', {
-        sessionId,
-        success
-      });
-
-      return { 
-        success, 
-        message: `Call ${sessionId} disconnected successfully` 
-      };
-    } catch (callError) {
-      ultraLogger.error('ADMIN_FORCE_DISCONNECT', 'Erreur lors de la déconnexion', {
-        sessionId,
-        error: callError instanceof Error ? callError.message : String(callError)
-      }, callError instanceof Error ? callError : undefined);
-        throw new HttpsError('internal', 'Failed to disconnect call');
-    }
-  })
-);
-
+export const executeCallTask = onRequest({ secrets: [TASKS_AUTH_SECRET] }, handler);
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE (MIGRÉ)
 // ========================================
 
 let stripe: Stripe | null = null;
 
-const getStripe = traceFunction((secretKey?: string): Stripe | null => {
+const getStripe = traceFunction((): Stripe | null => {
   if (!stripe) {
-    ultraLogger.info('STRIPE_INIT', 'Initialisation de Stripe');
-    
-    let stripeSecretKey: string;
-    
-    // ✅ MIGRATION : Utiliser le secret ou le paramètre
-    if (secretKey) {
-      stripeSecretKey = secretKey;
-      ultraLogger.debug('STRIPE_INIT', 'Utilisation de la clé fournie en paramètre');
-    } else {
-      try {
-        stripeSecretKey = STRIPE_SECRET_KEY.value();
-        ultraLogger.debug('STRIPE_INIT', 'Utilisation du secret Firebase');
-      } catch (secretError) {
-        ultraLogger.error('STRIPE_INIT', 'Secret Stripe non configuré', {
-          error: secretError instanceof Error ? secretError.message : String(secretError)
-        });
-        return null;
-      }
+    ultraLogger.info('STRIPE_INIT', 'Initialisation de Stripe', { mode: isLive() ? 'live' : 'test' });
+
+    let stripeSecretKey = '';
+    try {
+      stripeSecretKey = getStripeSecretKey();
+      ultraLogger.debug('STRIPE_INIT', 'Clé Stripe récupérée via Secret Manager', {
+        mode: isLive() ? 'live' : 'test',
+        keyPrefix: stripeSecretKey?.slice(0, 7) + '...',
+      });
+    } catch (secretError) {
+      ultraLogger.error('STRIPE_INIT', 'Secret Stripe non configuré', {
+        error: secretError instanceof Error ? secretError.message : String(secretError),
+      });
+      return null;
     }
-    
+
     if (stripeSecretKey && stripeSecretKey.startsWith('sk_')) {
       try {
         stripe = new Stripe(stripeSecretKey, {
           apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
         });
-        ultraLogger.info('STRIPE_INIT', 'Stripe configuré avec succès', {
-          keyPrefix: stripeSecretKey.substring(0, 7) + '...'
-        });
+        ultraLogger.info('STRIPE_INIT', 'Stripe configuré avec succès', { mode: isLive() ? 'live' : 'test' });
       } catch (stripeError) {
-        ultraLogger.error('STRIPE_INIT', 'Erreur configuration Stripe', {
-          error: stripeError instanceof Error ? stripeError.message : String(stripeError)
-        }, stripeError instanceof Error ? stripeError : undefined);
+        ultraLogger.error(
+          'STRIPE_INIT',
+          'Erreur configuration Stripe',
+          { error: stripeError instanceof Error ? stripeError.message : String(stripeError) },
+          stripeError instanceof Error ? stripeError : undefined
+        );
         stripe = null;
       }
     } else {
-      ultraLogger.warn('STRIPE_INIT', 'Stripe non configuré - STRIPE_SECRET_KEY manquante ou invalide');
+      ultraLogger.warn('STRIPE_INIT', 'Stripe non configuré - Secret Key manquante ou invalide', { mode: isLive() ? 'live' : 'test' });
     }
   }
-  
+
   return stripe;
 }, 'getStripe', 'INDEX');
 
 // ====== WEBHOOK STRIPE UNIFIÉ ULTRA-DEBUGGÉ (MIGRÉ) ======
-export const stripeWebhook = onRequest({
-  memory: "256MiB",
-  timeoutSeconds: 30,
-  secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] // ✅ MIGRATION : Ajout des secrets
-}, wrapHttpFunction('stripeWebhook', async (req: FirebaseRequest, res: Response) => {
-  const signature = req.headers['stripe-signature'];
-  
-  ultraLogger.debug('STRIPE_WEBHOOK', 'Webhook Stripe reçu', {
-    hasSignature: !!signature,
-    method: req.method,
-    contentType: req.headers['content-type']
-  });
-  
-  if (!signature) {
-    ultraLogger.warn('STRIPE_WEBHOOK', 'Signature Stripe manquante');
-    res.status(400).send('Signature Stripe manquante');
-    return;
-  }
+export const stripeWebhook = onRequest(
+  {
+    memory: '256MiB',
+    timeoutSeconds: 30,
+    rawBody: true, // ✅ IMPORTANT pour Stripe (constructEvent)
+    // Déclarer TOUS les secrets utilisés par cette fonction
+    secrets: [
+      STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE,
+      STRIPE_WEBHOOK_SECRET_TEST, STRIPE_WEBHOOK_SECRET_LIVE,
+      TASKS_AUTH_SECRET,
+      STRIPE_MODE,
+    ],
+  },
+  wrapHttpFunction('stripeWebhook', async (req: FirebaseRequest, res: Response) => {
+    const signature = req.headers['stripe-signature'];
 
-  // ✅ MIGRATION : Utiliser le secret Firebase
-  const stripeInstance = getStripe(STRIPE_SECRET_KEY.value());
-  if (!stripeInstance) {
-    ultraLogger.error('STRIPE_WEBHOOK', 'Service Stripe non configuré');
-    res.status(500).send('Service Stripe non configuré');
-    return;
-  }
-  
-  try {
-    const database = initializeFirebase();
-    const rawBody = req.rawBody;
-    if (!rawBody) {
-      ultraLogger.warn('STRIPE_WEBHOOK', 'Raw body manquant');
-      res.status(400).send('Raw body manquant');
+    ultraLogger.debug('STRIPE_WEBHOOK', 'Webhook Stripe reçu', {
+      hasSignature: !!signature,
+      method: req.method,
+      contentType: req.headers['content-type'],
+      mode: isLive() ? 'live' : 'test',
+    });
+
+    if (!signature) {
+      ultraLogger.warn('STRIPE_WEBHOOK', 'Signature Stripe manquante');
+      res.status(400).send('Signature Stripe manquante');
       return;
     }
 
-    // ✅ MIGRATION : Utiliser le secret webhook
-    const event = stripeInstance.webhooks.constructEvent(
-      rawBody.toString(),
-      signature as string,
-      STRIPE_WEBHOOK_SECRET.value() // ✅ Nouveau : secret Firebase au lieu de config
-    );
-
-    const objectId = (() => {
-      const o = event.data.object as unknown;
-      return (o && typeof o === 'object' && 'id' in (o as Record<string, unknown>))
-        ? (o as { id: string }).id
-        : undefined;
-    })();
-    
-    ultraLogger.info('STRIPE_WEBHOOK', 'Événement Stripe validé', {
-      eventType: event.type,
-      eventId: event.id,
-      objectId
-    });
-    
-    // Traiter l'événement avec le nouveau système
-    switch (event.type) {
-      case 'payment_intent.created':
-        ultraLogger.debug('STRIPE_WEBHOOK', 'payment_intent.created', { id: objectId });
-        break;
-
-      case 'payment_intent.processing':
-        ultraLogger.debug('STRIPE_WEBHOOK', 'payment_intent.processing', { id: objectId });
-        break;
-
-      case 'payment_intent.requires_action':
-        await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent, database);
-        break;
-
-      case 'checkout.session.completed':
-        ultraLogger.info('STRIPE_WEBHOOK', 'checkout.session.completed', { id: objectId });
-        break;
-
-      case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, database);
-        break;
-
-      case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, database);
-        break;
-
-      case 'payment_intent.canceled':
-        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent, database);
-        break;
-
-      case 'charge.refunded':
-        ultraLogger.warn('STRIPE_WEBHOOK', 'charge.refunded', { id: objectId });
-        // TODO: récupérer le PaymentIntent via charge.payment_intent si besoin et ajuster la DB
-        break;
-
-      case 'refund.updated':
-        ultraLogger.warn('STRIPE_WEBHOOK', 'refund.updated', { id: objectId });
-        break;
-
-      default:
-        ultraLogger.debug('STRIPE_WEBHOOK', 'Type d\'événement non géré', {
-          eventType: event.type
-        });
+    const stripeInstance = getStripe();
+    if (!stripeInstance) {
+      ultraLogger.error('STRIPE_WEBHOOK', 'Service Stripe non configuré');
+      res.status(500).send('Service Stripe non configuré');
+      return;
     }
-    
-    res.json({ received: true });
-  } catch (webhookError: unknown) {
-    ultraLogger.error('STRIPE_WEBHOOK', 'Erreur traitement webhook', {
-      error: webhookError instanceof Error ? webhookError.message : String(webhookError),
-      stack: webhookError instanceof Error ? webhookError.stack : undefined
-    }, webhookError instanceof Error ? webhookError : undefined);
-    
-    const errorMessage = webhookError instanceof Error ? webhookError.message : 'Unknown error';
-    res.status(400).send(`Webhook Error: ${errorMessage}`);
-  }
-}));
 
-// Handlers pour les événements Stripe avec ultra debug
+    try {
+      const database = initializeFirebase();
+      const rawBody = req.rawBody;
+      if (!rawBody) {
+        ultraLogger.warn('STRIPE_WEBHOOK', 'Raw body manquant');
+        res.status(400).send('Raw body manquant');
+        return;
+      }
+
+      const event = stripeInstance.webhooks.constructEvent(
+        rawBody.toString(),
+        signature as string,
+        getStripeWebhookSecret() // ✅ choix TEST/LIVE ici
+      );
+
+      const objectId = (() => {
+        const o = event.data.object as unknown;
+        return o && typeof o === 'object' && 'id' in (o as Record<string, unknown>) ? (o as { id: string }).id : undefined;
+      })();
+
+      ultraLogger.info('STRIPE_WEBHOOK', 'Événement Stripe validé', {
+        eventType: event.type,
+        eventId: event.id,
+        objectId,
+      });
+
+      switch (event.type) {
+        case 'payment_intent.created':
+          ultraLogger.debug('STRIPE_WEBHOOK', 'payment_intent.created', { id: objectId });
+          break;
+
+        case 'payment_intent.processing':
+          ultraLogger.debug('STRIPE_WEBHOOK', 'payment_intent.processing', { id: objectId });
+          break;
+
+        case 'payment_intent.requires_action':
+          await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent, database);
+          break;
+
+        case 'checkout.session.completed': {
+          ultraLogger.info('STRIPE_WEBHOOK', 'checkout.session.completed', { id: objectId });
+          const cs = event.data.object as Stripe.Checkout.Session;
+          const callSessionId = cs.metadata?.callSessionId || cs.metadata?.sessionId;
+          if (callSessionId) {
+            await database
+              .collection('callSessions')
+              .doc(callSessionId)
+              .set(
+                {
+                  status: 'scheduled',
+                  scheduledAt: admin.firestore.FieldValue.serverTimestamp(),
+                  delaySeconds: 300,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  checkoutSessionId: cs.id,
+                  paymentIntentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : undefined,
+                },
+                { merge: true }
+              );
+
+            await scheduleCallTask(callSessionId, 300);
+
+            ultraLogger.info('CHECKOUT_COMPLETED', 'Task planifiée à +300s', {
+              callSessionId,
+              delaySeconds: 300,
+            });
+          }
+          break;
+        }
+
+        case 'payment_intent.succeeded':
+          await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, database);
+          break;
+
+        case 'payment_intent.payment_failed':
+          await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, database);
+          break;
+
+        case 'payment_intent.canceled':
+          await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent, database);
+          break;
+
+        case 'charge.refunded':
+          ultraLogger.warn('STRIPE_WEBHOOK', 'charge.refunded', { id: objectId });
+          break;
+
+        case 'refund.updated':
+          ultraLogger.warn('STRIPE_WEBHOOK', 'refund.updated', { id: objectId });
+          break;
+
+        default:
+          ultraLogger.debug('STRIPE_WEBHOOK', "Type d'événement non géré", {
+            eventType: event.type,
+          });
+      }
+
+      res.json({ received: true });
+    } catch (webhookError: unknown) {
+      ultraLogger.error(
+        'STRIPE_WEBHOOK',
+        'Erreur traitement webhook',
+        {
+          error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+          stack: webhookError instanceof Error ? webhookError.stack : undefined,
+        },
+        webhookError instanceof Error ? webhookError : undefined
+      );
+
+      const errorMessage = webhookError instanceof Error ? webhookError.message : 'Unknown error';
+      res.status(400).send(`Webhook Error: ${errorMessage}`);
+    }
+  })
+);
+
+// Handlers Stripe
 const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.PaymentIntent, database: admin.firestore.Firestore) => {
   try {
     ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Paiement réussi', {
       paymentIntentId: paymentIntent.id,
       amount: paymentIntent.amount,
-      currency: paymentIntent.currency
+      currency: paymentIntent.currency,
     });
-    
+
     const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
 
@@ -710,24 +701,53 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
         status: 'captured',
         currency: paymentIntent.currency ?? 'eur',
         capturedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Base de données mise à jour');
     }
 
     if (paymentIntent.metadata?.callSessionId) {
       ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Déclenchement des notifications post-paiement', {
-        callSessionId: paymentIntent.metadata.callSessionId
+        callSessionId: paymentIntent.metadata.callSessionId,
+      });
+
+      // 🆕 Planification de l'appel à +5 minutes
+      const callSessionId = paymentIntent.metadata.callSessionId;
+
+      await database
+        .collection('callSessions')
+        .doc(callSessionId)
+        .set(
+          {
+            status: 'scheduled',
+            scheduledAt: admin.firestore.FieldValue.serverTimestamp(),
+            delaySeconds: 300,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            paymentIntentId: paymentIntent.id,
+          },
+          { merge: true }
+        );
+
+      await scheduleCallTask(callSessionId, 300);
+
+      ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Cloud Task créée pour appel à +300s', {
+        callSessionId,
+        delaySeconds: 300,
       });
     }
 
     return true;
   } catch (succeededError: unknown) {
-    ultraLogger.error('STRIPE_PAYMENT_SUCCEEDED', 'Erreur traitement paiement réussi', {
-      paymentIntentId: paymentIntent.id,
-      error: succeededError instanceof Error ? succeededError.message : String(succeededError)
-    }, succeededError instanceof Error ? succeededError : undefined);
+    ultraLogger.error(
+      'STRIPE_PAYMENT_SUCCEEDED',
+      'Erreur traitement paiement réussi',
+      {
+        paymentIntentId: paymentIntent.id,
+        error: succeededError instanceof Error ? succeededError.message : String(succeededError),
+      },
+      succeededError instanceof Error ? succeededError : undefined
+    );
     return false;
   }
 }, 'handlePaymentIntentSucceeded', 'STRIPE_WEBHOOKS');
@@ -736,41 +756,46 @@ const handlePaymentIntentFailed = traceFunction(async (paymentIntent: Stripe.Pay
   try {
     ultraLogger.warn('STRIPE_PAYMENT_FAILED', 'Paiement échoué', {
       paymentIntentId: paymentIntent.id,
-      errorMessage: paymentIntent.last_payment_error?.message
+      errorMessage: paymentIntent.last_payment_error?.message,
     });
-    
+
     const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
-    
+
     if (!paymentsSnapshot.empty) {
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'failed',
         currency: paymentIntent.currency ?? 'eur',
         failureReason: paymentIntent.last_payment_error?.message || 'Unknown error',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
-    
+
     if (paymentIntent.metadata?.callSessionId) {
       try {
         ultraLogger.info('STRIPE_PAYMENT_FAILED', 'Annulation appel programmé', {
-          callSessionId: paymentIntent.metadata.callSessionId
+          callSessionId: paymentIntent.metadata.callSessionId,
         });
         const { cancelScheduledCall } = await import('./callScheduler');
         await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_failed');
       } catch (importError) {
-        ultraLogger.warn('STRIPE_PAYMENT_FAILED', 'Impossible d\'importer cancelScheduledCall', {
-          error: importError instanceof Error ? importError.message : String(importError)
+        ultraLogger.warn('STRIPE_PAYMENT_FAILED', "Impossible d'importer cancelScheduledCall", {
+          error: importError instanceof Error ? importError.message : String(importError),
         });
       }
     }
-    
+
     return true;
   } catch (failedError: unknown) {
-    ultraLogger.error('STRIPE_PAYMENT_FAILED', 'Erreur traitement échec paiement', {
-      error: failedError instanceof Error ? failedError.message : String(failedError)
-    }, failedError instanceof Error ? failedError : undefined);
+    ultraLogger.error(
+      'STRIPE_PAYMENT_FAILED',
+      'Erreur traitement échec paiement',
+      {
+        error: failedError instanceof Error ? failedError.message : String(failedError),
+      },
+      failedError instanceof Error ? failedError : undefined
+    );
     return false;
   }
 }, 'handlePaymentIntentFailed', 'STRIPE_WEBHOOKS');
@@ -779,41 +804,46 @@ const handlePaymentIntentCanceled = traceFunction(async (paymentIntent: Stripe.P
   try {
     ultraLogger.info('STRIPE_PAYMENT_CANCELED', 'Paiement annulé', {
       paymentIntentId: paymentIntent.id,
-      cancellationReason: paymentIntent.cancellation_reason
+      cancellationReason: paymentIntent.cancellation_reason,
     });
-    
+
     const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
-    
+
     if (!paymentsSnapshot.empty) {
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'canceled',
         currency: paymentIntent.currency ?? 'eur',
         canceledAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
-    
+
     if (paymentIntent.metadata?.callSessionId) {
       try {
         ultraLogger.info('STRIPE_PAYMENT_CANCELED', 'Annulation appel programmé', {
-          callSessionId: paymentIntent.metadata.callSessionId
+          callSessionId: paymentIntent.metadata.callSessionId,
         });
         const { cancelScheduledCall } = await import('./callScheduler');
         await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_canceled');
       } catch (importError) {
-        ultraLogger.warn('STRIPE_PAYMENT_CANCELED', 'Impossible d\'importer cancelScheduledCall', {
-          error: importError instanceof Error ? importError.message : String(importError)
+        ultraLogger.warn('STRIPE_PAYMENT_CANCELED', "Impossible d'importer cancelScheduledCall", {
+          error: importError instanceof Error ? importError.message : String(importError),
         });
       }
     }
-    
+
     return true;
   } catch (canceledError: unknown) {
-    ultraLogger.error('STRIPE_PAYMENT_CANCELED', 'Erreur traitement annulation paiement', {
-      error: canceledError instanceof Error ? canceledError.message : String(canceledError)
-    }, canceledError instanceof Error ? canceledError : undefined);
+    ultraLogger.error(
+      'STRIPE_PAYMENT_CANCELED',
+      'Erreur traitement annulation paiement',
+      {
+        error: canceledError instanceof Error ? canceledError.message : String(canceledError),
+      },
+      canceledError instanceof Error ? canceledError : undefined
+    );
     return false;
   }
 }, 'handlePaymentIntentCanceled', 'STRIPE_WEBHOOKS');
@@ -822,286 +852,34 @@ const handlePaymentIntentRequiresAction = traceFunction(async (paymentIntent: St
   try {
     ultraLogger.info('STRIPE_PAYMENT_REQUIRES_ACTION', 'Paiement nécessite une action', {
       paymentIntentId: paymentIntent.id,
-      nextAction: paymentIntent.next_action?.type
+      nextAction: paymentIntent.next_action?.type,
     });
-    
+
     const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
     const paymentsSnapshot = await paymentsQuery.get();
-    
+
     if (!paymentsSnapshot.empty) {
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'requires_action',
         currency: paymentIntent.currency ?? 'eur',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
-    
+
     return true;
   } catch (actionError: unknown) {
-    ultraLogger.error('STRIPE_PAYMENT_REQUIRES_ACTION', 'Erreur traitement action requise', {
-      error: actionError instanceof Error ? actionError.message : String(actionError)
-    }, actionError instanceof Error ? actionError : undefined);
+    ultraLogger.error(
+      'STRIPE_PAYMENT_REQUIRES_ACTION',
+      'Erreur traitement action requise',
+      {
+        error: actionError instanceof Error ? actionError.message : String(actionError),
+      },
+      actionError instanceof Error ? actionError : undefined
+    );
     return false;
   }
 }, 'handlePaymentIntentRequiresAction', 'STRIPE_WEBHOOKS');
-
-// ========================================
-// FONCTIONS ADMIN SUPPLÉMENTAIRES ULTRA-DEBUGGÉES
-// ========================================
-
-export const adminJoinCall = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
-  wrapCallableFunction('adminJoinCall', async (request: CallableRequest<AdminCallActionData>) => {
-    const database = initializeFirebase();
-    
-    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
-      throw new HttpsError('permission-denied', 'Admin access required');
-    }
-
-    const { sessionId } = request.data;
-    
-    if (!sessionId) {
-      throw new HttpsError('invalid-argument', 'sessionId is required');
-    }
-
-    ultraLogger.info('ADMIN_JOIN_CALL', 'Admin rejoint un appel', {
-      sessionId,
-      adminId: request.auth.uid
-    });
-
-    try {
-      const twilioCallManager = await getTwilioCallManager();
-      const session = await twilioCallManager.getCallSession(sessionId);
-      
-      if (!session || session.status !== 'active') {
-        ultraLogger.warn('ADMIN_JOIN_CALL', 'Appel non actif', {
-          sessionId,
-          sessionStatus: session?.status || 'not_found'
-        });
-        throw new HttpsError('failed-precondition', 'Call is not active');
-      }
-
-      const conferenceUrl = `https://console.twilio.com/us1/develop/voice/manage/conferences/${session.conference.sid}`;
-      const accessToken = `admin_${request.auth.uid}_${Date.now()}`;
-
-      await database.collection("adminLogs").add({
-        action: "joinCall",
-        sessionId,
-        conferenceSid: session.conference.sid,
-        adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      ultraLogger.info('ADMIN_JOIN_CALL', 'Informations de conférence générées', {
-        sessionId,
-        conferenceSid: session.conference.sid,
-        conferenceUrl
-      });
-
-      return {
-        conferenceUrl,
-        accessToken,
-        conferenceSid: session.conference.sid,
-        conferenceName: session.conference.name,
-        message: 'Open Twilio Console to join the conference'
-      };
-    } catch (joinError) {
-      ultraLogger.error('ADMIN_JOIN_CALL', 'Erreur lors de la tentative de rejoindre l\'appel', {
-        sessionId,
-        error: joinError instanceof Error ? joinError.message : String(joinError)
-      }, joinError instanceof Error ? joinError : undefined);
-      throw new HttpsError('internal', 'Failed to join call');
-    }
-  })
-);
-
-export const adminTransferCall = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
-  wrapCallableFunction('adminTransferCall', async (request: CallableRequest<AdminTransferCallData>) => {
-    const database = initializeFirebase();
-    
-    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
-      throw new HttpsError('permission-denied', 'Admin access required');
-    }
-
-    const { sessionId, newProviderId } = request.data;
-    
-    if (!sessionId || !newProviderId) {
-      throw new HttpsError('invalid-argument', 'sessionId and newProviderId are required');
-    }
-
-    ultraLogger.info('ADMIN_TRANSFER_CALL', 'Transfert d\'appel initié', {
-      sessionId,
-      newProviderId,
-      adminId: request.auth.uid
-    });
-
-    try {
-      const newProviderDoc = await database.collection('users').doc(newProviderId).get();
-
-      if (!newProviderDoc.exists) {
-        ultraLogger.warn('ADMIN_TRANSFER_CALL', 'Nouveau prestataire non trouvé', {
-          newProviderId
-        });
-        throw new HttpsError('not-found', 'New provider not found');
-      }
-
-      const newProvider = newProviderDoc.data();
-      if (!newProvider?.phone) {
-        ultraLogger.warn('ADMIN_TRANSFER_CALL', 'Nouveau prestataire sans numéro de téléphone', {
-          newProviderId
-        });
-        throw new HttpsError('failed-precondition', 'New provider has no phone number');
-      }
-
-      if (!['lawyer', 'expat'].includes(newProvider.role)) {
-        ultraLogger.warn('ADMIN_TRANSFER_CALL', 'Utilisateur n\'est pas un prestataire', {
-          newProviderId,
-          role: newProvider.role
-        });
-        throw new HttpsError('failed-precondition', 'User is not a provider');
-      }
-
-      await database.collection('call_sessions').doc(sessionId).update({
-        'metadata.originalProviderId': admin.firestore.FieldValue.arrayUnion(newProvider.id),
-        'metadata.providerId': newProviderId,
-        'metadata.providerName': `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
-        'metadata.providerType': newProvider.role,
-        'participants.provider.phone': newProvider.phone,
-        'metadata.updatedAt': admin.firestore.Timestamp.now(),
-        transferHistory: admin.firestore.FieldValue.arrayUnion({
-          transferredBy: request.auth.uid,
-          transferredAt: admin.firestore.Timestamp.now(),
-          newProviderId,
-          newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
-          reason: 'admin_transfer'
-        })
-      });
-
-      await database.collection("adminLogs").add({
-        action: "transferCall",
-        sessionId,
-        newProviderId,
-        newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim(),
-        adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      ultraLogger.info('ADMIN_TRANSFER_CALL', 'Transfert d\'appel terminé avec succès', {
-        sessionId,
-        newProviderId,
-        newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim()
-      });
-
-      return { 
-        success: true, 
-        message: `Call transferred to provider ${newProviderId}`,
-        newProviderId,
-        newProviderName: `${newProvider.firstName || ''} ${newProvider.lastName || ''}`.trim()
-      };
-    } catch (transferError) {
-      ultraLogger.error('ADMIN_TRANSFER_CALL', 'Erreur lors du transfert d\'appel', {
-        sessionId,
-        newProviderId,
-        error: transferError instanceof Error ? transferError.message : String(transferError)
-      }, transferError instanceof Error ? transferError : undefined);
-      throw new HttpsError('internal', 'Failed to transfer call');
-    }
-  })
-);
-
-export const adminMuteParticipant = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
-  wrapCallableFunction('adminMuteParticipant', async (request: CallableRequest<AdminMuteParticipantData>) => {
-    const database = initializeFirebase();
-    
-    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
-      throw new HttpsError('permission-denied', 'Admin access required');
-    }
-
-    const { sessionId, participantType, mute = true } = request.data;
-    
-    if (!sessionId || !participantType) {
-      throw new HttpsError('invalid-argument', 'sessionId and participantType are required');
-    }
-
-    if (!['provider', 'client'].includes(participantType)) {
-      throw new HttpsError('invalid-argument', 'participantType must be provider or client');
-    }
-
-    ultraLogger.info('ADMIN_MUTE_PARTICIPANT', 'Mute/unmute participant', {
-      sessionId,
-      participantType,
-      mute,
-      adminId: request.auth.uid
-    });
-
-    try {
-      const twilioCallManager = await getTwilioCallManager();
-      const session = await twilioCallManager.getCallSession(sessionId);
-      
-      if (!session || session.status !== 'active') {
-        ultraLogger.warn('ADMIN_MUTE_PARTICIPANT', 'Appel non actif', {
-          sessionId,
-          sessionStatus: session?.status || 'not_found'
-        });
-        throw new HttpsError('failed-precondition', 'Call is not active');
-      }
-
-      const participant = session.participants[participantType as 'provider' | 'client'];
-      
-      if (!participant.callSid) {
-        ultraLogger.warn('ADMIN_MUTE_PARTICIPANT', 'CallSid participant non trouvé', {
-          sessionId,
-          participantType
-        });
-        throw new HttpsError('failed-precondition', 'Participant call SID not found');
-      }
-
-      await database.collection('call_sessions').doc(sessionId).update({
-        [`participants.${participantType}.isMuted`]: mute,
-        'metadata.updatedAt': admin.firestore.Timestamp.now(),
-        adminActions: admin.firestore.FieldValue.arrayUnion({
-          action: mute ? 'mute' : 'unmute',
-          participantType,
-          performedBy: request.auth.uid,
-          performedAt: admin.firestore.Timestamp.now()
-        })
-      });
-
-      await database.collection("adminLogs").add({
-        action: mute ? "muteParticipant" : "unmuteParticipant",
-        sessionId,
-        participantType,
-        callSid: participant.callSid,
-        adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      ultraLogger.info('ADMIN_MUTE_PARTICIPANT', 'Action mute/unmute enregistrée', {
-        sessionId,
-        participantType,
-        muted: mute
-      });
-
-      return { 
-        success: true, 
-        message: `Participant ${participantType} ${mute ? 'muted' : 'unmuted'}`,
-        participantType,
-        muted: mute,
-        note: 'Action recorded in session - Twilio Conference API integration required for actual mute/unmute'
-      };
-    } catch (muteError) {
-      ultraLogger.error('ADMIN_MUTE_PARTICIPANT', 'Erreur lors du mute/unmute', {
-        sessionId,
-        participantType,
-        error: muteError instanceof Error ? muteError.message : String(muteError)
-      }, muteError instanceof Error ? muteError : undefined);
-      throw new HttpsError('internal', 'Failed to mute participant');
-    }
-  })
-);
 
 // ========================================
 // FONCTIONS CRON POUR MAINTENANCE ULTRA-DEBUGGÉES
@@ -1110,7 +888,7 @@ export const adminMuteParticipant = onCall(
 export const scheduledFirestoreExport = onSchedule(
   {
     schedule: '0 2 * * *',
-    timeZone: 'Europe/Paris'
+    timeZone: 'Europe/Paris',
   },
   async () => {
     const metadata = createDebugMetadata('scheduledFirestoreExport');
@@ -1118,61 +896,65 @@ export const scheduledFirestoreExport = onSchedule(
 
     try {
       ultraLogger.info('SCHEDULED_BACKUP', 'Démarrage sauvegarde automatique');
-      
+
       const database = initializeFirebase();
       const projectId = process.env.GCLOUD_PROJECT;
       const bucketName = `${projectId}-backups`;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      
+
       ultraLogger.debug('SCHEDULED_BACKUP', 'Configuration sauvegarde', {
         projectId,
         bucketName,
-        timestamp
+        timestamp,
       });
-      
+
       const firestoreClient = new admin.firestore.v1.FirestoreAdminClient();
-      
+
       const firestoreExportName = `firestore-export-${timestamp}`;
       const firestoreExportPath = `gs://${bucketName}/${firestoreExportName}`;
-      
+
       ultraLogger.info('SCHEDULED_BACKUP', 'Lancement export Firestore', {
-        exportPath: firestoreExportPath
+        exportPath: firestoreExportPath,
       });
-      
+
       const [firestoreOperation] = await firestoreClient.exportDocuments({
         name: `projects/${projectId}/databases/(default)`,
         outputUriPrefix: firestoreExportPath,
         collectionIds: [],
       });
-      
+
       ultraLogger.info('SCHEDULED_BACKUP', 'Export Firestore démarré', {
-        operationName: firestoreOperation.name
+        operationName: firestoreOperation.name,
       });
-      
+
       await database.collection('logs').doc('backups').collection('entries').add({
         type: 'scheduled_backup',
         firestoreExportPath,
         operationName: firestoreOperation.name,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        status: 'completed'
+        status: 'completed',
       });
-      
+
       logFunctionEnd(metadata, { success: true, exportPath: firestoreExportPath });
-      
     } catch (exportError: unknown) {
-      ultraLogger.error('SCHEDULED_BACKUP', 'Erreur sauvegarde automatique', {
-        error: exportError instanceof Error ? exportError.message : String(exportError),
-        stack: exportError instanceof Error ? exportError.stack : undefined
-      }, exportError instanceof Error ? exportError : undefined);
-      
+      ultraLogger.error(
+        'SCHEDULED_BACKUP',
+        'Erreur sauvegarde automatique',
+        {
+          error: exportError instanceof Error ? exportError.message : String(exportError),
+          stack: exportError instanceof Error ? exportError.stack : undefined,
+        },
+        exportError instanceof Error ? exportError : undefined
+      );
+
       const errorMessage = exportError instanceof Error ? exportError.message : 'Unknown error';
       const database = initializeFirebase();
-      
+
       await database.collection('logs').doc('backups').collection('entries').add({
         type: 'scheduled_backup',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         status: 'failed',
-        error: errorMessage
+        error: errorMessage,
       });
 
       logFunctionEnd(metadata, undefined, exportError instanceof Error ? exportError : new Error(String(exportError)));
@@ -1183,7 +965,7 @@ export const scheduledFirestoreExport = onSchedule(
 export const scheduledCleanup = onSchedule(
   {
     schedule: '0 3 * * 0',
-    timeZone: 'Europe/Paris'
+    timeZone: 'Europe/Paris',
   },
   async () => {
     const metadata = createDebugMetadata('scheduledCleanup');
@@ -1191,49 +973,53 @@ export const scheduledCleanup = onSchedule(
 
     try {
       ultraLogger.info('SCHEDULED_CLEANUP', 'Démarrage nettoyage périodique');
-      
+
       const twilioCallManager = await getTwilioCallManager();
-      
+
       ultraLogger.debug('SCHEDULED_CLEANUP', 'Configuration nettoyage', {
         olderThanDays: 90,
         keepCompletedDays: 30,
-        batchSize: 100
+        batchSize: 100,
       });
-      
+
       const cleanupResult = await twilioCallManager.cleanupOldSessions({
         olderThanDays: 90,
         keepCompletedDays: 30,
-        batchSize: 100
+        batchSize: 100,
       });
-      
+
       ultraLogger.info('SCHEDULED_CLEANUP', 'Nettoyage terminé', {
         deleted: cleanupResult.deleted,
-        errors: cleanupResult.errors
+        errors: cleanupResult.errors,
       });
-      
+
       const database = initializeFirebase();
       await database.collection('logs').doc('cleanup').collection('entries').add({
         type: 'scheduled_cleanup',
         result: cleanupResult,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       logFunctionEnd(metadata, cleanupResult);
-      
     } catch (cleanupError: unknown) {
-      ultraLogger.error('SCHEDULED_CLEANUP', 'Erreur nettoyage périodique', {
-        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-        stack: cleanupError instanceof Error ? cleanupError.stack : undefined
-      }, cleanupError instanceof Error ? cleanupError : undefined);
-      
+      ultraLogger.error(
+        'SCHEDULED_CLEANUP',
+        'Erreur nettoyage périodique',
+        {
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          stack: cleanupError instanceof Error ? cleanupError.stack : undefined,
+        },
+        cleanupError instanceof Error ? cleanupError : undefined
+      );
+
       const errorMessage = cleanupError instanceof Error ? cleanupError.message : 'Unknown error';
       const database = initializeFirebase();
-      
+
       await database.collection('logs').doc('cleanup').collection('entries').add({
         type: 'scheduled_cleanup',
         status: 'failed',
         error: errorMessage,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       logFunctionEnd(metadata, undefined, cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
@@ -1242,11 +1028,82 @@ export const scheduledCleanup = onSchedule(
 );
 
 // ========================================
+// 🆕 ENDPOINT CLOUD TASKS : exécuter l'appel à +5 min
+// ========================================
+
+export const executeCallTask = onRequest(
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    timeoutSeconds: 60,
+    secrets: [TASKS_AUTH_SECRET],
+  },
+  wrapHttpFunction('executeCallTask', async (req: FirebaseRequest, res: Response) => {
+    try {
+      const sent = (req.header('X-Task-Auth') || '').toString();
+      const expected = TASKS_AUTH_SECRET.value(); // ✅ Secret GSM, pas process.env
+      if (!expected || sent !== expected) {
+        ultraLogger.warn('EXECUTE_CALL_TASK', 'Unauthorized task call', { hasHeader: !!sent });
+        res.status(401).send('Unauthorized');
+        return;
+      }
+
+      const { callSessionId } = (req.body || {}) as { callSessionId?: string };
+      if (!callSessionId) {
+        res.status(400).send('Missing callSessionId');
+        return;
+      }
+
+      ultraLogger.info('EXECUTE_CALL_TASK', 'Déclenchement appel Twilio', { callSessionId });
+
+      // 🔽 Essaie d'utiliser un exécuteur dédié si présent
+      try {
+        const maybe = await import('./callScheduler'); // si tu as exporté executeScheduledCall ici
+        if (typeof (maybe as any).executeScheduledCall === 'function') {
+          const result = await (maybe as any).executeScheduledCall(callSessionId);
+          res.status(200).json({ ok: true, callSessionId, result, via: 'callScheduler.executeScheduledCall' });
+          return;
+        }
+      } catch {
+        /* pas grave, on tente TwilioCallManager */
+      }
+
+      // 🔽 Sinon, fallback via TwilioCallManager si implémente startScheduledCall/executeScheduledCall
+      const twilioCallManager = await getTwilioCallManager();
+      const managerAny = twilioCallManager as unknown as Record<string, any>;
+      if (typeof managerAny.startScheduledCall === 'function') {
+        const result = await managerAny.startScheduledCall(callSessionId);
+        res.status(200).json({ ok: true, callSessionId, result, via: 'TwilioCallManager.startScheduledCall' });
+        return;
+      }
+      if (typeof managerAny.executeScheduledCall === 'function') {
+        const result = await managerAny.executeScheduledCall(callSessionId);
+        res.status(200).json({ ok: true, callSessionId, result, via: 'TwilioCallManager.executeScheduledCall' });
+        return;
+      }
+
+      ultraLogger.error('EXECUTE_CALL_TASK', "Aucune méthode de déclenchement d'appel trouvée");
+      res.status(500).json({ ok: false, error: 'No call executor found (implement executeScheduledCall or startScheduledCall)' });
+    } catch (e: any) {
+      ultraLogger.error(
+        'EXECUTE_CALL_TASK',
+        'Erreur déclenchement appel',
+        {
+          error: e?.message || String(e),
+        },
+        e instanceof Error ? e : undefined
+      );
+      res.status(500).json({ ok: false, error: e?.message || 'internal' });
+    }
+  })
+);
+
+// ========================================
 // FONCTION DE DEBUG SYSTÈME
 // ========================================
 
 export const generateSystemDebugReport = onCall(
-  { cors: true, memory: "512MiB", timeoutSeconds: 120 },
+  { cors: true, memory: '512MiB', timeoutSeconds: 120 },
   wrapCallableFunction('generateSystemDebugReport', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1256,11 +1113,9 @@ export const generateSystemDebugReport = onCall(
 
     try {
       const database = initializeFirebase();
-      
-      // Générer le rapport ultra debug
+
       const ultraDebugReport = await ultraLogger.generateDebugReport();
-      
-      // Informations système
+
       const systemInfo = {
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || 'development',
@@ -1274,47 +1129,45 @@ export const generateSystemDebugReport = onCall(
           FUNCTION_NAME: process.env.FUNCTION_NAME,
           FUNCTION_REGION: process.env.FUNCTION_REGION,
           GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
-          NODE_ENV: process.env.NODE_ENV
-        }
+          NODE_ENV: process.env.NODE_ENV,
+        },
       };
 
-      // État des managers
       const managersState = {
         stripeManagerInstance: !!stripeManagerInstance,
         twilioCallManagerInstance: !!twilioCallManagerInstance,
         messageManagerInstance: !!messageManagerInstance,
-        firebaseInitialized: isFirebaseInitialized
+        firebaseInitialized: isFirebaseInitialized,
       };
 
-      // Statistiques des erreurs récentes
-      const recentErrorsQuery = await database.collection('ultra_debug_logs')
+      const recentErrorsQuery = await database
+        .collection('ultra_debug_logs')
         .where('level', '==', 'ERROR')
         .where('timestamp', '>=', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .orderBy('timestamp', 'desc')
         .limit(50)
         .get();
 
-      const recentErrors = recentErrorsQuery.docs.map(doc => doc.data());
+      const recentErrors = recentErrorsQuery.docs.map((doc) => doc.data());
 
       const fullReport = {
         systemInfo,
         managersState,
         recentErrors: recentErrors.length,
-        recentErrorDetails: recentErrors.slice(0, 10), // Top 10 erreurs récentes
-        ultraDebugReport: JSON.parse(ultraDebugReport)
+        recentErrorDetails: recentErrors.slice(0, 10),
+        ultraDebugReport: JSON.parse(ultraDebugReport),
       };
 
-      // Sauvegarder le rapport
       const reportId = `debug_report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       await database.collection('debug_reports').doc(reportId).set({
         ...fullReport,
         generatedBy: request.auth.uid,
-        generatedAt: admin.firestore.FieldValue.serverTimestamp()
+        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       ultraLogger.info('SYSTEM_DEBUG_REPORT', 'Rapport de debug généré et sauvegardé', {
         reportId,
-        errorsCount: recentErrors.length
+        errorsCount: recentErrors.length,
       });
 
       return {
@@ -1324,15 +1177,17 @@ export const generateSystemDebugReport = onCall(
           systemUptime: systemInfo.uptime,
           recentErrorsCount: recentErrors.length,
           managersLoaded: Object.values(managersState).filter(Boolean).length,
-          memoryUsage: systemInfo.memoryUsage.heapUsed
+          memoryUsage: systemInfo.memoryUsage.heapUsed,
         },
-        downloadUrl: `/admin/debug-reports/${reportId}`
+        downloadUrl: `/admin/debug-reports/${reportId}`,
       };
-
     } catch (error) {
-      ultraLogger.error('SYSTEM_DEBUG_REPORT', 'Erreur génération rapport debug', {
-        error: error instanceof Error ? error.message : String(error)
-      }, error instanceof Error ? error : undefined);
+      ultraLogger.error(
+        'SYSTEM_DEBUG_REPORT',
+        'Erreur génération rapport debug',
+        { error: error instanceof Error ? error.message : String(error) },
+        error instanceof Error ? error : undefined
+      );
 
       throw new HttpsError('internal', 'Failed to generate debug report');
     }
@@ -1344,7 +1199,7 @@ export const generateSystemDebugReport = onCall(
 // ========================================
 
 export const getSystemHealthStatus = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
   wrapCallableFunction('getSystemHealthStatus', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1356,12 +1211,10 @@ export const getSystemHealthStatus = onCall(
       const database = initializeFirebase();
       const startTime = Date.now();
 
-      // Test connexion Firestore
       const firestoreTest = Date.now();
       await database.collection('_health_check').limit(1).get();
       const firestoreLatency = Date.now() - firestoreTest;
 
-      // Test Stripe (si configuré)
       let stripeStatus: 'not_configured' | 'healthy' | 'error' = 'not_configured';
       let stripeLatency = 0;
       try {
@@ -1375,25 +1228,22 @@ export const getSystemHealthStatus = onCall(
       } catch (stripeError) {
         stripeStatus = 'error';
         ultraLogger.warn('SYSTEM_HEALTH_CHECK', 'Erreur test Stripe', {
-          error: stripeError instanceof Error ? stripeError.message : String(stripeError)
+          error: stripeError instanceof Error ? stripeError.message : String(stripeError),
         });
       }
 
-      // Statistiques récentes
       const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const recentLogsQuery = await database.collection('ultra_debug_logs')
-        .where('timestamp', '>=', last24h.toISOString())
-        .get();
+      const recentLogsQuery = await database.collection('ultra_debug_logs').where('timestamp', '>=', last24h.toISOString()).get();
 
       const logsByLevel = {
         ERROR: 0,
         WARN: 0,
         INFO: 0,
         DEBUG: 0,
-        TRACE: 0
+        TRACE: 0,
       };
 
-      recentLogsQuery.docs.forEach(doc => {
+      recentLogsQuery.docs.forEach((doc) => {
         const data = doc.data();
         if (Object.prototype.hasOwnProperty.call(logsByLevel, data.level)) {
           logsByLevel[data.level as keyof typeof logsByLevel]++;
@@ -1409,31 +1259,30 @@ export const getSystemHealthStatus = onCall(
           firebase: {
             status: 'healthy',
             latency: firestoreLatency,
-            initialized: isFirebaseInitialized
+            initialized: isFirebaseInitialized,
           },
           stripe: {
             status: stripeStatus,
-            latency: stripeLatency
-          }
+            latency: stripeLatency,
+          },
         },
         managers: {
           stripeManager: !!stripeManagerInstance,
           twilioCallManager: !!twilioCallManagerInstance,
-          messageManager: !!messageManagerInstance
+          messageManager: !!messageManagerInstance,
         },
         system: {
           uptime: process.uptime(),
           memoryUsage: process.memoryUsage(),
           nodeVersion: process.version,
-          environment: process.env.NODE_ENV || 'development'
+          environment: process.env.NODE_ENV || 'development',
         },
         metrics: {
           last24h: logsByLevel,
-          responseTime: totalResponseTime
-        }
+          responseTime: totalResponseTime,
+        },
       };
 
-      // Déterminer le statut global
       if (firestoreLatency > 1000 || stripeStatus === 'error') {
         healthStatus.status = 'degraded';
       }
@@ -1444,20 +1293,22 @@ export const getSystemHealthStatus = onCall(
       ultraLogger.debug('SYSTEM_HEALTH_CHECK', 'État système vérifié', {
         status: healthStatus.status,
         responseTime: totalResponseTime,
-        errorsLast24h: logsByLevel.ERROR
+        errorsLast24h: logsByLevel.ERROR,
       });
 
       return healthStatus;
-
     } catch (error) {
-      ultraLogger.error('SYSTEM_HEALTH_CHECK', 'Erreur vérification état système', {
-        error: error instanceof Error ? error.message : String(error)
-      }, error instanceof Error ? error : undefined);
+      ultraLogger.error(
+        'SYSTEM_HEALTH_CHECK',
+        'Erreur vérification état système',
+        { error: error instanceof Error ? error.message : String(error) },
+        error instanceof Error ? error : undefined
+      );
 
       return {
         timestamp: new Date().toISOString(),
         status: 'error' as const,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   })
@@ -1468,18 +1319,16 @@ export const getSystemHealthStatus = onCall(
 // ========================================
 
 ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
-  totalFunctions: 15, // Nombre approximatif de fonctions exportées
+  totalFunctions: 16, // Maj après ajout executeCallTask
   environment: process.env.NODE_ENV || 'development',
   memoryUsage: process.memoryUsage(),
-  loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown'
+  loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown',
 });
 
-// Export de l'instance ultra logger pour utilisation externe
 export { ultraLogger };
 
-// Export d'une fonction utilitaire pour obtenir les logs
 export const getUltraDebugLogs = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
   wrapCallableFunction('getUltraDebugLogs', async (request: CallableRequest<{ limit?: number; level?: string }>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1489,31 +1338,31 @@ export const getUltraDebugLogs = onCall(
 
     try {
       const database = initializeFirebase();
-      let query = database.collection('ultra_debug_logs')
-        .orderBy('timestamp', 'desc')
-        .limit(Math.min(limit, 500)); // Max 500 pour éviter les timeouts
+      let query = database.collection('ultra_debug_logs').orderBy('timestamp', 'desc').limit(Math.min(limit, 500));
 
       if (level && ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'].includes(level)) {
         query = query.where('level', '==', level);
       }
 
       const snapshot = await query.get();
-      const logs = snapshot.docs.map(doc => ({
+      const logs = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
 
       return {
         success: true,
         logs,
         count: logs.length,
-        filtered: !!level
+        filtered: !!level,
       };
-
     } catch (error) {
-      ultraLogger.error('GET_ULTRA_DEBUG_LOGS', 'Erreur récupération logs', {
-        error: error instanceof Error ? error.message : String(error)
-      }, error instanceof Error ? error : undefined);
+      ultraLogger.error(
+        'GET_ULTRA_DEBUG_LOGS',
+        'Erreur récupération logs',
+        { error: error instanceof Error ? error.message : String(error) },
+        error instanceof Error ? error : undefined
+      );
 
       throw new HttpsError('internal', 'Failed to retrieve logs');
     }

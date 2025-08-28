@@ -3,7 +3,10 @@ const admin = require("firebase-admin");
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret, defineString } = require("firebase-functions/params");
-console.log('[CFG] STRIPE_MODE =', STRIPE_MODE.value() ?? '(unset)');
+
+// ====== Secrets configuration ======
+const STRIPE_MODE = defineSecret("STRIPE_MODE");
+
 const { google } = require("googleapis");
 const { Storage } = require("@google-cloud/storage");
 
@@ -13,7 +16,7 @@ const db = admin.firestore();
 
 // ====== Secrets & Params (Functions v2) ======
 const BACKUP_CRON_TOKEN = defineSecret("BACKUP_CRON_TOKEN"); // secret côté Cloud Functions v2
-// L’URL réelle de la fonction v2 startBackupHttp (Cloud Run) : à définir après 1er déploiement
+// L'URL réelle de la fonction v2 startBackupHttp (Cloud Run) : à définir après 1er déploiement
 // Exemple: "https://startbackuphttp-XXXX-ew.a.run.app"
 const START_BACKUP_HTTP_URL = defineString("START_BACKUP_HTTP_URL"); // param configurable (pas un secret)
 
@@ -288,7 +291,7 @@ exports.startBackupHttp = onRequest(
     maxInstances: 1,
     concurrency: 80,
     timeoutSeconds: 60,
-    secrets: [BACKUP_CRON_TOKEN],
+    secrets: [BACKUP_CRON_TOKEN, STRIPE_MODE],
   },
   async (req, res) => {
     try {
@@ -348,7 +351,7 @@ exports.updateBackupSchedule = onCall(
     maxInstances: 1,
     concurrency: 80,
     timeoutSeconds: 30,
-    secrets: [BACKUP_CRON_TOKEN],
+    secrets: [BACKUP_CRON_TOKEN, STRIPE_MODE],
   },
   async (req) => {
     if (!req.auth || (req.auth.token?.role !== "admin"))
@@ -362,7 +365,7 @@ exports.updateBackupSchedule = onCall(
     });
     const cs = google.cloudscheduler({ version: "v1", auth });
 
-    // ✅ Utilise l’URL réelle de la fonction v2, fournie en param START_BACKUP_HTTP_URL
+    // ✅ Utilise l'URL réelle de la fonction v2, fournie en param START_BACKUP_HTTP_URL
     const uriParam = START_BACKUP_HTTP_URL.value();
     if (!uriParam) {
       // Guide explicite si le param n'est pas encore renseigné
@@ -458,16 +461,16 @@ exports.restoreFromBackup = onCall(
                 overwriteObjectsAlreadyExistingInSink: true,
               },
             },
-          },
-          schedule: {
-            scheduleStartDate: {
-              year: start.getFullYear(),
-              month: start.getMonth() + 1,
-              day: start.getDate(),
+            schedule: {
+              scheduleStartDate: {
+                year: start.getFullYear(),
+                month: start.getMonth() + 1,
+                day: start.getDate(),
+              },
             },
+            status: "ENABLED",
+            description: `restore-storage-${prefix}`,
           },
-          status: "ENABLED",
-          description: `restore-storage-${prefix}`,
         })
       ).data.name;
     }
@@ -499,7 +502,7 @@ exports.restoreFromBackup = onCall(
               });
             });
           if (u.email) {
-            // Génère un lien de réinitialisation (à envoyer via votre système d’emailing).
+            // Génère un lien de réinitialisation (à envoyer via votre système d'emailing).
             await admin.auth().generatePasswordResetLink(u.email);
           }
         } catch {
@@ -513,7 +516,7 @@ exports.restoreFromBackup = onCall(
   }
 );
 
-// ====== Suppression d’un backup (fichiers + document) ======
+// ====== Suppression d'un backup (fichiers + document) ======
 exports.deleteBackup = onCall(
   {
     region: "europe-west1",
@@ -570,7 +573,7 @@ exports.grantAdminIfToken = onCall(
     maxInstances: 1,
     concurrency: 80,
     timeoutSeconds: 30,
-    secrets: [BACKUP_CRON_TOKEN],
+    secrets: [BACKUP_CRON_TOKEN, STRIPE_MODE],
   },
   async (req) => {
     if (!req.auth) {
@@ -592,14 +595,15 @@ exports.grantAdminIfToken = onCall(
 
 /*
 ================================================================================
-Notes d’exploitation
+Notes d'exploitation
 ================================================================================
 
 # 1) Déclare les secrets/params (une fois)
 firebase functions:secrets:set BACKUP_CRON_TOKEN
+firebase functions:secrets:set STRIPE_MODE
 firebase functions:config:set params.START_BACKUP_HTTP_URL="https://startbackuphttp-XXXX-ew.a.run.app"
 
-# 2) Important: ne définis PAS BACKUP_CRON_TOKEN dans .env ni firebase.json
+# 2) Important: ne définis PAS BACKUP_CRON_TOKEN ni STRIPE_MODE dans .env ni firebase.json
 #    (sinon: "Secret overlaps non secret environment variable").
 
 # 3) Déploiement conseillé par paquets (évite les pics CPU)
@@ -610,7 +614,7 @@ firebase deploy --only functions:nightlyBackup
 
 # 4) Renseigner START_BACKUP_HTTP_URL :
 #    - Déploie startBackupHttp
-#    - Récupère l’URL affichée (console ou CLI)
+#    - Récupère l'URL affichée (console ou CLI)
 #    - Exécute la commande ci-dessus pour la stocker
-#    - Puis set le cron via l’UI admin (ou directement updateBackupSchedule).
+#    - Puis set le cron via l'UI admin (ou directement updateBackupSchedule).
 */

@@ -3,6 +3,17 @@
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
+// Utilitaire pour nettoyer les objets des valeurs undefined
+const cleanObject = (obj: any): any => {
+  const cleaned: any = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  });
+  return cleaned;
+};
+
 // Interfaces pour les différents types d'événements analytiques
 export interface BaseAnalyticsEvent {
   timestamp: Date;
@@ -93,17 +104,16 @@ class AnalyticsService {
   }
 
   /**
-   * Données de base pour tous les événements
+   * Données de base pour tous les événements (nettoyées)
    */
-  private getBaseEventData(): BaseAnalyticsEvent {
-    return {
-      timestamp: new Date(),
+  private getBaseEventData(): Record<string, any> {
+    return cleanObject({
       userId: this.userId,
       sessionId: this.sessionId,
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-      referrer: document.referrer || undefined
-    };
+      userAgent: navigator?.userAgent,
+      url: typeof window !== 'undefined' ? window.location?.href : undefined,
+      referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined
+    });
   }
 
   /**
@@ -113,17 +123,15 @@ class AnalyticsService {
     if (!this.isEnabled) return;
 
     try {
-      const event: LanguageMismatchEvent = {
+      const eventData = {
         ...this.getBaseEventData(),
-        ...data
+        ...cleanObject(data),
+        timestamp: serverTimestamp(),
+        eventType: 'language_mismatch'
       };
 
       // Enregistrer dans Firestore
-      await addDoc(collection(db, 'analytics_language_mismatches'), {
-        ...event,
-        timestamp: serverTimestamp(),
-        eventType: 'language_mismatch'
-      });
+      await addDoc(collection(db, 'analytics_language_mismatches'), eventData);
 
       // Incrémenter les compteurs pour les métriques rapides
       await this.incrementCounter('language_mismatches_total');
@@ -149,16 +157,14 @@ class AnalyticsService {
     if (!this.isEnabled) return;
 
     try {
-      const event: UserActionEvent = {
+      const eventData = {
         ...this.getBaseEventData(),
-        ...data
-      };
-
-      await addDoc(collection(db, 'analytics_user_actions'), {
-        ...event,
+        ...cleanObject(data),
         timestamp: serverTimestamp(),
         eventType: 'user_action'
-      });
+      };
+
+      await addDoc(collection(db, 'analytics_user_actions'), eventData);
 
       // Google Analytics 4 style tracking (si disponible)
       if (typeof gtag !== 'undefined') {
@@ -182,21 +188,19 @@ class AnalyticsService {
     if (!this.isEnabled) return;
 
     try {
-      const event: ConversionEvent = {
+      const eventData = {
         ...this.getBaseEventData(),
-        ...data
-      };
-
-      await addDoc(collection(db, 'analytics_conversions'), {
-        ...event,
+        ...cleanObject(data),
         timestamp: serverTimestamp(),
         eventType: 'conversion'
-      });
+      };
+
+      await addDoc(collection(db, 'analytics_conversions'), eventData);
 
       // Incrémenter les compteurs de conversion
       await this.incrementCounter(`conversions_${data.conversionType}`);
       if (data.providerType) {
-        await this.incrementCounter(`conversions_${data.providerType}_${data.providerType}`);
+        await this.incrementCounter(`conversions_${data.providerType}_${data.conversionType}`);
       }
 
       // Google Analytics conversion tracking
@@ -224,16 +228,14 @@ class AnalyticsService {
     if (!this.isEnabled) return;
 
     try {
-      const event: ErrorEvent = {
+      const eventData = {
         ...this.getBaseEventData(),
-        ...data
-      };
-
-      await addDoc(collection(db, 'analytics_errors'), {
-        ...event,
+        ...cleanObject(data),
         timestamp: serverTimestamp(),
         eventType: 'error'
-      });
+      };
+
+      await addDoc(collection(db, 'analytics_errors'), eventData);
 
       // Incrémenter les compteurs d'erreurs
       await this.incrementCounter('errors_total');
@@ -257,16 +259,14 @@ class AnalyticsService {
     if (!this.isEnabled) return;
 
     try {
-      const event: PerformanceEvent = {
+      const eventData = {
         ...this.getBaseEventData(),
-        ...data
-      };
-
-      await addDoc(collection(db, 'analytics_performance'), {
-        ...event,
+        ...cleanObject(data),
         timestamp: serverTimestamp(),
         eventType: 'performance'
-      });
+      };
+
+      await addDoc(collection(db, 'analytics_performance'), eventData);
 
       // Alertes pour les performances dégradées
       if (data.duration > 5000) { // Plus de 5 secondes
@@ -289,12 +289,12 @@ class AnalyticsService {
         lastUpdated: serverTimestamp()
       }).catch(async () => {
         // Si le document n'existe pas, le créer
-        await addDoc(collection(db, 'analytics_counters'), {
+        await addDoc(collection(db, 'analytics_counters'), cleanObject({
           name: counterName,
           count: value,
           createdAt: serverTimestamp(),
           lastUpdated: serverTimestamp()
-        });
+        }));
       });
     } catch (error) {
       console.error('❌ Erreur lors de l\'incrémentation du compteur:', error);
@@ -305,6 +305,8 @@ class AnalyticsService {
    * Configure le tracking automatique des erreurs JavaScript
    */
   private setupErrorTracking(): void {
+    if (typeof window === 'undefined') return;
+
     // Erreurs non catchées
     window.addEventListener('error', (event) => {
       this.logError({
@@ -331,6 +333,8 @@ class AnalyticsService {
    * Configure le tracking automatique des performances
    */
   private setupPerformanceTracking(): void {
+    if (typeof window === 'undefined') return;
+
     // Navigation Timing API
     if ('performance' in window && 'getEntriesByType' in performance) {
       window.addEventListener('load', () => {
@@ -362,10 +366,10 @@ class AnalyticsService {
       category: 'search',
       label: `${filters.providerType || 'all'}_${filters.country || 'all'}`,
       value: resultsCount,
-      metadata: {
-        filters,
+      metadata: cleanObject({
+        filters: cleanObject(filters),
         resultsCount
-      }
+      })
     });
   }
 
@@ -439,12 +443,12 @@ class AnalyticsService {
   /**
    * Track une erreur de paiement
    */
-  async trackPaymentError(errorMessage: string, amount: number): Promise<void> {
+  async trackPaymentError(errorMessage: string, amount?: number): Promise<void> {
     await this.logError({
       errorType: 'payment_error',
       errorMessage,
       severity: 'high',
-      metadata: { amount }
+      metadata: cleanObject({ amount })
     });
   }
 
@@ -495,4 +499,3 @@ export const configureAnalytics = (userId?: string, enabled: boolean = true) => 
 
 // Export de l'instance pour les cas d'usage avancés
 export default analyticsService;
-

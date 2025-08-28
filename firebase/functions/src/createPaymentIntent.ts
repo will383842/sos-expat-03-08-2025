@@ -686,7 +686,7 @@ const response: SuccessResponse & { stripeMode: string; stripeAccountId?: string
  *    firebase functions:secrets:set STRIPE_SECRET_KEY_LIVE
  *
  * 2) Ajoute le param STRIPE_MODE (config param, pas un secret) :
- *    firebase functions:config:set params.STRIPE_MODE="test"
+ *    firebase functions:config:set params_STRIPE_MODE="test"
  *    # ou "live" lors du basculement prod
  *
  * 3) Vérifie que ton front et ton back sont dans le même mode :

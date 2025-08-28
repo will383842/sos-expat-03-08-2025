@@ -1,10 +1,16 @@
-// firebase/functions/src/createAndScheduleCallFunction.ts - Version corrigée
+// firebase/functions/src/createAndScheduleCallFunction.ts - Version rectifiée sans planification
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
-import { createAndScheduleCall } from './callScheduler';
+import { defineSecret } from 'firebase-functions/params';
+import { createCallSession } from './callScheduler';
 import { logError } from './utils/logs/logError';
 
-// ✅ CORRECTION: Interface corrigée pour correspondre exactement aux données frontend
-interface CreateAndScheduleCallRequest {
+// ✅ Déclarations des secrets Twilio (même si pas utilisés dans cette fonction)
+const TWILIO_ACCOUNT_SID = defineSecret('TWILIO_ACCOUNT_SID');
+const TWILIO_AUTH_TOKEN = defineSecret('TWILIO_AUTH_TOKEN');
+const TWILIO_PHONE_NUMBER = defineSecret('TWILIO_PHONE_NUMBER');
+
+// ✅ Interface corrigée pour correspondre exactement aux données frontend
+interface CreateCallRequest {
   providerId: string;
   clientId: string;
   providerPhone: string;
@@ -13,23 +19,25 @@ interface CreateAndScheduleCallRequest {
   providerType: 'lawyer' | 'expat';
   paymentIntentId: string;
   amount: number; // EN EUROS - Interface simplifiée
-  delayMinutes?: number;
+  delayMinutes?: number; // ✅ Garde le champ pour compatibilité mais ne l'utilise plus
   clientLanguages?: string[];
   providerLanguages?: string[];
-  // ✅ CORRECTION: Ajouter le champ clientWhatsapp qui est maintenant envoyé
   clientWhatsapp?: string;
 }
 
 /**
- * ✅ Cloud Function CORRIGÉE avec validation détaillée et logs de debug
+ * ✅ Cloud Function RECTIFIÉE - Crée l'appel SANS planification
+ * La planification sera gérée par le webhook Stripe à +5 min
  */
 export const createAndScheduleCallHTTPS = onCall(
   {
     memory: "256MiB",
     timeoutSeconds: 60,
-    cors: true
+    cors: true,
+    // ✅ Déclarer les secrets même si pas utilisés (évite les warnings)
+    secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]
   },
-  async (request: CallableRequest<CreateAndScheduleCallRequest>) => {
+  async (request: CallableRequest<CreateCallRequest>) => {
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     
     try {
@@ -72,7 +80,7 @@ export const createAndScheduleCallHTTPS = onCall(
         providerType,
         paymentIntentId,
         amount,
-        delayMinutes = 5,
+        delayMinutes = 5, // ✅ Garde pour compatibilité mais ne sera plus utilisé
         clientLanguages,
         providerLanguages,
         clientWhatsapp,
@@ -223,16 +231,7 @@ export const createAndScheduleCallHTTPS = onCall(
       console.log(`✅ [${requestId}] Numéros de téléphone validés`);
 
       // ========================================
-      // 7. VALIDATION DU DÉLAI
-      // ========================================
-      const validDelayMinutes = Math.min(Math.max(delayMinutes, 0), 10);
-      
-      if (validDelayMinutes !== delayMinutes) {
-        console.warn(`⚠️ [${requestId}] Délai ajusté: ${delayMinutes} → ${validDelayMinutes} minutes`);
-      }
-
-      // ========================================
-      // 8. VALIDATION DU PAYMENT INTENT
+      // 7. VALIDATION DU PAYMENT INTENT
       // ========================================
       if (!paymentIntentId || !paymentIntentId.startsWith('pi_')) {
         console.error(`❌ [${requestId}] PaymentIntent ID invalide:`, paymentIntentId);
@@ -245,16 +244,16 @@ export const createAndScheduleCallHTTPS = onCall(
       console.log(`✅ [${requestId}] PaymentIntent validé: ${paymentIntentId}`);
 
       // ========================================
-      // 9. CRÉATION ET PLANIFICATION DE L'APPEL
+      // 8. CRÉATION DE LA SESSION D'APPEL (SANS PLANIFICATION)
       // ========================================
-      console.log(`📞 [${requestId}] Création appel initiée`);
+      console.log(`📞 [${requestId}] Création session d'appel initiée`);
       console.log(`👥 [${requestId}] Client: ${clientId.substring(0, 8)}... → Provider: ${providerId.substring(0, 8)}...`);
       console.log(`💰 [${requestId}] Montant: ${amount}€ pour service ${serviceType}`);
-      console.log(`⏰ [${requestId}] Délai programmé: ${validDelayMinutes} minutes`);
       console.log(`💳 [${requestId}] PaymentIntent: ${paymentIntentId}`);
+      console.log(`⚠️ [${requestId}] NOUVEAU FLUX: Pas de planification immédiate - sera géré par webhook Stripe`);
 
-      // ✅ Appel au callScheduler avec toutes les données
-      const callSession = await createAndScheduleCall({
+      // ✅ RECTIFICATION: Appel uniquement à createCallSession (sans planification)
+      const callSession = await createCallSession({
         providerId,
         clientId,
         providerPhone,
@@ -264,53 +263,61 @@ export const createAndScheduleCallHTTPS = onCall(
         providerType,
         paymentIntentId,
         amount, // ✅ EN EUROS directement
-        delayMinutes: validDelayMinutes,
         requestId,
         clientLanguages: clientLanguages || ['fr'],
         providerLanguages: providerLanguages || ['fr']
       });
 
-      console.log(`✅ [${requestId}] Appel créé avec succès - Session: ${callSession.id}`);
-      console.log(`📅 [${requestId}] Status: ${callSession.status}`);
+      // ✅ RECTIFICATION MAJEURE: Plus de planification ici
+      // La planification sera désormais gérée par le webhook Stripe à payment_intent.succeeded
+      // qui créera une Cloud Task programmée à +5 minutes
 
-      // Calculer l'heure de programmation
-      const scheduledTime = new Date(Date.now() + (validDelayMinutes * 60 * 1000));
+      console.log(`✅ [${requestId}] Session d'appel créée avec succès - ID: ${callSession.id}`);
+      console.log(`📅 [${requestId}] Status: ${callSession.status}`);
+      console.log(`⏰ [${requestId}] Planification: Sera gérée par webhook Stripe à +5 min`);
+
+      // Calculer l'heure théorique de programmation (pour info uniquement)
+      const theoreticalScheduledTime = new Date(Date.now() + (5 * 60 * 1000)); // +5 min fixe
 
       // ========================================
-      // 10. RÉPONSE DE SUCCÈS
+      // 9. RÉPONSE DE SUCCÈS
       // ========================================
       const response = {
         success: true,
         sessionId: callSession.id,
         status: callSession.status,
-        scheduledFor: scheduledTime.toISOString(),
-        scheduledForReadable: scheduledTime.toLocaleString('fr-FR', {
+        scheduledFor: theoreticalScheduledTime.toISOString(), // ✅ Théorique - sera confirmé par webhook
+        scheduledForReadable: theoreticalScheduledTime.toLocaleString('fr-FR', {
           timeZone: 'Europe/Paris',
           dateStyle: 'short',
           timeStyle: 'short'
         }),
-        message: `Appel programmé dans ${validDelayMinutes} minutes`,
+        message: `Session d'appel créée. Planification dans 5 minutes via webhook Stripe.`,
         amount: amount, // ✅ Retourner en euros
         serviceType,
         providerType,
         requestId,
         paymentIntentId,
-        delayMinutes: validDelayMinutes,
-        timestamp: new Date().toISOString()
+        delayMinutes: 5, // ✅ Fixe à 5 minutes maintenant
+        timestamp: new Date().toISOString(),
+        // ✅ NOUVEAU: Indiquer le nouveau flux
+        schedulingMethod: 'stripe_webhook', // vs 'immediate' dans l'ancien flux
+        note: 'L\'appel sera automatiquement planifié par Stripe webhook une fois le paiement confirmé'
       };
 
       console.log(`🎉 [${requestId}] Réponse envoyée:`, {
         sessionId: response.sessionId,
         status: response.status,
         scheduledFor: response.scheduledFor,
-        amount: response.amount
+        amount: response.amount,
+        schedulingMethod: response.schedulingMethod
       });
 
       return response;
 
     } catch (error: unknown) {
       // ========================================
-      // 11. GESTION D'ERREURS COMPLÈTE
+      // 10. GESTION D'ERREURS COMPLÈTE
       // ========================================
       const errorDetails = {
         requestId,
@@ -326,26 +333,27 @@ export const createAndScheduleCallHTTPS = onCall(
           paymentIntentId: request.data?.paymentIntentId,
           hasAuth: !!request.auth,
           delayMinutes: request.data?.delayMinutes,
-          // ✅ AJOUT: Debug des numéros de téléphone
           hasProviderPhone: !!request.data?.providerPhone,
           hasClientPhone: !!request.data?.clientPhone,
           providerPhoneLength: request.data?.providerPhone?.length || 0,
           clientPhoneLength: request.data?.clientPhone?.length || 0,
         },
         userAuth: request.auth?.uid?.substring(0, 8) + '...' || 'not-authenticated',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        newFlow: 'stripe_webhook_scheduling' // ✅ Indiquer le nouveau flux dans les logs d'erreur
       };
 
       // Log détaillé de l'erreur
-      await logError('createAndScheduleCall:error', errorDetails);
+      await logError('createCallSession:error', errorDetails);
 
-      console.error(`❌ [${requestId}] Erreur lors de la création d'appel:`, {
+      console.error(`❌ [${requestId}] Erreur lors de la création de session:`, {
         error: errorDetails.error,
         errorType: errorDetails.errorType,
         serviceType: request.data?.serviceType,
         amount: request.data?.amount,
         hasProviderPhone: errorDetails.requestData.hasProviderPhone,
-        hasClientPhone: errorDetails.requestData.hasClientPhone
+        hasClientPhone: errorDetails.requestData.hasClientPhone,
+        newFlow: errorDetails.newFlow
       });
 
       // Si c'est déjà une HttpsError Firebase, la relancer telle quelle
@@ -370,14 +378,13 @@ export const createAndScheduleCallHTTPS = onCall(
           );
         }
 
-        if (error.message.includes('schedule') || error.message.includes('call')) {
+        if (error.message.includes('session') || error.message.includes('call')) {
           throw new HttpsError(
             'internal',
-            'Erreur lors de la programmation de l\'appel. Service temporairement indisponible.'
+            'Erreur lors de la création de la session d\'appel. Service temporairement indisponible.'
           );
         }
 
-        // ✅ AJOUT: Erreurs spécifiques aux numéros de téléphone
         if (error.message.includes('phone') || error.message.includes('téléphone')) {
           throw new HttpsError(
             'invalid-argument',
@@ -389,7 +396,7 @@ export const createAndScheduleCallHTTPS = onCall(
       // Erreur générique pour tout le reste
       throw new HttpsError(
         'internal',
-        'Erreur interne lors de la création de l\'appel. Veuillez réessayer dans quelques instants.'
+        'Erreur interne lors de la création de la session d\'appel. Veuillez réessayer dans quelques instants.'
       );
     }
   }

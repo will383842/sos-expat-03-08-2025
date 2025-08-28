@@ -1,10 +1,10 @@
-// firebase/functions/src/createPaymentIntent.ts
-// 🔧 Firebase Functions v2 avec configuration simplifiée
+// 🔧 Firebase Functions v2 avec configuration complète + sélection Stripe test/live
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
-import { defineSecret } from "firebase-functions/params";
+import { defineSecret, defineString } from 'firebase-functions/params';
+import * as admin from 'firebase-admin';
+
 import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
-import * as admin from 'firebase-admin';
 import {
   toCents,
   checkDailyLimit,
@@ -13,18 +13,30 @@ import {
 } from './utils/paymentValidators';
 
 // =========================================
-// 🔧 Configuration Firebase Functions v2 simplifiée
+// 🔧 Configuration Firebase Functions v2
 // =========================================
 const FUNCTION_CONFIG = {
-  memory: "256MiB" as const,
+  memory: '256MiB' as const,
   timeoutSeconds: 60,
   maxInstances: 10,
   minInstances: 0,
   concurrency: 80,
-  region: 'europe-west1'  // Explicite pour être sûr
+  region: 'europe-west1',
 };
 
-const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
+// =========================================
+// 🔑 Secrets / Params (NE MET JAMAIS TES CLÉS EN DUR)
+// - Secrets: Google Secret Manager
+// - Params: Config paramétrable (notamment STRIPE_MODE)
+// =========================================
+const STRIPE_SECRET_KEY_TEST = defineSecret('STRIPE_SECRET_KEY_TEST'); // sk_test_***
+const STRIPE_SECRET_KEY_LIVE = defineSecret('STRIPE_SECRET_KEY_LIVE'); // sk_live_***
+const STRIPE_MODE = defineString('STRIPE_MODE'); // "test" ou "live"
+
+// Helper: renvoie le Secret à utiliser selon le mode actuel
+const getStripeSecretParam = () =>
+  (STRIPE_MODE.value() === 'live' ? STRIPE_SECRET_KEY_LIVE : STRIPE_SECRET_KEY_TEST);
+
 // =========================================
 // 🌍 DÉTECTION D'ENVIRONNEMENT
 // =========================================
@@ -37,13 +49,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 const BYPASS_MODE = process.env.BYPASS_SECURITY === 'true';
 
 console.log(
-  `🌍 Environment: ${process.env.NODE_ENV || 'development'}, Production: ${isProduction}, Bypass: ${BYPASS_MODE}`
+  `🌍 Environment: ${process.env.NODE_ENV || 'development'}, Production: ${isProduction}, Bypass: ${BYPASS_MODE}, StripeMode: ${STRIPE_MODE.value() || '(unset)'}`
 );
 
+// =========================================
+// ♻️ Rate limit store (mémoire)
+// =========================================
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 // =========================================
-/** 📋 INTERFACES ET TYPES */
+// 📋 INTERFACES ET TYPES
 // =========================================
 type SupportedCurrency = 'eur' | 'usd';
 type SupportedServiceType = 'lawyer_call' | 'expat_call';
@@ -75,7 +90,7 @@ interface SuccessResponse {
   success: true;
   clientSecret: string;
   paymentIntentId: string;
-  amount: number;
+  amount: number; // en cents
   currency: SupportedCurrency;
   serviceType: string;
   status: string;
@@ -83,7 +98,7 @@ interface SuccessResponse {
 }
 
 // =========================================
-// ⚙️ CONFIGURATION
+/** ⚙️ CONFIGURATION RÈGLES DE SÉCURITÉ */
 // =========================================
 const SECURITY_LIMITS = {
   RATE_LIMIT: {
@@ -112,8 +127,26 @@ const SECURITY_LIMITS = {
 } as const;
 
 // =========================================
-// 🛡️ FONCTIONS DE SÉCURITÉ
+// 🛡️ UTILITAIRES SÉCURITÉ
 // =========================================
+function logSecurityEvent(event: string, data: Record<string, unknown>) {
+  const timestamp = new Date().toISOString();
+
+  if (isDevelopment) {
+    console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
+  } else if (isProduction) {
+    const sanitizedData = {
+      ...data,
+      userId: data.userId ? String(data.userId).substring(0, 8) + '...' : undefined,
+      clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined,
+      providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined,
+    };
+    console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
+  } else {
+    console.log(`🧪 [TEST-${timestamp}] ${event}:`, data);
+  }
+}
+
 function checkRateLimit(userId: string): { allowed: boolean; resetTime?: number } {
   if (BYPASS_MODE) {
     logSecurityEvent('rate_limit_bypassed', { userId });
@@ -249,7 +282,10 @@ async function validateAmountSecurity(
       }
     } catch (error) {
       await logError('validateAmountSecurity:dailyLimit', error);
-      logSecurityEvent('daily_limit_check_error', { error });
+      logSecurityEvent('daily_limit_check_error', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : undefined,
+      });
     }
   }
 
@@ -371,31 +407,13 @@ function sanitizeAndConvertInput(data: PaymentIntentRequestData) {
   };
 }
 
-function logSecurityEvent(event: string, data: Record<string, unknown>) {
-  const timestamp = new Date().toISOString();
-
-  if (isDevelopment) {
-    console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
-  } else if (isProduction) {
-    const sanitizedData = {
-      ...data,
-      userId: data.userId ? String(data.userId).substring(0, 8) + '...' : undefined,
-      clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined,
-      providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined,
-    };
-    console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
-  } else {
-    console.log(`🧪 [TEST-${timestamp}] ${event}:`, data);
-  }
-}
-
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE avec configuration simplifiée
+// 🚀 CLOUD FUNCTION PRINCIPALE
 // =========================================
 export const createPaymentIntent = onCall(
   {
     ...FUNCTION_CONFIG,
-    secrets: [STRIPE_SECRET_KEY],
+    secrets: [STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE], // seuls les "secrets" vont ici
   },
   async (request: CallableRequest<PaymentIntentRequestData>) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -405,6 +423,7 @@ export const createPaymentIntent = onCall(
       logSecurityEvent('payment_intent_start', {
         requestId,
         environment: process.env.NODE_ENV,
+        stripeMode: STRIPE_MODE.value() || 'test',
         isDevelopment,
         isProduction,
         bypassMode: BYPASS_MODE,
@@ -423,7 +442,6 @@ export const createPaymentIntent = onCall(
           `Montant invalide reçu: ${request.data.amount} (type: ${typeof request.data.amount})`
         );
       }
-      
       if (
         typeof request.data.commissionAmount !== 'number' ||
         isNaN(request.data.commissionAmount) ||
@@ -431,7 +449,6 @@ export const createPaymentIntent = onCall(
       ) {
         throw new HttpsError('invalid-argument', 'Commission invalide');
       }
-      
       if (
         typeof request.data.providerAmount !== 'number' ||
         isNaN(request.data.providerAmount) ||
@@ -478,12 +495,11 @@ export const createPaymentIntent = onCall(
       if (!clientId || typeof clientId !== 'string' || clientId.length < 5) {
         throw new HttpsError('invalid-argument', 'ID client invalide');
       }
-
       if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
         throw new HttpsError('invalid-argument', `Devise non supportée: ${currency}`);
       }
 
-      // Validation cohérence
+      // 6) Validation cohérence interne
       const coherence = validateAmountCoherence(
         amountInMainUnit,
         commissionAmountInMainUnit,
@@ -497,32 +513,33 @@ export const createPaymentIntent = onCall(
         }
       }
 
-      // Validation sécuritaire
+      // 7) Validation sécuritaire (montants + limites journalières)
       const db = admin.firestore();
       const sec = await validateAmountSecurity(amountInMainUnit, currency, userId, db);
       if (!sec.valid) {
         throw new HttpsError('invalid-argument', sec.error!);
       }
 
-      // Validation business
+      // 8) Validation business (prestataire / tarifs attendus)
       const biz = await validateBusinessLogic(request.data, currency, db);
       if (!biz.valid) {
         throw new HttpsError('failed-precondition', biz.error!);
       }
 
-      // Anti-doublons
+      // 9) Anti-doublons
       const hasDuplicate = await checkDuplicatePayments(clientId, providerId, amountInMainUnit, currency, db);
       if (hasDuplicate) {
         throw new HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
       }
 
-      // Récupération du secret Stripe
-      const stripeSecretKey = STRIPE_SECRET_KEY.value();
-// Derive providerType once (no literal assertions)
-const providerType: 'lawyer' | 'expat' =
-  serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
+      // 🔑 Choix de la clé Stripe selon le mode
+      const stripeSecretKey = getStripeSecretParam().value();
 
-      // Création du paiement Stripe
+      // 🧭 Dérive le providerType
+      const providerType: 'lawyer' | 'expat' =
+        serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
+
+      // 10) Création du PaymentIntent via StripeManager
       const stripePayload = {
         amount: amountInMainUnit,
         currency,
@@ -543,11 +560,11 @@ const providerType: 'lawyer' | 'expat' =
           originalCommission: commissionAmountInMainUnit.toString(),
           originalProviderAmount: providerAmountInMainUnit.toString(),
           originalCurrency: currency,
+          stripeMode: STRIPE_MODE.value() || 'test',
           ...metadata,
         },
       };
 
-      // Appel à StripeManager avec la clé secrète
       const result = await stripeManager.createPaymentIntent(stripePayload, stripeSecretKey);
 
       if (!result?.success) {
@@ -562,25 +579,28 @@ const providerType: 'lawyer' | 'expat' =
         throw new HttpsError('internal', 'Erreur lors de la création du paiement. Veuillez réessayer.');
       }
 
-      // Audit
+      // 11) Audit (prod uniquement)
       if (isProduction) {
         try {
-          await logPaymentAudit({
-            paymentId: result.paymentIntentId!,
-            userId: clientId,
-            amount: amountInMainUnit,
-            currency: currency as 'eur' | 'usd',
-            type: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat') as 'lawyer' | 'expat',
-            action: 'create' as const,
-            metadata: {
-              commissionAmountInMainUnit,
-              providerAmountInMainUnit,
-              amountInCents,
-              commissionAmountInCents,
-              providerAmountInCents,
-              requestId,
+          await logPaymentAudit(
+            {
+              paymentId: result.paymentIntentId!,
+              userId: clientId,
+              amount: amountInMainUnit,
+              currency: currency as 'eur' | 'usd',
+              type: (serviceType === 'lawyer_call' ? 'lawyer' : 'expat') as 'lawyer' | 'expat',
+              action: 'create' as const,
+              metadata: {
+                commissionAmountInMainUnit,
+                providerAmountInMainUnit,
+                amountInCents,
+                commissionAmountInCents,
+                providerAmountInCents,
+                requestId,
+              },
             },
-          }, db);
+            db
+          );
         } catch (auditError) {
           console.warn('Audit logging failed:', auditError);
         }
@@ -597,22 +617,37 @@ const providerType: 'lawyer' | 'expat' =
         success: true,
         clientSecret: result.clientSecret!,
         paymentIntentId: result.paymentIntentId!,
-        amount: amountInCents,
+        amount: amountInCents, // on renvoie en cents côté client pour Stripe.js
         currency,
         serviceType,
         status: 'requires_payment_method',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
+// dans createPaymentIntent, juste avant "return response;"
+const accountId = (await (await import('stripe')).default(getStripeSecretParam().value(), { apiVersion: '2023-10-16' }))
+  .accounts.retrieve()
+  .then(a => a.id)
+  .catch(() => undefined);
 
+const response: SuccessResponse & { stripeMode: string; stripeAccountId?: string } = {
+  success: true,
+  clientSecret: result.clientSecret!,
+  paymentIntentId: result.paymentIntentId!,
+  amount: amountInCents,
+  currency,
+  serviceType,
+  status: 'requires_payment_method',
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  stripeMode: STRIPE_MODE.value() || 'test',
+  stripeAccountId: accountId,
+};
       return response;
-
     } catch (error: unknown) {
       const processingTime = Date.now() - startTime;
 
       const errorData: Record<string, unknown> = {
         requestId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
         processingTime,
         requestData: {
           amount: request.data?.amount,
@@ -623,6 +658,7 @@ const providerType: 'lawyer' | 'expat' =
         },
         userAuth: request.auth?.uid || 'not-authenticated',
         environment: process.env.NODE_ENV,
+        stripeMode: STRIPE_MODE.value() || 'test',
       };
 
       await logError('createPaymentIntent:error', errorData);
@@ -641,3 +677,22 @@ const providerType: 'lawyer' | 'expat' =
     }
   }
 );
+
+/**
+ * ✅ Récap déploiement / config
+ *
+ * 1) Stocke tes deux clés dans Secret Manager :
+ *    firebase functions:secrets:set STRIPE_SECRET_KEY_TEST
+ *    firebase functions:secrets:set STRIPE_SECRET_KEY_LIVE
+ *
+ * 2) Ajoute le param STRIPE_MODE (config param, pas un secret) :
+ *    firebase functions:config:set params.STRIPE_MODE="test"
+ *    # ou "live" lors du basculement prod
+ *
+ * 3) Vérifie que ton front et ton back sont dans le même mode :
+ *    - Front: publie pk_test_*** si STRIPE_MODE=test, pk_live_*** si STRIPE_MODE=live
+ *    - Back : sélectionne la bonne sk_* via STRIPE_MODE
+ *
+ * 4) Déploie :
+ *    firebase deploy --only functions
+ */

@@ -24,12 +24,15 @@ import {
 } from "lucide-react";
 import { getAuth } from "firebase/auth";
 
+// -------------------------
 // Types
+// -------------------------
+type BackupStatus = "pending" | "completed" | "failed";
 
 type Row = {
   id: string;
   type: string;
-  status: "pending" | "completed" | "failed";
+  status: BackupStatus;
   createdAt?: unknown;
   completedAt?: unknown;
   createdBy?: string;
@@ -38,8 +41,9 @@ type Row = {
   prefix?: string;
 };
 
-// Utils
-
+// -------------------------
+// Helpers
+// -------------------------
 async function isAdminNow(): Promise<boolean> {
   const auth = getAuth();
   // Attendre que Firebase connaisse l'état d'auth
@@ -55,6 +59,103 @@ async function isAdminNow(): Promise<boolean> {
   return t?.claims?.role === "admin";
 }
 
+function getErrMsg(e: unknown) {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function toDateFromFirestoreLike(v: unknown): Date | undefined {
+  try {
+    // Timestamp Firestore (client) -> .toDate()
+    if (
+      typeof v === "object" &&
+      v !== null &&
+      "toDate" in (v as Record<string, unknown>) &&
+      typeof (v as { toDate?: () => Date }).toDate === "function"
+    ) {
+      return (v as { toDate: () => Date }).toDate();
+    }
+    // Date native
+    if (v instanceof Date) return v;
+    // Timestamp Firestore (REST) -> {_seconds: number}
+    if (
+      typeof v === "object" &&
+      v !== null &&
+      "_seconds" in (v as Record<string, unknown>)
+    ) {
+      const secs = (v as { _seconds: number })._seconds;
+      return new Date(Number(secs) * 1000);
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+function fmtFrDate(v: unknown): string {
+  const d = toDateFromFirestoreLike(v);
+  return d
+    ? new Intl.DateTimeFormat("fr-FR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(d)
+    : "-";
+}
+
+// -------------------------
+// Composants de badge
+// -------------------------
+const StatusBadge: React.FC<{ s: BackupStatus }> = ({ s }) => {
+  if (s === "completed")
+    return (
+      <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs">
+        <CheckCircle size={12} className="mr-1" />
+        Terminé
+      </span>
+    );
+  if (s === "failed")
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-xs">
+        <AlertTriangle size={12} className="mr-1" />
+        Échoué
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center rounded-full bg-yellow-100 text-yellow-800 px-2 py-0.5 text-xs">
+      <Clock size={12} className="mr-1" />
+      En cours
+    </span>
+  );
+};
+
+const TypeBadge: React.FC<{ t: string }> = ({ t }) => {
+  if (t === "automatic")
+    return (
+      <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
+        <RefreshCw size={12} className="mr-1" />
+        Automatique
+      </span>
+    );
+  if (t === "manual")
+    return (
+      <span className="inline-flex items-center rounded-full bg-purple-100 text-purple-800 px-2 py-0.5 text-xs">
+        <Save size={12} className="mr-1" />
+        Manuel
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center rounded-full bg-gray-100 text-gray-800 px-2 py-0.5 text-xs">
+      <Database size={12} className="mr-1" />
+      {t}
+    </span>
+  );
+};
+
+// -------------------------
+// Page
+// -------------------------
 const AdminBackups: React.FC = () => {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,92 +194,25 @@ const AdminBackups: React.FC = () => {
     };
   }, []);
 
-  // --- Helpers ---
-  const fmtDate = (v: unknown) => {
-    try {
-      const d =
-        typeof v === "object" &&
-        v !== null &&
-        "toDate" in (v as Record<string, unknown>) &&
-        typeof (v as { toDate?: () => Date }).toDate === "function"
-          ? (v as { toDate: () => Date }).toDate()
-          : v instanceof Date
-          ? v
-          : typeof v === "object" &&
-            v !== null &&
-            "_seconds" in (v as Record<string, unknown>)
-          ? new Date(Number((v as { _seconds: number })._seconds) * 1000)
-          : undefined;
-
-      return d
-        ? new Intl.DateTimeFormat("fr-FR", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(d)
-        : "-";
-    } catch {
-      return "-";
-    }
-  };
-
-  const StatusBadge: React.FC<{ s: Row["status"] }> = ({ s }) => {
-    if (s === "completed")
-      return (
-        <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs">
-          <CheckCircle size={12} className="mr-1" />
-          Terminé
-        </span>
-      );
-    if (s === "failed")
-      return (
-        <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-xs">
-          <AlertTriangle size={12} className="mr-1" />
-          Échoué
-        </span>
-      );
-    return (
-      <span className="inline-flex items-center rounded-full bg-yellow-100 text-yellow-800 px-2 py-0.5 text-xs">
-        <Clock size={12} className="mr-1" />
-        En cours
-      </span>
-    );
-  };
-
-  const TypeBadge: React.FC<{ t: string }> = ({ t }) => {
-    if (t === "automatic")
-      return (
-        <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
-          <RefreshCw size={12} className="mr-1" />
-          Automatique
-        </span>
-      );
-    if (t === "manual")
-      return (
-        <span className="inline-flex items-center rounded-full bg-purple-100 text-purple-800 px-2 py-0.5 text-xs">
-          <Save size={12} className="mr-1" />
-          Manuel
-        </span>
-      );
-    return (
-      <span className="inline-flex items-center rounded-full bg-gray-100 text-gray-800 px-2 py-0.5 text-xs">
-        <Database size={12} className="mr-1" />
-        {t}
-      </span>
-    );
-  };
-
+  // ---- Dernier préfixe détectable automatiquement ----
   const latestPrefix = useMemo(() => {
     const completed = rows.filter((r) => r.status === "completed");
     if (completed.length === 0) return "";
-    for (const r of completed) if (r.prefix) return r.prefix as string;
+
+    // 1) si prefix déjà stocké en champ dédié
+    for (const r of completed) {
+      if (typeof r.prefix === "string" && r.prefix.includes("/")) {
+        return r.prefix;
+      }
+    }
+
+    // 2) tenter de l'extraire depuis artifacts (firestore/auth/functions)
     for (const r of completed) {
       const a = r.artifacts || {};
-      const anyVal = (a as any).firestore || (a as any).auth || (a as any).functions;
+      const anyVal = a.firestore || a.auth || a.functions;
       if (typeof anyVal === "string" && anyVal.includes("/app/")) {
-        const m = anyVal.match(/app\/(^[^/]+\/[^/]+)/);
+        // ⚠️ Correction regex: enlever le ^ mal placé
+        const m = anyVal.match(/app\/([^/]+\/[^/]+)/);
         if (m) return m[1];
       }
     }
@@ -197,13 +231,10 @@ const AdminBackups: React.FC = () => {
     return ok;
   }
 
-  function getErrMsg(e: unknown) {
-    return e instanceof Error ? e.message : String(e);
-  }
-
   async function onTest() {
     try {
       await openTestBackupHttp();
+      alert("Requête test envoyée (vérifie le bucket de backup).");
     } catch (e) {
       alert(getErrMsg(e));
     }
@@ -282,13 +313,16 @@ const AdminBackups: React.FC = () => {
       const t = await auth.currentUser?.getIdTokenResult();
       console.log("Claims:", t?.claims); // on s'attend à { role: "admin", ... }
       alert("OK: rôle admin accordé. Recharge la page.");
-    } catch (e: any) {
-      alert(e?.message || "Erreur grantAdminIfToken");
+    } catch (e: unknown) {
+      alert(getErrMsg(e) || "Erreur grantAdminIfToken");
     } finally {
       setGranting(false);
     }
   }
 
+  // -------------------------
+  // UI
+  // -------------------------
   return (
     <AdminLayout>
       <div className="px-4 sm:px-6 lg:px-8 py-8">
@@ -371,7 +405,7 @@ const AdminBackups: React.FC = () => {
               Lancer la restauration
             </Button>
           </div>
-          {latestPrefix && (
+          {!!latestPrefix && (
             <p className="text-xs text-gray-500 mt-2">
               Dernier préfixe détecté : <code>{latestPrefix}</code>
             </p>
@@ -406,7 +440,7 @@ const AdminBackups: React.FC = () => {
                       <td className="px-6 py-3">
                         <TypeBadge t={r.type} />
                       </td>
-                      <td className="px-6 py-3 text-sm text-gray-700">{fmtDate(r.createdAt)}</td>
+                      <td className="px-6 py-3 text-sm text-gray-700">{fmtFrDate(r.createdAt)}</td>
                       <td className="px-6 py-3">
                         <StatusBadge s={r.status} />
                       </td>

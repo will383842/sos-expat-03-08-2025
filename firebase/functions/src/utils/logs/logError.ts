@@ -1,5 +1,28 @@
 import { db, FieldValue } from '../firebase';
 
+function safeStringify(obj: unknown): string {
+  const seen = new WeakSet();
+  try {
+    return JSON.stringify(obj, (_key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[Circular]';
+        }
+        seen.add(value);
+      }
+      if (value instanceof Error) {
+        return {
+          name: value.name,
+          message: value.message,
+        };
+      }
+      return value;
+    });
+  } catch (err) {
+    return `Unstringifiable object: ${String(err)}`;
+  }
+}
+
 export async function logError(context: string, error: unknown) {
   try {
     let message = 'Erreur inconnue';
@@ -8,13 +31,13 @@ export async function logError(context: string, error: unknown) {
 
     if (error instanceof Error) {
       message = error.message;
-      stack = error.stack || '';
+      stack = (error.stack || '').slice(0, 5000); // tronqué pour Firestore
       errorType = error.constructor.name;
     } else if (typeof error === 'string') {
       message = error;
       errorType = 'string';
     } else if (error && typeof error === 'object') {
-      message = JSON.stringify(error);
+      message = safeStringify(error);
       errorType = 'object';
     } else {
       message = String(error);

@@ -110,6 +110,21 @@ interface CustomClaims {
 
 ultraLogger.debug('TYPES', 'Interfaces et types définis');
 
+// ====== TYPES TWILIO (NOUVEAU) ======
+type TwilioCallParticipant = { callSid?: string; isMuted?: boolean };
+type TwilioCallSession = {
+  status: 'active' | 'scheduled' | 'ended' | string;
+  conference: { sid: string; name: string };
+  participants: { provider: TwilioCallParticipant; client: TwilioCallParticipant };
+};
+type CleanupResult = { deleted: number; errors: number };
+
+export interface TwilioCallManager {
+  cancelCallSession(sessionId: string, reason: string, performedBy: string): Promise<boolean>;
+  getCallSession(sessionId: string): Promise<TwilioCallSession | null>;
+  cleanupOldSessions(opts: { olderThanDays: number; keepCompletedDays: number; batchSize: number }): Promise<CleanupResult>;
+}
+
 // ====== INITIALISATION FIREBASE ULTRA-DEBUGGÉE ======
 let isFirebaseInitialized = false;
 let db: admin.firestore.Firestore;
@@ -172,25 +187,28 @@ const initializeFirebase = traceFunction(() => {
 }, 'initializeFirebase', 'INDEX');
 
 // ====== LAZY LOADING DES MANAGERS ULTRA-DEBUGGÉ ======
-const stripeManagerInstance: unknown = null;
-const twilioCallManagerInstance: unknown = null;
-const messageManagerInstance: unknown = null;
+const stripeManagerInstance: unknown = null; // jamais réassigné
+let twilioCallManagerInstance: TwilioCallManager | null = null; // réassigné après import
+const messageManagerInstance: unknown = null; // jamais réassigné
 
-const getTwilioCallManager = traceFunction(async () => {
+
+const getTwilioCallManager = traceFunction(async (): Promise<TwilioCallManager> => {
   if (!twilioCallManagerInstance) {
-    ultraLogger.info('LAZY_LOADING', 'Chargement du TwilioCallManager');
-    const startTime = Date.now();
-    
-    const { twilioCallManager } = await import('./TwilioCallManager');
-    twilioCallManagerInstance = twilioCallManager;
-    
-    const loadTime = Date.now() - startTime;
-    ultraLogger.info('LAZY_LOADING', 'TwilioCallManager chargé avec succès', {
-      loadTime: `${loadTime}ms`
-    });
+    // On type l’import pour éviter 'any'
+    const mod = await import('./TwilioCallManager') as {
+      twilioCallManager?: TwilioCallManager;
+      default?: TwilioCallManager;
+    };
+
+    const resolved = mod.twilioCallManager ?? mod.default;
+    if (!resolved) {
+      throw new Error('TwilioCallManager introuvable dans ./TwilioCallManager (ni export nommé, ni export par défaut).');
+    }
+    twilioCallManagerInstance = resolved;
   }
   return twilioCallManagerInstance;
 }, 'getTwilioCallManager', 'INDEX');
+
 
 // ====== MIDDLEWARE DE DEBUG POUR TOUTES LES FONCTIONS ======
 function createDebugMetadata(functionName: string, userId?: string): UltraDebugMetadata {
@@ -505,7 +523,7 @@ export const adminForceDisconnectCall = onCall(
         sessionId,
         error: callError instanceof Error ? callError.message : String(callError)
       }, callError instanceof Error ? callError : undefined);
-      throw new HttpsError('internal', 'Failed to disconnect call');
+        throw new HttpsError('internal', 'Failed to disconnect call');
     }
   })
 );
@@ -603,27 +621,59 @@ export const stripeWebhook = onRequest({
       signature as string,
       STRIPE_WEBHOOK_SECRET.value() // ✅ Nouveau : secret Firebase au lieu de config
     );
+
+    const objectId = (() => {
+      const o = event.data.object as unknown;
+      return (o && typeof o === 'object' && 'id' in (o as Record<string, unknown>))
+        ? (o as { id: string }).id
+        : undefined;
+    })();
     
     ultraLogger.info('STRIPE_WEBHOOK', 'Événement Stripe validé', {
       eventType: event.type,
       eventId: event.id,
-      objectId: (event.data.object as any)?.id
+      objectId
     });
     
     // Traiter l'événement avec le nouveau système
     switch (event.type) {
-      case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, database);
+      case 'payment_intent.created':
+        ultraLogger.debug('STRIPE_WEBHOOK', 'payment_intent.created', { id: objectId });
         break;
-      case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, database);
+
+      case 'payment_intent.processing':
+        ultraLogger.debug('STRIPE_WEBHOOK', 'payment_intent.processing', { id: objectId });
         break;
-      case 'payment_intent.canceled':
-        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent, database);
-        break;
+
       case 'payment_intent.requires_action':
         await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent, database);
         break;
+
+      case 'checkout.session.completed':
+        ultraLogger.info('STRIPE_WEBHOOK', 'checkout.session.completed', { id: objectId });
+        break;
+
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, database);
+        break;
+
+      case 'payment_intent.payment_failed':
+        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, database);
+        break;
+
+      case 'payment_intent.canceled':
+        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent, database);
+        break;
+
+      case 'charge.refunded':
+        ultraLogger.warn('STRIPE_WEBHOOK', 'charge.refunded', { id: objectId });
+        // TODO: récupérer le PaymentIntent via charge.payment_intent si besoin et ajuster la DB
+        break;
+
+      case 'refund.updated':
+        ultraLogger.warn('STRIPE_WEBHOOK', 'refund.updated', { id: objectId });
+        break;
+
       default:
         ultraLogger.debug('STRIPE_WEBHOOK', 'Type d\'événement non géré', {
           eventType: event.type
@@ -658,6 +708,7 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'captured',
+        currency: paymentIntent.currency ?? 'eur',
         capturedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -695,6 +746,7 @@ const handlePaymentIntentFailed = traceFunction(async (paymentIntent: Stripe.Pay
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'failed',
+        currency: paymentIntent.currency ?? 'eur',
         failureReason: paymentIntent.last_payment_error?.message || 'Unknown error',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -737,6 +789,7 @@ const handlePaymentIntentCanceled = traceFunction(async (paymentIntent: Stripe.P
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'canceled',
+        currency: paymentIntent.currency ?? 'eur',
         canceledAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -779,6 +832,7 @@ const handlePaymentIntentRequiresAction = traceFunction(async (paymentIntent: St
       const paymentDoc = paymentsSnapshot.docs[0];
       await paymentDoc.ref.update({
         status: 'requires_action',
+        currency: paymentIntent.currency ?? 'eur',
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
@@ -1308,7 +1362,7 @@ export const getSystemHealthStatus = onCall(
       const firestoreLatency = Date.now() - firestoreTest;
 
       // Test Stripe (si configuré)
-      let stripeStatus = 'not_configured';
+      let stripeStatus: 'not_configured' | 'healthy' | 'error' = 'not_configured';
       let stripeLatency = 0;
       try {
         const stripeInstance = getStripe();
@@ -1350,7 +1404,7 @@ export const getSystemHealthStatus = onCall(
 
       const healthStatus = {
         timestamp: new Date().toISOString(),
-        status: 'healthy',
+        status: 'healthy' as 'healthy' | 'degraded' | 'unhealthy' | 'error',
         services: {
           firebase: {
             status: 'healthy',
@@ -1402,7 +1456,7 @@ export const getSystemHealthStatus = onCall(
 
       return {
         timestamp: new Date().toISOString(),
-        status: 'error',
+        status: 'error' as const,
         error: error instanceof Error ? error.message : String(error)
       };
     }

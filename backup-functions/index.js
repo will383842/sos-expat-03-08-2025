@@ -2,16 +2,20 @@
 const admin = require("firebase-admin");
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { defineSecret } = require("firebase-functions/params");
+const { defineSecret, defineString } = require("firebase-functions/params");
+console.log('[CFG] STRIPE_MODE =', STRIPE_MODE.value() ?? '(unset)');
 const { google } = require("googleapis");
 const { Storage } = require("@google-cloud/storage");
 
 // ====== Init Firebase Admin ======
-admin.initializeApp();
+try { admin.initializeApp(); } catch (_) {}
 const db = admin.firestore();
 
-// ====== Secrets ======
-const BACKUP_CRON_TOKEN = defineSecret("BACKUP_CRON_TOKEN");
+// ====== Secrets & Params (Functions v2) ======
+const BACKUP_CRON_TOKEN = defineSecret("BACKUP_CRON_TOKEN"); // secret côté Cloud Functions v2
+// L’URL réelle de la fonction v2 startBackupHttp (Cloud Run) : à définir après 1er déploiement
+// Exemple: "https://startbackuphttp-XXXX-ew.a.run.app"
+const START_BACKUP_HTTP_URL = defineString("START_BACKUP_HTTP_URL"); // param configurable (pas un secret)
 
 // ====== Config ======
 const PROJECT_ID =
@@ -20,17 +24,8 @@ const PROJECT_ID =
   process.env.FUNCTIONS_PROJECT_ID;
 
 const BACKUP_BUCKET = process.env.BACKUP_BUCKET || "sos-expat-backup"; // bucket Europe (europe-west1)
-// index.js
-const STORAGE_SOURCE_BUCKET = "sos-urgently-ac307.firebasestorage.app";
+const STORAGE_SOURCE_BUCKET = `${PROJECT_ID}.appspot.com`; // Source Storage par défaut
 const RETENTION_COUNT = 6; // garder 6 sauvegardes
-
-// ====== Scheduler (config) ======
-const SCHEDULER_JOB_ID = "backup-nightly";
-const SCHEDULER_REGION = "europe-west1";
-const SCHEDULER_PARENT = `projects/${PROJECT_ID}/locations/${SCHEDULER_REGION}`;
-function getStartBackupHttpUrl() {
-  return `https://${SCHEDULER_REGION}-${PROJECT_ID}.cloudfunctions.net/startBackupHttp`;
-}
 
 // ====== Outils ======
 const p = (n) => String(n).padStart(2, "0");
@@ -99,11 +94,11 @@ async function runStorageTransfer(prefixForThisBackup) {
     requestBody: {
       projectId: PROJECT_ID,
       transferSpec: {
-        gcsDataSource: { bucketName: STORAGE_SOURCE_BUCKET }, // source us-central1
+        gcsDataSource: { bucketName: STORAGE_SOURCE_BUCKET }, // source: bucket appspot
         gcsDataSink: {
           bucketName: BACKUP_BUCKET,
           path: `app/${prefixForThisBackup}/storage/`,
-        }, // destination Europe
+        }, // destination: BACKUP_BUCKET Europe
         transferOptions: { overwriteObjectsAlreadyExistingInSink: true },
       },
       schedule: {
@@ -121,27 +116,35 @@ async function runStorageTransfer(prefixForThisBackup) {
   return res.data.name || "";
 }
 
-// ====== Export liste des Functions ======
+// ====== Export liste des Functions (Gen1/Gen2 mix) ======
 async function exportFunctionsList(gcsPath) {
   const auth = await google.auth.getClient({
     scopes: ["https://www.googleapis.com/auth/cloud-platform"],
   });
-  const cf = google.cloudfunctions({ version: "v1", auth });
+  const cf = google.cloudfunctions({ version: "v1", auth }); // Gen1
+  let list = [];
 
-  const parent = `projects/${PROJECT_ID}/locations/-`;
-  const resp = await cf.projects.locations.functions.list({ parent });
-  const list = (resp.data.functions || []).map((f) => ({
-    name: f.name,
-    runtime: f.runtime,
-    entryPoint: f.entryPoint,
-    region:
-      f.name && f.name.includes("/locations/")
-        ? f.name.split("/locations/")[1].split("/")[0]
-        : null,
-    httpsTrigger: !!f.httpsTrigger,
-    eventTrigger: f.eventTrigger || null,
-    updateTime: f.updateTime,
-  }));
+  try {
+    const parent = `projects/${PROJECT_ID}/locations/-`;
+    const resp = await cf.projects.locations.functions.list({ parent });
+    list = (resp.data.functions || []).map((f) => ({
+      name: f.name,
+      runtime: f.runtime,
+      entryPoint: f.entryPoint,
+      region:
+        f.name && f.name.includes("/locations/")
+          ? f.name.split("/locations/")[1].split("/")[0]
+          : null,
+      httpsTrigger: !!f.httpsTrigger,
+      eventTrigger: f.eventTrigger || null,
+      updateTime: f.updateTime,
+      gen: "gen1",
+    }));
+  } catch (_) {
+    // ignore
+  }
+
+  // Optionnel: appeler Cloud Run Admin API pour Gen2 si besoin (non indispensable ici)
 
   const storage = new Storage();
   const [bucketName, ...rest] = gcsPath.replace("gs://", "").split("/");
@@ -198,7 +201,6 @@ async function runBackupInternal(type, createdBy) {
     artifacts["functions"] = await exportFunctionsList(`${base}/functions/list.json`);
     artifacts["storageJob"] = await runStorageTransfer(prefix);
 
-    // ✅ Ajout de prefix dans le document Firestore
     await docRef.update({
       status: "completed",
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -218,32 +220,59 @@ async function runBackupInternal(type, createdBy) {
   }
 }
 
-// ====== Fonctions exportées ======
+// ====== Fonctions exportées (avec limites CPU/instances pour éviter le quota) ======
 
 // Test HTTP: écrit test.txt dans le bucket Europe
-exports.testBackup = onRequest({ region: "europe-west1" }, async (_req, res) => {
-  try {
-    const storage = new Storage();
-    const file = storage.bucket(BACKUP_BUCKET).file("test.txt");
-    await file.save("Hello SOS Expat!", { contentType: "text/plain" });
-    res.status(200).send(`Test écrit dans gs://${BACKUP_BUCKET}/test.txt`);
-  } catch (err) {
-    res.status(500).send((err && err.message) || "Erreur testBackup");
+exports.testBackup = onRequest(
+  {
+    region: "europe-west1",
+    availableMemory: "256MiB",
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 30,
+  },
+  async (_req, res) => {
+    try {
+      const storage = new Storage();
+      const file = storage.bucket(BACKUP_BUCKET).file("test.txt");
+      await file.save("Hello SOS Expat!", { contentType: "text/plain" });
+      res.status(200).send(`Test écrit dans gs://${BACKUP_BUCKET}/test.txt`);
+    } catch (err) {
+      res.status(500).send((err && err.message) || "Erreur testBackup");
+    }
   }
-});
+);
 
 // Sauvegarde manuelle (callable, côté admin)
-exports.startBackup = onCall({ region: "europe-west1" }, async (req) => {
-  if (!req.auth) throw new HttpsError("unauthenticated", "Connexion requise.");
-  const claims = req.auth.token || {};
-  if (claims.role !== "admin")
-    throw new HttpsError("permission-denied", "Admin requis.");
-  return await runBackupInternal("manual", req.auth.uid);
-});
+exports.startBackup = onCall(
+  {
+    region: "europe-west1",
+    availableMemory: "256MiB",
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 60,
+  },
+  async (req) => {
+    if (!req.auth) throw new HttpsError("unauthenticated", "Connexion requise.");
+    const claims = req.auth.token || {};
+    if (claims.role !== "admin")
+      throw new HttpsError("permission-denied", "Admin requis.");
+    return await runBackupInternal("manual", req.auth.uid);
+  }
+);
 
 // Sauvegarde planifiée fixe (fallback à 03:00 Europe/Paris)
 exports.nightlyBackup = onSchedule(
-  { schedule: "0 3 * * *", timeZone: "Europe/Paris", region: "europe-west1" },
+  {
+    schedule: "0 3 * * *",
+    timeZone: "Europe/Paris",
+    region: "europe-west1",
+    // (pas besoin d'options CPU ici, c'est un job scheduler)
+  },
   async () => {
     await runBackupInternal("automatic", "scheduler-onSchedule");
   }
@@ -251,7 +280,16 @@ exports.nightlyBackup = onSchedule(
 
 // HTTP déclenché par Cloud Scheduler (horaire modifiable)
 exports.startBackupHttp = onRequest(
-  { region: "europe-west1", secrets: [BACKUP_CRON_TOKEN] },
+  {
+    region: "europe-west1",
+    availableMemory: "256MiB",
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 60,
+    secrets: [BACKUP_CRON_TOKEN],
+  },
   async (req, res) => {
     try {
       if (req.method !== "POST") return res.status(405).send("method-not-allowed");
@@ -268,30 +306,50 @@ exports.startBackupHttp = onRequest(
 );
 
 // Lire le planning actuel (Cloud Scheduler)
-exports.getBackupSchedule = onCall({ region: "europe-west1" }, async (req) => {
-  if (!req.auth || (req.auth.token?.role !== "admin"))
-    throw new HttpsError("permission-denied", "Admin requis.");
-  const auth = await google.auth.getClient({
-    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-  });
-  const cs = google.cloudscheduler({ version: "v1", auth });
-  try {
-    const { data } = await cs.projects.locations.jobs.get({
-      name: `${SCHEDULER_PARENT}/jobs/${SCHEDULER_JOB_ID}`,
+exports.getBackupSchedule = onCall(
+  {
+    region: "europe-west1",
+    availableMemory: "256MiB",
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 30,
+  },
+  async (req) => {
+    if (!req.auth || (req.auth.token?.role !== "admin"))
+      throw new HttpsError("permission-denied", "Admin requis.");
+    const auth = await google.auth.getClient({
+      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     });
-    return {
-      schedule: data.schedule || null,
-      timeZone: data.timeZone || "Europe/Paris",
-      uri: data.httpTarget?.uri || null,
-    };
-  } catch {
-    return { schedule: null, timeZone: "Europe/Paris", uri: null };
+    const cs = google.cloudscheduler({ version: "v1", auth });
+    try {
+      const { data } = await cs.projects.locations.jobs.get({
+        name: `projects/${PROJECT_ID}/locations/europe-west1/jobs/backup-nightly`,
+      });
+      return {
+        schedule: data.schedule || null,
+        timeZone: data.timeZone || "Europe/Paris",
+        uri: data.httpTarget?.uri || null,
+      };
+    } catch {
+      return { schedule: null, timeZone: "Europe/Paris", uri: null };
+    }
   }
-});
+);
 
 // Créer/modifier le planning (Cloud Scheduler)
 exports.updateBackupSchedule = onCall(
-  { region: "europe-west1", secrets: [BACKUP_CRON_TOKEN] },
+  {
+    region: "europe-west1",
+    availableMemory: "256MiB",
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 30,
+    secrets: [BACKUP_CRON_TOKEN],
+  },
   async (req) => {
     if (!req.auth || (req.auth.token?.role !== "admin"))
       throw new HttpsError("permission-denied", "Admin requis.");
@@ -304,12 +362,22 @@ exports.updateBackupSchedule = onCall(
     });
     const cs = google.cloudscheduler({ version: "v1", auth });
 
+    // ✅ Utilise l’URL réelle de la fonction v2, fournie en param START_BACKUP_HTTP_URL
+    const uriParam = START_BACKUP_HTTP_URL.value();
+    if (!uriParam) {
+      // Guide explicite si le param n'est pas encore renseigné
+      throw new HttpsError(
+        "failed-precondition",
+        "Le paramètre START_BACKUP_HTTP_URL n'est pas défini. Récupère l'URL de startBackupHttp après déploiement (console) puis exécute: firebase functions:config:set params.START_BACKUP_HTTP_URL=\"https://...a.run.app\""
+      );
+    }
+
     const body = {
-      name: `${SCHEDULER_PARENT}/jobs/${SCHEDULER_JOB_ID}`,
+      name: `projects/${PROJECT_ID}/locations/europe-west1/jobs/backup-nightly`,
       schedule: cron,
       timeZone,
       httpTarget: {
-        uri: getStartBackupHttpUrl(),
+        uri: uriParam,
         httpMethod: "POST",
         headers: { "x-backup-token": BACKUP_CRON_TOKEN.value() },
       },
@@ -323,7 +391,7 @@ exports.updateBackupSchedule = onCall(
       });
     } catch {
       await cs.projects.locations.jobs.create({
-        parent: SCHEDULER_PARENT,
+        parent: `projects/${PROJECT_ID}/locations/europe-west1`,
         requestBody: body,
       });
     }
@@ -332,52 +400,63 @@ exports.updateBackupSchedule = onCall(
 );
 
 // Restaurer depuis un backup
-exports.restoreFromBackup = onCall({ region: "europe-west1" }, async (req) => {
-  if (!req.auth || (req.auth.token?.role !== "admin"))
-    throw new HttpsError("permission-denied", "Admin requis.");
-  const { prefix, parts = { firestore: true, storage: true, auth: "basic" } } =
-    req.data || {};
-  if (!prefix) throw new HttpsError("invalid-argument", "prefix requis.");
+exports.restoreFromBackup = onCall(
+  {
+    region: "europe-west1",
+    availableMemory: "512MiB", // un peu plus large
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 20,
+    timeoutSeconds: 540, // opérations longues
+  },
+  async (req) => {
+    if (!req.auth || (req.auth.token?.role !== "admin"))
+      throw new HttpsError("permission-denied", "Admin requis.");
+    const { prefix, parts = { firestore: true, storage: true, auth: "basic" } } =
+      req.data || {};
+    if (!prefix) throw new HttpsError("invalid-argument", "prefix requis.");
 
-  const base = `gs://${BACKUP_BUCKET}/app/${prefix}`;
-  const authClient = await google.auth.getClient({
-    scopes: [
-      "https://www.googleapis.com/auth/cloud-platform",
-      "https://www.googleapis.com/auth/datastore",
-    ],
-  });
+    const base = `gs://${BACKUP_BUCKET}/app/${prefix}`;
+    const authClient = await google.auth.getClient({
+      scopes: [
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/datastore",
+      ],
+    });
 
-  const out = {};
+    const out = {};
 
-  // Firestore import
-  if (parts.firestore) {
-    const firestore = google.firestore({ version: "v1", auth: authClient });
-    const name = `projects/${PROJECT_ID}/databases/(default)`;
-    const inputUriPrefix = `${base}/firestore`;
-    out.firestore = (
-      await firestore.projects.databases.importDocuments({
-        name,
-        requestBody: { inputUriPrefix },
-      })
-    ).data || true;
-  }
+    // Firestore import
+    if (parts.firestore) {
+      const firestore = google.firestore({ version: "v1", auth: authClient });
+      const name = `projects/${PROJECT_ID}/databases/(default)`;
+      const inputUriPrefix = `${base}/firestore`;
+      out.firestore = (
+        await firestore.projects.databases.importDocuments({
+          name,
+          requestBody: { inputUriPrefix },
+        })
+      ).data || true;
+    }
 
-  // Storage restore (backup -> appspot)
-  if (parts.storage) {
-    const sts = google.storagetransfer({ version: "v1", auth: authClient });
-    const start = new Date();
-    out.storageJob = (
-      await sts.transferJobs.create({
-        requestBody: {
-          projectId: PROJECT_ID,
-          transferSpec: {
-            gcsDataSource: {
-              bucketName: BACKUP_BUCKET,
-              path: `app/${prefix}/storage/`,
-            },
-            gcsDataSink: { bucketName: `${PROJECT_ID}.appspot.com` },
-            transferOptions: {
-              overwriteObjectsAlreadyExistingInSink: true,
+    // Storage restore (backup -> appspot)
+    if (parts.storage) {
+      const sts = google.storagetransfer({ version: "v1", auth: authClient });
+      const start = new Date();
+      out.storageJob = (
+        await sts.transferJobs.create({
+          requestBody: {
+            projectId: PROJECT_ID,
+            transferSpec: {
+              gcsDataSource: {
+                bucketName: BACKUP_BUCKET,
+                path: `app/${prefix}/storage/`,
+              },
+              gcsDataSink: { bucketName: `${PROJECT_ID}.appspot.com` },
+              transferOptions: {
+                overwriteObjectsAlreadyExistingInSink: true,
+              },
             },
           },
           schedule: {
@@ -389,92 +468,110 @@ exports.restoreFromBackup = onCall({ region: "europe-west1" }, async (req) => {
           },
           status: "ENABLED",
           description: `restore-storage-${prefix}`,
-        },
-      })
-    ).data.name;
-  }
-
-  // Auth restore (basique : recrée comptes + génère lien de réinitialisation)
-  if (parts.auth === "basic") {
-    const storage = new Storage();
-    const file = storage
-      .bucket(BACKUP_BUCKET)
-      .file(`app/${prefix}/auth/users.json`);
-    const [buf] = await file.download();
-    const parsed = JSON.parse(buf.toString("utf-8"));
-    const users = parsed?.users || [];
-    for (const u of users) {
-      try {
-        await admin
-          .auth()
-          .updateUser(u.uid, {
-            email: u.email || undefined,
-            phoneNumber: u.phoneNumber || undefined,
-            displayName: u.displayName || undefined,
-            disabled: u.disabled || false,
-          })
-          .catch(async () => {
-            await admin.auth().createUser({
-              uid: u.uid,
-              email: u.email,
-              phoneNumber: u.phoneNumber,
-              displayName: u.displayName,
-              disabled: u.disabled || false,
-            });
-          });
-        if (u.email) {
-          // Génère un lien de réinitialisation (à envoyer via votre système d’emailing).
-          await admin.auth().generatePasswordResetLink(u.email);
-        }
-      } catch {
-        // ignore per-user errors to continue the loop
-      }
+        })
+      ).data.name;
     }
-    out.auth = { restored: users.length, mode: "basic" };
-  }
 
-  return { ok: true, ...out };
-});
+    // Auth restore (basique)
+    if (parts.auth === "basic") {
+      const storage = new Storage();
+      const file = storage.bucket(BACKUP_BUCKET).file(`app/${prefix}/auth/users.json`);
+      const [buf] = await file.download();
+      const parsed = JSON.parse(buf.toString("utf-8"));
+      const users = parsed?.users || [];
+      for (const u of users) {
+        try {
+          await admin
+            .auth()
+            .updateUser(u.uid, {
+              email: u.email || undefined,
+              phoneNumber: u.phoneNumber || undefined,
+              displayName: u.displayName || undefined,
+              disabled: u.disabled || false,
+            })
+            .catch(async () => {
+              await admin.auth().createUser({
+                uid: u.uid,
+                email: u.email,
+                phoneNumber: u.phoneNumber,
+                displayName: u.displayName,
+                disabled: u.disabled || false,
+              });
+            });
+          if (u.email) {
+            // Génère un lien de réinitialisation (à envoyer via votre système d’emailing).
+            await admin.auth().generatePasswordResetLink(u.email);
+          }
+        } catch {
+          // ignore per-user errors to continue the loop
+        }
+      }
+      out.auth = { restored: users.length, mode: "basic" };
+    }
+
+    return { ok: true, ...out };
+  }
+);
 
 // ====== Suppression d’un backup (fichiers + document) ======
-exports.deleteBackup = onCall({ region: "europe-west1" }, async (req) => {
-  if (!req.auth) throw new HttpsError("unauthenticated", "Connexion requise.");
-  const claims = req.auth.token || {};
-  if (claims.role !== "admin") throw new HttpsError("permission-denied", "Admin requis.");
+exports.deleteBackup = onCall(
+  {
+    region: "europe-west1",
+    availableMemory: "256MiB",
+    availableCpu: "0.167",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 60,
+  },
+  async (req) => {
+    if (!req.auth) throw new HttpsError("unauthenticated", "Connexion requise.");
+    const claims = req.auth.token || {};
+    if (claims.role !== "admin") throw new HttpsError("permission-denied", "Admin requis.");
 
-  const { docId } = req.data || {};
-  if (!docId) throw new HttpsError("invalid-argument", "docId requis.");
+    const { docId } = req.data || {};
+    if (!docId) throw new HttpsError("invalid-argument", "docId requis.");
 
-  const ref = db.collection("backups").doc(docId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError("not-found", "Backup introuvable.");
+    const ref = db.collection("backups").doc(docId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Backup introuvable.");
 
-  const data = snap.data() || {};
-  let prefix = data.prefix;
+    const data = snap.data() || {};
+    let prefix = data.prefix;
 
-  // Fallback si jamais prefix manquait (anciens backups)
-  if (!prefix) {
-    const anyVal = data.artifacts?.firestore || data.artifacts?.auth || data.artifacts?.functions;
-    const m = typeof anyVal === "string" ? anyVal.match(/app\/([^/]+\/[^/]+)/) : null;
-    prefix = m ? m[1] : null;
+    // Fallback si jamais prefix manquait (anciens backups)
+    if (!prefix) {
+      const anyVal = data.artifacts?.firestore || data.artifacts?.auth || data.artifacts?.functions;
+      const m = typeof anyVal === "string" ? anyVal.match(/app\/([^/]+\/[^/]+)/) : null;
+      prefix = m ? m[1] : null;
+    }
+
+    // Supprime les fichiers du bucket
+    if (prefix) {
+      const storage = new Storage();
+      await storage.bucket(BACKUP_BUCKET)
+        .deleteFiles({ prefix: `app/${prefix}/`, force: true })
+        .catch(() => {});
+    }
+
+    // Supprime le document Firestore
+    await ref.delete();
+    return { ok: true };
   }
-
-  // Supprime les fichiers du bucket
-  if (prefix) {
-    const storage = new Storage();
-    await storage.bucket(BACKUP_BUCKET)
-      .deleteFiles({ prefix: `app/${prefix}/`, force: true })
-      .catch(() => {});
-  }
-
-  // Supprime le document Firestore
-  await ref.delete();
-  return { ok: true };
-});
+);
 
 // ====== (Optionnel) Donner admin au compte connecté via secret (supprime après usage) ======
 exports.grantAdminIfToken = onCall(
-  { region: "europe-west1", secrets: [BACKUP_CRON_TOKEN] },
+  {
+    region: "europe-west1",
+    availableMemory: "128MiB",
+    availableCpu: "0.083",
+    minInstances: 0,
+    maxInstances: 1,
+    concurrency: 80,
+    timeoutSeconds: 30,
+    secrets: [BACKUP_CRON_TOKEN],
+  },
   async (req) => {
     if (!req.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
@@ -495,29 +592,25 @@ exports.grantAdminIfToken = onCall(
 
 /*
 ================================================================================
-Notes d’exploitation (en commentaires pour ne pas casser le fichier JS)
+Notes d’exploitation
 ================================================================================
 
-# Secret pour sécuriser l’appel Scheduler -> startBackupHttp
-# (choisir une valeur longue et privée)
-# firebase functions:secrets:set BACKUP_CRON_TOKEN
+# 1) Déclare les secrets/params (une fois)
+firebase functions:secrets:set BACKUP_CRON_TOKEN
+firebase functions:config:set params.START_BACKUP_HTTP_URL="https://startbackuphttp-XXXX-ew.a.run.app"
 
-# Donner les rôles nécessaires au service account des Functions
-# Remplacez le projet par le vôtre si différent.
+# 2) Important: ne définis PAS BACKUP_CRON_TOKEN dans .env ni firebase.json
+#    (sinon: "Secret overlaps non secret environment variable").
 
-# gcloud projects add-iam-policy-binding sos-urgently-ac307 \
-#   --member="serviceAccount:sos-urgently-ac307@appspot.gserviceaccount.com" \
-#   --role="roles/cloudscheduler.admin"
+# 3) Déploiement conseillé par paquets (évite les pics CPU)
+firebase deploy --only functions:startBackupHttp,functions:startBackup,functions:testBackup
+firebase deploy --only functions:getBackupSchedule,functions:updateBackupSchedule
+firebase deploy --only functions:restoreFromBackup,functions:deleteBackup,functions:grantAdminIfToken
+firebase deploy --only functions:nightlyBackup
 
-# gcloud projects add-iam-policy-binding sos-urgently-ac307 \
-#   --member="serviceAccount:sos-urgently-ac307@appspot.gserviceaccount.com" \
-#   --role="roles/datastore.importExportAdmin"
-
-# gcloud projects add-iam-policy-binding sos-urgently-ac307 \
-#   --member="serviceAccount:sos-urgently-ac307@appspot.gserviceaccount.com" \
-#   --role="roles/storagetransfer.admin"
-
-# Après t’être donné admin via `grantAdminIfToken`, supprime cette callable:
-# - Enlève exports.grantAdminIfToken de ce fichier
-# - firebase deploy --only functions:backup
+# 4) Renseigner START_BACKUP_HTTP_URL :
+#    - Déploie startBackupHttp
+#    - Récupère l’URL affichée (console ou CLI)
+#    - Exécute la commande ci-dessus pour la stocker
+#    - Puis set le cron via l’UI admin (ou directement updateBackupSchedule).
 */

@@ -36,8 +36,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.api = void 0;
 // firebase/functions/src/adminApi.ts
 const https_1 = require("firebase-functions/v2/https");
-const admin = __importStar(require("firebase-admin"));
 const StripeManager_1 = require("./StripeManager");
+const admin = __importStar(require("firebase-admin"));
+const asDate = (d) => (d && typeof d.toDate === 'function')
+    ? d.toDate()
+    : d;
 if (!admin.apps.length)
     admin.initializeApp();
 const db = admin.firestore();
@@ -75,13 +78,13 @@ exports.api = (0, https_1.onRequest)({
                 const prevEnd = admin.firestore.Timestamp.fromDate(new Date(now - 30 * 864e5));
                 // Stats 30 derniers jours
                 const curr = await StripeManager_1.stripeManager.getPaymentStatistics({
-                    startDate: d30,
+                    startDate: asDate(d30),
                 });
                 console.log('✅ Stats courantes récupérées:', curr);
                 // Période précédente
                 const prev = await StripeManager_1.stripeManager.getPaymentStatistics({
-                    startDate: prevStart,
-                    endDate: prevEnd,
+                    startDate: asDate(prevStart),
+                    endDate: asDate(prevEnd),
                 });
                 console.log('✅ Stats précédentes récupérées:', prev);
                 // "Transactions actives"
@@ -95,7 +98,7 @@ exports.api = (0, https_1.onRequest)({
                     'processing',
                 ])
                     .get();
-                const monthlyRevenue = curr.totalRevenue || 0;
+                const monthlyRevenue = curr.totalAmount || 0;
                 const totalCommissions = curr.totalCommission || 0;
                 const activeTransactions = pendingSnap.size;
                 const conversionRate = curr.count
@@ -107,7 +110,7 @@ exports.api = (0, https_1.onRequest)({
                     activeTransactions,
                     conversionRate,
                     changes: {
-                        revenue: pctChange(monthlyRevenue, prev.totalRevenue || 0),
+                        revenue: pctChange(monthlyRevenue, prev.totalAmount || 0),
                         commissions: pctChange(totalCommissions, prev.totalCommission || 0),
                         transactions: pctChange(activeTransactions, 0),
                         conversion: pctChange(conversionRate, 0),

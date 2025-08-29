@@ -3,6 +3,27 @@ import { CloudTasksClient } from "@google-cloud/tasks";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { logError } from "../utils/logs/logError";
 
+// Types pour améliorer la sécurité du code
+interface TaskPayload {
+  callSessionId: string;
+  scheduledAt: string;
+  taskId: string;
+}
+
+interface PendingTask {
+  taskId: string;
+  callSessionId: string;
+  scheduleTime: Date;
+  name: string;
+}
+
+interface QueueStats {
+  pendingTasks: number;
+  queueName: string;
+  location: string;
+  oldestTaskAge?: number; // minutes
+}
+
 // ------------------------------------------------------
 // Configuration via params + fallback ENV (sûr et flexible)
 // ------------------------------------------------------
@@ -88,7 +109,7 @@ export async function scheduleCallTask(
     scheduleTime.setSeconds(scheduleTime.getSeconds() + delaySeconds);
 
     // Corps de requête
-    const payload = {
+    const payload: TaskPayload = {
       callSessionId,
       scheduledAt: new Date().toISOString(),
       taskId,
@@ -165,14 +186,7 @@ export async function cancelCallTask(taskId: string): Promise<void> {
  */
 export async function listPendingTasks(
   maxResults: number = 100
-): Promise<
-  Array<{
-    taskId: string;
-    callSessionId: string;
-    scheduleTime: Date;
-    name: string;
-  }>
-> {
+): Promise<PendingTask[]> {
   try {
     const client = getTasksClient();
     const cfg = getTasksConfig();
@@ -187,24 +201,24 @@ export async function listPendingTasks(
     });
 
     const pending = tasks
-      .filter((t) => t.scheduleTime && t.httpRequest?.body)
-      .map((t) => {
+      .filter((task) => task.scheduleTime && task.httpRequest?.body)
+      .map((task) => {
         try {
-          const payload = JSON.parse((t.httpRequest!.body as Buffer).toString());
-          const scheduleTime = new Date((t.scheduleTime!.seconds as number) * 1000);
+          const payload = JSON.parse((task.httpRequest!.body as Buffer).toString()) as TaskPayload;
+          const scheduleTime = new Date((task.scheduleTime!.seconds as number) * 1000);
 
           return {
             taskId: payload.taskId || "unknown",
             callSessionId: payload.callSessionId || "unknown",
             scheduleTime,
-            name: t.name || "unknown",
+            name: task.name || "unknown",
           };
         } catch (e) {
           console.warn("⚠️ [CloudTasks] Erreur parsing payload:", e);
           return null;
         }
       })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
+      .filter((item): item is PendingTask => item !== null);
 
     console.log(`📊 [CloudTasks] ${pending.length} tâches en attente`);
     return pending;
@@ -241,12 +255,7 @@ export async function purgeQueue(): Promise<number> {
 /**
  * Statistiques basiques sur la queue.
  */
-export async function getQueueStats(): Promise<{
-  pendingTasks: number;
-  queueName: string;
-  location: string;
-  oldestTaskAge?: number; // minutes
-}> {
+export async function getQueueStats(): Promise<QueueStats> {
   try {
     const cfg = getTasksConfig();
     const pending = await listPendingTasks(1000);
@@ -300,7 +309,7 @@ export async function taskExists(taskId: string): Promise<boolean> {
  * Crée une tâche de test vers /test-webhook (utilitaire).
  */
 export async function createTestTask(
-  payload: any,
+  payload: Record<string, unknown>,
   delaySeconds: number = 5
 ): Promise<string> {
   try {

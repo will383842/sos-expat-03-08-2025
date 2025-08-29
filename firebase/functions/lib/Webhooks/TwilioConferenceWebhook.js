@@ -39,11 +39,12 @@ const TwilioCallManager_1 = require("../TwilioCallManager");
 const logCallRecord_1 = require("../utils/logs/logCallRecord");
 const logError_1 = require("../utils/logs/logError");
 const admin = __importStar(require("firebase-admin"));
+const twilio_1 = require("../lib/twilio");
 /**
  * Webhook pour les événements de conférence Twilio
  * Gère: start, end, join, leave, mute, hold
  */
-exports.twilioConferenceWebhook = (0, https_1.onRequest)(async (req, res) => {
+exports.twilioConferenceWebhook = (0, https_1.onRequest)({ secrets: [twilio_1.TWILIO_ACCOUNT_SID, twilio_1.TWILIO_AUTH_TOKEN, twilio_1.TWILIO_PHONE_NUMBER] }, async (req, res) => {
     try {
         const body = req.body;
         console.log('🔔 Conference Webhook reçu:', {

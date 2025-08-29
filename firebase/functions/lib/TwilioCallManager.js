@@ -40,11 +40,12 @@ exports.twilioCallManager = exports.TwilioCallManager = void 0;
 const admin = __importStar(require("firebase-admin"));
 // 🔧 Twilio client & num
 const twilio_1 = require("./lib/twilio");
+const urlBase_1 = require("./utils/urlBase");
 const logError_1 = require("./utils/logs/logError");
 const logCallRecord_1 = require("./utils/logs/logCallRecord");
 const MessageManager_1 = require("./MessageManager");
 const StripeManager_1 = require("./StripeManager");
-// 🔊 Textes d’intro multilingues (incluent S.O.S Expat)
+// 🔊 Textes d'intro multilingues (incluent S.O.S Expat)
 const voicePrompts_json_1 = __importDefault(require("./content/voicePrompts.json"));
 const prompts = voicePrompts_json_1.default;
 // =============================
@@ -52,15 +53,14 @@ const prompts = voicePrompts_json_1.default;
 // =============================
 const CALL_CONFIG = {
     MAX_RETRIES: 3,
-    CALL_TIMEOUT: 30,
-    CONNECTION_WAIT_TIME: 45000, // 45 s
+    CALL_TIMEOUT: 60, // 60 s
+    CONNECTION_WAIT_TIME: 90000, // 90 s
     MIN_CALL_DURATION: 120, // 2 min
     MAX_CONCURRENT_CALLS: 50,
     WEBHOOK_VALIDATION: true
 };
 // =============================
 // Locales TTS Twilio (principales)
-// NB: ajuste si besoin (ex: 'en-GB' vs 'en-US')
 // =============================
 const VOICE_LOCALES = {
     fr: 'fr-FR',
@@ -72,8 +72,8 @@ const VOICE_LOCALES = {
     zh: 'zh-CN',
     ar: 'ar-SA',
     hi: 'hi-IN',
-    bn: 'bn-IN', // disponibilité selon voix
-    ur: 'ur-PK', // disponibilité selon voix
+    bn: 'bn-IN',
+    ur: 'ur-PK',
     id: 'id-ID',
     ja: 'ja-JP',
     tr: 'tr-TR',
@@ -86,7 +86,6 @@ const VOICE_LOCALES = {
 // =============================
 // Helpers langue & prompts
 // =============================
-/** Normalise une liste de langues vers codes courts (fr, en, es, …) */
 function normalizeLangList(langs) {
     if (!langs || !Array.isArray(langs))
         return [];
@@ -100,30 +99,25 @@ function normalizeLangList(langs) {
     }
     return out;
 }
-/** Langues disponibles dans le fichier prompts (intersection) */
 function availablePromptLangs() {
     const providerLangs = Object.keys(prompts.provider_intro);
     const clientLangs = Object.keys(prompts.client_intro);
     return providerLangs.filter(l => clientLangs.includes(l));
 }
-/** Choisit la langue commune client/prestataire, sinon client[0], sinon 'en' */
 function pickSessionLanguage(clientLangs, providerLangs) {
-    const supported = new Set(availablePromptLangs()); // conforme aux prompts
+    const supported = new Set(availablePromptLangs());
     const c = normalizeLangList(clientLangs).filter(l => supported.has(l));
     const p = normalizeLangList(providerLangs).filter(l => supported.has(l));
-    for (const lang of c) {
+    for (const lang of c)
         if (p.includes(lang))
             return lang;
-    }
     if (c.length)
         return c[0];
     return 'en';
 }
-/** Map code court -> locale TTS Twilio, fallback en-US si inconnue */
 function localeFor(langKey) {
     return VOICE_LOCALES[langKey] || VOICE_LOCALES['en'];
 }
-/** Récupère le texte d’intro selon participant & langue, fallback EN */
 function getIntroText(participant, langKey) {
     var _a, _b;
     const langs = availablePromptLangs();
@@ -131,7 +125,62 @@ function getIntroText(participant, langKey) {
     const table = participant === 'provider' ? prompts.provider_intro : prompts.client_intro;
     return (_b = (_a = table[safeLang]) !== null && _a !== void 0 ? _a : table.en) !== null && _b !== void 0 ? _b : 'Please hold.';
 }
+function isCreatePayload(i) {
+    return (i.providerId !== undefined &&
+        i.providerPhone !== undefined &&
+        i.clientPhone !== undefined &&
+        i.paymentIntentId !== undefined &&
+        i.amount !== undefined);
+}
 class TwilioCallManager {
+    static getInstance() {
+        if (!this._instance)
+            this._instance = new TwilioCallManager();
+        return this._instance;
+    }
+    /** ⚡️ API utilisée par l’adapter */
+    static async startOutboundCall(input) {
+        try {
+            if (!(input === null || input === void 0 ? void 0 : input.sessionId))
+                throw new Error('startOutboundCall: "sessionId" requis');
+            const mgr = TwilioCallManager.getInstance();
+            const delayMinutes = typeof input.delayMinutes === 'number'
+                ? input.delayMinutes
+                : typeof input.delaySeconds === 'number'
+                    ? Math.ceil(input.delaySeconds / 60)
+                    : 0;
+            // Existant ?
+            const existing = await mgr.getCallSession(input.sessionId);
+            if (existing) {
+                await mgr.initiateCallSequence(input.sessionId, delayMinutes);
+                return existing;
+            }
+            // Création + lancement
+            if (!isCreatePayload(input)) {
+                throw new Error('startOutboundCall: la session n’existe pas, champs de création manquants');
+            }
+            const created = await mgr.createCallSession({
+                sessionId: input.sessionId,
+                providerId: input.providerId,
+                clientId: input.clientId,
+                providerPhone: input.providerPhone,
+                clientPhone: input.clientPhone,
+                serviceType: input.serviceType,
+                providerType: input.providerType,
+                paymentIntentId: input.paymentIntentId,
+                amount: input.amount,
+                requestId: input.requestId,
+                clientLanguages: input.clientLanguages,
+                providerLanguages: input.providerLanguages
+            });
+            await mgr.initiateCallSequence(input.sessionId, delayMinutes);
+            return created;
+        }
+        catch (error) {
+            await (0, logError_1.logError)('TwilioCallManager:startOutboundCall', error);
+            throw error;
+        }
+    }
     constructor() {
         this.activeCalls = new Map();
         this.callQueue = [];
@@ -146,9 +195,8 @@ class TwilioCallManager {
                 this.isProcessingQueue = true;
                 try {
                     const sessionId = this.callQueue.shift();
-                    if (sessionId) {
+                    if (sessionId)
                         await this.processQueuedCall(sessionId);
-                    }
                 }
                 catch (error) {
                     await (0, logError_1.logError)('TwilioCallManager:queueProcessor', error);
@@ -159,7 +207,6 @@ class TwilioCallManager {
             }
         }, 2000);
     }
-    /** Traiter un appel en file d'attente */
     async processQueuedCall(sessionId) {
         try {
             const session = await this.getCallSession(sessionId);
@@ -171,22 +218,17 @@ class TwilioCallManager {
             await (0, logError_1.logError)('TwilioCallManager:processQueuedCall', error);
         }
     }
-    /** Valide et formate un numéro international */
     validatePhoneNumber(phone) {
-        if (!phone || typeof phone !== 'string') {
+        if (!phone || typeof phone !== 'string')
             throw new Error('Numéro de téléphone requis');
-        }
         const cleaned = phone.trim().replace(/[^\d+]/g, '');
-        if (!cleaned.startsWith('+')) {
+        if (!cleaned.startsWith('+'))
             throw new Error(`Numéro invalide: ${phone}. Format: +33XXXXXXXXX`);
-        }
         const digits = cleaned.substring(1);
-        if (digits.length < 8 || digits.length > 15) {
+        if (digits.length < 8 || digits.length > 15)
             throw new Error(`Numéro invalide: ${phone}. Longueur 8-15 chiffres après +`);
-        }
         return cleaned;
     }
-    /** Crée une session d'appel */
     async createCallSession(params) {
         try {
             if (!params.sessionId || !params.providerId || !params.clientId) {
@@ -204,7 +246,7 @@ class TwilioCallManager {
             if (activeSessions >= CALL_CONFIG.MAX_CONCURRENT_CALLS) {
                 throw new Error('Limite d\'appels simultanés atteinte. Réessayer dans quelques minutes.');
             }
-            const maxDuration = params.providerType === 'lawyer' ? 1500 : 2100; // 25min / 35min
+            const maxDuration = params.providerType === 'lawyer' ? 1500 : 2100; // 25/35 min
             const conferenceName = `conf_${params.sessionId}_${Date.now()}`;
             const callSession = {
                 id: params.sessionId,
@@ -229,9 +271,8 @@ class TwilioCallManager {
                 }
             };
             const existingSession = await this.getCallSession(params.sessionId);
-            if (existingSession) {
+            if (existingSession)
                 throw new Error(`Session d'appel existe déjà: ${params.sessionId}`);
-            }
             await this.saveWithRetry(() => this.db.collection('call_sessions').doc(params.sessionId).set(callSession));
             await (0, logCallRecord_1.logCallRecord)({
                 callId: params.sessionId,
@@ -251,7 +292,6 @@ class TwilioCallManager {
             throw error;
         }
     }
-    /** Lance la séquence (avec délai min) */
     async initiateCallSequence(sessionId, delayMinutes = 5) {
         try {
             console.log(`🚀 Init séquence d'appel ${sessionId} dans ${delayMinutes} min`);
@@ -259,7 +299,7 @@ class TwilioCallManager {
                 const timeout = setTimeout(async () => {
                     this.activeCalls.delete(sessionId);
                     await this.executeCallSequence(sessionId);
-                }, Math.min(delayMinutes, 10) * 60 * 1000); // cap 10 min
+                }, Math.min(delayMinutes, 10) * 60 * 1000);
                 this.activeCalls.set(sessionId, timeout);
                 return;
             }
@@ -270,7 +310,6 @@ class TwilioCallManager {
             await this.handleCallFailure(sessionId, 'system_error');
         }
     }
-    /** Exécute la séquence d'appel */
     async executeCallSequence(sessionId) {
         const callSession = await this.getCallSession(sessionId);
         if (!callSession)
@@ -284,7 +323,6 @@ class TwilioCallManager {
             await this.handleCallFailure(sessionId, 'payment_invalid');
             return;
         }
-        // 🔊 Résoudre la langue maintenant (et la stocker)
         const langKey = pickSessionLanguage(callSession.metadata.clientLanguages || [], callSession.metadata.providerLanguages || []);
         const ttsLocale = localeFor(langKey);
         await this.saveWithRetry(() => this.db.collection('call_sessions').doc(sessionId).update({
@@ -292,20 +330,16 @@ class TwilioCallManager {
             'metadata.ttsLocale': ttsLocale,
             'metadata.updatedAt': admin.firestore.Timestamp.now()
         }));
-        // ✅ On appelle le CLIENT d'abord
         await this.updateCallSessionStatus(sessionId, 'client_connecting');
         console.log(`📞 Étape 1: Appel client ${sessionId}`);
-        const clientConnected = await this.callParticipantWithRetries(sessionId, 'client', callSession.participants.client.phone, callSession.conference.name, callSession.metadata.maxDuration, ttsLocale, langKey, undefined // backoff client : progressif (comportement existant)
-        );
+        const clientConnected = await this.callParticipantWithRetries(sessionId, 'client', callSession.participants.client.phone, callSession.conference.name, callSession.metadata.maxDuration, ttsLocale, langKey);
         if (!clientConnected) {
             await this.handleCallFailure(sessionId, 'client_no_answer');
             return;
         }
-        // Puis on appelle l'AVOCAT (provider)
         await this.updateCallSessionStatus(sessionId, 'provider_connecting');
         console.log(`📞 Étape 2: Appel prestataire (avocat) ${sessionId}`);
-        const providerConnected = await this.callParticipantWithRetries(sessionId, 'provider', callSession.participants.provider.phone, callSession.conference.name, callSession.metadata.maxDuration, ttsLocale, langKey, 15000 // ✅ backoff fixe 15s entre tentatives avocat
-        );
+        const providerConnected = await this.callParticipantWithRetries(sessionId, 'provider', callSession.participants.provider.phone, callSession.conference.name, callSession.metadata.maxDuration, ttsLocale, langKey, 15000);
         if (!providerConnected) {
             await this.handleCallFailure(sessionId, 'provider_no_answer');
             return;
@@ -318,20 +352,13 @@ class TwilioCallManager {
         });
         console.log(`✅ Séquence d'appel complétée pour ${sessionId}`);
     }
-    /** Valide le paiement (narrowing sans any) */
     async validatePaymentStatus(paymentIntentId) {
         try {
             const payment = await StripeManager_1.stripeManager.getPayment(paymentIntentId);
-            // 🔒 Narrowing sûr: on extrait un string si présent, sinon null
-            let status = null;
-            if (payment && typeof payment === 'object') {
-                const stripe = payment.stripe;
-                if (stripe && typeof stripe === 'object') {
-                    const s = stripe.status;
-                    status = typeof s === 'string' ? s : null;
-                }
-            }
-            if (!status)
+            if (!payment || typeof payment !== 'object')
+                return false;
+            const status = payment.status;
+            if (typeof status !== 'string')
                 return false;
             const validStatuses = new Set([
                 'requires_payment_method',
@@ -348,9 +375,7 @@ class TwilioCallManager {
             return false;
         }
     }
-    /** Appelle un participant avec retries */
-    async callParticipantWithRetries(sessionId, participantType, phoneNumber, conferenceName, timeLimit, ttsLocale, langKey, backoffOverrideMs // si défini, délai fixe entre tentatives
-    ) {
+    async callParticipantWithRetries(sessionId, participantType, phoneNumber, conferenceName, timeLimit, ttsLocale, langKey, backoffOverrideMs) {
         for (let attempt = 1; attempt <= CALL_CONFIG.MAX_RETRIES; attempt++) {
             try {
                 console.log(`📞 Tentative ${attempt}/${CALL_CONFIG.MAX_RETRIES} → ${participantType} (${sessionId})`);
@@ -362,17 +387,19 @@ class TwilioCallManager {
                 });
                 const welcomeMessage = getIntroText(participantType, langKey);
                 const twiml = this.generateConferenceTwiML(conferenceName, participantType, timeLimit, sessionId, ttsLocale, welcomeMessage);
-                const call = await twilio_1.twilioClient.calls.create({
+                const twilioClient = (0, twilio_1.getTwilioClient)();
+                const fromNumber = (0, twilio_1.getTwilioPhoneNumber)();
+                const base = (0, urlBase_1.getFunctionsBaseUrl)();
+                const call = await twilioClient.calls.create({
                     to: phoneNumber,
-                    from: twilio_1.twilioPhoneNumber,
+                    from: fromNumber,
                     twiml,
-                    // 🔁 Callback d’ÉTAT D’APPEL (pas conférence)
-                    statusCallback: `${process.env.FUNCTION_URL}/twilioCallWebhook`,
+                    statusCallback: `${base}/twilioCallWebhook`,
                     statusCallbackMethod: 'POST',
                     statusCallbackEvent: ['ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer'],
                     timeout: CALL_CONFIG.CALL_TIMEOUT,
                     record: true,
-                    recordingStatusCallback: `${process.env.FUNCTION_URL}/twilioRecordingWebhook`,
+                    recordingStatusCallback: `${base}/twilioRecordingWebhook`,
                     recordingStatusCallbackMethod: 'POST',
                     machineDetection: 'Enable',
                     machineDetectionTimeout: 10
@@ -388,17 +415,12 @@ class TwilioCallManager {
                     });
                     return true;
                 }
-                // Délai entre tentatives (sauf après la dernière)
                 if (attempt < CALL_CONFIG.MAX_RETRIES) {
                     if (typeof backoffOverrideMs === 'number') {
-                        // cas AVOCAT : délai fixe 15s demandé
-                        console.log(`⏳ Pause ${backoffOverrideMs}ms avant retry ${participantType}`);
                         await this.delay(backoffOverrideMs);
                     }
                     else {
-                        // client : backoff progressif ~20s puis ~25s
                         const progressive = 15000 + attempt * 5000;
-                        console.log(`⏳ Pause ${progressive}ms avant retry ${participantType}`);
                         await this.delay(progressive);
                     }
                 }
@@ -422,7 +444,6 @@ class TwilioCallManager {
         });
         return false;
     }
-    /** Incrémente le compteur de tentatives */
     async incrementAttemptCount(sessionId, participantType) {
         try {
             await this.db.collection('call_sessions').doc(sessionId).update({
@@ -434,7 +455,6 @@ class TwilioCallManager {
             await (0, logError_1.logError)('TwilioCallManager:incrementAttemptCount', error);
         }
     }
-    /** Attend la connexion (avec timeout) */
     async waitForConnection(sessionId, participantType, attempt) {
         const maxWaitTime = CALL_CONFIG.CONNECTION_WAIT_TIME;
         const checkInterval = 3000;
@@ -448,36 +468,31 @@ class TwilioCallManager {
                 const participant = participantType === 'provider'
                     ? session.participants.provider
                     : session.participants.client;
-                if (participant.status === 'connected') {
-                    console.log(`✅ ${participantType} connecté en ${(check + 1) * checkInterval / 1000}s`);
+                if (participant.status === 'connected')
                     return true;
-                }
-                if (participant.status === 'disconnected' || participant.status === 'no_answer') {
-                    console.log(`❌ ${participantType} ${participant.status} après ${(check + 1) * checkInterval / 1000}s`);
+                if (participant.status === 'disconnected' || participant.status === 'no_answer')
                     return false;
-                }
             }
             catch (error) {
                 console.warn(`Erreur waitForConnection: ${error}`);
             }
         }
-        console.log(`⏱️ Timeout pour ${participantType} tentative ${attempt}`);
         return false;
     }
-    /** TwiML conférence multilingue */
     generateConferenceTwiML(conferenceName, participantType, timeLimit, sessionId, ttsLocale, welcomeMessage) {
         const participantLabel = participantType === 'provider' ? 'provider' : 'client';
         const waitUrl = 'http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient';
+        const base = (0, urlBase_1.getFunctionsBaseUrl)();
         return `
 <Response>
   <Say voice="alice" language="${ttsLocale}">${escapeXml(welcomeMessage)}</Say>
   <Dial timeout="${CALL_CONFIG.CALL_TIMEOUT}" timeLimit="${timeLimit}">
     <Conference
-      statusCallback="${process.env.FUNCTION_URL}/twilioConferenceWebhook"
+      statusCallback="${base}/twilioConferenceWebhook"
       statusCallbackMethod="POST"
       statusCallbackEvent="start end join leave mute hold"
       record="record-from-start"
-      recordingStatusCallback="${process.env.FUNCTION_URL}/twilioRecordingWebhook"
+      recordingStatusCallback="${base}/twilioRecordingWebhook"
       recordingStatusCallbackMethod="POST"
       participantLabel="${participantLabel}"
       sessionId="${sessionId}"
@@ -493,10 +508,8 @@ class TwilioCallManager {
 </Response>
     `.trim();
     }
-    /** Déconnexions précoces */
     async handleEarlyDisconnection(sessionId, participantType, duration) {
         try {
-            console.log(`⚠️ Déconnexion précoce: ${sessionId}, ${participantType}, durée: ${duration}s`);
             const session = await this.getCallSession(sessionId);
             if (!session)
                 return;
@@ -517,7 +530,6 @@ class TwilioCallManager {
             await (0, logError_1.logError)('TwilioCallManager:handleEarlyDisconnection', error);
         }
     }
-    /** Échecs d’appel + notifications + remboursement */
     async handleCallFailure(sessionId, reason) {
         var _a, _b;
         try {
@@ -533,22 +545,14 @@ class TwilioCallManager {
                     notificationPromises.push(MessageManager_1.messageManager.sendSmartMessage({
                         to: callSession.participants.provider.phone,
                         templateId: `call_failure_${reason}_provider`,
-                        variables: {
-                            clientName: 'le client',
-                            serviceType: callSession.metadata.serviceType,
-                            language: providerLanguage
-                        }
+                        variables: { clientName: 'le client', serviceType: callSession.metadata.serviceType, language: providerLanguage }
                     }));
                 }
                 if (reason === 'provider_no_answer' || reason === 'system_error') {
                     notificationPromises.push(MessageManager_1.messageManager.sendSmartMessage({
                         to: callSession.participants.client.phone,
                         templateId: `call_failure_${reason}_client`,
-                        variables: {
-                            providerName: 'votre expert',
-                            serviceType: callSession.metadata.serviceType,
-                            language: clientLanguage
-                        }
+                        variables: { providerName: 'votre expert', serviceType: callSession.metadata.serviceType, language: clientLanguage }
                     }));
                 }
                 await Promise.allSettled(notificationPromises);
@@ -563,13 +567,11 @@ class TwilioCallManager {
                 retryCount: 0,
                 additionalData: { reason, paymentIntentId: callSession.payment.intentId }
             });
-            console.log(`❌ Appel échoué ${sessionId}, raison: ${reason}`);
         }
         catch (error) {
             await (0, logError_1.logError)('TwilioCallManager:handleCallFailure', error);
         }
     }
-    /** Remboursement Stripe */
     async processRefund(sessionId, reason) {
         try {
             const callSession = await this.getCallSession(sessionId);
@@ -582,7 +584,6 @@ class TwilioCallManager {
                     'payment.refundedAt': admin.firestore.Timestamp.now(),
                     'metadata.updatedAt': admin.firestore.Timestamp.now()
                 });
-                console.log(`💰 Remboursement OK: ${sessionId}`);
             }
             else {
                 console.error(`❌ Remboursement KO ${sessionId}:`, refundResult.error);
@@ -592,7 +593,6 @@ class TwilioCallManager {
             await (0, logError_1.logError)('TwilioCallManager:processRefund', error);
         }
     }
-    /** Fin d’appel + capture si éligible */
     async handleCallCompletion(sessionId, duration) {
         var _a, _b;
         try {
@@ -609,22 +609,12 @@ class TwilioCallManager {
                     MessageManager_1.messageManager.sendSmartMessage({
                         to: callSession.participants.client.phone,
                         templateId: 'call_success_client',
-                        variables: {
-                            duration: minutes.toString(),
-                            seconds: seconds.toString(),
-                            serviceType: callSession.metadata.serviceType,
-                            language: clientLanguage
-                        }
+                        variables: { duration: minutes.toString(), seconds: seconds.toString(), serviceType: callSession.metadata.serviceType, language: clientLanguage }
                     }),
                     MessageManager_1.messageManager.sendSmartMessage({
                         to: callSession.participants.provider.phone,
                         templateId: 'call_success_provider',
-                        variables: {
-                            duration: minutes.toString(),
-                            seconds: seconds.toString(),
-                            serviceType: callSession.metadata.serviceType,
-                            language: providerLanguage
-                        }
+                        variables: { duration: minutes.toString(), seconds: seconds.toString(), serviceType: callSession.metadata.serviceType, language: providerLanguage }
                     })
                 ]);
             }
@@ -640,13 +630,11 @@ class TwilioCallManager {
                 retryCount: 0,
                 additionalData: { duration }
             });
-            console.log(`✅ Appel complété ${sessionId}, durée: ${duration}s`);
         }
         catch (error) {
             await (0, logError_1.logError)('TwilioCallManager:handleCallCompletion', error);
         }
     }
-    /** Décide si on capture le paiement */
     shouldCapturePayment(session, duration) {
         const { provider, client } = session.participants;
         const { startedAt, duration: sessionDuration } = session.conference;
@@ -661,7 +649,6 @@ class TwilioCallManager {
             return false;
         return true;
     }
-    /** Capture paiement */
     async capturePaymentForSession(sessionId) {
         try {
             const session = await this.getCallSession(sessionId);
@@ -683,12 +670,8 @@ class TwilioCallManager {
                     callId: sessionId,
                     status: 'payment_captured',
                     retryCount: 0,
-                    additionalData: {
-                        amount: session.payment.amount,
-                        duration: session.conference.duration
-                    }
+                    additionalData: { amount: session.payment.amount, duration: session.conference.duration }
                 });
-                console.log(`💰 Paiement capturé: ${sessionId}`);
                 return true;
             }
             else {
@@ -701,7 +684,6 @@ class TwilioCallManager {
             return false;
         }
     }
-    /** Demande d’avis */
     async createReviewRequest(session) {
         try {
             const reviewRequest = {
@@ -721,13 +703,11 @@ class TwilioCallManager {
                 requestId: session.metadata.requestId
             };
             await this.saveWithRetry(() => this.db.collection('reviews_requests').add(reviewRequest));
-            console.log(`📝 Demande d'avis créée: ${session.id}`);
         }
         catch (error) {
             await (0, logError_1.logError)('TwilioCallManager:createReviewRequest', error);
         }
     }
-    /** Annule une session */
     async cancelCallSession(sessionId, reason, cancelledBy) {
         try {
             const session = await this.getCallSession(sessionId);
@@ -753,7 +733,6 @@ class TwilioCallManager {
                 retryCount: 0,
                 additionalData: { cancelledBy: cancelledBy || 'system' }
             });
-            console.log(`🚫 Session annulée: ${sessionId}, raison: ${reason}`);
             return true;
         }
         catch (error) {
@@ -761,15 +740,15 @@ class TwilioCallManager {
             return false;
         }
     }
-    /** Annule appels Twilio actifs */
     async cancelActiveCallsForSession(session) {
         try {
+            const twilioClient = (0, twilio_1.getTwilioClient)();
             const promises = [];
             if (session.participants.provider.callSid) {
-                promises.push(this.cancelTwilioCall(session.participants.provider.callSid));
+                promises.push(this.cancelTwilioCall(session.participants.provider.callSid, twilioClient));
             }
             if (session.participants.client.callSid) {
-                promises.push(this.cancelTwilioCall(session.participants.client.callSid));
+                promises.push(this.cancelTwilioCall(session.participants.client.callSid, twilioClient));
             }
             await Promise.allSettled(promises);
         }
@@ -777,17 +756,14 @@ class TwilioCallManager {
             await (0, logError_1.logError)('TwilioCallManager:cancelActiveCallsForSession', error);
         }
     }
-    /** Annule un appel Twilio via CallSid */
-    async cancelTwilioCall(callSid) {
+    async cancelTwilioCall(callSid, twilioClient) {
         try {
-            await twilio_1.twilioClient.calls(callSid).update({ status: 'completed' });
-            console.log(`📞 Appel Twilio annulé: ${callSid}`);
+            await twilioClient.calls(callSid).update({ status: 'completed' });
         }
         catch (error) {
             console.warn(`Impossible d'annuler l'appel Twilio ${callSid}:`, error);
         }
     }
-    /** Compte sessions actives */
     async getActiveSessionsCount() {
         try {
             const snapshot = await this.db.collection('call_sessions')
@@ -800,7 +776,6 @@ class TwilioCallManager {
             return 0;
         }
     }
-    // Utils
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -812,7 +787,6 @@ class TwilioCallManager {
             catch (error) {
                 if (attempt === maxRetries)
                     throw error;
-                console.warn(`Retry ${attempt}/${maxRetries} dans ${baseDelay * attempt}ms`);
                 await this.delay(baseDelay * attempt);
             }
         }
@@ -866,9 +840,7 @@ class TwilioCallManager {
     }
     async updateConferenceInfo(sessionId, updates) {
         try {
-            const updateData = {
-                'metadata.updatedAt': admin.firestore.Timestamp.now()
-            };
+            const updateData = { 'metadata.updatedAt': admin.firestore.Timestamp.now() };
             Object.entries(updates).forEach(([key, value]) => {
                 updateData[`conference.${key}`] = value;
             });
@@ -908,16 +880,14 @@ class TwilioCallManager {
                 .where('participants.provider.callSid', '==', callSid)
                 .limit(1)
                 .get();
-            if (!snapshot.empty) {
+            if (!snapshot.empty)
                 return { session: snapshot.docs[0].data(), participantType: 'provider' };
-            }
             snapshot = await this.db.collection('call_sessions')
                 .where('participants.client.callSid', '==', callSid)
                 .limit(1)
                 .get();
-            if (!snapshot.empty) {
+            if (!snapshot.empty)
                 return { session: snapshot.docs[0].data(), participantType: 'client' };
-            }
             return null;
         }
         catch (error) {
@@ -925,14 +895,12 @@ class TwilioCallManager {
             return null;
         }
     }
-    /** Ajoute à la file */
     addToQueue(sessionId) {
         if (!this.callQueue.includes(sessionId)) {
             this.callQueue.push(sessionId);
             console.log(`📞 Session ${sessionId} ajoutée à la queue (${this.callQueue.length} en attente)`);
         }
     }
-    /** Stats */
     async getCallStatistics(options = {}) {
         try {
             let query = this.db.collection('call_sessions');
@@ -1000,7 +968,6 @@ class TwilioCallManager {
             throw error;
         }
     }
-    /** Nettoyage */
     async cleanupOldSessions(options = {}) {
         const { olderThanDays = 90, keepCompletedDays = 30, batchSize = 50 } = options;
         try {
@@ -1009,7 +976,6 @@ class TwilioCallManager {
             const completedCutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - keepCompletedDays * 86400000);
             let deleted = 0;
             let errors = 0;
-            // failed/cancelled anciens
             const failedSnapshot = await this.db.collection('call_sessions')
                 .where('metadata.createdAt', '<=', generalCutoff)
                 .where('status', 'in', ['failed', 'cancelled'])
@@ -1021,14 +987,12 @@ class TwilioCallManager {
                 try {
                     await batch.commit();
                     deleted += failedSnapshot.size;
-                    console.log(`🗑️ Supprimé ${failedSnapshot.size} sessions échouées/annulées`);
                 }
                 catch (error) {
                     errors += failedSnapshot.size;
                     await (0, logError_1.logError)('TwilioCallManager:cleanupOldSessions:failed', error);
                 }
             }
-            // completed très anciens
             const completedSnapshot = await this.db.collection('call_sessions')
                 .where('metadata.createdAt', '<=', completedCutoff)
                 .where('status', '==', 'completed')
@@ -1040,14 +1004,12 @@ class TwilioCallManager {
                 try {
                     await batch.commit();
                     deleted += completedSnapshot.size;
-                    console.log(`🗑️ Supprimé ${completedSnapshot.size} sessions complétées anciennes`);
                 }
                 catch (error) {
                     errors += completedSnapshot.size;
                     await (0, logError_1.logError)('TwilioCallManager:cleanupOldSessions:completed', error);
                 }
             }
-            console.log(`✅ Nettoyage terminé: ${deleted} supprimées, ${errors} erreurs`);
             return { deleted, errors };
         }
         catch (error) {
@@ -1057,6 +1019,8 @@ class TwilioCallManager {
     }
 }
 exports.TwilioCallManager = TwilioCallManager;
+// ===== Singleton interne =====
+TwilioCallManager._instance = null;
 // 🔒 petite aide XML
 function escapeXml(s) {
     return s
@@ -1066,18 +1030,6 @@ function escapeXml(s) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;');
 }
-// 🔧 Singleton
-let twilioCallManagerInstance = null;
-exports.twilioCallManager = (() => {
-    if (!twilioCallManagerInstance) {
-        try {
-            twilioCallManagerInstance = new TwilioCallManager();
-        }
-        catch (error) {
-            console.error('Erreur init TwilioCallManager:', error);
-            throw error;
-        }
-    }
-    return twilioCallManagerInstance;
-})();
+// 🔧 Singleton export
+exports.twilioCallManager = TwilioCallManager.getInstance();
 //# sourceMappingURL=TwilioCallManager.js.map

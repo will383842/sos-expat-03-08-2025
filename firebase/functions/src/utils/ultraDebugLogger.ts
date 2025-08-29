@@ -124,8 +124,8 @@ class UltraDebugLogger {
         // Test de connexion Firestore
         try {
           console.log('🔥 [ULTRA DEBUG] Test de connexion Firestore...');
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const testDoc = await this.db.collection('_test').limit(1).get();
+          const _testDoc = await this.db.collection('_test').limit(1).get();
+          void _testDoc; // Neutralise la variable non utilisée
           console.log('✅ [ULTRA DEBUG] Connexion Firestore OK');
         } catch (firestoreError) {
           console.error('❌ [ULTRA DEBUG] Erreur connexion Firestore:', firestoreError);
@@ -311,11 +311,11 @@ const testDoc = await this.db.collection('_test').limit(1).get();
       },
       firebase: {
         isInitialized: this.isFirebaseInitialized,
-        apps: (admin.apps ?? []).map((app: admin.app.App) => ({
+        apps: (admin.apps ?? []).filter(Boolean).map((app: any) => ({
           name: app.name,
           options: {
-            projectId: app.options.projectId,
-            storageBucket: app.options.storageBucket
+            projectId: app?.options?.projectId,
+            storageBucket: app?.options?.storageBucket
           }
         }))
       },

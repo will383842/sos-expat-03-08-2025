@@ -33,12 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listBackups = exports.scheduledBackup = exports.manualBackup = void 0;
+exports.listBackups = exports.scheduledBackup = exports.manualBackup = exports.startBackup = void 0;
 // functions/src/backup.ts
 const admin = __importStar(require("firebase-admin"));
-const functions = __importStar(require("firebase-functions"));
 const googleapis_1 = require("googleapis");
 const storage_1 = require("@google-cloud/storage");
+const https_1 = require("firebase-functions/v2/https");
 admin.initializeApp();
 const db = admin.firestore();
 const PROJECT_ID = process.env.GCLOUD_PROJECT;
@@ -192,49 +192,74 @@ async function runBackupInternal(type, createdBy) {
     }
 }
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
-// 1) Bouton "Sauvegarder maintenant" (depuis ton admin)
-exports.manualBackup = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+// 1) Fonction v2 pour backup manuel depuis l'admin
+exports.startBackup = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
     }
-    // Vérifier les permissions admin (optionnel)
-    const claims = context.auth.token;
-    if (!claims.admin && !claims.isAdmin) {
-        throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+    // Vérifier les permissions admin
+    const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+    const userData = userDoc.data();
+    if (!userData || userData.role !== 'admin') {
+        throw new https_1.HttpsError('permission-denied', 'Droits administrateur requis.');
     }
-    return await runBackupInternal("manual", context.auth.uid);
+    return await runBackupInternal('manual', request.auth.uid);
 });
-// 2) Pour l'automatique (Scheduler OU scheduler Firebase)
-exports.scheduledBackup = functions.https.onRequest(async (_req, res) => {
-    try {
-        await runBackupInternal("automatic", "system");
-        res.status(200).send("ok");
+// 2) Fonction v2 pour backup manuel (remplace la v1)
+exports.manualBackup = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Connexion requise.");
     }
-    catch (e) {
-        const errorMessage = e instanceof Error ? e.message : "error";
-        res.status(500).send(errorMessage);
+    // Vérifier les permissions admin
+    const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+    const userData = userDoc.data();
+    if (!userData || userData.role !== 'admin') {
+        throw new https_1.HttpsError("permission-denied", "Droits administrateur requis.");
+    }
+    return await runBackupInternal("manual", request.auth.uid);
+});
+// 3) Pour l'automatique (Scheduler) - v2
+exports.scheduledBackup = (0, https_1.onRequest)(async (req, res) => {
+    var _a;
+    // Vérifier que la requête vient du scheduler (optionnel - vérifier headers ou token)
+    const authHeader = req.get('Authorization');
+    if (((_a = req.get('User-Agent')) === null || _a === void 0 ? void 0 : _a.includes('Google-Cloud-Scheduler')) || (authHeader === null || authHeader === void 0 ? void 0 : authHeader.includes('Bearer'))) {
+        try {
+            await runBackupInternal("automatic", "system");
+            res.status(200).send("Backup completed successfully");
+        }
+        catch (e) {
+            const errorMessage = e instanceof Error ? e.message : "Unknown error occurred";
+            console.error('Scheduled backup failed:', errorMessage);
+            res.status(500).send(`Backup failed: ${errorMessage}`);
+        }
+    }
+    else {
+        res.status(403).send("Unauthorized - Scheduler only");
     }
 });
-// 3) Fonction pour lister les sauvegardes (optionnel)
-exports.listBackups = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError("unauthenticated", "Connexion requise.");
+// 4) Fonction pour lister les sauvegardes
+exports.listBackups = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
     }
-    const claims = context.auth.token;
-    if (!claims.admin && !claims.isAdmin) {
-        throw new functions.https.HttpsError("permission-denied", "Droits administrateur requis.");
+    // Vérifier les permissions admin
+    const userDoc = await admin.firestore().collection('users').doc(request.auth.uid).get();
+    const userData = userDoc.data();
+    if (!userData || userData.role !== 'admin') {
+        throw new https_1.HttpsError('permission-denied', 'Droits administrateur requis.');
     }
-    try {
-        const limit = (data === null || data === void 0 ? void 0 : data.limit) || 10;
-        const snap = await db.collection("backups")
-            .orderBy("createdAt", "desc")
-            .limit(limit)
-            .get();
-        const backups = snap.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
-        return { backups };
-    }
-    catch (_a) {
-        throw new functions.https.HttpsError("internal", "Erreur lors de la récupération des sauvegardes.");
-    }
+    const { limit } = (request.data || {});
+    const snap = await admin.firestore()
+        .collection('backups')
+        .orderBy('createdAt', 'desc')
+        .limit(typeof limit === 'number' ? limit : 20)
+        .get();
+    return {
+        backups: snap.docs.map(d => {
+            var _a, _b, _c, _d, _e, _f;
+            return (Object.assign(Object.assign({ id: d.id }, d.data()), { createdAt: ((_c = (_b = (_a = d.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) === null || _c === void 0 ? void 0 : _c.toISOString()) || null, completedAt: ((_f = (_e = (_d = d.data().completedAt) === null || _d === void 0 ? void 0 : _d.toDate) === null || _e === void 0 ? void 0 : _e.call(_d)) === null || _f === void 0 ? void 0 : _f.toISOString()) || null }));
+        })
+    };
 });
 //# sourceMappingURL=backup.js.map

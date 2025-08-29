@@ -17,23 +17,13 @@ ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index
 // ====== CONFIGURATION GLOBALE ======
 import { setGlobalOptions } from 'firebase-functions/v2';
 
-setGlobalOptions({
-  region: 'europe-west1',
-  cpu: 'gcf_gen1',
-  memory: '256MiB',
-  minInstances: 0,
-  maxInstances: 1,
-  concurrency: 50,
-});
-
 const globalConfig = {
   region: 'europe-west1',
 };
 
-ultraLogger.debug('GLOBAL_CONFIG', 'Configuration globale Firebase Functions', globalConfig);
-
 setGlobalOptions(globalConfig);
 
+ultraLogger.debug('GLOBAL_CONFIG', 'Configuration globale Firebase Functions', globalConfig);
 ultraLogger.info('GLOBAL_CONFIG', 'Configuration globale Firebase Functions appliquée', globalConfig);
 
 // ====== IMPORTS PRINCIPAUX ======
@@ -47,6 +37,13 @@ import type { Request as ExpressRequest, Response } from 'express';
 
 // 🆕 Cloud Tasks helper (réutilise ton fichier existant)
 import { scheduleCallTask } from './lib/tasks';
+
+// ====== IMPORTS DES MODULES PRINCIPAUX (RECTIFIÉS) ======
+import { createAndScheduleCallHTTPS } from "./createAndScheduleCallFunction";
+import { runExecuteCallTask } from "./runtime/executeCallTask";
+
+// ⚠️ Les secrets Twilio DOIVENT venir de lib/twilio (PAS de createAndScheduleCallFunction)
+import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from "./lib/twilio";
 
 ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
 
@@ -109,22 +106,6 @@ interface AdminBulkUpdateData {
   ids: string[];
   status: 'active' | 'pending' | 'blocked' | 'suspended';
   reason?: string;
-}
-
-interface AdminCallActionData {
-  sessionId: string;
-  reason?: string;
-}
-
-interface AdminTransferCallData {
-  sessionId: string;
-  newProviderId: string;
-}
-
-interface AdminMuteParticipantData {
-  sessionId: string;
-  participantType: string;
-  mute?: boolean;
 }
 
 interface CustomClaims {
@@ -224,7 +205,7 @@ const messageManagerInstance: unknown = null; // jamais réassigné
 
 const getTwilioCallManager = traceFunction(async (): Promise<TwilioCallManager> => {
   if (!twilioCallManagerInstance) {
-    // On type l’import pour éviter 'any'
+    // On type l'import pour éviter 'any'
     const mod = (await import('./TwilioCallManager')) as {
       twilioCallManager?: TwilioCallManager;
       default?: TwilioCallManager;
@@ -340,17 +321,34 @@ function wrapHttpFunction(functionName: string, originalFunction: (req: Firebase
 // ====== EXPORTS DIRECTS RECTIFIÉS ======
 ultraLogger.info('EXPORTS', 'Début du chargement des exports directs');
 
-export { createAndScheduleCallHTTPS } from './createAndScheduleCallFunction';
-export { createAndScheduleCallHTTPS as createAndScheduleCall } from './createAndScheduleCallFunction';
+// ⬇️ Exports des modules principaux
+export { createAndScheduleCallHTTPS };
+export { createAndScheduleCallHTTPS as createAndScheduleCall };
 export { createPaymentIntent } from './createPaymentIntent';
 export { api } from './adminApi';
 export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
 export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook';
-export { twilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
+export { TwilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
 export { initializeMessageTemplates } from './initializeMessageTemplates';
 export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 
 ultraLogger.info('EXPORTS', 'Exports directs configurés');
+
+// ========================================
+// 🆕 ENDPOINT CLOUD TASKS : exécuter l'appel (avec parallélisme)
+// ========================================
+export const executeCallTask = onRequest(
+  {
+    region: "europe-west1",
+    memory: "256MiB",
+    timeoutSeconds: 120,
+    maxInstances: 10,    // ✅ Nb max d’instances simultanées
+    concurrency: 80,      // ✅ Nb de requêtes traitées en parallèle par instance
+    // ✅ Secrets requis pour le handler + authentification Cloud Tasks
+    secrets: [TASKS_AUTH_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER],
+  },
+  async (req, res) => { await runExecuteCallTask(req as unknown as FirebaseRequest, res); }
+);
 
 // ========================================
 // FONCTIONS ADMIN ULTRA-DEBUGGÉES (V2)
@@ -485,7 +483,7 @@ export const adminBulkUpdateStatus = onCall(
     return { ok: true };
   })
 );
-export const executeCallTask = onRequest({ secrets: [TASKS_AUTH_SECRET] }, handler);
+
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE (MIGRÉ)
 // ========================================
@@ -536,10 +534,10 @@ const getStripe = traceFunction((): Stripe | null => {
 // ====== WEBHOOK STRIPE UNIFIÉ ULTRA-DEBUGGÉ (MIGRÉ) ======
 export const stripeWebhook = onRequest(
   {
+    region: 'europe-west1',
     memory: '256MiB',
     timeoutSeconds: 30,
-    rawBody: true, // ✅ IMPORTANT pour Stripe (constructEvent)
-    // Déclarer TOUS les secrets utilisés par cette fonction
+    // ❌ rawBody: true retiré en v2 (on garde l'accès à req.rawBody fourni par la plateforme)
     secrets: [
       STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE,
       STRIPE_WEBHOOK_SECRET_TEST, STRIPE_WEBHOOK_SECRET_LIVE,
@@ -615,7 +613,7 @@ export const stripeWebhook = onRequest(
           const callSessionId = cs.metadata?.callSessionId || cs.metadata?.sessionId;
           if (callSessionId) {
             await database
-              .collection('callSessions')
+              .collection('call_sessions')
               .doc(callSessionId)
               .set(
                 {
@@ -1028,77 +1026,6 @@ export const scheduledCleanup = onSchedule(
 );
 
 // ========================================
-// 🆕 ENDPOINT CLOUD TASKS : exécuter l'appel à +5 min
-// ========================================
-
-export const executeCallTask = onRequest(
-  {
-    region: 'europe-west1',
-    memory: '256MiB',
-    timeoutSeconds: 60,
-    secrets: [TASKS_AUTH_SECRET],
-  },
-  wrapHttpFunction('executeCallTask', async (req: FirebaseRequest, res: Response) => {
-    try {
-      const sent = (req.header('X-Task-Auth') || '').toString();
-      const expected = TASKS_AUTH_SECRET.value(); // ✅ Secret GSM, pas process.env
-      if (!expected || sent !== expected) {
-        ultraLogger.warn('EXECUTE_CALL_TASK', 'Unauthorized task call', { hasHeader: !!sent });
-        res.status(401).send('Unauthorized');
-        return;
-      }
-
-      const { callSessionId } = (req.body || {}) as { callSessionId?: string };
-      if (!callSessionId) {
-        res.status(400).send('Missing callSessionId');
-        return;
-      }
-
-      ultraLogger.info('EXECUTE_CALL_TASK', 'Déclenchement appel Twilio', { callSessionId });
-
-      // 🔽 Essaie d'utiliser un exécuteur dédié si présent
-      try {
-        const maybe = await import('./callScheduler'); // si tu as exporté executeScheduledCall ici
-        if (typeof (maybe as any).executeScheduledCall === 'function') {
-          const result = await (maybe as any).executeScheduledCall(callSessionId);
-          res.status(200).json({ ok: true, callSessionId, result, via: 'callScheduler.executeScheduledCall' });
-          return;
-        }
-      } catch {
-        /* pas grave, on tente TwilioCallManager */
-      }
-
-      // 🔽 Sinon, fallback via TwilioCallManager si implémente startScheduledCall/executeScheduledCall
-      const twilioCallManager = await getTwilioCallManager();
-      const managerAny = twilioCallManager as unknown as Record<string, any>;
-      if (typeof managerAny.startScheduledCall === 'function') {
-        const result = await managerAny.startScheduledCall(callSessionId);
-        res.status(200).json({ ok: true, callSessionId, result, via: 'TwilioCallManager.startScheduledCall' });
-        return;
-      }
-      if (typeof managerAny.executeScheduledCall === 'function') {
-        const result = await managerAny.executeScheduledCall(callSessionId);
-        res.status(200).json({ ok: true, callSessionId, result, via: 'TwilioCallManager.executeScheduledCall' });
-        return;
-      }
-
-      ultraLogger.error('EXECUTE_CALL_TASK', "Aucune méthode de déclenchement d'appel trouvée");
-      res.status(500).json({ ok: false, error: 'No call executor found (implement executeScheduledCall or startScheduledCall)' });
-    } catch (e: any) {
-      ultraLogger.error(
-        'EXECUTE_CALL_TASK',
-        'Erreur déclenchement appel',
-        {
-          error: e?.message || String(e),
-        },
-        e instanceof Error ? e : undefined
-      );
-      res.status(500).json({ ok: false, error: e?.message || 'internal' });
-    }
-  })
-);
-
-// ========================================
 // FONCTION DE DEBUG SYSTÈME
 // ========================================
 
@@ -1315,17 +1242,8 @@ export const getSystemHealthStatus = onCall(
 );
 
 // ========================================
-// INITIALISATION FINALE ET LOGS DE DÉMARRAGE
+// LOGS DEBUG ULTRA
 // ========================================
-
-ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
-  totalFunctions: 16, // Maj après ajout executeCallTask
-  environment: process.env.NODE_ENV || 'development',
-  memoryUsage: process.memoryUsage(),
-  loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown',
-});
-
-export { ultraLogger };
 
 export const getUltraDebugLogs = onCall(
   { cors: true, memory: '256MiB', timeoutSeconds: 30 },
@@ -1368,5 +1286,18 @@ export const getUltraDebugLogs = onCall(
     }
   })
 );
+
+// ========================================
+// INITIALISATION FINALE ET LOGS DE DÉMARRAGE
+// ========================================
+
+ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
+  totalFunctions: 16,
+  environment: process.env.NODE_ENV || 'development',
+  memoryUsage: process.memoryUsage(),
+  loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown',
+});
+
+export { ultraLogger };
 
 ultraLogger.info('INDEX_EXPORTS_COMPLETE', 'Toutes les fonctions exportées et configurées avec ultra debug');

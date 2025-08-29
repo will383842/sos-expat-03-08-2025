@@ -1,4 +1,5 @@
-import { scheduleCallSequence } from '../callScheduler';
+// ✅ Import corrigé - utilisation de la nouvelle planification par tâches
+import { scheduleCallTask } from '../lib/tasks';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall } from 'firebase-functions/v2/https';
 import { messageManager } from '../MessageManager';
@@ -59,8 +60,9 @@ export async function notifyAfterPaymentInternal(callId: string) {
     throw error;
   }
 
-  // 🔁 Déclenche l'appel vocal entre client et prestataire dans 5 minutes
-  await scheduleCallSequence(callData.sessionId || callId);
+  // 🔁 Planifie l'appel vocal entre client et prestataire dans 5 minutes (300 secondes)
+  const callSessionId = callData.sessionId || callId;
+  await scheduleCallTask(callSessionId, 5 * 60); // 5 minutes en secondes
 }
 
 // ✅ Cloud Function (appelable depuis le frontend) - OPTIMISÉE CPU

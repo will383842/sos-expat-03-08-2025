@@ -4,6 +4,7 @@ import { twilioCallManager } from '../TwilioCallManager';
 import { logCallRecord } from '../utils/logs/logCallRecord';
 import { logError } from '../utils/logs/logError';
 import { Request, Response } from 'express';
+import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
 
 interface TwilioRecordingWebhookBody {
   RecordingSid: string;
@@ -12,11 +13,11 @@ interface TwilioRecordingWebhookBody {
   RecordingDuration: string;
   RecordingChannels: string;
   RecordingSource: string;
-  
+
   // Informations de la conférence/appel
   ConferenceSid?: string;
   CallSid?: string;
-  
+
   // Métadonnées
   AccountSid: string;
   Timestamp: string;
@@ -26,75 +27,77 @@ interface TwilioRecordingWebhookBody {
  * Webhook pour les événements d'enregistrement Twilio
  * Gère: completed, failed, absent
  */
-export const twilioRecordingWebhook = onRequest(async (req: Request, res: Response) => {
-  try {
-    const body: TwilioRecordingWebhookBody = req.body;
-    
-    console.log('🎬 Recording Webhook reçu:', {
-      status: body.RecordingStatus,
-      recordingSid: body.RecordingSid,
-      duration: body.RecordingDuration,
-      conferenceSid: body.ConferenceSid,
-      callSid: body.CallSid
-    });
+export const TwilioRecordingWebhook = onRequest(
+  { secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  async (req: Request, res: Response) => {
+    try {
+      const body: TwilioRecordingWebhookBody = req.body;
 
-    // Trouver la session d'appel
-    let session = null;
-    let sessionId = '';
+      console.log('🎬 Recording Webhook reçu:', {
+        status: body.RecordingStatus,
+        recordingSid: body.RecordingSid,
+        duration: body.RecordingDuration,
+        conferenceSid: body.ConferenceSid,
+        callSid: body.CallSid
+      });
 
-    if (body.ConferenceSid) {
-      session = await twilioCallManager.findSessionByConferenceSid(body.ConferenceSid);
-    } else if (body.CallSid) {
-      const result = await twilioCallManager.findSessionByCallSid(body.CallSid);
-      session = result?.session || null;
+      // Trouver la session d'appel
+      let session: any = null;
+      let sessionId = '';
+
+      if (body.ConferenceSid) {
+        session = await twilioCallManager.findSessionByConferenceSid(body.ConferenceSid);
+      } else if (body.CallSid) {
+        const result = await twilioCallManager.findSessionByCallSid(body.CallSid);
+        session = result?.session || null;
+      }
+
+      if (!session) {
+        console.warn(`Session non trouvée pour enregistrement: ${body.RecordingSid}`);
+        res.status(200).send('Session not found');
+        return;
+      }
+
+      sessionId = session.id as string;
+
+      switch (body.RecordingStatus) {
+        case 'completed':
+          await handleRecordingCompleted(sessionId, body);
+          break;
+
+        case 'failed':
+          await handleRecordingFailed(sessionId, body);
+          break;
+
+        case 'absent':
+          await handleRecordingAbsent(sessionId, body);
+          break;
+
+        default:
+          console.log(`Statut d'enregistrement non géré: ${body.RecordingStatus}`);
+      }
+
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('❌ Erreur webhook enregistrement:', error);
+      await logError('twilioRecordingWebhook:error', error);
+      res.status(500).send('Webhook error');
     }
-
-    if (!session) {
-      console.warn(`Session non trouvée pour enregistrement: ${body.RecordingSid}`);
-      res.status(200).send('Session not found');
-      return;
-    }
-
-    sessionId = session.id;
-
-    switch (body.RecordingStatus) {
-      case 'completed':
-        await handleRecordingCompleted(sessionId, body);
-        break;
-        
-      case 'failed':
-        await handleRecordingFailed(sessionId, body);
-        break;
-        
-      case 'absent':
-        await handleRecordingAbsent(sessionId, body);
-        break;
-        
-      default:
-        console.log(`Statut d'enregistrement non géré: ${body.RecordingStatus}`);
-    }
-
-    res.status(200).send('OK');
-
-  } catch (error) {
-    console.error('❌ Erreur webhook enregistrement:', error);
-    await logError('twilioRecordingWebhook:error', error);
-    res.status(500).send('Webhook error');
   }
-});
+);
 
 /**
  * Gère la completion d'un enregistrement
  */
 async function handleRecordingCompleted(sessionId: string, body: TwilioRecordingWebhookBody) {
   try {
-    const duration = parseInt(body.RecordingDuration || '0');
+    const duration = parseInt(body.RecordingDuration || '0', 10);
     console.log(`✅ Enregistrement complété: ${sessionId}, durée: ${duration}s`);
-    
+
     // Mettre à jour la session avec l'URL d'enregistrement
     await twilioCallManager.updateConferenceInfo(sessionId, {
       recordingUrl: body.RecordingUrl,
-      duration: duration
+      duration
     });
 
     // Sauvegarder les métadonnées de l'enregistrement
@@ -107,14 +110,13 @@ async function handleRecordingCompleted(sessionId: string, body: TwilioRecording
       callId: sessionId,
       status: 'recording_completed',
       retryCount: 0,
-      duration: duration,
+      duration,
       additionalData: {
         recordingSid: body.RecordingSid,
         recordingUrl: body.RecordingUrl,
         recordingDuration: duration
       }
     });
-
   } catch (error) {
     await logError('handleRecordingCompleted', error);
   }
@@ -126,7 +128,7 @@ async function handleRecordingCompleted(sessionId: string, body: TwilioRecording
 async function handleRecordingFailed(sessionId: string, body: TwilioRecordingWebhookBody) {
   try {
     console.log(`❌ Échec enregistrement: ${sessionId}`);
-    
+
     // Sauvegarder les métadonnées de l'échec
     await saveRecordingMetadata(sessionId, body, 'failed');
 
@@ -143,7 +145,6 @@ async function handleRecordingFailed(sessionId: string, body: TwilioRecordingWeb
         conferenceSid: body.ConferenceSid
       }
     });
-
   } catch (error) {
     await logError('handleRecordingFailed', error);
   }
@@ -155,7 +156,7 @@ async function handleRecordingFailed(sessionId: string, body: TwilioRecordingWeb
 async function handleRecordingAbsent(sessionId: string, body: TwilioRecordingWebhookBody) {
   try {
     console.log(`⚠️ Enregistrement absent: ${sessionId}`);
-    
+
     // Sauvegarder les métadonnées de l'absence
     await saveRecordingMetadata(sessionId, body, 'absent');
 
@@ -169,7 +170,6 @@ async function handleRecordingAbsent(sessionId: string, body: TwilioRecordingWeb
         reason: 'No recording available'
       }
     });
-
   } catch (error) {
     await logError('handleRecordingAbsent', error);
   }
@@ -179,20 +179,20 @@ async function handleRecordingAbsent(sessionId: string, body: TwilioRecordingWeb
  * Sauvegarde les métadonnées de l'enregistrement
  */
 async function saveRecordingMetadata(
-  sessionId: string, 
-  body: TwilioRecordingWebhookBody, 
+  sessionId: string,
+  body: TwilioRecordingWebhookBody,
   status: 'completed' | 'failed' | 'absent'
 ) {
   try {
     const db = admin.firestore();
-    
+
     const recordingData = {
       sessionId,
       recordingSid: body.RecordingSid,
       recordingUrl: body.RecordingUrl || null,
       recordingStatus: status,
-      recordingDuration: parseInt(body.RecordingDuration || '0'),
-      recordingChannels: parseInt(body.RecordingChannels || '1'),
+      recordingDuration: parseInt(body.RecordingDuration || '0', 10),
+      recordingChannels: parseInt(body.RecordingChannels || '1', 10),
       recordingSource: body.RecordingSource || 'conference',
       conferenceSid: body.ConferenceSid || null,
       callSid: body.CallSid || null,
@@ -203,9 +203,8 @@ async function saveRecordingMetadata(
     };
 
     await db.collection('call_recordings').doc(body.RecordingSid).set(recordingData);
-    
-    console.log(`📹 Métadonnées enregistrement sauvegardées: ${body.RecordingSid}`);
 
+    console.log(`📹 Métadonnées enregistrement sauvegardées: ${body.RecordingSid}`);
   } catch (error) {
     await logError('saveRecordingMetadata', error);
   }
@@ -219,8 +218,8 @@ async function handlePostRecordingProcessing(sessionId: string, body: TwilioReco
     const session = await twilioCallManager.getCallSession(sessionId);
     if (!session) return;
 
-    const recordingDuration = parseInt(body.RecordingDuration || '0');
-    
+    const recordingDuration = parseInt(body.RecordingDuration || '0', 10);
+
     // Si l'enregistrement confirme que l'appel était assez long, capturer le paiement
     if (recordingDuration >= 120 && twilioCallManager.shouldCapturePayment(session)) {
       console.log(`💰 Déclenchement capture paiement suite à enregistrement valide: ${sessionId}`);
@@ -229,7 +228,6 @@ async function handlePostRecordingProcessing(sessionId: string, body: TwilioReco
 
     // Créer une notification pour informer de la disponibilité de l'enregistrement
     await notifyRecordingAvailable(sessionId, session, body);
-
   } catch (error) {
     await logError('handlePostRecordingProcessing', error);
   }
@@ -239,20 +237,20 @@ async function handlePostRecordingProcessing(sessionId: string, body: TwilioReco
  * Notifie la disponibilité de l'enregistrement
  */
 async function notifyRecordingAvailable(
-  sessionId: string, 
-  session: any, 
+  sessionId: string,
+  session: any,
   body: TwilioRecordingWebhookBody
 ) {
   try {
     const db = admin.firestore();
-    
+
     // Créer une notification pour l'équipe administrative
     await db.collection('admin_notifications').add({
       type: 'recording_available',
       sessionId,
       recordingSid: body.RecordingSid,
       recordingUrl: body.RecordingUrl,
-      recordingDuration: parseInt(body.RecordingDuration || '0'),
+      recordingDuration: parseInt(body.RecordingDuration || '0', 10),
       clientId: session.metadata.clientId,
       providerId: session.metadata.providerId,
       serviceType: session.metadata.serviceType,
@@ -263,7 +261,6 @@ async function notifyRecordingAvailable(
 
     // Log pour les métriques
     console.log(`📢 Notification enregistrement créée: ${sessionId}`);
-
   } catch (error) {
     await logError('notifyRecordingAvailable', error);
   }
@@ -275,7 +272,7 @@ async function notifyRecordingAvailable(
 async function notifyRecordingFailure(sessionId: string, body: TwilioRecordingWebhookBody) {
   try {
     const db = admin.firestore();
-    
+
     // Créer une alerte technique
     await db.collection('technical_alerts').add({
       type: 'recording_failure',
@@ -295,7 +292,6 @@ async function notifyRecordingFailure(sessionId: string, body: TwilioRecordingWe
     });
 
     console.log(`🚨 Alerte technique créée pour échec enregistrement: ${sessionId}`);
-
   } catch (error) {
     await logError('notifyRecordingFailure', error);
   }
@@ -307,8 +303,9 @@ async function notifyRecordingFailure(sessionId: string, body: TwilioRecordingWe
 export async function getSessionRecordings(sessionId: string) {
   try {
     const db = admin.firestore();
-    
-    const snapshot = await db.collection('call_recordings')
+
+    const snapshot = await db
+      .collection('call_recordings')
       .where('sessionId', '==', sessionId)
       .orderBy('createdAt', 'desc')
       .get();
@@ -317,9 +314,14 @@ export async function getSessionRecordings(sessionId: string) {
       id: doc.id,
       ...doc.data()
     }));
-
   } catch (error) {
     await logError('getSessionRecordings', error);
     return [];
   }
 }
+
+/**
+ * Alias d’export pour compatibilité avec les imports en lowercase.
+ * Permet: import { twilioRecordingWebhook } from './TwilioRecordingWebhook'
+ */
+export { TwilioRecordingWebhook as twilioRecordingWebhook };

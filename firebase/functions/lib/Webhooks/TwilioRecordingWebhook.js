@@ -33,18 +33,19 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.twilioRecordingWebhook = void 0;
+exports.twilioRecordingWebhook = exports.TwilioRecordingWebhook = void 0;
 exports.getSessionRecordings = getSessionRecordings;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const TwilioCallManager_1 = require("../TwilioCallManager");
 const logCallRecord_1 = require("../utils/logs/logCallRecord");
 const logError_1 = require("../utils/logs/logError");
+const twilio_1 = require("../lib/twilio");
 /**
  * Webhook pour les événements d'enregistrement Twilio
  * Gère: completed, failed, absent
  */
-exports.twilioRecordingWebhook = (0, https_1.onRequest)(async (req, res) => {
+exports.TwilioRecordingWebhook = (0, https_1.onRequest)({ secrets: [twilio_1.TWILIO_ACCOUNT_SID, twilio_1.TWILIO_AUTH_TOKEN, twilio_1.TWILIO_PHONE_NUMBER] }, async (req, res) => {
     try {
         const body = req.body;
         console.log('🎬 Recording Webhook reçu:', {
@@ -91,17 +92,18 @@ exports.twilioRecordingWebhook = (0, https_1.onRequest)(async (req, res) => {
         res.status(500).send('Webhook error');
     }
 });
+exports.twilioRecordingWebhook = exports.TwilioRecordingWebhook;
 /**
  * Gère la completion d'un enregistrement
  */
 async function handleRecordingCompleted(sessionId, body) {
     try {
-        const duration = parseInt(body.RecordingDuration || '0');
+        const duration = parseInt(body.RecordingDuration || '0', 10);
         console.log(`✅ Enregistrement complété: ${sessionId}, durée: ${duration}s`);
         // Mettre à jour la session avec l'URL d'enregistrement
         await TwilioCallManager_1.twilioCallManager.updateConferenceInfo(sessionId, {
             recordingUrl: body.RecordingUrl,
-            duration: duration
+            duration
         });
         // Sauvegarder les métadonnées de l'enregistrement
         await saveRecordingMetadata(sessionId, body, 'completed');
@@ -111,7 +113,7 @@ async function handleRecordingCompleted(sessionId, body) {
             callId: sessionId,
             status: 'recording_completed',
             retryCount: 0,
-            duration: duration,
+            duration,
             additionalData: {
                 recordingSid: body.RecordingSid,
                 recordingUrl: body.RecordingUrl,
@@ -182,8 +184,8 @@ async function saveRecordingMetadata(sessionId, body, status) {
             recordingSid: body.RecordingSid,
             recordingUrl: body.RecordingUrl || null,
             recordingStatus: status,
-            recordingDuration: parseInt(body.RecordingDuration || '0'),
-            recordingChannels: parseInt(body.RecordingChannels || '1'),
+            recordingDuration: parseInt(body.RecordingDuration || '0', 10),
+            recordingChannels: parseInt(body.RecordingChannels || '1', 10),
             recordingSource: body.RecordingSource || 'conference',
             conferenceSid: body.ConferenceSid || null,
             callSid: body.CallSid || null,
@@ -207,7 +209,7 @@ async function handlePostRecordingProcessing(sessionId, body) {
         const session = await TwilioCallManager_1.twilioCallManager.getCallSession(sessionId);
         if (!session)
             return;
-        const recordingDuration = parseInt(body.RecordingDuration || '0');
+        const recordingDuration = parseInt(body.RecordingDuration || '0', 10);
         // Si l'enregistrement confirme que l'appel était assez long, capturer le paiement
         if (recordingDuration >= 120 && TwilioCallManager_1.twilioCallManager.shouldCapturePayment(session)) {
             console.log(`💰 Déclenchement capture paiement suite à enregistrement valide: ${sessionId}`);
@@ -232,7 +234,7 @@ async function notifyRecordingAvailable(sessionId, session, body) {
             sessionId,
             recordingSid: body.RecordingSid,
             recordingUrl: body.RecordingUrl,
-            recordingDuration: parseInt(body.RecordingDuration || '0'),
+            recordingDuration: parseInt(body.RecordingDuration || '0', 10),
             clientId: session.metadata.clientId,
             providerId: session.metadata.providerId,
             serviceType: session.metadata.serviceType,
@@ -282,7 +284,8 @@ async function notifyRecordingFailure(sessionId, body) {
 async function getSessionRecordings(sessionId) {
     try {
         const db = admin.firestore();
-        const snapshot = await db.collection('call_recordings')
+        const snapshot = await db
+            .collection('call_recordings')
             .where('sessionId', '==', sessionId)
             .orderBy('createdAt', 'desc')
             .get();

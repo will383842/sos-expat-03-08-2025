@@ -141,9 +141,14 @@ class MessageManager {
           <Say voice="alice" language="${params.language || 'fr-FR'}">${message}</Say>
         </Response>
       `;
-            await twilio_1.twilioClient.calls.create({
+            const twilioClient = (0, twilio_1.getTwilioClient)();
+            const twilioPhoneNumber = (0, twilio_1.getTwilioPhoneNumber)();
+            if (!twilioClient || !twilioPhoneNumber) {
+                throw new Error('Configuration Twilio manquante');
+            }
+            await twilioClient.calls.create({
                 to: params.to,
-                from: twilio_1.twilioPhoneNumber,
+                from: twilioPhoneNumber,
                 twiml: twiml,
                 timeout: 30
             });
@@ -159,12 +164,14 @@ class MessageManager {
      */
     async sendNotificationCall(phoneNumber, message) {
         try {
-            if (!process.env.TWILIO_PHONE_NUMBER) {
+            const twilioClient = (0, twilio_1.getTwilioClient)();
+            const twilioPhone = (0, twilio_1.getTwilioPhoneNumber)();
+            if (!twilioClient || !twilioPhone) {
                 throw new Error('Configuration Twilio manquante');
             }
-            await twilio_1.twilioClient.calls.create({
+            await twilioClient.calls.create({
                 to: phoneNumber,
-                from: process.env.TWILIO_PHONE_NUMBER,
+                from: twilioPhone,
                 twiml: `<Response><Say voice="alice" language="fr-FR">${message}</Say></Response>`,
                 timeout: 20
             });
@@ -191,12 +198,14 @@ class MessageManager {
      */
     async sendWhatsAppDirect(to, message) {
         try {
-            if (!process.env.TWILIO_WHATSAPP_NUMBER) {
-                throw new Error('Numéro WhatsApp Twilio non configuré');
+            const twilioClient = (0, twilio_1.getTwilioClient)();
+            const whatsappNumber = (0, twilio_1.getTwilioWhatsAppNumber)();
+            if (!twilioClient || !whatsappNumber) {
+                throw new Error('Configuration Twilio WhatsApp manquante');
             }
-            await twilio_1.twilioClient.messages.create({
+            await twilioClient.messages.create({
                 body: message,
-                from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+                from: whatsappNumber, // ✅ CORRIGÉ : Firebase Secrets (déjà formaté avec whatsapp:)
                 to: `whatsapp:${to}`
             });
             return true;
@@ -208,12 +217,14 @@ class MessageManager {
     }
     async sendSMSDirect(to, message) {
         try {
-            if (!process.env.TWILIO_PHONE_NUMBER) {
-                throw new Error('Numéro SMS Twilio non configuré');
+            const twilioClient = (0, twilio_1.getTwilioClient)();
+            const twilioPhone = (0, twilio_1.getTwilioPhoneNumber)();
+            if (!twilioClient || !twilioPhone) {
+                throw new Error('Configuration Twilio SMS manquante');
             }
-            await twilio_1.twilioClient.messages.create({
+            await twilioClient.messages.create({
                 body: message,
-                from: process.env.TWILIO_PHONE_NUMBER,
+                from: twilioPhone,
                 to: to
             });
             return true;

@@ -1,40 +1,84 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.twilioWhatsAppNumber = exports.twilioPhoneNumber = exports.twilioClient = void 0;
+exports.TWILIO_WHATSAPP_NUMBER = exports.TWILIO_PHONE_NUMBER = exports.TWILIO_AUTH_TOKEN = exports.TWILIO_ACCOUNT_SID = void 0;
+exports.getTwilioClient = getTwilioClient;
+exports.getTwilioPhoneNumber = getTwilioPhoneNumber;
+exports.getTwilioWhatsAppNumber = getTwilioWhatsAppNumber;
+exports.resetTwilioCache = resetTwilioCache;
+// firebase/functions/src/lib/twilio.ts
 const twilio_1 = require("twilio");
-// 🔐 Lecture des variables d'environnement depuis votre .env
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
-const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
-// ✅ Mode build-safe : ne pas bloquer si les variables manquent au build
-const isBuildTime = !accountSid && !authToken;
-if (!isBuildTime) {
-    // Validation seulement à l'exécution
-    if (!accountSid || !authToken) {
-        console.error('❌ Variables Twilio manquantes dans .env:', {
-            hasSid: !!accountSid,
-            hasToken: !!authToken
-        });
-        throw new Error('Variables d\'environnement Twilio manquantes: TWILIO_ACCOUNT_SID et TWILIO_AUTH_TOKEN requis');
+const params_1 = require("firebase-functions/params");
+// 🔐 Définition des secrets Firebase v2
+exports.TWILIO_ACCOUNT_SID = (0, params_1.defineSecret)('TWILIO_ACCOUNT_SID');
+exports.TWILIO_AUTH_TOKEN = (0, params_1.defineSecret)('TWILIO_AUTH_TOKEN');
+exports.TWILIO_PHONE_NUMBER = (0, params_1.defineSecret)('TWILIO_PHONE_NUMBER');
+exports.TWILIO_WHATSAPP_NUMBER = (0, params_1.defineSecret)('TWILIO_WHATSAPP_NUMBER');
+// 💾 Cache pour les instances (lazy loading)
+let _twilioClient = null;
+let _phoneNumber = null;
+let _whatsappNumber = null;
+/**
+ * 🔄 Getter lazy pour le client Twilio
+ * Initialise le client uniquement lors du premier appel
+ */
+function getTwilioClient() {
+    if (!_twilioClient) {
+        const accountSid = exports.TWILIO_ACCOUNT_SID.value();
+        const authToken = exports.TWILIO_AUTH_TOKEN.value();
+        if (!accountSid || !authToken) {
+            throw new Error('Configuration Twilio manquante: ACCOUNT_SID ou AUTH_TOKEN non défini');
+        }
+        _twilioClient = new twilio_1.Twilio(accountSid, authToken);
+        console.log('✅ Client Twilio initialisé avec secrets Firebase');
     }
-    if (!phoneNumber) {
-        throw new Error('Variable d\'environnement TWILIO_PHONE_NUMBER manquante');
+    return _twilioClient;
+}
+/**
+ * 📱 Getter lazy pour le numéro de téléphone Twilio
+ * Valide le format international (+...)
+ */
+function getTwilioPhoneNumber() {
+    if (!_phoneNumber) {
+        const number = exports.TWILIO_PHONE_NUMBER.value();
+        if (!number) {
+            throw new Error('Numéro Twilio non configuré');
+        }
+        if (!number.startsWith('+')) {
+            throw new Error(`Numéro Twilio doit être au format international. Reçu: ${number}`);
+        }
+        _phoneNumber = number;
+        console.log('✅ Numéro Twilio configuré');
     }
-    if (!phoneNumber.startsWith('+')) {
-        throw new Error('TWILIO_PHONE_NUMBER doit être au format international (+33...)');
+    return _phoneNumber;
+}
+/**
+ * 💬 Getter lazy pour le numéro WhatsApp (optionnel)
+ * Retourne undefined si non configuré
+ */
+function getTwilioWhatsAppNumber() {
+    if (_whatsappNumber === null) {
+        try {
+            const number = exports.TWILIO_WHATSAPP_NUMBER.value();
+            _whatsappNumber = number ? `whatsapp:${number}` : '';
+        }
+        catch (error) {
+            // WhatsApp est optionnel, pas d'erreur si non configuré
+            _whatsappNumber = '';
+            console.log('ℹ️ WhatsApp non configuré (optionnel)');
+        }
     }
+    return _whatsappNumber || undefined;
 }
-else {
-    console.log('🔧 Mode build détecté - validation Twilio reportée à l\'exécution');
+/**
+ * 🔄 Fonction utilitaire pour réinitialiser le cache
+ * Utile pour les tests ou la reconfiguration
+ */
+function resetTwilioCache() {
+    _twilioClient = null;
+    _phoneNumber = null;
+    _whatsappNumber = null;
+    console.log('🔄 Cache Twilio réinitialisé');
 }
-// 📞 Créer le client Twilio
-exports.twilioClient = new twilio_1.Twilio(accountSid || 'ACfake_build_placeholder', authToken || 'fake_build_placeholder_token');
-// 📱 Export des numéros
-exports.twilioPhoneNumber = phoneNumber || '+447427874305';
-exports.twilioWhatsAppNumber = whatsappNumber ? `whatsapp:${whatsappNumber}` : undefined;
-if (!isBuildTime) {
-    console.log('✅ Client Twilio initialisé avec succès depuis .env');
-}
-exports.default = exports.twilioClient;
+// 📤 Exports par défaut pour compatibilité
+exports.default = getTwilioClient;
 //# sourceMappingURL=twilio.js.map

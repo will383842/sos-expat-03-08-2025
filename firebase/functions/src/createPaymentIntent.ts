@@ -2,6 +2,7 @@
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
+import Stripe from 'stripe';
 
 import { stripeManager } from './StripeManager';
 import { logError } from './utils/logs/logError';
@@ -613,7 +614,8 @@ export const createPaymentIntent = onCall(
         provider: formatAmount(providerAmountInMainUnit, currency),
       });
 
-      const response: SuccessResponse = {
+      // Réponse de base
+      const baseResponse: SuccessResponse = {
         success: true,
         clientSecret: result.clientSecret!,
         paymentIntentId: result.paymentIntentId!,
@@ -623,25 +625,26 @@ export const createPaymentIntent = onCall(
         status: 'requires_payment_method',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
-// dans createPaymentIntent, juste avant "return response;"
-const accountId = (await (await import('stripe')).default(getStripeSecretParam().value(), { apiVersion: '2023-10-16' }))
-  .accounts.retrieve()
-  .then(a => a.id)
-  .catch(() => undefined);
 
-const response: SuccessResponse & { stripeMode: string; stripeAccountId?: string } = {
-  success: true,
-  clientSecret: result.clientSecret!,
-  paymentIntentId: result.paymentIntentId!,
-  amount: amountInCents,
-  currency,
-  serviceType,
-  status: 'requires_payment_method',
-  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-  stripeMode: STRIPE_MODE.value() || 'test',
-  stripeAccountId: accountId,
-};
-      return response;
+      // Récupération sécurisée de l'account ID Stripe
+      let accountId: string | undefined;
+      try {
+        const stripe = new Stripe(getStripeSecretParam().value(), { apiVersion: '2023-10-16' });
+        const account = await stripe.accounts.retrieve();
+        accountId = account.id;
+      } catch (error) {
+        console.warn('Impossible de récupérer l\'account ID Stripe:', error);
+        accountId = undefined;
+      }
+
+      // Réponse finale avec informations supplémentaires
+      const finalResponse: SuccessResponse & { stripeMode: string; stripeAccountId?: string } = {
+        ...baseResponse,
+        stripeMode: STRIPE_MODE.value() || 'test',
+        stripeAccountId: accountId,
+      };
+
+      return finalResponse;
     } catch (error: unknown) {
       const processingTime = Date.now() - startTime;
 

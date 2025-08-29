@@ -2,6 +2,29 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logError = logError;
 const firebase_1 = require("../firebase");
+function safeStringify(obj) {
+    const seen = new WeakSet();
+    try {
+        return JSON.stringify(obj, (_key, value) => {
+            if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) {
+                    return '[Circular]';
+                }
+                seen.add(value);
+            }
+            if (value instanceof Error) {
+                return {
+                    name: value.name,
+                    message: value.message,
+                };
+            }
+            return value;
+        });
+    }
+    catch (err) {
+        return `Unstringifiable object: ${String(err)}`;
+    }
+}
 async function logError(context, error) {
     try {
         let message = 'Erreur inconnue';
@@ -9,7 +32,7 @@ async function logError(context, error) {
         let errorType = 'unknown';
         if (error instanceof Error) {
             message = error.message;
-            stack = error.stack || '';
+            stack = (error.stack || '').slice(0, 5000); // tronqué pour Firestore
             errorType = error.constructor.name;
         }
         else if (typeof error === 'string') {
@@ -17,7 +40,7 @@ async function logError(context, error) {
             errorType = 'string';
         }
         else if (error && typeof error === 'object') {
-            message = JSON.stringify(error);
+            message = safeStringify(error);
             errorType = 'object';
         }
         else {

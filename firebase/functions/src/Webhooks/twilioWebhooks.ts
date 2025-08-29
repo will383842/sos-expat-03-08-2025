@@ -5,6 +5,7 @@ import { logError } from '../utils/logs/logError';
 import { Response } from 'express';
 import * as admin from 'firebase-admin';
 import { Request } from 'firebase-functions/v2/https';
+import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
 
 interface TwilioCallWebhookBody {
   CallSid: string;
@@ -24,63 +25,66 @@ interface TwilioCallWebhookBody {
  * Webhook unifié pour les événements d'appels Twilio
  * Compatible avec le système TwilioCallManager moderne
  */
-export const twilioCallWebhook = onRequest(async (req: Request, res: Response) => {
-  try {
-    const body: TwilioCallWebhookBody = req.body;
-    
-    console.log('🔔 Call Webhook reçu:', {
-      event: body.CallStatus,
-      callSid: body.CallSid,
-      from: body.From,
-      to: body.To,
-      duration: body.CallDuration
-    });
+export const twilioCallWebhook = onRequest(
+  { secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  async (req: Request, res: Response) => {
+    try {
+      const body: TwilioCallWebhookBody = req.body;
+      
+      console.log('🔔 Call Webhook reçu:', {
+        event: body.CallStatus,
+        callSid: body.CallSid,
+        from: body.From,
+        to: body.To,
+        duration: body.CallDuration
+      });
 
-    // Trouver la session d'appel par CallSid
-    const sessionResult = await twilioCallManager.findSessionByCallSid(body.CallSid);
-    
-    if (!sessionResult) {
-      console.warn(`Session non trouvée pour CallSid: ${body.CallSid}`);
-      res.status(200).send('Session not found');
-      return;
+      // Trouver la session d'appel par CallSid
+      const sessionResult = await twilioCallManager.findSessionByCallSid(body.CallSid);
+      
+      if (!sessionResult) {
+        console.warn(`Session non trouvée pour CallSid: ${body.CallSid}`);
+        res.status(200).send('Session not found');
+        return;
+      }
+
+      const { session, participantType } = sessionResult;
+      const sessionId = session.id;
+
+      // Traiter les différents statuts d'appel
+      switch (body.CallStatus) {
+        case 'ringing':
+          await handleCallRinging(sessionId, participantType, body);
+          break;
+          
+        case 'answered':
+        case 'in-progress':
+          await handleCallAnswered(sessionId, participantType, body);
+          break;
+          
+        case 'completed':
+          await handleCallCompleted(sessionId, participantType, body);
+          break;
+          
+        case 'failed':
+        case 'busy':
+        case 'no-answer':
+          await handleCallFailed(sessionId, participantType, body);
+          break;
+          
+        default:
+          console.log(`Statut d'appel non géré: ${body.CallStatus}`);
+      }
+
+      res.status(200).send('OK');
+
+    } catch (error) {
+      console.error('❌ Erreur webhook appel:', error);
+      await logError('twilioCallWebhook:error', error);
+      res.status(500).send('Webhook error');
     }
-
-    const { session, participantType } = sessionResult;
-    const sessionId = session.id;
-
-    // Traiter les différents statuts d'appel
-    switch (body.CallStatus) {
-      case 'ringing':
-        await handleCallRinging(sessionId, participantType, body);
-        break;
-        
-      case 'answered':
-      case 'in-progress':
-        await handleCallAnswered(sessionId, participantType, body);
-        break;
-        
-      case 'completed':
-        await handleCallCompleted(sessionId, participantType, body);
-        break;
-        
-      case 'failed':
-      case 'busy':
-      case 'no-answer':
-        await handleCallFailed(sessionId, participantType, body);
-        break;
-        
-      default:
-        console.log(`Statut d'appel non géré: ${body.CallStatus}`);
-    }
-
-    res.status(200).send('OK');
-
-  } catch (error) {
-    console.error('❌ Erreur webhook appel:', error);
-    await logError('twilioCallWebhook:error', error);
-    res.status(500).send('Webhook error');
   }
-});
+);
 
 /**
  * Gère le statut "ringing"
@@ -261,20 +265,26 @@ async function handleCallFailed(
 /**
  * Webhook pour les événements de conférence (délégué au système moderne)
  */
-export const twilioConferenceWebhook = onRequest(async (req: Request, res: Response) => {
-  // Rediriger vers le webhook de conférence moderne
-  const { twilioConferenceWebhook: modernWebhook } = await import('./TwilioConferenceWebhook');
-  return modernWebhook(req as Request, res);
-});
+export const twilioConferenceWebhook = onRequest(
+  { secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  async (req: Request, res: Response) => {
+    // Rediriger vers le webhook de conférence moderne
+    const { twilioConferenceWebhook: modernWebhook } = await import('./TwilioConferenceWebhook');
+    return modernWebhook(req as Request, res);
+  }
+);
 
 /**
  * Webhook pour les événements d'enregistrement (délégué au système moderne)
  */
-export const twilioRecordingWebhook = onRequest(async (req: Request, res: Response) => {
-  // Rediriger vers le webhook d'enregistrement moderne
-  const { twilioRecordingWebhook: modernWebhook } = await import('./TwilioRecordingWebhook');
-  return modernWebhook(req as Request, res);
-});
+export const twilioRecordingWebhook = onRequest(
+  { secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  async (req: Request, res: Response) => {
+    // Rediriger vers le webhook d'enregistrement moderne
+    const { twilioRecordingWebhook: modernWebhook } = await import('./TwilioRecordingWebhook');
+    return modernWebhook(req as Request, res);
+  }
+);
 
 /**
  * Fonction utilitaire pour recherche de session (compatible avec l'ancien système)

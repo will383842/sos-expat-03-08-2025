@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p .",
     "deploy": "firebase deploy --only functions",
     "test:production": "node testProduction.js"
   },
@@ -10,6 +10,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@google-cloud/tasks": "^6.2.0",
     "@types/cors": "^2.8.19",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",

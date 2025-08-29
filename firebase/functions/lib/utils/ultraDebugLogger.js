@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ultraLogger = void 0;
 exports.traceFunction = traceFunction;
@@ -6,6 +39,9 @@ exports.traceGlobalImport = traceGlobalImport;
 // firebase/functions/src/utils/ultraDebugLogger.ts
 const firestore_1 = require("firebase-admin/firestore");
 const app_1 = require("firebase-admin/app");
+const admin = __importStar(require("firebase-admin"));
+const DISABLE_FIRESTORE_LOG_LOCAL = process.env.DISABLE_FIRESTORE_LOG_LOCAL === '1' ||
+    process.env.NODE_ENV === 'development';
 // Désactiver l'écriture Firestore en local
 const IS_LOCAL = process.env.FUNCTIONS_EMULATOR === "true" ||
     process.env.FIREBASE_EMULATOR_HUB ||
@@ -91,7 +127,8 @@ class UltraDebugLogger {
                 // Test de connexion Firestore
                 try {
                     console.log('🔥 [ULTRA DEBUG] Test de connexion Firestore...');
-                    const testDoc = await this.db.collection('_test').limit(1).get();
+                    const _testDoc = await this.db.collection('_test').limit(1).get();
+                    void _testDoc; // Neutralise la variable non utilisée
                     console.log('✅ [ULTRA DEBUG] Connexion Firestore OK');
                 }
                 catch (firestoreError) {
@@ -232,6 +269,7 @@ class UltraDebugLogger {
     }
     // Méthode pour générer un rapport complet de debugging
     async generateDebugReport() {
+        var _a;
         const report = {
             sessionId: this.sessionId,
             generatedAt: new Date().toISOString(),
@@ -253,13 +291,16 @@ class UltraDebugLogger {
             },
             firebase: {
                 isInitialized: this.isFirebaseInitialized,
-                apps: admin.apps.map(app => ({
-                    name: app.name,
-                    options: {
-                        projectId: app.options.projectId,
-                        storageBucket: app.options.storageBucket
-                    }
-                }))
+                apps: ((_a = admin.apps) !== null && _a !== void 0 ? _a : []).filter(Boolean).map((app) => {
+                    var _a, _b;
+                    return ({
+                        name: app.name,
+                        options: {
+                            projectId: (_a = app === null || app === void 0 ? void 0 : app.options) === null || _a === void 0 ? void 0 : _a.projectId,
+                            storageBucket: (_b = app === null || app === void 0 ? void 0 : app.options) === null || _b === void 0 ? void 0 : _b.storageBucket
+                        }
+                    });
+                })
             },
             logs: this.logs,
             summary: {

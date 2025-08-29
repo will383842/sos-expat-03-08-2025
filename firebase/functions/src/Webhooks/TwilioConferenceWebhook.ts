@@ -4,6 +4,7 @@ import { logCallRecord } from '../utils/logs/logCallRecord';
 import { logError } from '../utils/logs/logError';
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
+import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
 
 interface TwilioConferenceWebhookBody {
   ConferenceSid: string;
@@ -32,68 +33,71 @@ interface TwilioConferenceWebhookBody {
  * Webhook pour les événements de conférence Twilio
  * Gère: start, end, join, leave, mute, hold
  */
-export const twilioConferenceWebhook = onRequest(async (req: Request, res: Response) => {
-  try {
-    const body: TwilioConferenceWebhookBody = req.body;
-    
-    console.log('🔔 Conference Webhook reçu:', {
-      event: body.StatusCallbackEvent,
-      conferenceSid: body.ConferenceSid,
-      conferenceStatus: body.ConferenceStatus,
-      participantLabel: body.ParticipantLabel,
-      callSid: body.CallSid
-    });
+export const twilioConferenceWebhook = onRequest(
+  { secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  async (req: Request, res: Response) => {
+    try {
+      const body: TwilioConferenceWebhookBody = req.body;
+      
+      console.log('🔔 Conference Webhook reçu:', {
+        event: body.StatusCallbackEvent,
+        conferenceSid: body.ConferenceSid,
+        conferenceStatus: body.ConferenceStatus,
+        participantLabel: body.ParticipantLabel,
+        callSid: body.CallSid
+      });
 
-    // Trouver la session d'appel par le nom de la conférence
-    const session = await twilioCallManager.findSessionByConferenceSid(body.ConferenceSid);
-    
-    if (!session) {
-      console.warn(`Session non trouvée pour conférence: ${body.ConferenceSid}`);
-      res.status(200).send('Session not found');
-      return;
+      // Trouver la session d'appel par le nom de la conférence
+      const session = await twilioCallManager.findSessionByConferenceSid(body.ConferenceSid);
+      
+      if (!session) {
+        console.warn(`Session non trouvée pour conférence: ${body.ConferenceSid}`);
+        res.status(200).send('Session not found');
+        return;
+      }
+
+      const sessionId = session.id;
+
+      switch (body.StatusCallbackEvent) {
+        case 'conference-start':
+          await handleConferenceStart(sessionId, body);
+          break;
+          
+        case 'conference-end':
+          await handleConferenceEnd(sessionId, body);
+          break;
+          
+        case 'participant-join':
+          await handleParticipantJoin(sessionId, body);
+          break;
+          
+        case 'participant-leave':
+          await handleParticipantLeave(sessionId, body);
+          break;
+          
+        case 'participant-mute':
+        case 'participant-unmute':
+          await handleParticipantMute(sessionId, body);
+          break;
+          
+        case 'participant-hold':
+        case 'participant-unhold':
+          await handleParticipantHold(sessionId, body);
+          break;
+          
+        default:
+          console.log(`Événement conférence non géré: ${body.StatusCallbackEvent}`);
+      }
+
+      res.status(200).send('OK');
+
+    } catch (error) {
+      console.error('❌ Erreur webhook conférence:', error);
+      await logError('twilioConferenceWebhook:error', error);
+      res.status(500).send('Webhook error');
     }
-
-    const sessionId = session.id;
-
-    switch (body.StatusCallbackEvent) {
-      case 'conference-start':
-        await handleConferenceStart(sessionId, body);
-        break;
-        
-      case 'conference-end':
-        await handleConferenceEnd(sessionId, body);
-        break;
-        
-      case 'participant-join':
-        await handleParticipantJoin(sessionId, body);
-        break;
-        
-      case 'participant-leave':
-        await handleParticipantLeave(sessionId, body);
-        break;
-        
-      case 'participant-mute':
-      case 'participant-unmute':
-        await handleParticipantMute(sessionId, body);
-        break;
-        
-      case 'participant-hold':
-      case 'participant-unhold':
-        await handleParticipantHold(sessionId, body);
-        break;
-        
-      default:
-        console.log(`Événement conférence non géré: ${body.StatusCallbackEvent}`);
-    }
-
-    res.status(200).send('OK');
-
-  } catch (error) {
-    console.error('❌ Erreur webhook conférence:', error);
-    await logError('twilioConferenceWebhook:error', error);
-    res.status(500).send('Webhook error');
   }
-});
+);
 
 /**
  * Gère le début de la conférence
@@ -241,8 +245,8 @@ async function handleParticipantLeave(sessionId: string, body: TwilioConferenceW
     const duration = session?.conference.duration || 0;
 
     // Gérer la déconnexion selon le participant et la durée
-await twilioCallManager.handleEarlyDisconnection(sessionId, participantType, duration);
-// (Maintenant que la méthode existe dans TwilioCallManager)
+    await twilioCallManager.handleEarlyDisconnection(sessionId, participantType, duration);
+    // (Maintenant que la méthode existe dans TwilioCallManager)
 
     await logCallRecord({
       callId: sessionId,

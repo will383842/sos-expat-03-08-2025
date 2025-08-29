@@ -2,7 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.notifyAfterPayment = void 0;
 exports.notifyAfterPaymentInternal = notifyAfterPaymentInternal;
-const callScheduler_1 = require("../callScheduler");
+// ✅ Import corrigé - utilisation de la nouvelle planification par tâches
+const tasks_1 = require("../lib/tasks");
 const firestore_1 = require("firebase-admin/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const MessageManager_1 = require("../MessageManager");
@@ -56,8 +57,9 @@ async function notifyAfterPaymentInternal(callId) {
         console.error(`❌ Erreur lors de l'envoi des notifications pour callId ${callId}:`, error);
         throw error;
     }
-    // 🔁 Déclenche l'appel vocal entre client et prestataire dans 5 minutes
-    await (0, callScheduler_1.scheduleCallSequence)(callData.sessionId || callId);
+    // 🔁 Planifie l'appel vocal entre client et prestataire dans 5 minutes (300 secondes)
+    const callSessionId = callData.sessionId || callId;
+    await (0, tasks_1.scheduleCallTask)(callSessionId, 5 * 60); // 5 minutes en secondes
 }
 // ✅ Cloud Function (appelable depuis le frontend) - OPTIMISÉE CPU
 exports.notifyAfterPayment = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU

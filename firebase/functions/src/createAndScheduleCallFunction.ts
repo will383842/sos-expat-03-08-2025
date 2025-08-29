@@ -1,13 +1,7 @@
 // firebase/functions/src/createAndScheduleCallFunction.ts - Version rectifiée sans planification
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
-import { defineSecret } from 'firebase-functions/params';
 import { createCallSession } from './callScheduler';
 import { logError } from './utils/logs/logError';
-
-// ✅ Déclarations des secrets Twilio (même si pas utilisés dans cette fonction)
-const TWILIO_ACCOUNT_SID = defineSecret('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = defineSecret('TWILIO_AUTH_TOKEN');
-const TWILIO_PHONE_NUMBER = defineSecret('TWILIO_PHONE_NUMBER');
 
 // ✅ Interface corrigée pour correspondre exactement aux données frontend
 interface CreateCallRequest {
@@ -34,8 +28,7 @@ export const createAndScheduleCallHTTPS = onCall(
     memory: "256MiB",
     timeoutSeconds: 60,
     cors: true,
-    // ✅ Déclarer les secrets même si pas utilisés (évite les warnings)
-    secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]
+    // ✅ Pas de secrets Twilio ici - ils sont gérés dans lib/twilio et importés dans index.ts
   },
   async (request: CallableRequest<CreateCallRequest>) => {
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -85,6 +78,9 @@ export const createAndScheduleCallHTTPS = onCall(
         providerLanguages,
         clientWhatsapp,
       } = request.data;
+
+      // ✅ Évite l'avertissement TypeScript 6133 (variable assigned but never used)
+      void delayMinutes;
 
       // ✅ VALIDATION CHAMP PAR CHAMP avec messages d'erreur spécifiques
       const missingFields = [];

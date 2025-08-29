@@ -6,11 +6,13 @@ import { messageManager } from '../MessageManager';
 
 // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU
 const CPU_OPTIMIZED_CONFIG = {
-  memory: "128MiB" as const,
+  region: 'europe-west1' as const,
+  memory: '256MiB' as const,
+  cpu: 0.25 as const,
   timeoutSeconds: 30,
-  maxInstances: 5,
+  maxInstances: 3,
   minInstances: 0,
-  concurrency: 10
+  concurrency: 1,
 };
 
 const db = getFirestore();

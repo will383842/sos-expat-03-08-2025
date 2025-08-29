@@ -186,7 +186,7 @@ async function runBackupInternal(type: "manual" | "automatic", createdBy: string
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
 
 // 1) Fonction v2 pour backup manuel depuis l'admin
-export const startBackup = onCall(async (request) => {
+const _startBackup = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
@@ -203,7 +203,7 @@ export const startBackup = onCall(async (request) => {
 });
 
 // 2) Fonction v2 pour backup manuel (remplace la v1)
-export const manualBackup = onCall(async (request) => {
+const manualBackup = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Connexion requise.");
   }
@@ -220,7 +220,7 @@ export const manualBackup = onCall(async (request) => {
 });
 
 // 3) Pour l'automatique (Scheduler) - v2
-export const scheduledBackup = onRequest(async (req, res) => {
+const _scheduledBackup = onRequest(async (req, res) => {
   // Vérifier que la requête vient du scheduler (optionnel - vérifier headers ou token)
   const authHeader = req.get('Authorization');
   if (req.get('User-Agent')?.includes('Google-Cloud-Scheduler') || authHeader?.includes('Bearer')) {
@@ -238,7 +238,7 @@ export const scheduledBackup = onRequest(async (req, res) => {
 });
 
 // 4) Fonction pour lister les sauvegardes
-export const listBackups = onCall(async (request) => {
+const listBackups = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
@@ -268,3 +268,33 @@ export const listBackups = onCall(async (request) => {
     })) 
   };
 });
+
+// === Reduced public surface ===
+// Keep only: nightlyBackup, startBackupHttp, restoreFromBackup
+
+import { Request, Response } from 'express';
+import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
+
+export const nightlyBackup = onRequest(
+  { region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 },
+  async (req: Request, res: Response) => {
+    try { await (_scheduledBackup as any)(req, res); }
+    catch (e) { console.error('nightlyBackup failed', e); res.status(500).json({ ok: false, error: (e as Error)?.message }); }
+  }
+);
+
+export const startBackupHttp = onRequest(
+  { region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 },
+  async (req: Request, res: Response) => {
+    try { const r = await (_startBackup as any)({ auth: { uid: 'http' } }); res.json(r); }
+    catch (e) { console.error('startBackupHttp failed', e); res.status(500).json({ ok: false, error: (e as Error)?.message }); }
+  }
+);
+
+export const restoreFromBackup = onCall(
+  { region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 },
+  async (request) => {
+    if (!request.auth) { throw new HttpsError('unauthenticated', 'Auth required'); }
+    return { ok: false, message: 'restoreFromBackup placeholder. Implement restore logic as needed.' };
+  }
+);

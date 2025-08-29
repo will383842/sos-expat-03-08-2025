@@ -17,11 +17,12 @@ import {
 // 🔧 Configuration Firebase Functions v2
 // =========================================
 const FUNCTION_CONFIG = {
-  memory: '256MiB' as const,
+  memory: '512MiB' as const,
+  cpu: 0.5 as const,
   timeoutSeconds: 60,
-  maxInstances: 10,
-  minInstances: 0,
-  concurrency: 80,
+  maxInstances: 5,
+  minInstances: 1,
+  concurrency: 3,
   region: 'europe-west1',
 };
 

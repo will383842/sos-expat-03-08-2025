@@ -4,11 +4,13 @@ import { MessageTemplate } from './MessageManager';
 
 // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU SEULEMENT
 const CPU_OPTIMIZED_CONFIG = {
-  memory: "256MiB" as const, // Un peu plus de mémoire pour les templates complets
-  timeoutSeconds: 120, // Plus de temps pour tous les templates
-  maxInstances: 2, // Limite stricte pour cette fonction d'initialisation
+  region: 'europe-west1' as const,
+  memory: '256MiB' as const,
+  cpu: 0.25 as const,
+  timeoutSeconds: 120,
+  maxInstances: 3,
   minInstances: 0,
-  concurrency: 1 // Une seule exécution à la fois
+  concurrency: 1,
 };
 
 // ⚠️ TOUS LES TEMPLATES ORIGINAUX GARDÉS (pas de suppression fonctionnelle)

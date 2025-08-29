@@ -18,7 +18,12 @@ function pctChange(curr: number, prev: number) {
 export const api = onRequest(
   {
     region: 'europe-west1',
-    cors: [
+    memory: '512MiB',
+    cpu: 0.5,
+    maxInstances: 5,
+    minInstances: 1,
+    concurrency: 3,
+        cors: [
       'http://localhost:5173',       // Front local Vite
       'http://127.0.0.1:5000',       // Hosting emulator
       'https://sos-urgently-ac307.web.app', // Firebase Hosting prod

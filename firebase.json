@@ -12,16 +12,8 @@
       "codebase": "default",
       "runtime": "nodejs20",
       "region": "europe-west1"
-    },
-    {
-      "source": "backup-functions",
-      "codebase": "backup",
-      "runtime": "nodejs20",
-      "region": "europe-west1",
-      "environmentVariables": { 
-        "BACKUP_BUCKET": "sos-expat-backup" 
-      }
     }
+    
   ],
   "hosting": {
     "public": "dist",

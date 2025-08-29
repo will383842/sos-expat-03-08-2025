@@ -70,7 +70,7 @@ const useTranslation = () => {
         en: 'Consultation details are missing. Please select an expert again.',
       },
       'cta.select_expert': { fr: '🔍 Sélectionner un expert', en: '🔍 Choose an expert' },
-      'cta.home': { fr: '🏠 Retour à l'accueil', en: '🏠 Back to home' },
+      'cta.home': { fr: '🏠 Retour à l\'accueil', en: '🏠 Back to home' },
       'cta.back': { fr: '← Retour', en: '← Back' },
       'cta.clear_cache': { fr: '🗑️ Vider le cache et recharger', en: '🗑️ Clear cache & reload' },
     };
@@ -597,19 +597,19 @@ const CallCheckoutWrapper: React.FC = () => {
               onClick={() => navigate('/experts')}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              🔍 Sélectionner un expert
+              {t('cta.select_expert')}
             </button>
             <button
               onClick={() => navigate('/')}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              🏠 Retour à l'accueil
+              {t('cta.home')}
             </button>
             <button
               onClick={handleGoBack}
               className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              ← Retour
+              {t('cta.back')}
             </button>
             <button
               onClick={() => {
@@ -622,7 +622,7 @@ const CallCheckoutWrapper: React.FC = () => {
               }}
               className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 rounded-lg text-sm transition-colors"
             >
-              🗑️ Vider le cache et recharger
+              {t('cta.clear_cache')}
             </button>
           </div>
         </div>

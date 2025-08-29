@@ -25,6 +25,13 @@ interface CreateCallRequest {
  */
 export const createAndScheduleCallHTTPS = onCall(
   {
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1,
+    
     memory: "256MiB",
     timeoutSeconds: 60,
     cors: true,

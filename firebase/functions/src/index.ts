@@ -1,4 +1,5 @@
-// functions/src/index.ts - Version rectifiée avec gestion TEST/LIVE + migration functions.config() → secrets
+// functions/src/index.ts - Version rectifiée avec gestion TEST/LIVE + optimisation CPU + unification webhooks
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ====== ULTRA DEBUG INITIALIZATION ======
 import { ultraLogger, traceFunction, traceGlobalImport } from './utils/ultraDebugLogger';
@@ -7,6 +8,25 @@ import { ultraLogger, traceFunction, traceGlobalImport } from './utils/ultraDebu
 traceGlobalImport('firebase-functions/v2', 'index.ts');
 traceGlobalImport('firebase-admin', 'index.ts');
 traceGlobalImport('stripe', 'index.ts');
+
+// === CPU/MEM CONFIGS to control vCPU usage ===
+const emergencyConfig = {
+  region: "europe-west1",
+  memory: "256MiB" as const,
+  cpu: 0.25,
+  maxInstances: 3,
+  minInstances: 0,
+  concurrency: 1
+};
+
+const criticalConfig = {
+  region: "europe-west1",
+  memory: "512MiB" as const,
+  cpu: 0.5,
+  maxInstances: 5,
+  minInstances: 1,
+  concurrency: 3
+};
 
 ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index.ts', {
   timestamp: Date.now(),
@@ -27,10 +47,9 @@ ultraLogger.debug('GLOBAL_CONFIG', 'Configuration globale Firebase Functions', g
 ultraLogger.info('GLOBAL_CONFIG', 'Configuration globale Firebase Functions appliquée', globalConfig);
 
 // ====== IMPORTS PRINCIPAUX ======
-import { onRequest } from 'firebase-functions/v2/https';
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
+import { onRequest, onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { defineSecret } from 'firebase-functions/params'; // ✅ secrets + params
+import { defineSecret, defineString } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
@@ -47,29 +66,36 @@ import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from "./li
 
 ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
 
-// ====== SECRETS / PARAMS (NOUVEAU : TEST vs LIVE) ======
-const STRIPE_MODE = defineSecret('STRIPE_MODE'); // 'test' | 'live'
+// ====== PARAMS & SECRETS (TEST vs LIVE) ======
+// 👉 STRIPE_MODE est un PARAMÈTRE (pas un secret) pour éviter le conflit secret/env
+export const STRIPE_MODE = defineString('STRIPE_MODE'); // 'test' | 'live'
 
-// Clés Stripe
-const STRIPE_SECRET_KEY_TEST = defineSecret('STRIPE_SECRET_KEY_TEST');
-const STRIPE_SECRET_KEY_LIVE = defineSecret('STRIPE_SECRET_KEY_LIVE');
+// Clés Stripe (secrets)
+export const STRIPE_SECRET_KEY_TEST = defineSecret('STRIPE_SECRET_KEY_TEST');
+export const STRIPE_SECRET_KEY_LIVE = defineSecret('STRIPE_SECRET_KEY_LIVE');
 
-// Webhook secrets Stripe
-const STRIPE_WEBHOOK_SECRET_TEST = defineSecret('STRIPE_WEBHOOK_SECRET_TEST');
-const STRIPE_WEBHOOK_SECRET_LIVE = defineSecret('STRIPE_WEBHOOK_SECRET_LIVE');
+// Webhook secrets Stripe (secrets)
+export const STRIPE_WEBHOOK_SECRET_TEST = defineSecret('STRIPE_WEBHOOK_SECRET_TEST');
+export const STRIPE_WEBHOOK_SECRET_LIVE = defineSecret('STRIPE_WEBHOOK_SECRET_LIVE');
 
 // Secret partagé pour authentifier les Cloud Tasks → /executeCallTask
-const TASKS_AUTH_SECRET = defineSecret('TASKS_AUTH_SECRET');
+export const TASKS_AUTH_SECRET = defineSecret('TASKS_AUTH_SECRET');
 
-// Helpers de sélection de secrets selon le mode
-function isLive() {
+// Helpers de sélection de secrets selon le mode (évalués à l'exécution uniquement)
+function isLive(): boolean {
+  // ⚠️ N'appelez pas .value() en top-level : ces helpers sont utilisés UNIQUEMENT dans les handlers
   return (STRIPE_MODE.value() || 'test').toLowerCase() === 'live';
 }
 function getStripeSecretKey(): string {
-  return isLive() ? STRIPE_SECRET_KEY_LIVE.value() : STRIPE_SECRET_KEY_TEST.value();
+  // Les secrets sont injectés en variables d'environnement dans les fonctions qui les déclarent dans `secrets:[...]`
+  return isLive()
+    ? (process.env.STRIPE_SECRET_KEY_LIVE || '')
+    : (process.env.STRIPE_SECRET_KEY_TEST || '');
 }
 function getStripeWebhookSecret(): string {
-  return isLive() ? STRIPE_WEBHOOK_SECRET_LIVE.value() : STRIPE_WEBHOOK_SECRET_TEST.value();
+  return isLive()
+    ? (process.env.STRIPE_WEBHOOK_SECRET_LIVE || '')
+    : (process.env.STRIPE_WEBHOOK_SECRET_TEST || '');
 }
 
 // ====== INTERFACES DE DEBUGGING ======
@@ -128,9 +154,6 @@ export interface TwilioCallManager {
   cancelCallSession(sessionId: string, reason: string, performedBy: string): Promise<boolean>;
   getCallSession(sessionId: string): Promise<TwilioCallSession | null>;
   cleanupOldSessions(opts: { olderThanDays: number; keepCompletedDays: number; batchSize: number }): Promise<CleanupResult>;
-  // Facultatif selon ton implémentation :
-  // startScheduledCall?(sessionId: string): Promise<unknown>;
-  // executeScheduledCall?(sessionId: string): Promise<unknown>;
 }
 
 // ====== INITIALISATION FIREBASE ULTRA-DEBUGGÉE ======
@@ -199,13 +222,12 @@ const initializeFirebase = traceFunction(() => {
 }, 'initializeFirebase', 'INDEX');
 
 // ====== LAZY LOADING DES MANAGERS ULTRA-DEBUGGÉ ======
-const stripeManagerInstance: unknown = null; // jamais réassigné
+const stripeManagerInstance: unknown = null; // placeholder
 let twilioCallManagerInstance: TwilioCallManager | null = null; // réassigné après import
-const messageManagerInstance: unknown = null; // jamais réassigné
+const messageManagerInstance: unknown = null; // placeholder
 
 const getTwilioCallManager = traceFunction(async (): Promise<TwilioCallManager> => {
   if (!twilioCallManagerInstance) {
-    // On type l'import pour éviter 'any'
     const mod = (await import('./TwilioCallManager')) as {
       twilioCallManager?: TwilioCallManager;
       default?: TwilioCallManager;
@@ -298,7 +320,7 @@ function wrapCallableFunction<T>(functionName: string, originalFunction: (reques
 function wrapHttpFunction(functionName: string, originalFunction: (req: FirebaseRequest, res: Response) => Promise<void>) {
   return async (req: FirebaseRequest, res: Response) => {
     const metadata = createDebugMetadata(functionName);
-    req.debugMetadata = metadata;
+    (req as DebuggedRequest).debugMetadata = metadata;
 
     logFunctionStart(metadata, {
       method: req.method,
@@ -326,9 +348,11 @@ export { createAndScheduleCallHTTPS };
 export { createAndScheduleCallHTTPS as createAndScheduleCall };
 export { createPaymentIntent } from './createPaymentIntent';
 export { api } from './adminApi';
-export { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from './Webhooks/twilioWebhooks';
-export { twilioConferenceWebhook as modernConferenceWebhook } from './Webhooks/TwilioConferenceWebhook';
-export { TwilioRecordingWebhook as modernRecordingWebhook } from './Webhooks/TwilioRecordingWebhook';
+
+// ✅ Un seul webhook Twilio unifié (les legacy ne doivent plus être exportés)
+export { unifiedWebhook } from './webhooks/unifiedWebhook';
+
+// Utilitaires complémentaires
 export { initializeMessageTemplates } from './initializeMessageTemplates';
 export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 
@@ -339,11 +363,8 @@ ultraLogger.info('EXPORTS', 'Exports directs configurés');
 // ========================================
 export const executeCallTask = onRequest(
   {
-    region: "europe-west1",
-    memory: "256MiB",
+    ...criticalConfig,
     timeoutSeconds: 120,
-    maxInstances: 10,    // ✅ Nb max d'instances simultanées
-    concurrency: 80,      // ✅ Nb de requêtes traitées en parallèle par instance
     // ✅ Secrets requis pour le handler + authentification Cloud Tasks
     secrets: [TASKS_AUTH_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER],
   },
@@ -353,9 +374,11 @@ export const executeCallTask = onRequest(
 // ========================================
 // FONCTIONS ADMIN ULTRA-DEBUGGÉES (V2)
 // ========================================
-
 export const adminUpdateStatus = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 30
+  },
   wrapCallableFunction('adminUpdateStatus', async (request: CallableRequest<AdminUpdateStatusData>) => {
     const database = initializeFirebase();
 
@@ -405,7 +428,10 @@ export const adminUpdateStatus = onCall(
 );
 
 export const adminSoftDeleteUser = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 30
+  },
   wrapCallableFunction('adminSoftDeleteUser', async (request: CallableRequest<AdminSoftDeleteData>) => {
     const database = initializeFirebase();
 
@@ -444,7 +470,10 @@ export const adminSoftDeleteUser = onCall(
 );
 
 export const adminBulkUpdateStatus = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 30
+  },
   wrapCallableFunction('adminBulkUpdateStatus', async (request: CallableRequest<AdminBulkUpdateData>) => {
     const database = initializeFirebase();
 
@@ -487,7 +516,6 @@ export const adminBulkUpdateStatus = onCall(
 // ========================================
 // CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE (MIGRÉ)
 // ========================================
-
 let stripe: Stripe | null = null;
 
 const getStripe = traceFunction((): Stripe | null => {
@@ -531,18 +559,16 @@ const getStripe = traceFunction((): Stripe | null => {
   return stripe;
 }, 'getStripe', 'INDEX');
 
-// ====== WEBHOOK STRIPE UNIFIÉ ULTRA-DEBUGGÉ (MIGRÉ) ======
+// ====== WEBHOOK STRIPE ULTRA-DEBUGGÉ ======
 export const stripeWebhook = onRequest(
   {
-    region: 'europe-west1',
-    memory: '256MiB',
+    ...criticalConfig,
     timeoutSeconds: 30,
-    // ❌ rawBody: true retiré en v2 (on garde l'accès à req.rawBody fourni par la plateforme)
+    // ❗️Ne PAS inclure STRIPE_MODE ici (c'est un param, pas un secret)
     secrets: [
       STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE,
       STRIPE_WEBHOOK_SECRET_TEST, STRIPE_WEBHOOK_SECRET_LIVE,
-      TASKS_AUTH_SECRET,
-      STRIPE_MODE,
+      TASKS_AUTH_SECRET
     ],
   },
   wrapHttpFunction('stripeWebhook', async (req: FirebaseRequest, res: Response) => {
@@ -612,7 +638,6 @@ export const stripeWebhook = onRequest(
           const cs = event.data.object as Stripe.Checkout.Session;
           const callSessionId = cs.metadata?.callSessionId || cs.metadata?.sessionId;
           if (callSessionId) {
-            // ✅ FIX: Utiliser call_sessions (snake_case) au lieu de callSessions
             await database
               .collection('call_sessions')
               .doc(callSessionId)
@@ -711,10 +736,8 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
         callSessionId: paymentIntent.metadata.callSessionId,
       });
 
-      // 🆕 Planification de l'appel à +5 minutes
       const callSessionId = paymentIntent.metadata.callSessionId;
 
-      // ✅ FIX: Utiliser call_sessions (snake_case) au lieu de callSessions
       await database
         .collection('call_sessions')
         .doc(callSessionId)
@@ -884,9 +907,15 @@ const handlePaymentIntentRequiresAction = traceFunction(async (paymentIntent: St
 // ========================================
 // FONCTIONS CRON POUR MAINTENANCE ULTRA-DEBUGGÉES
 // ========================================
-
 export const scheduledFirestoreExport = onSchedule(
   {
+    // ultra sobre pour passer le quota CPU au déploiement
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.25,
+    maxInstances: 1,
+    minInstances: 0,
+    concurrency: 1,
     schedule: '0 2 * * *',
     timeZone: 'Europe/Paris',
   },
@@ -964,6 +993,12 @@ export const scheduledFirestoreExport = onSchedule(
 
 export const scheduledCleanup = onSchedule(
   {
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.25,
+    maxInstances: 1,
+    minInstances: 0,
+    concurrency: 1,
     schedule: '0 3 * * 0',
     timeZone: 'Europe/Paris',
   },
@@ -1030,9 +1065,11 @@ export const scheduledCleanup = onSchedule(
 // ========================================
 // FONCTION DE DEBUG SYSTÈME
 // ========================================
-
 export const generateSystemDebugReport = onCall(
-  { cors: true, memory: '512MiB', timeoutSeconds: 120 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 120
+  },
   wrapCallableFunction('generateSystemDebugReport', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1106,7 +1143,7 @@ export const generateSystemDebugReport = onCall(
           systemUptime: systemInfo.uptime,
           recentErrorsCount: recentErrors.length,
           managersLoaded: Object.values(managersState).filter(Boolean).length,
-          memoryUsage: systemInfo.memoryUsage.heapUsed,
+          memoryUsage: (systemInfo.memoryUsage as any).heapUsed,
         },
         downloadUrl: `/admin/debug-reports/${reportId}`,
       };
@@ -1126,9 +1163,11 @@ export const generateSystemDebugReport = onCall(
 // ========================================
 // FONCTION DE MONITORING EN TEMPS RÉEL
 // ========================================
-
 export const getSystemHealthStatus = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 30
+  },
   wrapCallableFunction('getSystemHealthStatus', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1173,9 +1212,9 @@ export const getSystemHealthStatus = onCall(
       };
 
       recentLogsQuery.docs.forEach((doc) => {
-        const data = doc.data();
+        const data = doc.data() as any;
         if (Object.prototype.hasOwnProperty.call(logsByLevel, data.level)) {
-          logsByLevel[data.level as keyof typeof logsByLevel]++;
+          (logsByLevel as any)[data.level]++;
         }
       });
 
@@ -1213,16 +1252,16 @@ export const getSystemHealthStatus = onCall(
       };
 
       if (firestoreLatency > 1000 || stripeStatus === 'error') {
-        healthStatus.status = 'degraded';
+        (healthStatus as any).status = 'degraded';
       }
-      if (logsByLevel.ERROR > 100) {
-        healthStatus.status = 'unhealthy';
+      if ((logsByLevel as any).ERROR > 100) {
+        (healthStatus as any).status = 'unhealthy';
       }
 
       ultraLogger.debug('SYSTEM_HEALTH_CHECK', 'État système vérifié', {
-        status: healthStatus.status,
+        status: (healthStatus as any).status,
         responseTime: totalResponseTime,
-        errorsLast24h: logsByLevel.ERROR,
+        errorsLast24h: (logsByLevel as any).ERROR,
       });
 
       return healthStatus;
@@ -1246,9 +1285,11 @@ export const getSystemHealthStatus = onCall(
 // ========================================
 // LOGS DEBUG ULTRA
 // ========================================
-
 export const getUltraDebugLogs = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 30
+  },
   wrapCallableFunction('getUltraDebugLogs', async (request: CallableRequest<{ limit?: number; level?: string }>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1258,7 +1299,7 @@ export const getUltraDebugLogs = onCall(
 
     try {
       const database = initializeFirebase();
-      let query = database.collection('ultra_debug_logs').orderBy('timestamp', 'desc').limit(Math.min(limit, 500));
+      let query: FirebaseFirestore.Query = database.collection('ultra_debug_logs').orderBy('timestamp', 'desc').limit(Math.min(limit, 500));
 
       if (level && ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'].includes(level)) {
         query = query.where('level', '==', level);
@@ -1292,9 +1333,11 @@ export const getUltraDebugLogs = onCall(
 // ========================================
 // FONCTIONS DE TEST ET UTILITAIRES
 // ========================================
-
 export const testCloudTasksConnection = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 60 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 60
+  },
   wrapCallableFunction('testCloudTasksConnection', async (request: CallableRequest<{ testPayload?: Record<string, unknown> }>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1305,7 +1348,7 @@ export const testCloudTasksConnection = onCall(
 
       const { createTestTask } = await import('./lib/tasks');
       const testPayload = request.data?.testPayload || { test: 'cloud_tasks_connection' };
-      
+
       const taskId = await createTestTask(testPayload, 10); // 10 secondes de délai
 
       ultraLogger.info('TEST_CLOUD_TASKS', 'Tâche de test créée avec succès', {
@@ -1334,7 +1377,10 @@ export const testCloudTasksConnection = onCall(
 );
 
 export const getCloudTasksQueueStats = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 30
+  },
   wrapCallableFunction('getCloudTasksQueueStats', async (request: CallableRequest<Record<string, never>>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1344,16 +1390,16 @@ export const getCloudTasksQueueStats = onCall(
       ultraLogger.info('QUEUE_STATS', 'Récupération statistiques queue Cloud Tasks');
 
       const { getQueueStats, listPendingTasks } = await import('./lib/tasks');
-      
+
       const [stats, pendingTasks] = await Promise.all([
         getQueueStats(),
         listPendingTasks(20), // Limite à 20 tâches pour l'aperçu
       ]);
 
       ultraLogger.info('QUEUE_STATS', 'Statistiques récupérées', {
-        pendingTasksCount: stats.pendingTasks,
-        queueName: stats.queueName,
-        location: stats.location,
+        pendingTasksCount: (stats as any).pendingTasks,
+        queueName: (stats as any).queueName,
+        location: (stats as any).location,
       });
 
       return {
@@ -1376,7 +1422,10 @@ export const getCloudTasksQueueStats = onCall(
 );
 
 export const manuallyTriggerCallExecution = onCall(
-  { cors: true, memory: '256MiB', timeoutSeconds: 60 },
+  {
+    ...emergencyConfig,
+    timeoutSeconds: 60
+  },
   wrapCallableFunction('manuallyTriggerCallExecution', async (request: CallableRequest<{ callSessionId: string }>) => {
     if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
       throw new HttpsError('permission-denied', 'Admin access required');
@@ -1403,24 +1452,24 @@ export const manuallyTriggerCallExecution = onCall(
       }
 
       const sessionData = sessionDoc.data();
-      
+
       ultraLogger.info('MANUAL_CALL_TRIGGER', 'Session trouvée', {
         callSessionId,
         currentStatus: sessionData?.status,
-        paymentStatus: sessionData?.payment?.status,
+        paymentStatus: (sessionData as any)?.payment?.status,
       });
 
       // Utiliser directement le TwilioCallManager
       const { TwilioCallManager } = await import('./TwilioCallManager');
-      
-      const result = await TwilioCallManager.startOutboundCall({
+
+      const result = await (TwilioCallManager as any).startOutboundCall({
         sessionId: callSessionId,
         delayMinutes: 0, // Immédiat
       });
 
       ultraLogger.info('MANUAL_CALL_TRIGGER', 'Appel déclenché avec succès', {
         callSessionId,
-        resultStatus: result?.status,
+        resultStatus: (result as any)?.status,
       });
 
       return {
@@ -1451,11 +1500,9 @@ export const manuallyTriggerCallExecution = onCall(
 // ========================================
 // WEBHOOK DE TEST POUR CLOUD TASKS
 // ========================================
-
 export const testWebhook = onRequest(
   {
-    region: 'europe-west1',
-    memory: '128MiB',
+    ...emergencyConfig,
     timeoutSeconds: 30,
     secrets: [TASKS_AUTH_SECRET],
   },
@@ -1463,7 +1510,7 @@ export const testWebhook = onRequest(
     try {
       // Vérification de l'authentification Cloud Tasks
       const authHeader = req.get('X-Task-Auth') || '';
-      const expectedAuth = TASKS_AUTH_SECRET.value() || '';
+      const expectedAuth = process.env.TASKS_AUTH_SECRET || '';
 
       if (authHeader !== expectedAuth) {
         ultraLogger.warn('TEST_WEBHOOK', 'Authentification échouée', {
@@ -1503,7 +1550,7 @@ export const testWebhook = onRequest(
         'Erreur traitement webhook de test',
         {
           error: error instanceof Error ? error.message : String(error),
-          body: req.body,
+          body: (req as any).body,
         },
         error instanceof Error ? error : undefined
       );
@@ -1520,12 +1567,10 @@ export const testWebhook = onRequest(
 // ========================================
 // INITIALISATION FINALE ET LOGS DE DÉMARRAGE
 // ========================================
-
 ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
-  totalFunctions: 22, // Mis à jour avec les nouvelles fonctions
+  totalFunctions: 22, // ajuster si nécessaire
   environment: process.env.NODE_ENV || 'development',
   memoryUsage: process.memoryUsage(),
-  loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown',
 });
 
 export { ultraLogger };

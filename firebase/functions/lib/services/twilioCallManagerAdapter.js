@@ -1,59 +1,114 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.beginOutboundCallForSession = beginOutboundCallForSession;
-// firebase/functions/src/services/twilioCallManagerAdapter.ts
+exports.beginOutboundCallForSessionLegacy = beginOutboundCallForSessionLegacy;
+// firebase/functions/src/services/twilioCallManagerAdapter.ts - VERSION CORRIGÉE SANS RÉFÉRENCES CIRCULAIRES
 const firestore_1 = require("firebase-admin/firestore");
-const urlBase_1 = require("../utils/urlBase"); // crÃ©ons ce helper juste aprÃ¨s
-// âš ï¸ Importe ton manager rÃ©el (chemin/nom Ã  ajuster selon ton repo)
-const TwilioCallManager_1 = require("../TwilioCallManager");
-async function beginOutboundCallForSession({ callSessionId, twilio, fromNumber, }) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
-    const db = (0, firestore_1.getFirestore)();
-    // 1) Try snake_case (front/scheduler actuel)
-    let snap = await db.collection("call_sessions").doc(callSessionId).get();
-    // 2) Fallback éventuel sur l’ancienne collection (compat)
-    if (!snap.exists) {
-        snap = await db.collection("callSessions").doc(callSessionId).get();
+const logError_1 = require("../utils/logs/logError");
+const logCallRecord_1 = require("../utils/logs/logCallRecord");
+/**
+ * ✅ Fonction principale pour exécuter un appel via Cloud Tasks
+ * Cette fonction utilise directement TwilioCallManager sans dépendances circulaires
+ */
+async function beginOutboundCallForSession(callSessionId) {
+    var _a;
+    try {
+        console.log(`🚀 [Adapter] Démarrage appel pour session: ${callSessionId}`);
+        const db = (0, firestore_1.getFirestore)();
+        // ✅ ÉTAPE 1: Vérifier que la session existe (collection standardisée)
+        const sessionDoc = await db.collection("call_sessions").doc(callSessionId).get();
+        if (!sessionDoc.exists) {
+            console.error(`❌ [Adapter] Session ${callSessionId} introuvable`);
+            throw new Error(`Session ${callSessionId} introuvable dans call_sessions`);
+        }
+        const sessionData = sessionDoc.data();
+        console.log(`✅ [Adapter] Session trouvée, status: ${sessionData === null || sessionData === void 0 ? void 0 : sessionData.status}`);
+        // ✅ ÉTAPE 2: Vérifier le paiement avant de continuer
+        const paymentStatus = (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.payment) === null || _a === void 0 ? void 0 : _a.status;
+        if (paymentStatus && paymentStatus !== "authorized") {
+            console.error(`❌ [Adapter] Paiement non autorisé (status=${paymentStatus})`);
+            throw new Error(`Paiement non autorisé pour session ${callSessionId} (status=${paymentStatus})`);
+        }
+        // ✅ ÉTAPE 3: Utiliser l'API CORRECTE du TwilioCallManager
+        console.log(`📞 [Adapter] Importation TwilioCallManager...`);
+        const { TwilioCallManager } = await Promise.resolve().then(() => __importStar(require("../TwilioCallManager")));
+        console.log(`📞 [Adapter] Déclenchement de la séquence d'appel...`);
+        const result = await TwilioCallManager.startOutboundCall({
+            sessionId: callSessionId,
+            delayMinutes: 0 // Immédiat car déjà programmé par Cloud Tasks
+        });
+        console.log(`✅ [Adapter] Appel initié avec succès:`, {
+            sessionId: callSessionId,
+            status: (result === null || result === void 0 ? void 0 : result.status) || 'unknown'
+        });
+        // ✅ ÉTAPE 4: Logger le succès
+        await (0, logCallRecord_1.logCallRecord)({
+            callId: callSessionId,
+            status: 'cloud_task_executed_successfully',
+            retryCount: 0,
+            additionalData: {
+                adaptedVia: 'beginOutboundCallForSession',
+                resultStatus: (result === null || result === void 0 ? void 0 : result.status) || 'unknown'
+            }
+        });
+        return result;
     }
-    if (!snap.exists)
-        throw new Error(`Session ${callSessionId} introuvable`);
-    const s = snap.data() || {};
-    // ✅ Vérifier le paiement avant de continuer
-    const paymentStatus = (_b = (_a = s === null || s === void 0 ? void 0 : s.payment) === null || _a === void 0 ? void 0 : _a.status) !== null && _b !== void 0 ? _b : null;
-    if (paymentStatus && paymentStatus !== "authorized") {
-        throw new Error(`Paiement non autorisé (status=${paymentStatus})`);
+    catch (error) {
+        console.error(`❌ [Adapter] Erreur lors de l'exécution pour ${callSessionId}:`, error);
+        // Logger l'erreur
+        await (0, logError_1.logError)(`twilioCallManagerAdapter:beginOutboundCallForSession`, error);
+        await (0, logCallRecord_1.logCallRecord)({
+            callId: callSessionId,
+            status: 'cloud_task_execution_failed',
+            retryCount: 0,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            additionalData: {
+                adaptedVia: 'beginOutboundCallForSession',
+                errorType: error instanceof Error ? error.constructor.name : 'UnknownError'
+            }
+        });
+        throw error;
     }
-    // Numéros acceptés (plat OU imbriqué)
-    const clientPhone = (_h = (_f = (_c = s.clientPhone) !== null && _c !== void 0 ? _c : (_e = (_d = s === null || s === void 0 ? void 0 : s.participants) === null || _d === void 0 ? void 0 : _d.client) === null || _e === void 0 ? void 0 : _e.phone) !== null && _f !== void 0 ? _f : (_g = s === null || s === void 0 ? void 0 : s.client) === null || _g === void 0 ? void 0 : _g.phone) !== null && _h !== void 0 ? _h : null;
-    const providerPhone = (_p = (_m = (_j = s.providerPhone) !== null && _j !== void 0 ? _j : (_l = (_k = s === null || s === void 0 ? void 0 : s.participants) === null || _k === void 0 ? void 0 : _k.provider) === null || _l === void 0 ? void 0 : _l.phone) !== null && _m !== void 0 ? _m : (_o = s === null || s === void 0 ? void 0 : s.provider) === null || _o === void 0 ? void 0 : _o.phone) !== null && _p !== void 0 ? _p : null;
-    const toNumber = clientPhone !== null && clientPhone !== void 0 ? clientPhone : providerPhone;
-    if (!toNumber)
-        throw new Error("Aucun numéro (client/provider) trouvé");
-    const base = (0, urlBase_1.getFunctionsBaseUrl)();
-    const statusCallback = `${base}/twilioCallWebhook`;
-    const connectUrl = `${base}/twiml/connectProvider?sessionId=${callSessionId}`;
-    const call = await TwilioCallManager_1.TwilioCallManager.startOutboundCall({
-        from: fromNumber,
-        to: toNumber,
-        url: connectUrl,
-        statusCallback,
-    });
-    if (!(call === null || call === void 0 ? void 0 : call.sid))
-        throw new Error("TwilioCallManager.startOutboundCall n'a pas renvoyé de sid");
-    await snap.ref.update({
-        twilioCallSid: call.sid,
-        status: "calling",
-        startedAt: new Date().toISOString(),
-    });
-    return call.sid;
-    if (!(call === null || call === void 0 ? void 0 : call.sid)) {
-        throw new Error("TwilioCallManager.startOutboundCall n'a pas renvoyÃ© de sid");
-    }
-    await snap.ref.update({
-        twilioCallSid: call.sid,
-        status: "calling",
-        startedAt: new Date().toISOString(),
-    });
-    return call.sid;
+}
+/**
+ * ✅ Version de compatibilité avec l'ancienne signature
+ * Accepte les paramètres twilio et fromNumber mais ne les utilise pas
+ */
+async function beginOutboundCallForSessionLegacy({ callSessionId, }) {
+    // Déléguer à la fonction principale
+    return beginOutboundCallForSession(callSessionId);
 }
 //# sourceMappingURL=twilioCallManagerAdapter.js.map

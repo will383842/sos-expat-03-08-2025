@@ -342,7 +342,7 @@ export const executeCallTask = onRequest(
     region: "europe-west1",
     memory: "256MiB",
     timeoutSeconds: 120,
-    maxInstances: 10,    // ✅ Nb max d’instances simultanées
+    maxInstances: 10,    // ✅ Nb max d'instances simultanées
     concurrency: 80,      // ✅ Nb de requêtes traitées en parallèle par instance
     // ✅ Secrets requis pour le handler + authentification Cloud Tasks
     secrets: [TASKS_AUTH_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER],
@@ -612,6 +612,7 @@ export const stripeWebhook = onRequest(
           const cs = event.data.object as Stripe.Checkout.Session;
           const callSessionId = cs.metadata?.callSessionId || cs.metadata?.sessionId;
           if (callSessionId) {
+            // ✅ FIX: Utiliser call_sessions (snake_case) au lieu de callSessions
             await database
               .collection('call_sessions')
               .doc(callSessionId)
@@ -713,8 +714,9 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
       // 🆕 Planification de l'appel à +5 minutes
       const callSessionId = paymentIntent.metadata.callSessionId;
 
+      // ✅ FIX: Utiliser call_sessions (snake_case) au lieu de callSessions
       await database
-        .collection('callSessions')
+        .collection('call_sessions')
         .doc(callSessionId)
         .set(
           {
@@ -1288,11 +1290,239 @@ export const getUltraDebugLogs = onCall(
 );
 
 // ========================================
+// FONCTIONS DE TEST ET UTILITAIRES
+// ========================================
+
+export const testCloudTasksConnection = onCall(
+  { cors: true, memory: '256MiB', timeoutSeconds: 60 },
+  wrapCallableFunction('testCloudTasksConnection', async (request: CallableRequest<{ testPayload?: Record<string, unknown> }>) => {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    try {
+      ultraLogger.info('TEST_CLOUD_TASKS', 'Test de connexion Cloud Tasks');
+
+      const { createTestTask } = await import('./lib/tasks');
+      const testPayload = request.data?.testPayload || { test: 'cloud_tasks_connection' };
+      
+      const taskId = await createTestTask(testPayload, 10); // 10 secondes de délai
+
+      ultraLogger.info('TEST_CLOUD_TASKS', 'Tâche de test créée avec succès', {
+        taskId,
+        delaySeconds: 10,
+      });
+
+      return {
+        success: true,
+        taskId,
+        message: 'Tâche de test créée, elle s\'exécutera dans 10 secondes',
+        testPayload,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      ultraLogger.error(
+        'TEST_CLOUD_TASKS',
+        'Erreur test Cloud Tasks',
+        { error: error instanceof Error ? error.message : String(error) },
+        error instanceof Error ? error : undefined
+      );
+
+      throw new HttpsError('internal', `Test Cloud Tasks échoué: ${error instanceof Error ? error.message : error}`);
+    }
+  })
+);
+
+export const getCloudTasksQueueStats = onCall(
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  wrapCallableFunction('getCloudTasksQueueStats', async (request: CallableRequest<Record<string, never>>) => {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    try {
+      ultraLogger.info('QUEUE_STATS', 'Récupération statistiques queue Cloud Tasks');
+
+      const { getQueueStats, listPendingTasks } = await import('./lib/tasks');
+      
+      const [stats, pendingTasks] = await Promise.all([
+        getQueueStats(),
+        listPendingTasks(20), // Limite à 20 tâches pour l'aperçu
+      ]);
+
+      ultraLogger.info('QUEUE_STATS', 'Statistiques récupérées', {
+        pendingTasksCount: stats.pendingTasks,
+        queueName: stats.queueName,
+        location: stats.location,
+      });
+
+      return {
+        success: true,
+        stats,
+        pendingTasksSample: pendingTasks,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      ultraLogger.error(
+        'QUEUE_STATS',
+        'Erreur récupération statistiques queue',
+        { error: error instanceof Error ? error.message : String(error) },
+        error instanceof Error ? error : undefined
+      );
+
+      throw new HttpsError('internal', `Erreur récupération stats: ${error instanceof Error ? error.message : error}`);
+    }
+  })
+);
+
+export const manuallyTriggerCallExecution = onCall(
+  { cors: true, memory: '256MiB', timeoutSeconds: 60 },
+  wrapCallableFunction('manuallyTriggerCallExecution', async (request: CallableRequest<{ callSessionId: string }>) => {
+    if (!request.auth || (request.auth.token as CustomClaims)?.role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    const { callSessionId } = request.data;
+
+    if (!callSessionId) {
+      throw new HttpsError('invalid-argument', 'callSessionId requis');
+    }
+
+    try {
+      ultraLogger.info('MANUAL_CALL_TRIGGER', 'Déclenchement manuel d\'appel', {
+        callSessionId,
+        triggeredBy: request.auth.uid,
+      });
+
+      // Vérifier que la session existe
+      const database = initializeFirebase();
+      const sessionDoc = await database.collection('call_sessions').doc(callSessionId).get();
+
+      if (!sessionDoc.exists) {
+        throw new HttpsError('not-found', `Session ${callSessionId} introuvable`);
+      }
+
+      const sessionData = sessionDoc.data();
+      
+      ultraLogger.info('MANUAL_CALL_TRIGGER', 'Session trouvée', {
+        callSessionId,
+        currentStatus: sessionData?.status,
+        paymentStatus: sessionData?.payment?.status,
+      });
+
+      // Utiliser directement le TwilioCallManager
+      const { TwilioCallManager } = await import('./TwilioCallManager');
+      
+      const result = await TwilioCallManager.startOutboundCall({
+        sessionId: callSessionId,
+        delayMinutes: 0, // Immédiat
+      });
+
+      ultraLogger.info('MANUAL_CALL_TRIGGER', 'Appel déclenché avec succès', {
+        callSessionId,
+        resultStatus: result?.status,
+      });
+
+      return {
+        success: true,
+        callSessionId,
+        result,
+        triggeredBy: request.auth.uid,
+        timestamp: new Date().toISOString(),
+        message: 'Appel déclenché manuellement avec succès',
+      };
+    } catch (error) {
+      ultraLogger.error(
+        'MANUAL_CALL_TRIGGER',
+        'Erreur déclenchement manuel d\'appel',
+        {
+          callSessionId,
+          error: error instanceof Error ? error.message : String(error),
+          triggeredBy: request.auth.uid,
+        },
+        error instanceof Error ? error : undefined
+      );
+
+      throw new HttpsError('internal', `Erreur déclenchement appel: ${error instanceof Error ? error.message : error}`);
+    }
+  })
+);
+
+// ========================================
+// WEBHOOK DE TEST POUR CLOUD TASKS
+// ========================================
+
+export const testWebhook = onRequest(
+  {
+    region: 'europe-west1',
+    memory: '128MiB',
+    timeoutSeconds: 30,
+    secrets: [TASKS_AUTH_SECRET],
+  },
+  wrapHttpFunction('testWebhook', async (req: FirebaseRequest, res: Response) => {
+    try {
+      // Vérification de l'authentification Cloud Tasks
+      const authHeader = req.get('X-Task-Auth') || '';
+      const expectedAuth = TASKS_AUTH_SECRET.value() || '';
+
+      if (authHeader !== expectedAuth) {
+        ultraLogger.warn('TEST_WEBHOOK', 'Authentification échouée', {
+          hasAuthHeader: !!authHeader,
+          expectedAuthSet: !!expectedAuth,
+        });
+        res.status(401).send('Unauthorized');
+        return;
+      }
+
+      const payload = req.body || {};
+
+      ultraLogger.info('TEST_WEBHOOK', 'Webhook de test reçu et authentifié', {
+        method: req.method,
+        payload: JSON.stringify(payload, null, 2),
+        timestamp: new Date().toISOString(),
+        userAgent: req.get('User-Agent') || 'unknown',
+      });
+
+      // Simuler un traitement
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const response = {
+        success: true,
+        message: 'Webhook de test traité avec succès',
+        receivedPayload: payload,
+        processedAt: new Date().toISOString(),
+        processingTimeMs: 1000,
+      };
+
+      ultraLogger.info('TEST_WEBHOOK', 'Traitement terminé', response);
+
+      res.status(200).json(response);
+    } catch (error) {
+      ultraLogger.error(
+        'TEST_WEBHOOK',
+        'Erreur traitement webhook de test',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          body: req.body,
+        },
+        error instanceof Error ? error : undefined
+      );
+
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      });
+    }
+  })
+);
+
+// ========================================
 // INITIALISATION FINALE ET LOGS DE DÉMARRAGE
 // ========================================
 
 ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
-  totalFunctions: 16,
+  totalFunctions: 22, // Mis à jour avec les nouvelles fonctions
   environment: process.env.NODE_ENV || 'development',
   memoryUsage: process.memoryUsage(),
   loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown',

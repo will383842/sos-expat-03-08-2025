@@ -1,7 +1,17 @@
 ﻿// firebase/functions/src/notificationPipeline/worker.ts
 
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { defineSecret } from "firebase-functions/params"; // ⬅️ AJOUTÉ
 import * as admin from "firebase-admin";
+
+// 🔐 SECRETS AJOUTÉS (seule modification nécessaire)
+const EMAIL_FROM = defineSecret("EMAIL_FROM");
+const EMAIL_USER = defineSecret("EMAIL_USER"); 
+const EMAIL_PASS = defineSecret("EMAIL_PASS");
+const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID");
+const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN");
+const TWILIO_PHONE_FROM = defineSecret("TWILIO_PHONE_FROM");
+const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM");
 
 // ----- Admin init (idempotent)
 if (!admin.apps.length) {
@@ -133,9 +143,10 @@ async function sendSmsTwilio(toE164: string, body: string) {
 }
 
 async function sendWhatsappTwilio(toE164: string, body: string) {
-  const { sendWhatsapp } = await import("./providers/whatsapp/twilio");
+  const { sendWhatsApp } = await import("./providers/whatsapp/twilio");
   // return { sid: string }
-  return await sendWhatsapp(toE164, body);
+  const sid = await sendWhatsApp(toE164, body);
+  return { sid };
 }
 
 async function sendPushFcm(token: string, title: string, body: string, data?: Record<string, string>) {
@@ -157,7 +168,17 @@ async function isMessagingEnabled(): Promise<boolean> {
 
 // ----- Worker principal
 export const onMessageEventCreate = onDocumentCreated(
-  { region: "europe-west1", document: "message_events/{id}" },
+  { 
+    region: "europe-west1", 
+    document: "message_events/{id}",
+    // ⬅️ SECRETS AJOUTÉS (seule modification nécessaire dans la config)
+    secrets: [
+      EMAIL_FROM, EMAIL_USER, EMAIL_PASS,
+      TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_FROM, TWILIO_WHATSAPP_FROM
+    ],
+    memory: "512MiB", // Plus de mémoire pour multi-canaux
+    timeoutSeconds: 120 // Plus de temps pour les envois multiples
+  },
   async (event) => {
     // 0) Interrupteur global
     const enabled = await isMessagingEnabled();
@@ -166,7 +187,7 @@ export const onMessageEventCreate = onDocumentCreated(
       return;
     }
 
-    // 1) Récupérer l’événement
+    // 1) Récupérer l'événement
     const evt = event.data?.data() as MessageEvent | undefined;
     if (!evt) {
       console.log("No event payload, abort");

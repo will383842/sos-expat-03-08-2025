@@ -158,9 +158,11 @@ async function runExecuteCallTask(req, res) {
 exports.executeCallTask = (0, https_1.onRequest)({
     region: "europe-west1",
     memory: "512MiB",
+    cpu: 0.5, // 0.5 vCPU par instance
+    maxInstances: 20, // Pour viser ~20 appels en parallèle (0.5 vCPU * 20 = 10 vCPU max)
+    minInstances: 1, // Garde au moins 1 instance active pour réduire le cold start
+    concurrency: 1, // OBLIGATOIRE car cpu < 1 (une seule requête par instance)
     timeoutSeconds: 120,
-    maxInstances: 50,
-    concurrency: 40,
     secrets: [
         exports.TASKS_AUTH_SECRET,
         exports.TWILIO_ACCOUNT_SID,

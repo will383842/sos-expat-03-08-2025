@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "routing": {
+    "user.signup.success": {
+      "channels": [
+        "email",
+        "sms",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "provider.signup.success": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "user.profile.incomplete.d1": {
+      "channels": [
+        "email",
+        "push"
+      ],
+      "rate_limit_h": 24
+    },
+    "provider.profile.incomplete.d1": {
+      "channels": [
+        "email",
+        "push"
+      ],
+      "rate_limit_h": 24
+    },
+    "request.created.client": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "request.needs_changes.client": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 2
+    },
+    "request.approved.client": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "checkout.abandoned.client.24h": {
+      "channels": [
+        "email"
+      ],
+      "rate_limit_h": 24
+    },
+    "payment.succeeded.client": {
+      "channels": [
+        "email",
+        "sms",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "payment.failed.client": {
+      "channels": [
+        "email",
+        "sms",
+        "inapp"
+      ],
+      "rate_limit_h": 1
+    },
+    "handoff.started.client": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "handoff.to.provider": {
+      "channels": [
+        "email",
+        "push",
+        "inapp",
+        "whatsapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "message.new.client": {
+      "channels": [
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0.1
+    },
+    "message.new.provider": {
+      "channels": [
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0.1
+    },
+    "messages.digest.client.daily": {
+      "channels": [
+        "email"
+      ],
+      "rate_limit_h": 24
+    },
+    "request.closed.client": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "request.closed.provider": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 0
+    },
+    "client.post_closure.d7": {
+      "channels": [
+        "email",
+        "push"
+      ],
+      "rate_limit_h": 24
+    },
+    "security.suspicious_login": {
+      "channels": [
+        "email",
+        "sms",
+        "inapp"
+      ],
+      "rate_limit_h": 12
+    },
+    "provider.monthly.report": {
+      "channels": [
+        "email",
+        "push",
+        "inapp"
+      ],
+      "rate_limit_h": 24
+    }
+  }
+}

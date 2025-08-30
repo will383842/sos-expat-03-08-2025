@@ -8,6 +8,10 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoutesV2 from '@/components/admin/AdminRoutesV2';
 import './App.css';
+import TemplatesEmails from "./pages/admin/marketing/TemplatesEmails";
+import NotificationsRouting from "./pages/admin/marketing/Notifications";
+import DelivrabiliteLogs from "./pages/admin/marketing/Delivrabilite";
+import MessagesTempsReel from "./pages/admin/marketing/MessagesTempsReel";
 
 // --------------------------------------------
 // Types
@@ -257,6 +261,12 @@ const App: React.FC = () => {
             {/* Admin routes - Fix: Redirect /admin to /admin/dashboard */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/*" element={<AdminRoutesV2 />} />
+
+            {/* Marketing & Communication */}
+          <Route path="marketing/templates-emails" element={<TemplatesEmails />} />
+          <Route path="marketing/notifications" element={<NotificationsRouting />} />
+          <Route path="marketing/delivrabilite" element={<DelivrabiliteLogs />} />
+          <Route path="marketing/messages-temps-reel" element={<MessagesTempsReel />} />
           </Routes>
 
           {/* Routes admin gérées par AdminRoutesV2 */}

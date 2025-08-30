@@ -1,0 +1,591 @@
+{
+  "version": 1,
+  "app": "SOS Expat",
+  "schema": "sosexpat.message.template/v1",
+  "locale": "fr-FR",
+  "defaults": {
+    "from_email": "SOS Expat <no-reply@sosexpat.app>",
+    "reply_to": "Support SOS Expat <support@sosexpat.app>",
+    "sms_sender_id": "SOSXPAT",
+    "push_icon": "ic_notification",
+    "push_channel_id": "general",
+    "deeplink_base": "sosexpat://"
+  },
+  "templates": [
+    {
+      "id": "user.signup.success",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": true,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Bienvenue à bord, {{user.firstName}} 👋",
+        "html": "<h1>Bienvenue !</h1><p>Ton compte est prêt. Deux minutes pour compléter ton profil et c’est parti ✨</p><p><a href='{{webappUrl}}/profile'>Compléter mon profil</a></p>",
+        "text": "Bienvenue {{user.firstName}} ! Ton compte est prêt. Complète ton profil ici : {{webappUrl}}/profile"
+      },
+      "sms": {
+        "text": "Bienvenue {{user.firstName}} ! Prêt(e) à démarrer ? Ton profil t’attend : {{webappUrl}}/profile"
+      },
+      "push": {
+        "title": "Bienvenue !",
+        "body": "Complète ton profil pour des matchs ultra-rapides ✨",
+        "deeplink": "sosexpat://profile"
+      },
+      "inapp": {
+        "title": "Bienvenue 👋",
+        "body": "Ajoute 2–3 infos et tu es ready.",
+        "action": {
+          "label": "Compléter",
+          "deeplink": "/profile"
+        }
+      }
+    },
+    {
+      "id": "provider.signup.success",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Bienvenue côté prestataire, {{user.firstName}} 🚀",
+        "html": "<h1>Bienvenue !</h1><p>Complète ton profil (domaines, pays, dispo) et commence à recevoir des demandes 💼</p><p><a href='{{webappUrl}}/provider/profile'>Compléter mon profil</a></p>",
+        "text": "Bienvenue {{user.firstName}} ! Complète ton profil prestataire : {{webappUrl}}/provider/profile"
+      },
+      "push": {
+        "title": "Compte prestataire créé",
+        "body": "Ajoute domaines & dispo pour être visible ✨",
+        "deeplink": "sosexpat://provider/profile"
+      },
+      "inapp": {
+        "title": "Hello pro 👋",
+        "body": "Checklist prête pour booster ta visibilité.",
+        "action": {
+          "label": "Compléter",
+          "deeplink": "/provider/profile"
+        }
+      }
+    },
+    {
+      "id": "user.profile.incomplete.d1",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": false,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Ton profil est à deux doigts d’être parfait ✨",
+        "html": "<p>Encore 1 petite info et tu es prêt(e) à matcher avec les meilleurs prestataires.</p><p><a href='{{webappUrl}}/profile'>Compléter maintenant</a></p>",
+        "text": "Encore 1 petite info et c’est bon ! {{webappUrl}}/profile"
+      },
+      "push": {
+        "title": "Presque fini 😎",
+        "body": "Complète ton profil (1 min) et on s’occupe du reste.",
+        "deeplink": "sosexpat://profile"
+      }
+    },
+    {
+      "id": "provider.profile.incomplete.d1",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": false,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Boost visibilité : complète ton profil 💡",
+        "html": "<p>Ajoute tes domaines & pays pour recevoir plus de demandes qualifiées.</p><p><a href='{{webappUrl}}/provider/profile'>Compléter</a></p>",
+        "text": "Ajoute tes domaines & pays pour recevoir plus de demandes : {{webappUrl}}/provider/profile"
+      },
+      "push": {
+        "title": "Un petit boost ? ✨",
+        "body": "Complète ton profil pro et brille sur SOS Expat.",
+        "deeplink": "sosexpat://provider/profile"
+      }
+    },
+    {
+      "id": "request.created.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Demande bien reçue ✅ — « {{request.title}} »",
+        "html": "<p>On vérifie tout et on te tient au courant très vite.</p><p><a href='{{webappUrl}}/requests/{{request.id}}'>Voir la demande</a></p>",
+        "text": "Demande enregistrée pour « {{request.title}} ». Suivi : {{webappUrl}}/requests/{{request.id}}"
+      },
+      "push": {
+        "title": "Demande enregistrée",
+        "body": "On s’occupe de toi ⏳",
+        "deeplink": "sosexpat://requests/{request.id}"
+      },
+      "inapp": {
+        "title": "En cours de vérification",
+        "body": "Promis, ça va vite 😉",
+        "action": {
+          "label": "Voir",
+          "deeplink": "/requests/{{request.id}}"
+        }
+      }
+    },
+    {
+      "id": "request.needs_changes.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Petit coup de polish ✨",
+        "html": "<p>On a juste besoin d’un détail : {{review.note}}</p><p><a href='{{webappUrl}}/requests/{{request.id}}/edit'>Compléter</a></p>",
+        "text": "Il manque un petit détail : {{review.note}} — {{webappUrl}}/requests/{{request.id}}/edit"
+      },
+      "push": {
+        "title": "Action requise",
+        "body": "Ajoute les infos manquantes (1 min ⏱️)",
+        "deeplink": "sosexpat://requests/{request.id}/edit"
+      },
+      "inapp": {
+        "title": "À peaufiner ✍️",
+        "body": "Ajoute ce qu’il manque pour validation rapide.",
+        "action": {
+          "label": "Compléter",
+          "deeplink": "/requests/{{request.id}}/edit"
+        }
+      }
+    },
+    {
+      "id": "request.approved.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Validée 🎉 — « {{request.title}} »",
+        "html": "<p>Let’s go ! Passe au paiement pour lancer la mise en relation.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Payer maintenant</a></p>",
+        "text": "Demande validée. Paiement ici : {{webappUrl}}/checkout/{{request.id}}"
+      },
+      "push": {
+        "title": "Demande validée",
+        "body": "Let’s go 🚀",
+        "deeplink": "sosexpat://checkout/{request.id}"
+      },
+      "inapp": {
+        "title": "Go time 🎉",
+        "body": "Effectue le paiement et on connecte le prestataire.",
+        "action": {
+          "label": "Payer",
+          "deeplink": "/checkout/{{request.id}}"
+        }
+      }
+    },
+    {
+      "id": "checkout.abandoned.client.24h",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": false,
+        "inapp": false,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "On a gardé ta demande au chaud 🔥",
+        "html": "<p>Tu peux finaliser en 1 minute chrono.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Finaliser le paiement</a></p>",
+        "text": "Ta demande t’attend 😌 : {{webappUrl}}/checkout/{{request.id}}"
+      }
+    },
+    {
+      "id": "payment.succeeded.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": true,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Paiement confirmé — {{request.title}}",
+        "html": "<p>Merci 🙏 Ton prestataire est notifié. On ouvre le chat 🔓</p><p><a href='{{webappUrl}}/requests/{{request.id}}'>Voir ma demande</a></p>",
+        "text": "Paiement confirmé pour « {{request.title}} ». Ton prestataire est notifié. {{webappUrl}}/requests/{{request.id}}"
+      },
+      "sms": {
+        "text": "✅ Paiement OK pour « {{request.title}} ». Le prestataire te contacte très vite."
+      },
+      "push": {
+        "title": "Paiement confirmé",
+        "body": "Chat prêt. Let’s chat 💬",
+        "deeplink": "sosexpat://requests/{request.id}"
+      },
+      "inapp": {
+        "title": "Merci ✨",
+        "body": "Ton prestataire a été notifié.",
+        "action": {
+          "label": "Voir la demande",
+          "deeplink": "/requests/{{request.id}}"
+        }
+      }
+    },
+    {
+      "id": "payment.failed.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": true,
+        "push": false,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Oups — paiement refusé",
+        "html": "<p>Ça arrive. Réessaie avec une autre carte ou contacte le support, on est là 💬</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Réessayer</a></p>",
+        "text": "Paiement refusé pour « {{request.title}} ». Réessayer : {{webappUrl}}/checkout/{{request.id}}"
+      },
+      "sms": {
+        "text": "⚠️ Paiement refusé pour « {{request.title}} ». Réessaye : {{webappUrl}}/checkout/{{request.id}}"
+      },
+      "inapp": {
+        "title": "Paiement refusé 😕",
+        "body": "On retente ensemble ?",
+        "action": {
+          "label": "Réessayer",
+          "deeplink": "/checkout/{{request.id}}"
+        }
+      }
+    },
+    {
+      "id": "handoff.started.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Mise en relation en cours 🤝",
+        "html": "<p>Ton prestataire arrive dans le chat. Prépare tes questions !</p><p><a href='{{webappUrl}}/messages'>Ouvrir le chat</a></p>",
+        "text": "C’est parti ! Ton prestataire arrive dans le chat : {{webappUrl}}/messages"
+      },
+      "push": {
+        "title": "Ça se rapproche ✨",
+        "body": "Ton prestataire est en route vers le chat.",
+        "deeplink": "sosexpat://messages"
+      },
+      "inapp": {
+        "title": "On connecte les points 🤝",
+        "body": "Tu vas pouvoir échanger en direct.",
+        "action": {
+          "label": "Ouvrir le chat",
+          "deeplink": "/messages"
+        }
+      }
+    },
+    {
+      "id": "handoff.to.provider",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": true
+      },
+      "email": {
+        "subject": "Nouveau client confirmé — {{request.title}}",
+        "html": "<p>Le client a payé ✅ Voici le récap et le lien direct vers le chat.</p><p><a href='{{webappUrl}}/provider/messages/{{thread.id}}'>Ouvrir le chat</a></p>",
+        "text": "Nouveau client confirmé. Chat : {{webappUrl}}/provider/messages/{{thread.id}}"
+      },
+      "push": {
+        "title": "Nouveau client 🎉",
+        "body": "Ouvre le chat et dis bonjour 💬",
+        "deeplink": "sosexpat://provider/messages/{thread.id}"
+      },
+      "inapp": {
+        "title": "Client confirmé",
+        "body": "On t’a préparé le thread.",
+        "action": {
+          "label": "Ouvrir le chat",
+          "deeplink": "/provider/messages/{{thread.id}}"
+        }
+      },
+      "whatsapp": {
+        "twilio_template_name": "new_client_confirmed",
+        "params": [
+          "{{client.firstName}}",
+          "{{client.nationality}}",
+          "{{request.country}}",
+          "{{request.title}}",
+          "{{request.description}}",
+          "{{client.language}}",
+          "{{webappUrl}}/provider/messages/{{thread.id}}"
+        ]
+      }
+    },
+    {
+      "id": "message.new.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": false,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "push": {
+        "title": "Nouveau message 💬",
+        "body": "Message de {{provider.firstName}} — à toi de jouer 😉",
+        "deeplink": "sosexpat://messages/{thread.id}"
+      },
+      "inapp": {
+        "title": "Nouveau message",
+        "body": "Réponds quand tu veux 😉",
+        "action": {
+          "label": "Ouvrir",
+          "deeplink": "/messages/{{thread.id}}"
+        }
+      }
+    },
+    {
+      "id": "message.new.provider",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": false,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "push": {
+        "title": "Message de {{client.firstName}} 💬",
+        "body": "Un petit mot t’attend.",
+        "deeplink": "sosexpat://provider/messages/{thread.id}"
+      },
+      "inapp": {
+        "title": "Nouveau message",
+        "body": "Rester réactif = clients heureux ✨",
+        "action": {
+          "label": "Répondre",
+          "deeplink": "/provider/messages/{{thread.id}}"
+        }
+      }
+    },
+    {
+      "id": "messages.digest.client.daily",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": false,
+        "inapp": false,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Tu as {{unreadCount}} message(s) en attente 💌",
+        "html": "<p>Un petit tour dans le chat ?</p><p><a href='{{webappUrl}}/messages'>Répondre maintenant</a></p>",
+        "text": "Tu as {{unreadCount}} message(s) en attente. Réponds ici : {{webappUrl}}/messages"
+      }
+    },
+    {
+      "id": "request.closed.client",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Mission accomplie ✅",
+        "html": "<p>Un grand merci ! Une petite note pour aider la communauté ?</p><p><a href='{{webappUrl}}/reviews/new?requestId={{request.id}}'>Noter le prestataire</a></p>",
+        "text": "Merci ! Laisse une note : {{webappUrl}}/reviews/new?requestId={{request.id}}"
+      },
+      "push": {
+        "title": "Demande terminée",
+        "body": "Note ton prestataire ✨",
+        "deeplink": "sosexpat://reviews/new?requestId={request.id}"
+      },
+      "inapp": {
+        "title": "Merci 🙏",
+        "body": "Ton avis compte beaucoup.",
+        "action": {
+          "label": "Noter",
+          "deeplink": "/reviews/new?requestId={{request.id}}"
+        }
+      }
+    },
+    {
+      "id": "request.closed.provider",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Mission terminée — bravo ✨",
+        "html": "<p>La demande de {{client.firstName}} est clôturée. Tes stats ont été mises à jour.</p><p><a href='{{webappUrl}}/provider/stats'>Voir mes stats</a></p>",
+        "text": "Mission terminée pour {{client.firstName}}. Stats mises à jour : {{webappUrl}}/provider/stats"
+      },
+      "push": {
+        "title": "Demande terminée",
+        "body": "Ta performance a été mise à jour.",
+        "deeplink": "sosexpat://provider/stats"
+      },
+      "inapp": {
+        "title": "Nice job 👏",
+        "body": "Va jeter un œil à tes stats.",
+        "action": {
+          "label": "Voir mes stats",
+          "deeplink": "/provider/stats"
+        }
+      }
+    },
+    {
+      "id": "client.post_closure.d7",
+      "roles": [
+        "client"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": false,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Et si on t’aidait sur la suite ? 💡",
+        "html": "<p>On peut aussi t’accompagner pour {{suggestions.topCountry}} ou {{suggestions.topService}}.</p><p><a href='{{webappUrl}}/services'>Découvrir</a></p>",
+        "text": "Besoin d’un coup de main ? {{webappUrl}}/services"
+      },
+      "push": {
+        "title": "Besoin d’aide ?",
+        "body": "On a des bons plans pour la suite 😉",
+        "deeplink": "sosexpat://services"
+      }
+    },
+    {
+      "id": "security.suspicious_login",
+      "roles": [
+        "client",
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": true,
+        "push": false,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Alerte sécurité 🔒",
+        "html": "<p>Connexion depuis {{security.city}}, {{security.country}} ({{security.ip}}).</p><p>Si ce n’est pas toi, change ton mot de passe.</p><p><a href='{{webappUrl}}/security'>Sécuriser mon compte</a></p>",
+        "text": "Connexion suspecte détectée. Si ce n’est pas toi : {{webappUrl}}/security"
+      },
+      "sms": {
+        "text": "⚠️ Connexion suspecte détectée. Sécurise ton compte : {{webappUrl}}/security"
+      },
+      "inapp": {
+        "title": "Sécurité",
+        "body": "On veille. Mets ton mot de passe à jour si besoin.",
+        "action": {
+          "label": "Sécuriser",
+          "deeplink": "/security"
+        }
+      }
+    },
+    {
+      "id": "provider.monthly.report",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": false,
+        "push": true,
+        "inapp": true,
+        "whatsapp": false
+      },
+      "email": {
+        "subject": "Ton mois en un clin d’œil — {{date.monthName}} {{date.year}}",
+        "html": "<p>{{metrics.clients}} clients • {{metrics.revenue}}€ • {{metrics.rating}}★</p><p><a href='{{webappUrl}}/provider/stats?period=month'>Voir le détail</a></p>",
+        "text": "Bilan : {{metrics.clients}} clients • {{metrics.revenue}}€ • {{metrics.rating}}★"
+      },
+      "push": {
+        "title": "Bilan dispo 📈",
+        "body": "Tes stats du mois sont prêtes.",
+        "deeplink": "sosexpat://provider/stats?period=month"
+      },
+      "inapp": {
+        "title": "Bilan mensuel",
+        "body": "Regarde ce que tu as accompli 👏",
+        "action": {
+          "label": "Voir",
+          "deeplink": "/provider/stats?period=month"
+        }
+      }
+    }
+  ]
+}

@@ -3,10 +3,12 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
 import { stripeManager } from './StripeManager';
 import * as admin from 'firebase-admin';
+
 const asDate = (d: Date | admin.firestore.Timestamp) =>
   (d && typeof (d as admin.firestore.Timestamp).toDate === 'function')
     ? (d as admin.firestore.Timestamp).toDate()
     : (d as Date);
+
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
@@ -18,12 +20,12 @@ function pctChange(curr: number, prev: number) {
 export const api = onRequest(
   {
     region: 'europe-west1',
-    memory: '512MiB',
-    cpu: 0.5,
-    maxInstances: 5,
-    minInstances: 1,
-    concurrency: 3,
-        cors: [
+    memory: '256MiB',
+    concurrency: 1,
+    timeoutSeconds: 60,
+    minInstances: 0,
+    maxInstances: 3,
+    cors: [
       'http://localhost:5173',       // Front local Vite
       'http://127.0.0.1:5000',       // Hosting emulator
       'https://sos-urgently-ac307.web.app', // Firebase Hosting prod
@@ -67,7 +69,7 @@ export const api = onRequest(
           // Période précédente
           const prev = await stripeManager.getPaymentStatistics({
             startDate: asDate(prevStart),
-          endDate: asDate(prevEnd),
+            endDate: asDate(prevEnd),
           });
           console.log('✅ Stats précédentes récupérées:', prev);
 

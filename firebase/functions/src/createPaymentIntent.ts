@@ -1,4 +1,4 @@
-// 🔧 Firebase Functions v2 avec configuration complète + sélection Stripe test/live
+﻿// ðŸ”§ Firebase Functions v2 avec configuration complÃ¨te + sÃ©lection Stripe test/live
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
@@ -14,33 +14,33 @@ import {
 } from './utils/paymentValidators';
 
 // =========================================
-// 🔧 Configuration Firebase Functions v2
+// ðŸ”§ Configuration Firebase Functions v2
 // =========================================
-const FUNCTION_CONFIG = {
-  memory: '512MiB' as const,
-  cpu: 0.5 as const,
-  timeoutSeconds: 60,
-  maxInstances: 5,
-  minInstances: 1,
-  concurrency: 3,
+const _FUNCTION_CONFIG = {
   region: 'europe-west1',
+  memory: '256MiB' as const,
+  concurrency: 1,
+  timeoutSeconds: 60,
+  minInstances: 0,
+  maxInstances: 3,
+  // pas de cpu: 0.25/0.5 si concurrency > 1 ; ici on garde 1
 };
 
 // =========================================
-// 🔑 Secrets / Params (NE MET JAMAIS TES CLÉS EN DUR)
+// ðŸ”‘ Secrets / Params (NE MET JAMAIS TES CLÃ‰S EN DUR)
 // - Secrets: Google Secret Manager
-// - Params: Config paramétrable (notamment STRIPE_MODE)
+// - Params: Config paramÃ©trable (notamment STRIPE_MODE)
 // =========================================
 const STRIPE_SECRET_KEY_TEST = defineSecret('STRIPE_SECRET_KEY_TEST'); // sk_test_***
 const STRIPE_SECRET_KEY_LIVE = defineSecret('STRIPE_SECRET_KEY_LIVE'); // sk_live_***
 const STRIPE_MODE = defineString('STRIPE_MODE'); // "test" ou "live"
 
-// Helper: renvoie le Secret à utiliser selon le mode actuel
+// Helper: renvoie le Secret Ã  utiliser selon le mode actuel
 const getStripeSecretParam = () =>
   (STRIPE_MODE.value() === 'live' ? STRIPE_SECRET_KEY_LIVE : STRIPE_SECRET_KEY_TEST);
 
 // =========================================
-// 🌍 DÉTECTION D'ENVIRONNEMENT
+// ðŸŒ DÃ‰TECTION D'ENVIRONNEMENT
 // =========================================
 const isDevelopment =
   process.env.NODE_ENV === 'development' ||
@@ -51,16 +51,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 const BYPASS_MODE = process.env.BYPASS_SECURITY === 'true';
 
 console.log(
-  `🌍 Environment: ${process.env.NODE_ENV || 'development'}, Production: ${isProduction}, Bypass: ${BYPASS_MODE}, StripeMode: ${STRIPE_MODE.value() || '(unset)'}`
+  `ðŸŒ Environment: ${process.env.NODE_ENV || 'development'}, Production: ${isProduction}, Bypass: ${BYPASS_MODE}, StripeMode: ${STRIPE_MODE.value() || '(unset)'}`
 );
 
 // =========================================
-// ♻️ Rate limit store (mémoire)
+// â™»ï¸ Rate limit store (mÃ©moire)
 // =========================================
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 // =========================================
-// 📋 INTERFACES ET TYPES
+// ðŸ“‹ INTERFACES ET TYPES
 // =========================================
 type SupportedCurrency = 'eur' | 'usd';
 type SupportedServiceType = 'lawyer_call' | 'expat_call';
@@ -100,7 +100,7 @@ interface SuccessResponse {
 }
 
 // =========================================
-/** ⚙️ CONFIGURATION RÈGLES DE SÉCURITÉ */
+/** âš™ï¸ CONFIGURATION RÃˆGLES DE SÃ‰CURITÃ‰ */
 // =========================================
 const SECURITY_LIMITS = {
   RATE_LIMIT: {
@@ -129,13 +129,13 @@ const SECURITY_LIMITS = {
 } as const;
 
 // =========================================
-// 🛡️ UTILITAIRES SÉCURITÉ
+// ðŸ›¡ï¸ UTILITAIRES SÃ‰CURITÃ‰
 // =========================================
 function logSecurityEvent(event: string, data: Record<string, unknown>) {
   const timestamp = new Date().toISOString();
 
   if (isDevelopment) {
-    console.log(`🔧 [DEV-${timestamp}] ${event}:`, data);
+    console.log(`ðŸ”§ [DEV-${timestamp}] ${event}:`, data);
   } else if (isProduction) {
     const sanitizedData = {
       ...data,
@@ -143,9 +143,9 @@ function logSecurityEvent(event: string, data: Record<string, unknown>) {
       clientId: data.clientId ? String(data.clientId).substring(0, 8) + '...' : undefined,
       providerId: data.providerId ? String(data.providerId).substring(0, 8) + '...' : undefined,
     };
-    console.log(`🏭 [PROD-${timestamp}] ${event}:`, sanitizedData);
+    console.log(`ðŸ­ [PROD-${timestamp}] ${event}:`, sanitizedData);
   } else {
-    console.log(`🧪 [TEST-${timestamp}] ${event}:`, data);
+    console.log(`ðŸ§ª [TEST-${timestamp}] ${event}:`, data);
   }
 }
 
@@ -204,7 +204,7 @@ async function validateBusinessLogic(
     const providerDoc = await db.collection('users').doc(data.providerId).get();
     const providerData = providerDoc.data();
 
-    if (!providerData) return { valid: false, error: 'Prestataire non trouvé' };
+    if (!providerData) return { valid: false, error: 'Prestataire non trouvÃ©' };
     if (providerData.status === 'suspended' || providerData.status === 'banned') {
       return { valid: false, error: 'Prestataire non disponible' };
     }
@@ -237,7 +237,7 @@ async function validateBusinessLogic(
       });
 
       if (isProduction && difference > 100) {
-        return { valid: false, error: 'Montant très éloigné du tarif standard' };
+        return { valid: false, error: 'Montant trÃ¨s Ã©loignÃ© du tarif standard' };
       }
     }
 
@@ -265,14 +265,14 @@ async function validateAmountSecurity(
   if (amount < limits.min) {
     return {
       valid: false,
-      error: `Montant minimum de ${limits.min}${currency === 'eur' ? '€' : '$'} requis`,
+      error: `Montant minimum de ${limits.min}${currency === 'eur' ? 'â‚¬' : '$'} requis`,
     };
   }
 
   if (amount > limits.max) {
     return {
       valid: false,
-      error: `Montant maximum de ${limits.max}${currency === 'eur' ? '€' : '$'} dépassé`,
+      error: `Montant maximum de ${limits.max}${currency === 'eur' ? 'â‚¬' : '$'} dÃ©passÃ©`,
     };
   }
 
@@ -348,7 +348,7 @@ function validateAmountCoherence(
   const difference = Math.abs(totalCalculated - amountRounded);
   const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
 
-  console.log('💰 Validation cohérence (commissionAmount):', {
+  console.log('ðŸ’° Validation cohÃ©rence (commissionAmount):', {
     totalAmount: amountRounded,
     commissionAmount,
     providerAmount,
@@ -360,7 +360,7 @@ function validateAmountCoherence(
   if (difference > tolerance) {
     return {
       valid: false,
-      error: `Incohérence montants: ${difference.toFixed(2)} d'écart (tolérance: ${tolerance.toFixed(2)})`,
+      error: `IncohÃ©rence montants: ${difference.toFixed(2)} d'Ã©cart (tolÃ©rance: ${tolerance.toFixed(2)})`,
       difference,
     };
   }
@@ -410,11 +410,17 @@ function sanitizeAndConvertInput(data: PaymentIntentRequestData) {
 }
 
 // =========================================
-// 🚀 CLOUD FUNCTION PRINCIPALE
+// ðŸš€ CLOUD FUNCTION PRINCIPALE
 // =========================================
 export const createPaymentIntent = onCall(
   {
-    ...FUNCTION_CONFIG,
+    region: 'europe-west1',
+    memory: '256MiB',
+    concurrency: 1,
+    timeoutSeconds: 60,
+    minInstances: 0,
+    maxInstances: 3,
+    // pas de cpu: 0.25/0.5 si concurrency > 1 ; ici on garde 1
     secrets: [STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE], // seuls les "secrets" vont ici
   },
   async (request: CallableRequest<PaymentIntentRequestData>) => {
@@ -433,15 +439,15 @@ export const createPaymentIntent = onCall(
 
       // 1) AUTH
       if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'Authentification requise pour créer un paiement.');
+        throw new HttpsError('unauthenticated', 'Authentification requise pour crÃ©er un paiement.');
       }
       const userId = request.auth.uid;
 
-      // 2) VALIDATION PRÉLIMINAIRE
+      // 2) VALIDATION PRÃ‰LIMINAIRE
       if (typeof request.data.amount !== 'number' || isNaN(request.data.amount) || request.data.amount <= 0) {
         throw new HttpsError(
           'invalid-argument',
-          `Montant invalide reçu: ${request.data.amount} (type: ${typeof request.data.amount})`
+          `Montant invalide reÃ§u: ${request.data.amount} (type: ${typeof request.data.amount})`
         );
       }
       if (
@@ -463,7 +469,7 @@ export const createPaymentIntent = onCall(
       const rateLimitResult = checkRateLimit(userId);
       if (!rateLimitResult.allowed) {
         const waitTime = Math.ceil((rateLimitResult.resetTime! - Date.now()) / 60000);
-        throw new HttpsError('resource-exhausted', `Trop de tentatives. Réessayez dans ${waitTime} minutes.`);
+        throw new HttpsError('resource-exhausted', `Trop de tentatives. RÃ©essayez dans ${waitTime} minutes.`);
       }
 
       // 4) SANITIZE + CONVERT
@@ -498,10 +504,10 @@ export const createPaymentIntent = onCall(
         throw new HttpsError('invalid-argument', 'ID client invalide');
       }
       if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
-        throw new HttpsError('invalid-argument', `Devise non supportée: ${currency}`);
+        throw new HttpsError('invalid-argument', `Devise non supportÃ©e: ${currency}`);
       }
 
-      // 6) Validation cohérence interne
+      // 6) Validation cohÃ©rence interne
       const coherence = validateAmountCoherence(
         amountInMainUnit,
         commissionAmountInMainUnit,
@@ -515,7 +521,7 @@ export const createPaymentIntent = onCall(
         }
       }
 
-      // 7) Validation sécuritaire (montants + limites journalières)
+      // 7) Validation sÃ©curitaire (montants + limites journaliÃ¨res)
       const db = admin.firestore();
       const sec = await validateAmountSecurity(amountInMainUnit, currency, userId, db);
       if (!sec.valid) {
@@ -531,17 +537,17 @@ export const createPaymentIntent = onCall(
       // 9) Anti-doublons
       const hasDuplicate = await checkDuplicatePayments(clientId, providerId, amountInMainUnit, currency, db);
       if (hasDuplicate) {
-        throw new HttpsError('already-exists', 'Un paiement similaire est déjà en cours de traitement.');
+        throw new HttpsError('already-exists', 'Un paiement similaire est dÃ©jÃ  en cours de traitement.');
       }
 
-      // 🔑 Choix de la clé Stripe selon le mode
+      // ðŸ”‘ Choix de la clÃ© Stripe selon le mode
       const stripeSecretKey = getStripeSecretParam().value();
 
-      // 🧭 Dérive le providerType
+      // ðŸ§­ DÃ©rive le providerType
       const providerType: 'lawyer' | 'expat' =
         serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
 
-      // 10) Création du PaymentIntent via StripeManager
+      // 10) CrÃ©ation du PaymentIntent via StripeManager
       const stripePayload = {
         amount: amountInMainUnit,
         currency,
@@ -578,7 +584,7 @@ export const createPaymentIntent = onCall(
           amountInCents,
           error: result?.error,
         });
-        throw new HttpsError('internal', 'Erreur lors de la création du paiement. Veuillez réessayer.');
+        throw new HttpsError('internal', 'Erreur lors de la crÃ©ation du paiement. Veuillez rÃ©essayer.');
       }
 
       // 11) Audit (prod uniquement)
@@ -608,37 +614,37 @@ export const createPaymentIntent = onCall(
         }
       }
 
-      console.log('✅ Paiement créé:', {
+      console.log('âœ… Paiement crÃ©Ã©:', {
         id: result.paymentIntentId,
         total: formatAmount(amountInMainUnit, currency),
         commission: formatAmount(commissionAmountInMainUnit, currency),
         provider: formatAmount(providerAmountInMainUnit, currency),
       });
 
-      // Réponse de base
+      // RÃ©ponse de base
       const baseResponse: SuccessResponse = {
         success: true,
         clientSecret: result.clientSecret!,
         paymentIntentId: result.paymentIntentId!,
-        amount: amountInCents, // on renvoie en cents côté client pour Stripe.js
+        amount: amountInCents, // on renvoie en cents cÃ´tÃ© client pour Stripe.js
         currency,
         serviceType,
         status: 'requires_payment_method',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      // Récupération sécurisée de l'account ID Stripe
+      // RÃ©cupÃ©ration sÃ©curisÃ©e de l'account ID Stripe
       let accountId: string | undefined;
       try {
         const stripe = new Stripe(getStripeSecretParam().value(), { apiVersion: '2023-10-16' });
         const account = await stripe.accounts.retrieve();
         accountId = account.id;
       } catch (error) {
-        console.warn('Impossible de récupérer l\'account ID Stripe:', error);
+        console.warn('Impossible de rÃ©cupÃ©rer l\'account ID Stripe:', error);
         accountId = undefined;
       }
 
-      // Réponse finale avec informations supplémentaires
+      // RÃ©ponse finale avec informations supplÃ©mentaires
       const finalResponse: SuccessResponse & { stripeMode: string; stripeAccountId?: string } = {
         ...baseResponse,
         stripeMode: STRIPE_MODE.value() || 'test',
@@ -671,7 +677,7 @@ export const createPaymentIntent = onCall(
 
       const errorResponse: ErrorResponse = {
         success: false,
-        error: "Une erreur inattendue s'est produite. Veuillez réessayer.",
+        error: "Une erreur inattendue s'est produite. Veuillez rÃ©essayer.",
         code: 'INTERNAL_ERROR',
         timestamp: new Date().toISOString(),
         requestId,
@@ -683,9 +689,9 @@ export const createPaymentIntent = onCall(
 );
 
 /**
- * ✅ Récap déploiement / config
+ * âœ… RÃ©cap dÃ©ploiement / config
  *
- * 1) Stocke tes deux clés dans Secret Manager :
+ * 1) Stocke tes deux clÃ©s dans Secret Manager :
  *    firebase functions:secrets:set STRIPE_SECRET_KEY_TEST
  *    firebase functions:secrets:set STRIPE_SECRET_KEY_LIVE
  *
@@ -693,10 +699,12 @@ export const createPaymentIntent = onCall(
  *    firebase functions:config:set params_STRIPE_MODE="test"
  *    # ou "live" lors du basculement prod
  *
- * 3) Vérifie que ton front et ton back sont dans le même mode :
+ * 3) VÃ©rifie que ton front et ton back sont dans le mÃªme mode :
  *    - Front: publie pk_test_*** si STRIPE_MODE=test, pk_live_*** si STRIPE_MODE=live
- *    - Back : sélectionne la bonne sk_* via STRIPE_MODE
+ *    - Back : sÃ©lectionne la bonne sk_* via STRIPE_MODE
  *
- * 4) Déploie :
+ * 4) DÃ©ploie :
  *    firebase deploy --only functions
  */
+
+void _FUNCTION_CONFIG;

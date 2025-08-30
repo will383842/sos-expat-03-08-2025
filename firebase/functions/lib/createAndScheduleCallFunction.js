@@ -10,7 +10,12 @@ const logError_1 = require("./utils/logs/logError");
  * La planification sera gérée par le webhook Stripe à +5 min
  */
 exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
-    memory: "256MiB",
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1,
     timeoutSeconds: 60,
     cors: true,
     // ✅ Pas de secrets Twilio ici - ils sont gérés dans lib/twilio et importés dans index.ts

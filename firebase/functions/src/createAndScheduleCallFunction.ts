@@ -31,8 +31,6 @@ export const createAndScheduleCallHTTPS = onCall(
     maxInstances: 3,
     minInstances: 0,
     concurrency: 1,
-    
-    memory: "256MiB",
     timeoutSeconds: 60,
     cors: true,
     // ✅ Pas de secrets Twilio ici - ils sont gérés dans lib/twilio et importés dans index.ts

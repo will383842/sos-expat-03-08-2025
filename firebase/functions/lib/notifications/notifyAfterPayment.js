@@ -9,11 +9,13 @@ const https_1 = require("firebase-functions/v2/https");
 const MessageManager_1 = require("../MessageManager");
 // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU
 const CPU_OPTIMIZED_CONFIG = {
-    memory: "128MiB",
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
     timeoutSeconds: 30,
-    maxInstances: 5,
+    maxInstances: 3,
     minInstances: 0,
-    concurrency: 10
+    concurrency: 1,
 };
 const db = (0, firestore_1.getFirestore)();
 // ✅ Fonction interne (pour usage depuis d'autres Cloud Functions comme les webhooks)

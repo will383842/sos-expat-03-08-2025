@@ -51,6 +51,11 @@ function pctChange(curr, prev) {
 }
 exports.api = (0, https_1.onRequest)({
     region: 'europe-west1',
+    memory: '256MiB',
+    concurrency: 1,
+    timeoutSeconds: 60,
+    minInstances: 0,
+    maxInstances: 3,
     cors: [
         'http://localhost:5173', // Front local Vite
         'http://127.0.0.1:5000', // Hosting emulator

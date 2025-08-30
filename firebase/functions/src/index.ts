@@ -1,4 +1,3 @@
-// functions/src/index.ts - Version rectifiée avec gestion TEST/LIVE + optimisation CPU + unification webhooks
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ====== ULTRA DEBUG INITIALIZATION ======
@@ -19,7 +18,7 @@ const emergencyConfig = {
   concurrency: 1
 };
 
-const criticalConfig = {
+const _criticalConfig = {
   region: "europe-west1",
   memory: "512MiB" as const,
   cpu: 0.5,
@@ -35,34 +34,34 @@ ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index
 });
 
 // ====== CONFIGURATION GLOBALE ======
-import { setGlobalOptions } from 'firebase-functions/v2';
+import { setGlobalOptions } from "firebase-functions/v2";
+import { defineSecret, defineString } from "firebase-functions/params";
 
-const globalConfig = {
-  region: 'europe-west1',
-};
+// ⬇️ Secrets email : définis ici UNE SEULE FOIS
+export const EMAIL_USER = defineSecret("EMAIL_USER");
+export const EMAIL_PASS = defineSecret("EMAIL_PASS");
 
-setGlobalOptions(globalConfig);
-
-ultraLogger.debug('GLOBAL_CONFIG', 'Configuration globale Firebase Functions', globalConfig);
-ultraLogger.info('GLOBAL_CONFIG', 'Configuration globale Firebase Functions appliquée', globalConfig);
+// ⬇️ Un seul setGlobalOptions dans tout le repo
+setGlobalOptions({
+  region: "europe-west1",
+  secrets: ([EMAIL_USER, EMAIL_PASS]) as (string | ReturnType<typeof defineSecret>)[]
+});
 
 // ====== IMPORTS PRINCIPAUX ======
 import { onRequest, onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { defineSecret, defineString } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import type { Request as ExpressRequest, Response } from 'express';
 
-// 🆕 Cloud Tasks helper (réutilise ton fichier existant)
+// 🦾 Cloud Tasks helper (réutilise ton fichier existant)
 import { scheduleCallTask } from './lib/tasks';
 
 // ====== IMPORTS DES MODULES PRINCIPAUX (RECTIFIÉS) ======
 import { createAndScheduleCallHTTPS } from "./createAndScheduleCallFunction";
 import { runExecuteCallTask } from "./runtime/executeCallTask";
 
-// ⚠️ Les secrets Twilio DOIVENT venir de lib/twilio (PAS de createAndScheduleCallFunction)
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from "./lib/twilio";
+
 
 ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
 
@@ -77,6 +76,8 @@ export const STRIPE_SECRET_KEY_LIVE = defineSecret('STRIPE_SECRET_KEY_LIVE');
 // Webhook secrets Stripe (secrets)
 export const STRIPE_WEBHOOK_SECRET_TEST = defineSecret('STRIPE_WEBHOOK_SECRET_TEST');
 export const STRIPE_WEBHOOK_SECRET_LIVE = defineSecret('STRIPE_WEBHOOK_SECRET_LIVE');
+
+export { enqueueMessageEvent } from "./messaging/enqueueMessageEvent";
 
 // Secret partagé pour authentifier les Cloud Tasks → /executeCallTask
 export const TASKS_AUTH_SECRET = defineSecret('TASKS_AUTH_SECRET');
@@ -156,7 +157,7 @@ export interface TwilioCallManager {
   cleanupOldSessions(opts: { olderThanDays: number; keepCompletedDays: number; batchSize: number }): Promise<CleanupResult>;
 }
 
-// ====== INITIALISATION FIREBASE ULTRA-DEBUGGÉE ======
+// ====== INITIALISATION FIREBASE ULTRA-DÉBUGGÉE ======
 let isFirebaseInitialized = false;
 let db: admin.firestore.Firestore;
 let initializationError: Error | null = null;
@@ -221,7 +222,7 @@ const initializeFirebase = traceFunction(() => {
   return db;
 }, 'initializeFirebase', 'INDEX');
 
-// ====== LAZY LOADING DES MANAGERS ULTRA-DEBUGGÉ ======
+// ====== LAZY LOADING DES MANAGERS ULTRA-DÉBUGGÉ ======
 const stripeManagerInstance: unknown = null; // placeholder
 let twilioCallManagerInstance: TwilioCallManager | null = null; // réassigné après import
 const messageManagerInstance: unknown = null; // placeholder
@@ -350,7 +351,7 @@ export { createPaymentIntent } from './createPaymentIntent';
 export { api } from './adminApi';
 
 // ✅ Un seul webhook Twilio unifié (les legacy ne doivent plus être exportés)
-export { unifiedWebhook } from './webhooks/unifiedWebhook';
+export { unifiedWebhook } from './Webhooks/unifiedWebhook';
 
 // Utilitaires complémentaires
 export { initializeMessageTemplates } from './initializeMessageTemplates';
@@ -359,20 +360,21 @@ export { notifyAfterPayment } from './notifications/notifyAfterPayment';
 ultraLogger.info('EXPORTS', 'Exports directs configurés');
 
 // ========================================
-// 🆕 ENDPOINT CLOUD TASKS : exécuter l'appel (avec parallélisme)
+// 🦾 ENDPOINT CLOUD TASKS : exécuter l'appel (US-CENTRAL1 rectifié)
 // ========================================
 export const executeCallTask = onRequest(
   {
-    ...criticalConfig,
-    timeoutSeconds: 120,
-    // ✅ Secrets requis pour le handler + authentification Cloud Tasks
-    secrets: [TASKS_AUTH_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER],
+    region: "us-central1",
+    secrets: [TASKS_AUTH_SECRET],
+    timeoutSeconds: 60,
+    memory: "256MiB",
   },
-  async (req, res) => { await runExecuteCallTask(req as unknown as FirebaseRequest, res); }
+  (req, res) => runExecuteCallTask(req as any, res as any)
 );
 
+
 // ========================================
-// FONCTIONS ADMIN ULTRA-DEBUGGÉES (V2)
+// FONCTIONS ADMIN ULTRA-DÉBUGGÉES (V2)
 // ========================================
 export const adminUpdateStatus = onCall(
   {
@@ -514,7 +516,7 @@ export const adminBulkUpdateStatus = onCall(
 );
 
 // ========================================
-// CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE (MIGRÉ)
+// CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DÉBUGGÉE (MIGRÉ)
 // ========================================
 let stripe: Stripe | null = null;
 
@@ -559,15 +561,21 @@ const getStripe = traceFunction((): Stripe | null => {
   return stripe;
 }, 'getStripe', 'INDEX');
 
-// ====== WEBHOOK STRIPE ULTRA-DEBUGGÉ ======
+// ====== WEBHOOK STRIPE ULTRA-DÉBUGGÉ ======
 export const stripeWebhook = onRequest(
   {
-    ...criticalConfig,
+    region: "europe-west1",
+    memory: "512MiB",
+    concurrency: 1,
     timeoutSeconds: 30,
-    // ❗️Ne PAS inclure STRIPE_MODE ici (c'est un param, pas un secret)
+    minInstances: 0, // ou 1 si tu veux éviter le cold start
+    maxInstances: 5,
+    // ⛔️Ne PAS inclure STRIPE_MODE ici (c'est un param, pas un secret)
     secrets: [
-      STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE,
-      STRIPE_WEBHOOK_SECRET_TEST, STRIPE_WEBHOOK_SECRET_LIVE,
+      STRIPE_SECRET_KEY_TEST,
+      STRIPE_SECRET_KEY_LIVE,
+      STRIPE_WEBHOOK_SECRET_TEST,
+      STRIPE_WEBHOOK_SECRET_LIVE,
       TASKS_AUTH_SECRET
     ],
   },
@@ -905,7 +913,7 @@ const handlePaymentIntentRequiresAction = traceFunction(async (paymentIntent: St
 }, 'handlePaymentIntentRequiresAction', 'STRIPE_WEBHOOKS');
 
 // ========================================
-// FONCTIONS CRON POUR MAINTENANCE ULTRA-DEBUGGÉES
+// FONCTIONS CRON POUR MAINTENANCE ULTRA-DÉBUGGÉES
 // ========================================
 export const scheduledFirestoreExport = onSchedule(
   {
@@ -924,7 +932,7 @@ export const scheduledFirestoreExport = onSchedule(
     logFunctionStart(metadata);
 
     try {
-      ultraLogger.info('SCHEDULED_BACKUP', 'Démarrage sauvegarde automatique');
+      ultraLogger.info('SCHEDULED_BACKUP', 'Décollage sauvegarde automatique');
 
       const database = initializeFirebase();
       const projectId = process.env.GCLOUD_PROJECT;
@@ -1143,7 +1151,7 @@ export const generateSystemDebugReport = onCall(
           systemUptime: systemInfo.uptime,
           recentErrorsCount: recentErrors.length,
           managersLoaded: Object.values(managersState).filter(Boolean).length,
-          memoryUsage: (systemInfo.memoryUsage as any).heapUsed,
+          memoryUsage: (systemInfo as any).memoryUsage.heapUsed,
         },
         downloadUrl: `/admin/debug-reports/${reportId}`,
       };
@@ -1576,3 +1584,7 @@ ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
 export { ultraLogger };
 
 ultraLogger.info('INDEX_EXPORTS_COMPLETE', 'Toutes les fonctions exportées et configurées avec ultra debug');
+export { admin_templates_seed } from "./admin/callables";
+export { onMessageEventCreate } from "./notificationPipeline/worker";
+
+void _criticalConfig;

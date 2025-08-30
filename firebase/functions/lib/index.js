@@ -1,5 +1,5 @@
 "use strict";
-// functions/src/index.ts - Version rectifiée avec gestion TEST/LIVE + migration functions.config() → secrets
+/* eslint-disable @typescript-eslint/no-explicit-any */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ultraLogger = exports.testWebhook = exports.manuallyTriggerCallExecution = exports.getCloudTasksQueueStats = exports.testCloudTasksConnection = exports.getUltraDebugLogs = exports.getSystemHealthStatus = exports.generateSystemDebugReport = exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.adminBulkUpdateStatus = exports.adminSoftDeleteUser = exports.adminUpdateStatus = exports.executeCallTask = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.modernRecordingWebhook = exports.modernConferenceWebhook = exports.twilioRecordingWebhook = exports.twilioConferenceWebhook = exports.twilioCallWebhook = exports.api = exports.createPaymentIntent = exports.createAndScheduleCall = exports.createAndScheduleCallHTTPS = void 0;
+exports.onMessageEventCreate = exports.admin_templates_seed = exports.ultraLogger = exports.testWebhook = exports.manuallyTriggerCallExecution = exports.getCloudTasksQueueStats = exports.testCloudTasksConnection = exports.getUltraDebugLogs = exports.getSystemHealthStatus = exports.generateSystemDebugReport = exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.adminBulkUpdateStatus = exports.adminSoftDeleteUser = exports.adminUpdateStatus = exports.executeCallTask = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.unifiedWebhook = exports.api = exports.createPaymentIntent = exports.createAndScheduleCall = exports.createAndScheduleCallHTTPS = exports.TASKS_AUTH_SECRET = exports.STRIPE_WEBHOOK_SECRET_LIVE = exports.STRIPE_WEBHOOK_SECRET_TEST = exports.STRIPE_SECRET_KEY_LIVE = exports.STRIPE_SECRET_KEY_TEST = exports.STRIPE_MODE = exports.EMAIL_PASS = exports.EMAIL_USER = void 0;
 // ====== ULTRA DEBUG INITIALIZATION ======
 const ultraDebugLogger_1 = require("./utils/ultraDebugLogger");
 Object.defineProperty(exports, "ultraLogger", { enumerable: true, get: function () { return ultraDebugLogger_1.ultraLogger; } });
@@ -45,6 +45,23 @@ Object.defineProperty(exports, "ultraLogger", { enumerable: true, get: function 
 (0, ultraDebugLogger_1.traceGlobalImport)('firebase-functions/v2', 'index.ts');
 (0, ultraDebugLogger_1.traceGlobalImport)('firebase-admin', 'index.ts');
 (0, ultraDebugLogger_1.traceGlobalImport)('stripe', 'index.ts');
+// === CPU/MEM CONFIGS to control vCPU usage ===
+const emergencyConfig = {
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1
+};
+const _criticalConfig = {
+    region: "europe-west1",
+    memory: "512MiB",
+    cpu: 0.5,
+    maxInstances: 5,
+    minInstances: 1,
+    concurrency: 3
+};
 ultraDebugLogger_1.ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index.ts', {
     timestamp: Date.now(),
     nodeVersion: process.version,
@@ -52,51 +69,57 @@ ultraDebugLogger_1.ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisati
 });
 // ====== CONFIGURATION GLOBALE ======
 const v2_1 = require("firebase-functions/v2");
-const globalConfig = {
-    region: 'europe-west1',
-};
-(0, v2_1.setGlobalOptions)(globalConfig);
-ultraDebugLogger_1.ultraLogger.debug('GLOBAL_CONFIG', 'Configuration globale Firebase Functions', globalConfig);
-ultraDebugLogger_1.ultraLogger.info('GLOBAL_CONFIG', 'Configuration globale Firebase Functions appliquée', globalConfig);
+const params_1 = require("firebase-functions/params");
+// ⬇️ Secrets email : définis ici UNE SEULE FOIS
+exports.EMAIL_USER = (0, params_1.defineSecret)("EMAIL_USER");
+exports.EMAIL_PASS = (0, params_1.defineSecret)("EMAIL_PASS");
+// ⬇️ Un seul setGlobalOptions dans tout le repo
+(0, v2_1.setGlobalOptions)({
+    region: "europe-west1",
+    secrets: ([exports.EMAIL_USER, exports.EMAIL_PASS])
+});
 // ====== IMPORTS PRINCIPAUX ======
 const https_1 = require("firebase-functions/v2/https");
-const https_2 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
-const params_1 = require("firebase-functions/params"); // ✅ secrets + params
 const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
-// 🆕 Cloud Tasks helper (réutilise ton fichier existant)
+// 🦾 Cloud Tasks helper (réutilise ton fichier existant)
 const tasks_1 = require("./lib/tasks");
 // ====== IMPORTS DES MODULES PRINCIPAUX (RECTIFIÉS) ======
 const createAndScheduleCallFunction_1 = require("./createAndScheduleCallFunction");
 Object.defineProperty(exports, "createAndScheduleCallHTTPS", { enumerable: true, get: function () { return createAndScheduleCallFunction_1.createAndScheduleCallHTTPS; } });
 Object.defineProperty(exports, "createAndScheduleCall", { enumerable: true, get: function () { return createAndScheduleCallFunction_1.createAndScheduleCallHTTPS; } });
 const executeCallTask_1 = require("./runtime/executeCallTask");
-// ⚠️ Les secrets Twilio DOIVENT venir de lib/twilio (PAS de createAndScheduleCallFunction)
-const twilio_1 = require("./lib/twilio");
 ultraDebugLogger_1.ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
-// ====== SECRETS / PARAMS (NOUVEAU : TEST vs LIVE) ======
-const STRIPE_MODE = (0, params_1.defineSecret)('STRIPE_MODE'); // 'test' | 'live'
-// Clés Stripe
-const STRIPE_SECRET_KEY_TEST = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_TEST');
-const STRIPE_SECRET_KEY_LIVE = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_LIVE');
-// Webhook secrets Stripe
-const STRIPE_WEBHOOK_SECRET_TEST = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET_TEST');
-const STRIPE_WEBHOOK_SECRET_LIVE = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET_LIVE');
+// ====== PARAMS & SECRETS (TEST vs LIVE) ======
+// 👉 STRIPE_MODE est un PARAMÈTRE (pas un secret) pour éviter le conflit secret/env
+exports.STRIPE_MODE = (0, params_1.defineString)('STRIPE_MODE'); // 'test' | 'live'
+// Clés Stripe (secrets)
+exports.STRIPE_SECRET_KEY_TEST = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_TEST');
+exports.STRIPE_SECRET_KEY_LIVE = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_LIVE');
+// Webhook secrets Stripe (secrets)
+exports.STRIPE_WEBHOOK_SECRET_TEST = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET_TEST');
+exports.STRIPE_WEBHOOK_SECRET_LIVE = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET_LIVE');
 // Secret partagé pour authentifier les Cloud Tasks → /executeCallTask
-const TASKS_AUTH_SECRET = (0, params_1.defineSecret)('TASKS_AUTH_SECRET');
-// Helpers de sélection de secrets selon le mode
+exports.TASKS_AUTH_SECRET = (0, params_1.defineSecret)('TASKS_AUTH_SECRET');
+// Helpers de sélection de secrets selon le mode (évalués à l'exécution uniquement)
 function isLive() {
-    return (STRIPE_MODE.value() || 'test').toLowerCase() === 'live';
+    // ⚠️ N'appelez pas .value() en top-level : ces helpers sont utilisés UNIQUEMENT dans les handlers
+    return (exports.STRIPE_MODE.value() || 'test').toLowerCase() === 'live';
 }
 function getStripeSecretKey() {
-    return isLive() ? STRIPE_SECRET_KEY_LIVE.value() : STRIPE_SECRET_KEY_TEST.value();
+    // Les secrets sont injectés en variables d'environnement dans les fonctions qui les déclarent dans `secrets:[...]`
+    return isLive()
+        ? (process.env.STRIPE_SECRET_KEY_LIVE || '')
+        : (process.env.STRIPE_SECRET_KEY_TEST || '');
 }
 function getStripeWebhookSecret() {
-    return isLive() ? STRIPE_WEBHOOK_SECRET_LIVE.value() : STRIPE_WEBHOOK_SECRET_TEST.value();
+    return isLive()
+        ? (process.env.STRIPE_WEBHOOK_SECRET_LIVE || '')
+        : (process.env.STRIPE_WEBHOOK_SECRET_TEST || '');
 }
 ultraDebugLogger_1.ultraLogger.debug('TYPES', 'Interfaces et types définis');
-// ====== INITIALISATION FIREBASE ULTRA-DEBUGGÉE ======
+// ====== INITIALISATION FIREBASE ULTRA-DÉBUGGÉE ======
 let isFirebaseInitialized = false;
 let db;
 let initializationError = null;
@@ -151,14 +174,13 @@ const initializeFirebase = (0, ultraDebugLogger_1.traceFunction)(() => {
     }
     return db;
 }, 'initializeFirebase', 'INDEX');
-// ====== LAZY LOADING DES MANAGERS ULTRA-DEBUGGÉ ======
-const stripeManagerInstance = null; // jamais réassigné
+// ====== LAZY LOADING DES MANAGERS ULTRA-DÉBUGGÉ ======
+const stripeManagerInstance = null; // placeholder
 let twilioCallManagerInstance = null; // réassigné après import
-const messageManagerInstance = null; // jamais réassigné
+const messageManagerInstance = null; // placeholder
 const getTwilioCallManager = (0, ultraDebugLogger_1.traceFunction)(async () => {
     var _a;
     if (!twilioCallManagerInstance) {
-        // On type l'import pour éviter 'any'
         const mod = (await Promise.resolve().then(() => __importStar(require('./TwilioCallManager'))));
         const resolved = (_a = mod.twilioCallManager) !== null && _a !== void 0 ? _a : mod.default;
         if (!resolved) {
@@ -261,35 +283,28 @@ var createPaymentIntent_1 = require("./createPaymentIntent");
 Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: function () { return createPaymentIntent_1.createPaymentIntent; } });
 var adminApi_1 = require("./adminApi");
 Object.defineProperty(exports, "api", { enumerable: true, get: function () { return adminApi_1.api; } });
-var twilioWebhooks_1 = require("./Webhooks/twilioWebhooks");
-Object.defineProperty(exports, "twilioCallWebhook", { enumerable: true, get: function () { return twilioWebhooks_1.twilioCallWebhook; } });
-Object.defineProperty(exports, "twilioConferenceWebhook", { enumerable: true, get: function () { return twilioWebhooks_1.twilioConferenceWebhook; } });
-Object.defineProperty(exports, "twilioRecordingWebhook", { enumerable: true, get: function () { return twilioWebhooks_1.twilioRecordingWebhook; } });
-var TwilioConferenceWebhook_1 = require("./Webhooks/TwilioConferenceWebhook");
-Object.defineProperty(exports, "modernConferenceWebhook", { enumerable: true, get: function () { return TwilioConferenceWebhook_1.twilioConferenceWebhook; } });
-var TwilioRecordingWebhook_1 = require("./Webhooks/TwilioRecordingWebhook");
-Object.defineProperty(exports, "modernRecordingWebhook", { enumerable: true, get: function () { return TwilioRecordingWebhook_1.TwilioRecordingWebhook; } });
+// ✅ Un seul webhook Twilio unifié (les legacy ne doivent plus être exportés)
+var unifiedWebhook_1 = require("./Webhooks/unifiedWebhook");
+Object.defineProperty(exports, "unifiedWebhook", { enumerable: true, get: function () { return unifiedWebhook_1.unifiedWebhook; } });
+// Utilitaires complémentaires
 var initializeMessageTemplates_1 = require("./initializeMessageTemplates");
 Object.defineProperty(exports, "initializeMessageTemplates", { enumerable: true, get: function () { return initializeMessageTemplates_1.initializeMessageTemplates; } });
 var notifyAfterPayment_1 = require("./notifications/notifyAfterPayment");
 Object.defineProperty(exports, "notifyAfterPayment", { enumerable: true, get: function () { return notifyAfterPayment_1.notifyAfterPayment; } });
 ultraDebugLogger_1.ultraLogger.info('EXPORTS', 'Exports directs configurés');
 // ========================================
-// 🆕 ENDPOINT CLOUD TASKS : exécuter l'appel (avec parallélisme)
+// 🦾 ENDPOINT CLOUD TASKS : exécuter l'appel (US-CENTRAL1 rectifié)
 // ========================================
 exports.executeCallTask = (0, https_1.onRequest)({
-    region: "europe-west1",
+    region: "us-central1",
+    secrets: [exports.TASKS_AUTH_SECRET],
+    timeoutSeconds: 60,
     memory: "256MiB",
-    timeoutSeconds: 120,
-    maxInstances: 10, // ✅ Nb max d'instances simultanées
-    concurrency: 80, // ✅ Nb de requêtes traitées en parallèle par instance
-    // ✅ Secrets requis pour le handler + authentification Cloud Tasks
-    secrets: [TASKS_AUTH_SECRET, twilio_1.TWILIO_ACCOUNT_SID, twilio_1.TWILIO_AUTH_TOKEN, twilio_1.TWILIO_PHONE_NUMBER],
-}, async (req, res) => { await (0, executeCallTask_1.runExecuteCallTask)(req, res); });
+}, (req, res) => (0, executeCallTask_1.runExecuteCallTask)(req, res));
 // ========================================
-// FONCTIONS ADMIN ULTRA-DEBUGGÉES (V2)
+// FONCTIONS ADMIN ULTRA-DÉBUGGÉES (V2)
 // ========================================
-exports.adminUpdateStatus = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 30 }, wrapCallableFunction('adminUpdateStatus', async (request) => {
+exports.adminUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30 }), wrapCallableFunction('adminUpdateStatus', async (request) => {
     var _a, _b, _c, _d, _e, _f;
     const database = initializeFirebase();
     ultraDebugLogger_1.ultraLogger.debug('ADMIN_UPDATE_STATUS', 'Vérification des permissions admin', {
@@ -301,7 +316,7 @@ exports.adminUpdateStatus = (0, https_2.onCall)({ cors: true, memory: '256MiB', 
             userId: (_d = request.auth) === null || _d === void 0 ? void 0 : _d.uid,
             userRole: (_f = (_e = request.auth) === null || _e === void 0 ? void 0 : _e.token) === null || _f === void 0 ? void 0 : _f.role,
         });
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     const { userId, status, reason } = request.data;
     ultraDebugLogger_1.ultraLogger.info('ADMIN_UPDATE_STATUS', 'Mise à jour du statut utilisateur', {
@@ -328,14 +343,14 @@ exports.adminUpdateStatus = (0, https_2.onCall)({ cors: true, memory: '256MiB', 
     });
     return { ok: true };
 }));
-exports.adminSoftDeleteUser = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 30 }, wrapCallableFunction('adminSoftDeleteUser', async (request) => {
+exports.adminSoftDeleteUser = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30 }), wrapCallableFunction('adminSoftDeleteUser', async (request) => {
     var _a, _b;
     const database = initializeFirebase();
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
         ultraDebugLogger_1.ultraLogger.warn('ADMIN_SOFT_DELETE', 'Accès refusé', {
             userId: (_b = request.auth) === null || _b === void 0 ? void 0 : _b.uid,
         });
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     const { userId, reason } = request.data;
     ultraDebugLogger_1.ultraLogger.info('ADMIN_SOFT_DELETE', 'Suppression soft de l\'utilisateur', {
@@ -358,11 +373,11 @@ exports.adminSoftDeleteUser = (0, https_2.onCall)({ cors: true, memory: '256MiB'
     });
     return { ok: true };
 }));
-exports.adminBulkUpdateStatus = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 30 }, wrapCallableFunction('adminBulkUpdateStatus', async (request) => {
+exports.adminBulkUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30 }), wrapCallableFunction('adminBulkUpdateStatus', async (request) => {
     var _a;
     const database = initializeFirebase();
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     const { ids, status, reason } = request.data;
     ultraDebugLogger_1.ultraLogger.info('ADMIN_BULK_UPDATE', 'Mise à jour en lot', {
@@ -389,7 +404,7 @@ exports.adminBulkUpdateStatus = (0, https_2.onCall)({ cors: true, memory: '256Mi
     return { ok: true };
 }));
 // ========================================
-// CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DEBUGGÉE (MIGRÉ)
+// CONFIGURATION SÉCURISÉE DES SERVICES ULTRA-DÉBUGGÉE (MIGRÉ)
 // ========================================
 let stripe = null;
 const getStripe = (0, ultraDebugLogger_1.traceFunction)(() => {
@@ -427,17 +442,21 @@ const getStripe = (0, ultraDebugLogger_1.traceFunction)(() => {
     }
     return stripe;
 }, 'getStripe', 'INDEX');
-// ====== WEBHOOK STRIPE UNIFIÉ ULTRA-DEBUGGÉ (MIGRÉ) ======
+// ====== WEBHOOK STRIPE ULTRA-DÉBUGGÉ ======
 exports.stripeWebhook = (0, https_1.onRequest)({
-    region: 'europe-west1',
-    memory: '256MiB',
+    region: "europe-west1",
+    memory: "512MiB",
+    concurrency: 1,
     timeoutSeconds: 30,
-    // ❌ rawBody: true retiré en v2 (on garde l'accès à req.rawBody fourni par la plateforme)
+    minInstances: 0, // ou 1 si tu veux éviter le cold start
+    maxInstances: 5,
+    // ⛔️Ne PAS inclure STRIPE_MODE ici (c'est un param, pas un secret)
     secrets: [
-        STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE,
-        STRIPE_WEBHOOK_SECRET_TEST, STRIPE_WEBHOOK_SECRET_LIVE,
-        TASKS_AUTH_SECRET,
-        STRIPE_MODE,
+        exports.STRIPE_SECRET_KEY_TEST,
+        exports.STRIPE_SECRET_KEY_LIVE,
+        exports.STRIPE_WEBHOOK_SECRET_TEST,
+        exports.STRIPE_WEBHOOK_SECRET_LIVE,
+        exports.TASKS_AUTH_SECRET
     ],
 }, wrapHttpFunction('stripeWebhook', async (req, res) => {
     var _a, _b;
@@ -493,7 +512,6 @@ exports.stripeWebhook = (0, https_1.onRequest)({
                 const cs = event.data.object;
                 const callSessionId = ((_a = cs.metadata) === null || _a === void 0 ? void 0 : _a.callSessionId) || ((_b = cs.metadata) === null || _b === void 0 ? void 0 : _b.sessionId);
                 if (callSessionId) {
-                    // ✅ FIX: Utiliser call_sessions (snake_case) au lieu de callSessions
                     await database
                         .collection('call_sessions')
                         .doc(callSessionId)
@@ -569,9 +587,7 @@ const handlePaymentIntentSucceeded = (0, ultraDebugLogger_1.traceFunction)(async
             ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Déclenchement des notifications post-paiement', {
                 callSessionId: paymentIntent.metadata.callSessionId,
             });
-            // 🆕 Planification de l'appel à +5 minutes
             const callSessionId = paymentIntent.metadata.callSessionId;
-            // ✅ FIX: Utiliser call_sessions (snake_case) au lieu de callSessions
             await database
                 .collection('call_sessions')
                 .doc(callSessionId)
@@ -707,16 +723,23 @@ const handlePaymentIntentRequiresAction = (0, ultraDebugLogger_1.traceFunction)(
     }
 }, 'handlePaymentIntentRequiresAction', 'STRIPE_WEBHOOKS');
 // ========================================
-// FONCTIONS CRON POUR MAINTENANCE ULTRA-DEBUGGÉES
+// FONCTIONS CRON POUR MAINTENANCE ULTRA-DÉBUGGÉES
 // ========================================
 exports.scheduledFirestoreExport = (0, scheduler_1.onSchedule)({
+    // ultra sobre pour passer le quota CPU au déploiement
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.25,
+    maxInstances: 1,
+    minInstances: 0,
+    concurrency: 1,
     schedule: '0 2 * * *',
     timeZone: 'Europe/Paris',
 }, async () => {
     const metadata = createDebugMetadata('scheduledFirestoreExport');
     logFunctionStart(metadata);
     try {
-        ultraDebugLogger_1.ultraLogger.info('SCHEDULED_BACKUP', 'Démarrage sauvegarde automatique');
+        ultraDebugLogger_1.ultraLogger.info('SCHEDULED_BACKUP', 'Décollage sauvegarde automatique');
         const database = initializeFirebase();
         const projectId = process.env.GCLOUD_PROJECT;
         const bucketName = `${projectId}-backups`;
@@ -766,6 +789,12 @@ exports.scheduledFirestoreExport = (0, scheduler_1.onSchedule)({
     }
 });
 exports.scheduledCleanup = (0, scheduler_1.onSchedule)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.25,
+    maxInstances: 1,
+    minInstances: 0,
+    concurrency: 1,
     schedule: '0 3 * * 0',
     timeZone: 'Europe/Paris',
 }, async () => {
@@ -815,10 +844,10 @@ exports.scheduledCleanup = (0, scheduler_1.onSchedule)({
 // ========================================
 // FONCTION DE DEBUG SYSTÈME
 // ========================================
-exports.generateSystemDebugReport = (0, https_2.onCall)({ cors: true, memory: '512MiB', timeoutSeconds: 120 }, wrapCallableFunction('generateSystemDebugReport', async (request) => {
+exports.generateSystemDebugReport = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 120 }), wrapCallableFunction('generateSystemDebugReport', async (request) => {
     var _a;
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     ultraDebugLogger_1.ultraLogger.info('SYSTEM_DEBUG_REPORT', 'Génération rapport de debug système');
     try {
@@ -881,16 +910,16 @@ exports.generateSystemDebugReport = (0, https_2.onCall)({ cors: true, memory: '5
     }
     catch (error) {
         ultraDebugLogger_1.ultraLogger.error('SYSTEM_DEBUG_REPORT', 'Erreur génération rapport debug', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined);
-        throw new https_2.HttpsError('internal', 'Failed to generate debug report');
+        throw new https_1.HttpsError('internal', 'Failed to generate debug report');
     }
 }));
 // ========================================
 // FONCTION DE MONITORING EN TEMPS RÉEL
 // ========================================
-exports.getSystemHealthStatus = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 30 }, wrapCallableFunction('getSystemHealthStatus', async (request) => {
+exports.getSystemHealthStatus = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30 }), wrapCallableFunction('getSystemHealthStatus', async (request) => {
     var _a;
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     ultraDebugLogger_1.ultraLogger.debug('SYSTEM_HEALTH_CHECK', 'Vérification état système');
     try {
@@ -987,10 +1016,10 @@ exports.getSystemHealthStatus = (0, https_2.onCall)({ cors: true, memory: '256Mi
 // ========================================
 // LOGS DEBUG ULTRA
 // ========================================
-exports.getUltraDebugLogs = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 30 }, wrapCallableFunction('getUltraDebugLogs', async (request) => {
+exports.getUltraDebugLogs = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30 }), wrapCallableFunction('getUltraDebugLogs', async (request) => {
     var _a;
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     const { limit = 100, level } = request.data || {};
     try {
@@ -1010,16 +1039,16 @@ exports.getUltraDebugLogs = (0, https_2.onCall)({ cors: true, memory: '256MiB', 
     }
     catch (error) {
         ultraDebugLogger_1.ultraLogger.error('GET_ULTRA_DEBUG_LOGS', 'Erreur récupération logs', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined);
-        throw new https_2.HttpsError('internal', 'Failed to retrieve logs');
+        throw new https_1.HttpsError('internal', 'Failed to retrieve logs');
     }
 }));
 // ========================================
 // FONCTIONS DE TEST ET UTILITAIRES
 // ========================================
-exports.testCloudTasksConnection = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 60 }, wrapCallableFunction('testCloudTasksConnection', async (request) => {
+exports.testCloudTasksConnection = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 60 }), wrapCallableFunction('testCloudTasksConnection', async (request) => {
     var _a, _b;
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     try {
         ultraDebugLogger_1.ultraLogger.info('TEST_CLOUD_TASKS', 'Test de connexion Cloud Tasks');
@@ -1040,13 +1069,13 @@ exports.testCloudTasksConnection = (0, https_2.onCall)({ cors: true, memory: '25
     }
     catch (error) {
         ultraDebugLogger_1.ultraLogger.error('TEST_CLOUD_TASKS', 'Erreur test Cloud Tasks', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined);
-        throw new https_2.HttpsError('internal', `Test Cloud Tasks échoué: ${error instanceof Error ? error.message : error}`);
+        throw new https_1.HttpsError('internal', `Test Cloud Tasks échoué: ${error instanceof Error ? error.message : error}`);
     }
 }));
-exports.getCloudTasksQueueStats = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 30 }, wrapCallableFunction('getCloudTasksQueueStats', async (request) => {
+exports.getCloudTasksQueueStats = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30 }), wrapCallableFunction('getCloudTasksQueueStats', async (request) => {
     var _a;
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     try {
         ultraDebugLogger_1.ultraLogger.info('QUEUE_STATS', 'Récupération statistiques queue Cloud Tasks');
@@ -1069,17 +1098,17 @@ exports.getCloudTasksQueueStats = (0, https_2.onCall)({ cors: true, memory: '256
     }
     catch (error) {
         ultraDebugLogger_1.ultraLogger.error('QUEUE_STATS', 'Erreur récupération statistiques queue', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined);
-        throw new https_2.HttpsError('internal', `Erreur récupération stats: ${error instanceof Error ? error.message : error}`);
+        throw new https_1.HttpsError('internal', `Erreur récupération stats: ${error instanceof Error ? error.message : error}`);
     }
 }));
-exports.manuallyTriggerCallExecution = (0, https_2.onCall)({ cors: true, memory: '256MiB', timeoutSeconds: 60 }, wrapCallableFunction('manuallyTriggerCallExecution', async (request) => {
+exports.manuallyTriggerCallExecution = (0, https_1.onCall)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 60 }), wrapCallableFunction('manuallyTriggerCallExecution', async (request) => {
     var _a, _b;
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new https_2.HttpsError('permission-denied', 'Admin access required');
+        throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
     const { callSessionId } = request.data;
     if (!callSessionId) {
-        throw new https_2.HttpsError('invalid-argument', 'callSessionId requis');
+        throw new https_1.HttpsError('invalid-argument', 'callSessionId requis');
     }
     try {
         ultraDebugLogger_1.ultraLogger.info('MANUAL_CALL_TRIGGER', 'Déclenchement manuel d\'appel', {
@@ -1090,7 +1119,7 @@ exports.manuallyTriggerCallExecution = (0, https_2.onCall)({ cors: true, memory:
         const database = initializeFirebase();
         const sessionDoc = await database.collection('call_sessions').doc(callSessionId).get();
         if (!sessionDoc.exists) {
-            throw new https_2.HttpsError('not-found', `Session ${callSessionId} introuvable`);
+            throw new https_1.HttpsError('not-found', `Session ${callSessionId} introuvable`);
         }
         const sessionData = sessionDoc.data();
         ultraDebugLogger_1.ultraLogger.info('MANUAL_CALL_TRIGGER', 'Session trouvée', {
@@ -1123,22 +1152,17 @@ exports.manuallyTriggerCallExecution = (0, https_2.onCall)({ cors: true, memory:
             error: error instanceof Error ? error.message : String(error),
             triggeredBy: request.auth.uid,
         }, error instanceof Error ? error : undefined);
-        throw new https_2.HttpsError('internal', `Erreur déclenchement appel: ${error instanceof Error ? error.message : error}`);
+        throw new https_1.HttpsError('internal', `Erreur déclenchement appel: ${error instanceof Error ? error.message : error}`);
     }
 }));
 // ========================================
 // WEBHOOK DE TEST POUR CLOUD TASKS
 // ========================================
-exports.testWebhook = (0, https_1.onRequest)({
-    region: 'europe-west1',
-    memory: '128MiB',
-    timeoutSeconds: 30,
-    secrets: [TASKS_AUTH_SECRET],
-}, wrapHttpFunction('testWebhook', async (req, res) => {
+exports.testWebhook = (0, https_1.onRequest)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30, secrets: [exports.TASKS_AUTH_SECRET] }), wrapHttpFunction('testWebhook', async (req, res) => {
     try {
         // Vérification de l'authentification Cloud Tasks
         const authHeader = req.get('X-Task-Auth') || '';
-        const expectedAuth = TASKS_AUTH_SECRET.value() || '';
+        const expectedAuth = process.env.TASKS_AUTH_SECRET || '';
         if (authHeader !== expectedAuth) {
             ultraDebugLogger_1.ultraLogger.warn('TEST_WEBHOOK', 'Authentification échouée', {
                 hasAuthHeader: !!authHeader,
@@ -1182,10 +1206,14 @@ exports.testWebhook = (0, https_1.onRequest)({
 // INITIALISATION FINALE ET LOGS DE DÉMARRAGE
 // ========================================
 ultraDebugLogger_1.ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
-    totalFunctions: 22, // Mis à jour avec les nouvelles fonctions
+    totalFunctions: 22, // ajuster si nécessaire
     environment: process.env.NODE_ENV || 'development',
     memoryUsage: process.memoryUsage(),
-    loadTime: Date.now() - parseInt(process.env.LOAD_START_TIME || '0') || 'unknown',
 });
 ultraDebugLogger_1.ultraLogger.info('INDEX_EXPORTS_COMPLETE', 'Toutes les fonctions exportées et configurées avec ultra debug');
+var callables_1 = require("./admin/callables");
+Object.defineProperty(exports, "admin_templates_seed", { enumerable: true, get: function () { return callables_1.admin_templates_seed; } });
+var worker_1 = require("./notificationPipeline/worker");
+Object.defineProperty(exports, "onMessageEventCreate", { enumerable: true, get: function () { return worker_1.onMessageEventCreate; } });
+void _criticalConfig;
 //# sourceMappingURL=index.js.map

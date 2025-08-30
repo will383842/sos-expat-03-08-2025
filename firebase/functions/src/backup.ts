@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import { google } from "googleapis";
 import { Storage } from "@google-cloud/storage";
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { Request, Response } from 'express';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -202,8 +203,8 @@ const _startBackup = onCall(async (request) => {
   return await runBackupInternal('manual', request.auth.uid);
 });
 
-// 2) Fonction v2 pour backup manuel (remplace la v1)
-const manualBackup = onCall(async (request) => {
+// 2) Fonction v2 pour backup manuel (remplace la v1) - EXPORTED
+export const manualBackup = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Connexion requise.");
   }
@@ -237,8 +238,8 @@ const _scheduledBackup = onRequest(async (req, res) => {
   }
 });
 
-// 4) Fonction pour lister les sauvegardes
-const listBackups = onCall(async (request) => {
+// 4) Fonction pour lister les sauvegardes - EXPORTED
+export const listBackups = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
@@ -271,9 +272,6 @@ const listBackups = onCall(async (request) => {
 
 // === Reduced public surface ===
 // Keep only: nightlyBackup, startBackupHttp, restoreFromBackup
-
-import { Request, Response } from 'express';
-import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 
 export const nightlyBackup = onRequest(
   { region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 },

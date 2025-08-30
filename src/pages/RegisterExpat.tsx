@@ -1,4 +1,4 @@
-// src/pages/RegisterExpat.tsx
+﻿// src/pages/RegisterExpat.tsx
 import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -34,30 +34,30 @@ const COUNTRIES: Duo[] = [
   { fr: 'Afghanistan', en: 'Afghanistan' },
   { fr: 'Afrique du Sud', en: 'South Africa' },
   { fr: 'Albanie', en: 'Albania' },
-  { fr: 'Algérie', en: 'Algeria' },
+  { fr: 'AlgÃ©rie', en: 'Algeria' },
   { fr: 'Allemagne', en: 'Germany' },
   { fr: 'Andorre', en: 'Andorra' },
   { fr: 'Angola', en: 'Angola' },
   { fr: 'Arabie Saoudite', en: 'Saudi Arabia' },
   { fr: 'Argentine', en: 'Argentina' },
-  { fr: 'Arménie', en: 'Armenia' },
+  { fr: 'ArmÃ©nie', en: 'Armenia' },
   { fr: 'Australie', en: 'Australia' },
   { fr: 'Autriche', en: 'Austria' },
-  { fr: 'Azerbaïdjan', en: 'Azerbaijan' },
+  { fr: 'AzerbaÃ¯djan', en: 'Azerbaijan' },
   { fr: 'Bahamas', en: 'Bahamas' },
-  { fr: 'Bahreïn', en: 'Bahrain' },
+  { fr: 'BahreÃ¯n', en: 'Bahrain' },
   { fr: 'Bangladesh', en: 'Bangladesh' },
   { fr: 'Barbade', en: 'Barbados' },
   { fr: 'Belgique', en: 'Belgium' },
   { fr: 'Belize', en: 'Belize' },
-  { fr: 'Bénin', en: 'Benin' },
+  { fr: 'BÃ©nin', en: 'Benin' },
   { fr: 'Bhoutan', en: 'Bhutan' },
-  { fr: 'Biélorussie', en: 'Belarus' },
+  { fr: 'BiÃ©lorussie', en: 'Belarus' },
   { fr: 'Birmanie', en: 'Myanmar' },
   { fr: 'Bolivie', en: 'Bolivia' },
-  { fr: 'Bosnie-Herzégovine', en: 'Bosnia and Herzegovina' },
+  { fr: 'Bosnie-HerzÃ©govine', en: 'Bosnia and Herzegovina' },
   { fr: 'Botswana', en: 'Botswana' },
-  { fr: 'Brésil', en: 'Brazil' },
+  { fr: 'BrÃ©sil', en: 'Brazil' },
   { fr: 'Brunei', en: 'Brunei' },
   { fr: 'Bulgarie', en: 'Bulgaria' },
   { fr: 'Burkina Faso', en: 'Burkina Faso' },
@@ -72,23 +72,23 @@ const COUNTRIES: Duo[] = [
   { fr: 'Colombie', en: 'Colombia' },
   { fr: 'Comores', en: 'Comoros' },
   { fr: 'Congo', en: 'Congo' },
-  { fr: 'Corée du Nord', en: 'North Korea' },
-  { fr: 'Corée du Sud', en: 'South Korea' },
+  { fr: 'CorÃ©e du Nord', en: 'North Korea' },
+  { fr: 'CorÃ©e du Sud', en: 'South Korea' },
   { fr: 'Costa Rica', en: 'Costa Rica' },
-  { fr: "Côte d'Ivoire", en: 'Ivory Coast' },
+  { fr: "CÃ´te d'Ivoire", en: 'Ivory Coast' },
   { fr: 'Croatie', en: 'Croatia' },
   { fr: 'Cuba', en: 'Cuba' },
   { fr: 'Danemark', en: 'Denmark' },
   { fr: 'Djibouti', en: 'Djibouti' },
   { fr: 'Dominique', en: 'Dominica' },
-  { fr: 'Égypte', en: 'Egypt' },
-  { fr: 'Émirats arabes unis', en: 'United Arab Emirates' },
-  { fr: 'Équateur', en: 'Ecuador' },
-  { fr: 'Érythrée', en: 'Eritrea' },
+  { fr: 'Ã‰gypte', en: 'Egypt' },
+  { fr: 'Ã‰mirats arabes unis', en: 'United Arab Emirates' },
+  { fr: 'Ã‰quateur', en: 'Ecuador' },
+  { fr: 'Ã‰rythrÃ©e', en: 'Eritrea' },
   { fr: 'Espagne', en: 'Spain' },
   { fr: 'Estonie', en: 'Estonia' },
-  { fr: 'États-Unis', en: 'United States' },
-  { fr: 'Éthiopie', en: 'Ethiopia' },
+  { fr: 'Ã‰tats-Unis', en: 'United States' },
+  { fr: 'Ã‰thiopie', en: 'Ethiopia' },
   { fr: 'Fidji', en: 'Fiji' },
   { fr: 'Finlande', en: 'Finland' },
   { fr: 'France', en: 'France' },
@@ -96,55 +96,55 @@ const COUNTRIES: Duo[] = [
 ];
 
 const HELP_TYPES: Duo[] = [
-  { fr: 'Démarches administratives', en: 'Administrative procedures' },
+  { fr: 'DÃ©marches administratives', en: 'Administrative procedures' },
   { fr: 'Recherche de logement', en: 'Housing search' },
   { fr: 'Ouverture de compte bancaire', en: 'Bank account opening' },
-  { fr: 'Système de santé', en: 'Healthcare system' },
-  { fr: 'Éducation et écoles', en: 'Education & schools' },
+  { fr: 'SystÃ¨me de santÃ©', en: 'Healthcare system' },
+  { fr: 'Ã‰ducation et Ã©coles', en: 'Education & schools' },
   { fr: 'Transport', en: 'Transport' },
   { fr: "Recherche d'emploi", en: 'Job search' },
-  { fr: "Création d'entreprise", en: 'Company creation' },
-  { fr: 'Fiscalité locale', en: 'Local taxation' },
-  { fr: 'Culture et intégration', en: 'Culture & integration' },
+  { fr: "CrÃ©ation d'entreprise", en: 'Company creation' },
+  { fr: 'FiscalitÃ© locale', en: 'Local taxation' },
+  { fr: 'Culture et intÃ©gration', en: 'Culture & integration' },
   { fr: 'Visa et immigration', en: 'Visa & immigration' },
   { fr: 'Assurances', en: 'Insurances' },
-  { fr: 'Téléphonie et internet', en: 'Phone & internet' },
+  { fr: 'TÃ©lÃ©phonie et internet', en: 'Phone & internet' },
   { fr: 'Alimentation et courses', en: 'Groceries & food' },
   { fr: 'Loisirs et sorties', en: 'Leisure & going out' },
-  { fr: 'Sports et activités', en: 'Sports & activities' },
-  { fr: 'Sécurité', en: 'Safety' },
+  { fr: 'Sports et activitÃ©s', en: 'Sports & activities' },
+  { fr: 'SÃ©curitÃ©', en: 'Safety' },
   { fr: 'Urgences', en: 'Emergencies' },
   { fr: 'Autre', en: 'Other' },
 ];
 
 // Country codes (names FR/EN)
 const COUNTRY_CODES = [
-  { code: '+33', flag: '🇫🇷', fr: 'France', en: 'France' },
-  { code: '+1', flag: '🇺🇸', fr: 'USA/Canada', en: 'USA/Canada' },
-  { code: '+44', flag: '🇬🇧', fr: 'Royaume-Uni', en: 'United Kingdom' },
-  { code: '+49', flag: '🇩🇪', fr: 'Allemagne', en: 'Germany' },
-  { code: '+34', flag: '🇪🇸', fr: 'Espagne', en: 'Spain' },
-  { code: '+39', flag: '🇮🇹', fr: 'Italie', en: 'Italy' },
-  { code: '+32', flag: '🇧🇪', fr: 'Belgique', en: 'Belgium' },
-  { code: '+41', flag: '🇨🇭', fr: 'Suisse', en: 'Switzerland' },
-  { code: '+352', flag: '🇱🇺', fr: 'Luxembourg', en: 'Luxembourg' },
-  { code: '+31', flag: '🇳🇱', fr: 'Pays-Bas', en: 'Netherlands' },
-  { code: '+43', flag: '🇦🇹', fr: 'Autriche', en: 'Austria' },
-  { code: '+351', flag: '🇵🇹', fr: 'Portugal', en: 'Portugal' },
-  { code: '+30', flag: '🇬🇷', fr: 'Grèce', en: 'Greece' },
-  { code: '+66', flag: '🇹🇭', fr: 'Thaïlande', en: 'Thailand' },
-  { code: '+61', flag: '🇦🇺', fr: 'Australie', en: 'Australia' },
-  { code: '+64', flag: '🇳🇿', fr: 'Nouvelle-Zélande', en: 'New Zealand' },
-  { code: '+81', flag: '🇯🇵', fr: 'Japon', en: 'Japan' },
-  { code: '+82', flag: '🇰🇷', fr: 'Corée du Sud', en: 'South Korea' },
-  { code: '+65', flag: '🇸🇬', fr: 'Singapour', en: 'Singapore' },
-  { code: '+212', flag: '🇲🇦', fr: 'Maroc', en: 'Morocco' },
-  { code: '+216', flag: '🇹🇳', fr: 'Tunisie', en: 'Tunisia' },
-  { code: '+213', flag: '🇩🇿', fr: 'Algérie', en: 'Algeria' },
-  { code: '+971', flag: '🇦🇪', fr: 'Émirats', en: 'UAE' },
-  { code: '+55', flag: '🇧🇷', fr: 'Brésil', en: 'Brazil' },
-  { code: '+52', flag: '🇲🇽', fr: 'Mexique', en: 'Mexico' },
-  { code: '+7', flag: '🇷🇺', fr: 'Russie', en: 'Russia' },
+  { code: '+33', flag: 'ðŸ‡«ðŸ‡·', fr: 'France', en: 'France' },
+  { code: '+1', flag: 'ðŸ‡ºðŸ‡¸', fr: 'USA/Canada', en: 'USA/Canada' },
+  { code: '+44', flag: 'ðŸ‡¬ðŸ‡§', fr: 'Royaume-Uni', en: 'United Kingdom' },
+  { code: '+49', flag: 'ðŸ‡©ðŸ‡ª', fr: 'Allemagne', en: 'Germany' },
+  { code: '+34', flag: 'ðŸ‡ªðŸ‡¸', fr: 'Espagne', en: 'Spain' },
+  { code: '+39', flag: 'ðŸ‡®ðŸ‡¹', fr: 'Italie', en: 'Italy' },
+  { code: '+32', flag: 'ðŸ‡§ðŸ‡ª', fr: 'Belgique', en: 'Belgium' },
+  { code: '+41', flag: 'ðŸ‡¨ðŸ‡­', fr: 'Suisse', en: 'Switzerland' },
+  { code: '+352', flag: 'ðŸ‡±ðŸ‡º', fr: 'Luxembourg', en: 'Luxembourg' },
+  { code: '+31', flag: 'ðŸ‡³ðŸ‡±', fr: 'Pays-Bas', en: 'Netherlands' },
+  { code: '+43', flag: 'ðŸ‡¦ðŸ‡¹', fr: 'Autriche', en: 'Austria' },
+  { code: '+351', flag: 'ðŸ‡µðŸ‡¹', fr: 'Portugal', en: 'Portugal' },
+  { code: '+30', flag: 'ðŸ‡¬ðŸ‡·', fr: 'GrÃ¨ce', en: 'Greece' },
+  { code: '+66', flag: 'ðŸ‡¹ðŸ‡­', fr: 'ThaÃ¯lande', en: 'Thailand' },
+  { code: '+61', flag: 'ðŸ‡¦ðŸ‡º', fr: 'Australie', en: 'Australia' },
+  { code: '+64', flag: 'ðŸ‡³ðŸ‡¿', fr: 'Nouvelle-ZÃ©lande', en: 'New Zealand' },
+  { code: '+81', flag: 'ðŸ‡¯ðŸ‡µ', fr: 'Japon', en: 'Japan' },
+  { code: '+82', flag: 'ðŸ‡°ðŸ‡·', fr: 'CorÃ©e du Sud', en: 'South Korea' },
+  { code: '+65', flag: 'ðŸ‡¸ðŸ‡¬', fr: 'Singapour', en: 'Singapore' },
+  { code: '+212', flag: 'ðŸ‡²ðŸ‡¦', fr: 'Maroc', en: 'Morocco' },
+  { code: '+216', flag: 'ðŸ‡¹ðŸ‡³', fr: 'Tunisie', en: 'Tunisia' },
+  { code: '+213', flag: 'ðŸ‡©ðŸ‡¿', fr: 'AlgÃ©rie', en: 'Algeria' },
+  { code: '+971', flag: 'ðŸ‡¦ðŸ‡ª', fr: 'Ã‰mirats', en: 'UAE' },
+  { code: '+55', flag: 'ðŸ‡§ðŸ‡·', fr: 'BrÃ©sil', en: 'Brazil' },
+  { code: '+52', flag: 'ðŸ‡²ðŸ‡½', fr: 'Mexique', en: 'Mexico' },
+  { code: '+7', flag: 'ðŸ‡·ðŸ‡º', fr: 'Russie', en: 'Russia' },
 ] as const;
 
 // ===== Types =====
@@ -162,73 +162,73 @@ interface ExpatFormData {
 // ===== i18n =====
 const I18N = {
   fr: {
-    metaTitle: 'Inscription Expat Aidant • SOS Expats',
-    metaDesc: 'Partagez vos bons plans, filez des coups de main et rendez la vie à l’étranger plus simple ✨',
+    metaTitle: 'Inscription Expat Aidant â€¢ SOS Expats',
+    metaDesc: 'Partagez vos bons plans, filez des coups de main et rendez la vie Ã  lâ€™Ã©tranger plus simple âœ¨',
     heroTitle: 'Inscription Expat Aidant',
-    heroSubtitle: 'On crée votre profil en 3 petites étapes — facile, fluide, friendly 🌍',
-    already: 'Déjà inscrit ?', login: 'Se connecter',
+    heroSubtitle: 'On crÃ©e votre profil en 3 petites Ã©tapes â€” facile, fluide, friendly ðŸŒ',
+    already: 'DÃ©jÃ  inscrit ?', login: 'Se connecter',
     personalInfo: 'On fait connaissance',
-    geoInfo: 'Où vous êtes & expérience',
+    geoInfo: 'OÃ¹ vous Ãªtes & expÃ©rience',
     helpInfo: "Comment vous aimez aider ?",
-    firstName: 'Prénom', lastName: 'Nom', email: 'Adresse email', password: 'Mot de passe',
-    phone: 'Téléphone', whatsapp: 'Numéro WhatsApp',
+    firstName: 'PrÃ©nom', lastName: 'Nom', email: 'Adresse email', password: 'Mot de passe',
+    phone: 'TÃ©lÃ©phone', whatsapp: 'NumÃ©ro WhatsApp',
     countryCode: 'Indicatif pays',
-    residenceCountry: 'Pays de résidence',
-    presenceCountry: 'Pays où vous êtes en ce moment',
+    residenceCountry: 'Pays de rÃ©sidence',
+    presenceCountry: 'Pays oÃ¹ vous Ãªtes en ce moment',
     interventionCountry: "Pays d'intervention principal",
-    yearsAsExpat: "Années d'expatriation",
-    bio: 'Votre expérience (bio)', profilePhoto: 'Photo de profil',
-    languages: 'Langues parlées', selectedLanguages: 'Langues sélectionnées',
-    helpDomains: "Domaines d'aide", addHelp: "Ajouter un domaine d'aide", specifyHelp: "Précisez le domaine d'aide",
+    yearsAsExpat: "AnnÃ©es d'expatriation",
+    bio: 'Votre expÃ©rience (bio)', profilePhoto: 'Photo de profil',
+    languages: 'Langues parlÃ©es', selectedLanguages: 'Langues sÃ©lectionnÃ©es',
+    helpDomains: "Domaines d'aide", addHelp: "Ajouter un domaine d'aide", specifyHelp: "PrÃ©cisez le domaine d'aide",
     help: {
-      minPassword: '6 caractères et c’est parti (pas de prise de tête) 💃',
+      minPassword: '6 caractÃ¨res et câ€™est parti (pas de prise de tÃªte) ðŸ’ƒ',
       emailPlaceholder: 'vous@example.com',
-      firstNamePlaceholder: 'Comment on vous appelle ? 🥰',
-      bioHint: 'En 2–3 lignes, dites comment vous aidez (50 caractères mini).',
+      firstNamePlaceholder: 'Comment on vous appelle ? ðŸ¥°',
+      bioHint: 'En 2â€“3 lignes, dites comment vous aidez (50 caractÃ¨res mini).',
     },
     errors: {
-      title: 'Petites retouches avant le grand saut ✨',
-      firstNameRequired: 'On veut bien vous appeler… mais comment ? 😄',
-      lastNameRequired: 'Un nom de famille pour faire pro ? 👔',
-      emailRequired: 'Votre email pour rester en contact 📬',
-      emailInvalid: 'Cette adresse a l’air louche… Essayez nom@exemple.com 🧐',
-      emailTaken: 'Oups, cet email est déjà pris. Vous avez peut-être déjà un compte ? 🔑',
-      passwordTooShort: '6 caractères minimum — easy ! 💪',
-      phoneRequired: 'Quel numéro on compose ? 📞',
-      whatsappRequired: 'Votre WhatsApp pour papoter vite fait ? 💬',
-      needCountry: 'Votre pays de résidence, s’il vous plaît 🌍',
-      needPresence: 'Où êtes-vous en ce moment ? ✈️',
-      needIntervention: "Choisissez un pays d'intervention 🗺️",
-      needLang: 'Ajoutez au moins une langue (polyglotte ? 🗣️)',
-      needHelp: "Ajoutez au moins un domaine d'aide 🤝",
-      needBio: 'Encore un petit effort : 50 caractères minimum 📝',
-      needPhoto: 'Une photo pro, et c’est 100% plus rassurant 📸',
-      needYears: 'Au moins 1 an d’expatriation pour guider les autres 🌍',
-      acceptTermsRequired: 'Un petit clic sur les conditions et on y va ✅',
+      title: 'Petites retouches avant le grand saut âœ¨',
+      firstNameRequired: 'On veut bien vous appelerâ€¦ mais comment ? ðŸ˜„',
+      lastNameRequired: 'Un nom de famille pour faire pro ? ðŸ‘”',
+      emailRequired: 'Votre email pour rester en contact ðŸ“¬',
+      emailInvalid: 'Cette adresse a lâ€™air loucheâ€¦ Essayez nom@exemple.com ðŸ§',
+      emailTaken: 'Oups, cet email est dÃ©jÃ  pris. Vous avez peut-Ãªtre dÃ©jÃ  un compte ? ðŸ”‘',
+      passwordTooShort: '6 caractÃ¨res minimum â€” easy ! ðŸ’ª',
+      phoneRequired: 'Quel numÃ©ro on compose ? ðŸ“ž',
+      whatsappRequired: 'Votre WhatsApp pour papoter vite fait ? ðŸ’¬',
+      needCountry: 'Votre pays de rÃ©sidence, sâ€™il vous plaÃ®t ðŸŒ',
+      needPresence: 'OÃ¹ Ãªtes-vous en ce moment ? âœˆï¸',
+      needIntervention: "Choisissez un pays d'intervention ðŸ—ºï¸",
+      needLang: 'Ajoutez au moins une langue (polyglotte ? ðŸ—£ï¸)',
+      needHelp: "Ajoutez au moins un domaine d'aide ðŸ¤",
+      needBio: 'Encore un petit effort : 50 caractÃ¨res minimum ðŸ“',
+      needPhoto: 'Une photo pro, et câ€™est 100% plus rassurant ðŸ“¸',
+      needYears: 'Au moins 1 an dâ€™expatriation pour guider les autres ðŸŒ',
+      acceptTermsRequired: 'Un petit clic sur les conditions et on y va âœ…',
     },
-    success: 'Inscription réussie ! Bienvenue à bord 🎉',
-    secureNote: '🔒 Données protégées • Support 24/7',
+    success: 'Inscription rÃ©ussie ! Bienvenue Ã  bord ðŸŽ‰',
+    secureNote: 'ðŸ”’ DonnÃ©es protÃ©gÃ©es â€¢ Support 24/7',
     progress: 'Progression',
-    footerTitle: "🌍 Une communauté d'entraide à portée de main",
-    footerText: 'Des expats qui s’entraident, partout.',
-    cguLabel: '📋 CGU Expatriés',
-    privacy: '🔒 Confidentialité',
-    helpLink: '💬 Aide',
-    contact: '📧 Contact',
-    create: 'Créer mon compte expat aidant',
-    loading: 'On prépare tout… ⏳',
-    previewTitle: 'Aperçu live de votre profil',
-    previewHint: 'C’est ce que les autres verront. Peaufinez à votre goût ✨',
-    previewToggleOpen: 'Masquer l’aperçu',
-    previewToggleClose: 'Voir l’aperçu',
+    footerTitle: "ðŸŒ Une communautÃ© d'entraide Ã  portÃ©e de main",
+    footerText: 'Des expats qui sâ€™entraident, partout.',
+    cguLabel: 'ðŸ“‹ CGU ExpatriÃ©s',
+    privacy: 'ðŸ”’ ConfidentialitÃ©',
+    helpLink: 'ðŸ’¬ Aide',
+    contact: 'ðŸ“§ Contact',
+    create: 'CrÃ©er mon compte expat aidant',
+    loading: 'On prÃ©pare toutâ€¦ â³',
+    previewTitle: 'AperÃ§u live de votre profil',
+    previewHint: 'Câ€™est ce que les autres verront. Peaufinez Ã  votre goÃ»t âœ¨',
+    previewToggleOpen: 'Masquer lâ€™aperÃ§u',
+    previewToggleClose: 'Voir lâ€™aperÃ§u',
   },
   en: {
-    metaTitle: 'Expat Helper Registration • SOS Expats',
-    metaDesc: 'Share your tips, lend a hand, and make life abroad feel easy ✨',
+    metaTitle: 'Expat Helper Registration â€¢ SOS Expats',
+    metaDesc: 'Share your tips, lend a hand, and make life abroad feel easy âœ¨',
     heroTitle: 'Expat Helper Registration',
-    heroSubtitle: 'Create your profile in 3 smooth steps — easy, friendly, fun 🌍',
+    heroSubtitle: 'Create your profile in 3 smooth steps â€” easy, friendly, fun ðŸŒ',
     already: 'Already registered?', login: 'Log in',
-    personalInfo: 'Let’s get to know you',
+    personalInfo: 'Letâ€™s get to know you',
     geoInfo: 'Where you are & experience',
     helpInfo: 'How do you like to help?',
     firstName: 'First name', lastName: 'Last name', email: 'Email', password: 'Password',
@@ -242,44 +242,44 @@ const I18N = {
     languages: 'Spoken languages', selectedLanguages: 'Selected languages',
     helpDomains: 'Help domains', addHelp: 'Add a help domain', specifyHelp: 'Specify the help domain',
     help: {
-      minPassword: '6+ characters and you’re good 💃',
+      minPassword: '6+ characters and youâ€™re good ðŸ’ƒ',
       emailPlaceholder: 'you@example.com',
-      firstNamePlaceholder: 'How should we call you? 🥰',
-      bioHint: 'In 2–3 lines, say how you help (min 50 chars).',
+      firstNamePlaceholder: 'How should we call you? ðŸ¥°',
+      bioHint: 'In 2â€“3 lines, say how you help (min 50 chars).',
     },
     errors: {
-      title: 'Tiny tweaks and we’re there ✨',
-      firstNameRequired: 'We’d love to address you… what’s your name? 😄',
-      lastNameRequired: 'A last name keeps it professional 👔',
-      emailRequired: 'We need your email to stay in touch 📬',
-      emailInvalid: 'That email looks off. Try name@example.com 🧐',
-      emailTaken: 'This email is already in use. Maybe you already have an account? 🔑',
-      passwordTooShort: 'At least 6 characters — easy! 💪',
-      phoneRequired: 'What number should we call? 📞',
-      whatsappRequired: 'WhatsApp number, pretty please? 💬',
-      needCountry: 'Your residence country, please 🌍',
-      needPresence: 'Where are you at the moment? ✈️',
-      needIntervention: 'Pick a main intervention country 🗺️',
-      needLang: 'Add at least one language 🗣️',
-      needHelp: 'Add at least one help domain 🤝',
-      needBio: 'Push it to 50 characters — you got this 📝',
-      needPhoto: 'A professional photo builds trust 📸',
-      needYears: 'At least 1 year abroad to guide others 🌍',
-      acceptTermsRequired: 'Tick the box and we’re rolling ✅',
+      title: 'Tiny tweaks and weâ€™re there âœ¨',
+      firstNameRequired: 'Weâ€™d love to address youâ€¦ whatâ€™s your name? ðŸ˜„',
+      lastNameRequired: 'A last name keeps it professional ðŸ‘”',
+      emailRequired: 'We need your email to stay in touch ðŸ“¬',
+      emailInvalid: 'That email looks off. Try name@example.com ðŸ§',
+      emailTaken: 'This email is already in use. Maybe you already have an account? ðŸ”‘',
+      passwordTooShort: 'At least 6 characters â€” easy! ðŸ’ª',
+      phoneRequired: 'What number should we call? ðŸ“ž',
+      whatsappRequired: 'WhatsApp number, pretty please? ðŸ’¬',
+      needCountry: 'Your residence country, please ðŸŒ',
+      needPresence: 'Where are you at the moment? âœˆï¸',
+      needIntervention: 'Pick a main intervention country ðŸ—ºï¸',
+      needLang: 'Add at least one language ðŸ—£ï¸',
+      needHelp: 'Add at least one help domain ðŸ¤',
+      needBio: 'Push it to 50 characters â€” you got this ðŸ“',
+      needPhoto: 'A professional photo builds trust ðŸ“¸',
+      needYears: 'At least 1 year abroad to guide others ðŸŒ',
+      acceptTermsRequired: 'Tick the box and weâ€™re rolling âœ…',
     },
-    success: 'Registration successful! Welcome aboard 🎉',
-    secureNote: '🔒 Data protected • 24/7 support',
+    success: 'Registration successful! Welcome aboard ðŸŽ‰',
+    secureNote: 'ðŸ”’ Data protected â€¢ 24/7 support',
     progress: 'Progress',
-    footerTitle: '🌍 A community of helpful expats',
+    footerTitle: 'ðŸŒ A community of helpful expats',
     footerText: 'Expats helping expats, everywhere.',
-    cguLabel: '📋 CGU Expats',
-    privacy: '🔒 Privacy',
-    helpLink: '💬 Help',
-    contact: '📧 Contact',
+    cguLabel: 'ðŸ“‹ CGU Expats',
+    privacy: 'ðŸ”’ Privacy',
+    helpLink: 'ðŸ’¬ Help',
+    contact: 'ðŸ“§ Contact',
     create: 'Create my expat helper account',
-    loading: 'Getting things ready… ⏳',
+    loading: 'Getting things readyâ€¦ â³',
     previewTitle: 'Live profile preview',
-    previewHint: 'This is what others will see. Make it shine ✨',
+    previewHint: 'This is what others will see. Make it shine âœ¨',
     previewToggleOpen: 'Hide preview',
     previewToggleClose: 'Show preview',
   },
@@ -288,7 +288,7 @@ const I18N = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const mapDuo = (list: Duo[], lang: 'fr' | 'en') => list.map((item) => item[lang]);
 
-// Petit composant succès
+// Petit composant succÃ¨s
 const FieldSuccess = ({ show, children }: { show: boolean; children: React.ReactNode }) =>
   show ? (
     <div className="mt-1 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1 inline-flex items-center">
@@ -344,7 +344,7 @@ const computePasswordStrength = (pw: string) => {
   const clamp = Math.min(score, 4);
   const percentMap = [10, 35, 60, 80, 100] as const;
   const colorMap = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-500', 'bg-green-600'] as const;
-  const frMap = ['Très faible', 'Faible', 'Correct', 'Bien', 'Très solide'] as const;
+  const frMap = ['TrÃ¨s faible', 'Faible', 'Correct', 'Bien', 'TrÃ¨s solide'] as const;
   const enMap = ['Very weak', 'Weak', 'Okay', 'Good', 'Very strong'] as const;
   return { percent: percentMap[clamp], labelFr: frMap[clamp], labelEn: enMap[clamp], color: colorMap[clamp] };
 };
@@ -360,7 +360,7 @@ const Avatar = ({ src, name }: { src?: string; name: string }) => {
     .join('');
   return (
     <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center font-bold ring-2 ring-emerald-200">
-      {initials || '🙂'}
+      {initials || 'ðŸ™‚'}
     </div>
   );
 };
@@ -391,7 +391,7 @@ const PreviewCard = ({
             {fullName || (lang === 'en' ? 'Your Name' : 'Votre nom')}
           </h3>
           <p className="text-xs text-gray-500">
-            {lang === 'en' ? 'Expat Helper' : 'Expat Aidant'} • {progress}% {lang === 'en' ? 'complete' : 'complet'}
+            {lang === 'en' ? 'Expat Helper' : 'Expat Aidant'} â€¢ {progress}% {lang === 'en' ? 'complete' : 'complet'}
           </p>
         </div>
       </div>
@@ -407,7 +407,7 @@ const PreviewCard = ({
           <div className="flex items-center gap-2 text-gray-700">
             <MapPin className="w-4 h-4 text-emerald-600" />
             <span className="font-medium">
-              {currentCountry || (lang === 'en' ? 'Residence' : 'Résidence')}
+              {currentCountry || (lang === 'en' ? 'Residence' : 'RÃ©sidence')}
             </span>
             {presenceCountry && (
               <span className="ml-auto rounded-full px-2 py-0.5 text-xs bg-emerald-50 border border-emerald-200">
@@ -429,7 +429,7 @@ const PreviewCard = ({
         )}
         {typeof yearsAsExpat === 'number' && yearsAsExpat > 0 && (
           <div className="text-gray-700">
-            {lang === 'en' ? 'Years abroad:' : 'Années à l’étranger :'}{' '}
+            {lang === 'en' ? 'Years abroad:' : 'AnnÃ©es Ã  lâ€™Ã©tranger :'}{' '}
             <strong>{yearsAsExpat}</strong>
           </div>
         )}
@@ -486,7 +486,7 @@ const BottomChecklist = ({
     <div className="rounded-2xl bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 p-[10px] shadow-lg">
       <div className="rounded-xl bg-white/90 backdrop-blur-sm p-4 sm:p-5">
         <p className="font-bold text-gray-900 mb-3">
-          {lang === 'en' ? 'To complete:' : 'À compléter :'}
+          {lang === 'en' ? 'To complete:' : 'Ã€ complÃ©ter :'}
         </p>
 
         <div className="grid sm:grid-cols-2 gap-y-2">
@@ -511,7 +511,7 @@ const BottomChecklist = ({
 
         <div className="mt-4">
           <span className="text-xs text-gray-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1 inline-block">
-            {lang === 'en' ? `Completion: ${progress}%` : `Complétion : ${progress}%`}
+            {lang === 'en' ? `Completion: ${progress}%` : `ComplÃ©tion : ${progress}%`}
           </span>
         </div>
       </div>
@@ -523,7 +523,7 @@ const BottomChecklist = ({
 const RegisterExpat: React.FC = () => {
   const navigate = useNavigate();
 
-  // --- Types sûrs ---
+  // --- Types sÃ»rs ---
   type LocalNavState = Readonly<{ selectedProvider?: Provider }>;
   function isProviderLike(v: unknown): v is Provider {
     if (typeof v !== 'object' || v === null) return false;
@@ -624,7 +624,7 @@ const RegisterExpat: React.FC = () => {
   const valid = useMemo(() => ({
     firstName: !!form.firstName.trim(),
     lastName: !!form.lastName.trim(),
-    email: EMAIL_REGEX.test(form.email), // ✅ format uniquement
+    email: EMAIL_REGEX.test(form.email), // âœ… format uniquement
     password: form.password.length >= 6,
     phone: !!form.phone.trim(),
     whatsappNumber: !!form.whatsappNumber.trim(),
@@ -720,7 +720,7 @@ const RegisterExpat: React.FC = () => {
     if (!valid.lastName) e.lastName = t.errors.lastNameRequired;
     if (!form.email.trim()) e.email = t.errors.emailRequired;
     else if (!EMAIL_REGEX.test(form.email)) e.email = t.errors.emailInvalid;
-    // ⚠️ On ne bloque pas sur l’unicité (Firebase fera foi au submit)
+    // âš ï¸ On ne bloque pas sur lâ€™unicitÃ© (Firebase fera foi au submit)
     if (!valid.password) e.password = t.errors.passwordTooShort;
     if (!valid.phone) e.phone = t.errors.phoneRequired;
     if (!valid.whatsappNumber) e.whatsappNumber = t.errors.whatsappRequired;
@@ -852,20 +852,20 @@ const RegisterExpat: React.FC = () => {
   // ---- Checklist items ----
   const checklist = useMemo(
     () => [
-      { key: 'firstName', label: lang === 'en' ? 'First name' : 'Prénom', ok: valid.firstName, ref: refFirstName },
+      { key: 'firstName', label: lang === 'en' ? 'First name' : 'PrÃ©nom', ok: valid.firstName, ref: refFirstName },
       { key: 'lastName', label: lang === 'en' ? 'Last name' : 'Nom', ok: valid.lastName, ref: refLastName },
       { key: 'email', label: lang === 'en' ? 'Valid email' : 'Email valide', ok: valid.email, ref: refEmail },
-      { key: 'password', label: lang === 'en' ? 'Password (≥ 6 chars)' : 'Mot de passe (≥ 6 caractères)', ok: valid.password, ref: refPwd },
-      { key: 'phone', label: lang === 'en' ? 'Phone' : 'Téléphone', ok: valid.phone, ref: refPhone },
+      { key: 'password', label: lang === 'en' ? 'Password (â‰¥ 6 chars)' : 'Mot de passe (â‰¥ 6 caractÃ¨res)', ok: valid.password, ref: refPwd },
+      { key: 'phone', label: lang === 'en' ? 'Phone' : 'TÃ©lÃ©phone', ok: valid.phone, ref: refPhone },
       { key: 'whatsappNumber', label: 'WhatsApp', ok: valid.whatsappNumber, ref: refWhats },
-      { key: 'currentCountry', label: lang === 'en' ? 'Country of residence' : 'Pays de résidence', ok: valid.currentCountry, ref: refCountry },
-      { key: 'currentPresenceCountry', label: lang === 'en' ? 'Presence country' : 'Pays de présence', ok: valid.currentPresenceCountry, ref: refPresence },
+      { key: 'currentCountry', label: lang === 'en' ? 'Country of residence' : 'Pays de rÃ©sidence', ok: valid.currentCountry, ref: refCountry },
+      { key: 'currentPresenceCountry', label: lang === 'en' ? 'Presence country' : 'Pays de prÃ©sence', ok: valid.currentPresenceCountry, ref: refPresence },
       { key: 'interventionCountry', label: lang === 'en' ? 'Main intervention country' : "Pays d'intervention", ok: valid.interventionCountry, ref: refInterv },
       { key: 'languages', label: lang === 'en' ? 'At least one language' : 'Au moins une langue', ok: valid.languages, ref: refLangs },
-      { key: 'helpTypes', label: lang === 'en' ? 'At least one specialty' : 'Au moins une spécialité', ok: valid.helpTypes, ref: refHelp },
+      { key: 'helpTypes', label: lang === 'en' ? 'At least one specialty' : 'Au moins une spÃ©cialitÃ©', ok: valid.helpTypes, ref: refHelp },
       { key: 'profilePhoto', label: lang === 'en' ? 'Profile photo' : 'Photo de profil', ok: valid.profilePhoto, ref: refPhoto },
-      { key: 'bio', label: lang === 'en' ? 'Bio (≥ 50 chars)' : 'Bio (≥ 50 caractères)', ok: valid.bio, ref: refBio },
-      { key: 'yearsAsExpat', label: lang === 'en' ? 'Years abroad (≥ 1)' : "Années d'expatriation (≥ 1)", ok: valid.yearsAsExpat, ref: refYears },
+      { key: 'bio', label: lang === 'en' ? 'Bio (â‰¥ 50 chars)' : 'Bio (â‰¥ 50 caractÃ¨res)', ok: valid.bio, ref: refBio },
+      { key: 'yearsAsExpat', label: lang === 'en' ? 'Years abroad (â‰¥ 1)' : "AnnÃ©es d'expatriation (â‰¥ 1)", ok: valid.yearsAsExpat, ref: refYears },
       { key: 'acceptTerms', label: lang === 'en' ? 'Accept T&Cs' : 'Accepter les CGU', ok: valid.acceptTerms, ref: refCGU },
     ],
     [valid, lang]
@@ -957,7 +957,7 @@ const RegisterExpat: React.FC = () => {
                 lang={lang}
                 t={t}
                 progress={progress}
-                fullName={`${form.firstName || (lang === 'en' ? 'First' : 'Prénom')} ${form.lastName || (lang === 'en' ? 'Last' : 'Nom')}`.trim()}
+                fullName={`${form.firstName || (lang === 'en' ? 'First' : 'PrÃ©nom')} ${form.lastName || (lang === 'en' ? 'Last' : 'Nom')}`.trim()}
                 photo={form.profilePhoto}
                 currentCountry={form.currentCountry}
                 presenceCountry={form.currentPresenceCountry}
@@ -988,7 +988,7 @@ const RegisterExpat: React.FC = () => {
                           className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} focus:bg-white transition ${fieldErrors.firstName ? 'border-red-500 bg-red-50' : valid.firstName ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                           placeholder={t.help.firstNamePlaceholder}
                         />
-                        <FieldSuccess show={valid.firstName}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                        <FieldSuccess show={valid.firstName}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                       </div>
 
                       {/* Last name */}
@@ -1001,7 +1001,7 @@ const RegisterExpat: React.FC = () => {
                           className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} focus:bg-white transition ${fieldErrors.lastName ? 'border-red-500 bg-red-50' : valid.lastName ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                           placeholder={lang === 'en' ? 'Doe' : 'Dupont'}
                         />
-                        <FieldSuccess show={valid.lastName}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                        <FieldSuccess show={valid.lastName}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                       </div>
                     </div>
 
@@ -1026,10 +1026,10 @@ const RegisterExpat: React.FC = () => {
                         />
                       </div>
                       <p id="email-help" className="mt-1 text-xs text-gray-500">
-                        {lang === 'en' ? 'We only email for your account & connections. 🤝' : 'On vous écrit seulement pour le compte & les mises en relation. 🤝'}
+                        {lang === 'en' ? 'We only email for your account & connections. ðŸ¤' : 'On vous Ã©crit seulement pour le compte & les mises en relation. ðŸ¤'}
                       </p>
                       {fieldErrors.email && <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>}
-                      <FieldSuccess show={valid.email}>{lang === 'en' ? 'Looks good! 👌' : 'Email au top ! 👌'}</FieldSuccess>
+                      <FieldSuccess show={valid.email}>{lang === 'en' ? 'Looks good! ðŸ‘Œ' : 'Email au top ! ðŸ‘Œ'}</FieldSuccess>
                     </div>
 
                     {/* Password */}
@@ -1057,15 +1057,15 @@ const RegisterExpat: React.FC = () => {
                         </div>
                         <div className="mt-1 text-xs flex items-center justify-between">
                           <span className="text-gray-600">
-                            {lang === 'en' ? 'Strength:' : 'Qualité :'} <strong>{lang === 'en' ? pwdStrength.labelEn : pwdStrength.labelFr}</strong>
+                            {lang === 'en' ? 'Strength:' : 'QualitÃ© :'} <strong>{lang === 'en' ? pwdStrength.labelEn : pwdStrength.labelFr}</strong>
                           </span>
                           <span className="text-gray-500">
                             {lang === 'en' ? 'Tip: mix A-z, 0-9 & symbols' : 'Astuce : mixez A-z, 0-9 & symboles'}
                           </span>
                         </div>
-                        {capsPassword && <p className="text-xs text-orange-600 mt-1">↥ {lang === 'en' ? 'Caps Lock is ON' : 'Verr. Maj activée'}</p>}
+                        {capsPassword && <p className="text-xs text-orange-600 mt-1">â†¥ {lang === 'en' ? 'Caps Lock is ON' : 'Verr. Maj activÃ©e'}</p>}
                       </div>
-                      <FieldSuccess show={valid.password}>{lang === 'en' ? 'Nice password! 🔒' : 'Mot de passe OK ! 🔒'}</FieldSuccess>
+                      <FieldSuccess show={valid.password}>{lang === 'en' ? 'Nice password! ðŸ”’' : 'Mot de passe OK ! ðŸ”’'}</FieldSuccess>
                     </div>
 
                     {/* Contact */}
@@ -1092,8 +1092,8 @@ const RegisterExpat: React.FC = () => {
                             className={`w-full px-4 py-2.5 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.phone ? 'border-red-500 bg-red-50' : valid.phone ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                             placeholder="612345678"
                           />
-                          <FieldSuccess show={valid.phone}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
-                          <p className="text-xs text-gray-500 mt-1">{lang === 'en' ? 'No spam, ever. 📵' : 'Aucun spam, promis. 📵'}</p>
+                          <FieldSuccess show={valid.phone}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
+                          <p className="text-xs text-gray-500 mt-1">{lang === 'en' ? 'No spam, ever. ðŸ“µ' : 'Aucun spam, promis. ðŸ“µ'}</p>
                         </div>
                       </div>
 
@@ -1116,14 +1116,14 @@ const RegisterExpat: React.FC = () => {
                             className={`w-full px-4 py-2.5 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.whatsappNumber ? 'border-red-500 bg-red-50' : valid.whatsappNumber ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                             placeholder="612345678"
                           />
-                          <FieldSuccess show={valid.whatsappNumber}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                          <FieldSuccess show={valid.whatsappNumber}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                         </div>
                       </div>
                       <p className="mt-3 text-xs text-gray-600 flex items-center">
                         <Info className="w-3.5 h-3.5 mr-1" />
                         {lang === 'en'
                           ? 'We use your contact only to connect you with people who need help. No spam.'
-                          : 'Vos coordonnées servent uniquement à vous mettre en relation avec des personnes à aider. Pas de spam.'}
+                          : 'Vos coordonnÃ©es servent uniquement Ã  vous mettre en relation avec des personnes Ã  aider. Pas de spam.'}
                       </p>
                     </div>
                   </section>
@@ -1141,10 +1141,10 @@ const RegisterExpat: React.FC = () => {
                           name="currentCountry" value={form.currentCountry} onChange={onChange}
                           className={`w-full px-4 py-3 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.currentCountry ? 'border-red-500' : valid.currentCountry ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                         >
-                          <option value="">{lang === 'en' ? 'Select your country' : 'Sélectionnez votre pays'}</option>
+                          <option value="">{lang === 'en' ? 'Select your country' : 'SÃ©lectionnez votre pays'}</option>
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <FieldSuccess show={valid.currentCountry}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                        <FieldSuccess show={valid.currentCountry}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                       </div>
 
                       <div ref={refPresence}>
@@ -1155,10 +1155,10 @@ const RegisterExpat: React.FC = () => {
                           name="currentPresenceCountry" value={form.currentPresenceCountry} onChange={onChange}
                           className={`w-full px-4 py-3 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.currentPresenceCountry ? 'border-red-500' : valid.currentPresenceCountry ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                         >
-                          <option value="">{lang === 'en' ? 'Select your presence country' : 'Sélectionnez votre pays de présence'}</option>
+                          <option value="">{lang === 'en' ? 'Select your presence country' : 'SÃ©lectionnez votre pays de prÃ©sence'}</option>
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <FieldSuccess show={valid.currentPresenceCountry}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                        <FieldSuccess show={valid.currentPresenceCountry}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                       </div>
                     </div>
 
@@ -1171,10 +1171,10 @@ const RegisterExpat: React.FC = () => {
                           name="interventionCountry" value={form.interventionCountry} onChange={onChange}
                           className={`w-full px-4 py-3 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.interventionCountry ? 'border-red-500' : valid.interventionCountry ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                         >
-                          <option value="">{lang === 'en' ? 'Select your intervention country' : "Sélectionnez votre pays d'intervention"}</option>
+                          <option value="">{lang === 'en' ? 'Select your intervention country' : "SÃ©lectionnez votre pays d'intervention"}</option>
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <FieldSuccess show={valid.interventionCountry}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                        <FieldSuccess show={valid.interventionCountry}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                       </div>
 
                       <div ref={refYears}>
@@ -1186,7 +1186,7 @@ const RegisterExpat: React.FC = () => {
                           className={`w-full px-4 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} ${fieldErrors.yearsAsExpat ? 'border-red-500 bg-red-50' : valid.yearsAsExpat ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                           placeholder="5"
                         />
-                        <FieldSuccess show={valid.yearsAsExpat}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                        <FieldSuccess show={valid.yearsAsExpat}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                       </div>
                     </div>
 
@@ -1217,12 +1217,12 @@ const RegisterExpat: React.FC = () => {
                             }
                           }}
                           locale={lang}
-                          placeholder={lang === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
+                          placeholder={lang === 'fr' ? "Rechercher et sÃ©lectionner les langues..." : "Search and select languages..."}
                         />
                       </Suspense>
 
                       {fieldErrors.languages && <p className="text-sm text-red-600 mt-2">{fieldErrors.languages}</p>}
-                      <FieldSuccess show={valid.languages}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                      <FieldSuccess show={valid.languages}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                     </div>
 
                     {/* Bio */}
@@ -1243,11 +1243,11 @@ const RegisterExpat: React.FC = () => {
                           <span className={form.bio.length < 50 ? 'text-orange-600' : 'text-green-600'}>
                             {form.bio.length < 50
                               ? lang === 'en'
-                                ? `Just ${50 - form.bio.length} chars to go — you’ve got this! 💪`
-                                : `Encore ${50 - form.bio.length} caractères — vous y êtes presque ! 💪`
+                                ? `Just ${50 - form.bio.length} chars to go â€” youâ€™ve got this! ðŸ’ª`
+                                : `Encore ${50 - form.bio.length} caractÃ¨res â€” vous y Ãªtes presque ! ðŸ’ª`
                               : lang === 'en'
-                              ? '✓ Nice! Field validated.'
-                              : '✓ Top ! Champ validé.'}
+                              ? 'âœ“ Nice! Field validated.'
+                              : 'âœ“ Top ! Champ validÃ©.'}
                           </span>
                           <span className={form.bio.length > 450 ? 'text-orange-500' : 'text-gray-500'}>
                             {form.bio.length}/500
@@ -1281,7 +1281,7 @@ const RegisterExpat: React.FC = () => {
                       <p className="text-xs text-gray-500 mt-1">
                         {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}
                       </p>
-                      <FieldSuccess show={valid.profilePhoto}>{lang === 'en' ? 'Nice photo! 📸' : 'Belle photo ! 📸'}</FieldSuccess>
+                      <FieldSuccess show={valid.profilePhoto}>{lang === 'en' ? 'Nice photo! ðŸ“¸' : 'Belle photo ! ðŸ“¸'}</FieldSuccess>
                     </div>
                   </section>
 
@@ -1327,7 +1327,7 @@ const RegisterExpat: React.FC = () => {
                         </div>
                       )}
 
-                      <FieldSuccess show={valid.helpTypes}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                      <FieldSuccess show={valid.helpTypes}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                     </div>
                   </section>
 
@@ -1343,13 +1343,13 @@ const RegisterExpat: React.FC = () => {
                         <label htmlFor="acceptTerms" className="text-sm text-gray-800">
                           {lang === 'en' ? 'I accept the' : "J'accepte les"}{' '}
                           <Link to="/cgu-expatries" className="text-emerald-700 underline font-semibold" target="_blank" rel="noopener noreferrer">
-                            {lang === 'en' ? 'Expat T&Cs' : 'CGU Expatriés'}
+                            {lang === 'en' ? 'Expat T&Cs' : 'CGU ExpatriÃ©s'}
                           </Link>{' '}
                           <span className="text-red-500">*</span>
                         </label>
                       </div>
                       {fieldErrors.acceptTerms && <p className="text-sm text-red-600 mt-2">{fieldErrors.acceptTerms}</p>}
-                      <FieldSuccess show={valid.acceptTerms}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
+                      <FieldSuccess show={valid.acceptTerms}>{lang === 'en' ? 'Perfect! âœ¨' : 'Parfait ! âœ¨'}</FieldSuccess>
                     </div>
 
                     <div className="mt-4">

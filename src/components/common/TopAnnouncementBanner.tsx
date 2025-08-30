@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { X, Phone, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
@@ -6,8 +6,8 @@ import { useApp } from '../../contexts/AppContext';
 interface Props { className?: string }
 
 /**
- * Nouvelle bannière (remplace totalement l'ancienne bannière PWA).
- * - Disparaît si l'utilisateur clique sur ✕ (stockée dans localStorage 30 jours)
+ * Nouvelle banniÃ¨re (remplace totalement l'ancienne banniÃ¨re PWA).
+ * - DisparaÃ®t si l'utilisateur clique sur âœ• (stockÃ©e dans localStorage 30 jours)
  * - i18n simple via useApp().language
  * - Responsive + accessible
  */
@@ -27,13 +27,13 @@ const TopAnnouncementBanner: React.FC<Props> = ({ className = '' }) => {
 
   const t = {
     fr: {
-      title: "SOS Expat — Assistance 24/7",
-      subtitle: "Besoin d'une aide immédiate ? Contactez-nous maintenant.",
+      title: "SOS Expat â€” Assistance 24/7",
+      subtitle: "Besoin d'une aide immÃ©diate ? Contactez-nous maintenant.",
       call: "Appeler",
       chat: "WhatsApp"
     },
     en: {
-      title: "SOS Expat — 24/7 Assistance",
+      title: "SOS Expat â€” 24/7 Assistance",
       subtitle: "Need help right now? Contact us.",
       call: "Call",
       chat: "WhatsApp"
@@ -58,7 +58,7 @@ const TopAnnouncementBanner: React.FC<Props> = ({ className = '' }) => {
             <MessageCircle className="w-4 h-4" aria-hidden />
             <span className="text-sm sm:text-base">{L.chat}</span>
           </Link>
-          <button aria-label="Fermer la bannière" onClick={() => { localStorage.setItem('sos_banner_closed_at', String(Date.now())); setClosed(true); }} className="ml-1 p-2 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/60">
+          <button aria-label="Fermer la banniÃ¨re" onClick={() => { localStorage.setItem('sos_banner_closed_at', String(Date.now())); setClosed(true); }} className="ml-1 p-2 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/60">
             <X className="w-4 h-4" />
           </button>
         </div>

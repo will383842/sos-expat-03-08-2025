@@ -1,4 +1,4 @@
-// SendToOne.tsx
+﻿// SendToOne.tsx
 import React, { useState } from "react";
 import { functions } from "@/config/firebase";
 import { httpsCallable } from "firebase/functions";
@@ -8,12 +8,12 @@ import { getErrorMessage } from "../../../utils/errors";
 const sendEmail = httpsCallable<
   { to: string; subject: string; html: string },
   { success: boolean }
->(functions, "admin_sendEmail"); // à implémenter côté Functions
+>(functions, "admin_sendEmail"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const logEmail = httpsCallable<
   { type: string; count: number; error?: string },
   { logged: boolean }
->(functions, "admin_logEmail"); // à implémenter côté Functions
+>(functions, "admin_logEmail"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const SendToOne: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -23,7 +23,7 @@ const SendToOne: React.FC = () => {
 
   const handleSend = async (): Promise<void> => {
     if (!email) {
-      setStatus("❌ Veuillez entrer une adresse email");
+      setStatus("âŒ Veuillez entrer une adresse email");
       return;
     }
 
@@ -32,14 +32,14 @@ const SendToOne: React.FC = () => {
 
       await sendEmail({
         to: email,
-        subject: "Newsletter personnalisée",
+        subject: "Newsletter personnalisÃ©e",
         html,
       });
 
-      // ✅ log global (1 seul destinataire)
+      // âœ… log global (1 seul destinataire)
       await logEmail({ type: "newsletter", count: 1 });
 
-      setStatus("Email envoyé ✅");
+      setStatus("Email envoyÃ© âœ…");
     } catch (err) {
       await logEmail({
         type: "newsletter",
@@ -47,13 +47,13 @@ const SendToOne: React.FC = () => {
         error: getErrorMessage(err),
       });
 
-      setStatus("Erreur lors de l’envoi ❌ " + getErrorMessage(err));
+      setStatus("Erreur lors de lâ€™envoi âŒ " + getErrorMessage(err));
     }
   };
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">👤 Envoi individuel</h2>
+      <h2 className="text-xl font-semibold mb-4">ðŸ‘¤ Envoi individuel</h2>
       <div className="grid gap-4">
         <input
           value={email}

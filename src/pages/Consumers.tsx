@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { ShoppingCart, Shield, AlertTriangle, Phone, Check, Globe, Clock, Languages } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
@@ -14,12 +14,12 @@ const Consumers: React.FC = () => {
     (language as 'fr' | 'en') || 'fr'
   );
 
-  // Rester synchronisé avec la langue globale de l'app
+  // Rester synchronisÃ© avec la langue globale de l'app
   useEffect(() => {
     if (language) setSelectedLanguage(language as 'fr' | 'en');
   }, [language]);
 
-  // Logique métier Firestore conservée (type: 'legal')
+  // Logique mÃ©tier Firestore conservÃ©e (type: 'legal')
   useEffect(() => {
     const fetchConsumerInfo = async () => {
       try {
@@ -53,26 +53,26 @@ const Consumers: React.FC = () => {
   const translations = {
     fr: {
       title: 'Information Consommateurs',
-      subtitle: 'Vos droits et protections – Plateforme internationale',
-      lastUpdated: 'Version 2.2 – Dernière mise à jour : 16 juin 2025',
+      subtitle: 'Vos droits et protections â€“ Plateforme internationale',
+      lastUpdated: 'Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025',
       loading: 'Chargement...',
       features: ['Remboursement auto', 'Prix EUR & USD', 'Droits consommateurs', 'Support 24/7'],
       anchorTitle: 'Sommaire',
       contactCta: 'Nous contacter',
-      editHint: 'Document éditable depuis la console admin',
+      editHint: 'Document Ã©ditable depuis la console admin',
       sections: {
         rights: 'Vos droits de consommateur',
         refunds: 'Politique de remboursement',
         prices: 'Transparence des prix (EUR / USD)',
-        mediation: 'Médiation et réclamations',
+        mediation: 'MÃ©diation et rÃ©clamations',
         support: 'Service client',
         contact: 'Contact',
       },
     },
     en: {
       title: 'Consumer Information',
-      subtitle: 'Your rights and protections — International platform',
-      lastUpdated: 'Version 2.2 – Last updated: 16 June 2025',
+      subtitle: 'Your rights and protections â€” International platform',
+      lastUpdated: 'Version 2.2 â€“ Last updated: 16 June 2025',
       loading: 'Loading...',
       features: ['Auto refund', 'Prices in EUR & USD', 'Consumer rights', '24/7 support'],
       anchorTitle: 'Overview',
@@ -182,7 +182,7 @@ const Consumers: React.FC = () => {
         continue;
       }
 
-      // Bloc contact spécial (détection d'URL)
+      // Bloc contact spÃ©cial (dÃ©tection d'URL)
       if (line.toLowerCase().includes('http://localhost:5174/contact')) {
         elements.push(
           <div
@@ -233,64 +233,64 @@ const Consumers: React.FC = () => {
     return elements;
   };
 
-  // --------- Contenu par défaut (FR/EN) ----------
+  // --------- Contenu par dÃ©faut (FR/EN) ----------
   const defaultFr = `
 # Information Consommateurs (Global)
 
-**Version 2.2 – Dernière mise à jour : 16 juin 2025**
+**Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025**
 
 ---
 
 ## 1. Vos droits de consommateur
 
 1.1. **Information claire** sur les services, tarifs et conditions.  
-1.2. **Droit de rétractation** selon la loi impérative locale lorsque applicable (voir conditions de mise en œuvre auprès du prestataire et de la Plateforme).  
-1.3. **Protection** contre les pratiques commerciales déloyales et trompeuses.  
-1.4. **Accès** à un service client réactif via le **formulaire de contact**.
+1.2. **Droit de rÃ©tractation** selon la loi impÃ©rative locale lorsque applicable (voir conditions de mise en Å“uvre auprÃ¨s du prestataire et de la Plateforme).  
+1.3. **Protection** contre les pratiques commerciales dÃ©loyales et trompeuses.  
+1.4. **AccÃ¨s** Ã  un service client rÃ©actif via le **formulaire de contact**.
 
 ---
 
 ## 2. Politique de remboursement
 
-2.1. **Remboursement automatique** : si votre expert ne répond pas après **3 tentatives** d’appel dans la fenêtre prévue, la réservation est **annulée** et vous êtes **remboursé intégralement**.  
-2.2. **Autres cas** : contactez le support **dans les 24h** suivant l’appel via le **formulaire de contact** pour étude de votre demande.
+2.1. **Remboursement automatique** : si votre expert ne rÃ©pond pas aprÃ¨s **3 tentatives** dâ€™appel dans la fenÃªtre prÃ©vue, la rÃ©servation est **annulÃ©e** et vous Ãªtes **remboursÃ© intÃ©gralement**.  
+2.2. **Autres cas** : contactez le support **dans les 24h** suivant lâ€™appel via le **formulaire de contact** pour Ã©tude de votre demande.
 
 ---
 
 ## 3. Transparence des prix (EUR / USD)
 
-3.1. **Appel Avocat** : **49 € (EUR)** / **$49 (USD)** pour **20 minutes** (prix TTC).  
-3.2. **Appel Expatrié Aidant** : **19 € (EUR)** / **$19 (USD)** pour **30 minutes** (prix TTC).  
-3.3. **Aucun frais caché** ; le prix affiché inclut, le cas échéant, les frais techniques de mise en relation.  
-3.4. Les montants en **USD** peuvent être affichés et réglés **au choix du Client** ; des **frais/taux de conversion** du prestataire de paiement peuvent s’appliquer le cas échéant.
+3.1. **Appel Avocat** : **49 â‚¬ (EUR)** / **$49 (USD)** pour **20 minutes** (prix TTC).  
+3.2. **Appel ExpatriÃ© Aidant** : **19 â‚¬ (EUR)** / **$19 (USD)** pour **30 minutes** (prix TTC).  
+3.3. **Aucun frais cachÃ©** ; le prix affichÃ© inclut, le cas Ã©chÃ©ant, les frais techniques de mise en relation.  
+3.4. Les montants en **USD** peuvent Ãªtre affichÃ©s et rÃ©glÃ©s **au choix du Client** ; des **frais/taux de conversion** du prestataire de paiement peuvent sâ€™appliquer le cas Ã©chÃ©ant.
 
 ---
 
-## 4. Médiation et réclamations
+## 4. MÃ©diation et rÃ©clamations
 
 4.1. **Support via formulaire** : http://localhost:5174/contact  
-4.2. **Médiation consommation** : vous pouvez saisir le médiateur compétent selon votre pays.  
-4.3. **Plateforme européenne de RLL** : utilisation possible du règlement en ligne des litiges (ODR).
+4.2. **MÃ©diation consommation** : vous pouvez saisir le mÃ©diateur compÃ©tent selon votre pays.  
+4.3. **Plateforme europÃ©enne de RLL** : utilisation possible du rÃ¨glement en ligne des litiges (ODR).
 
 ---
 
 ## 5. Service client (international)
 
 5.1. **Horaires** : 24/7  
-5.2. **Temps de réponse** : sous 24h  
-5.3. **Contact** : utilisez le **formulaire** dédié : http://localhost:5174/contact
+5.2. **Temps de rÃ©ponse** : sous 24h  
+5.3. **Contact** : utilisez le **formulaire** dÃ©diÃ© : http://localhost:5174/contact
 
 ---
 
 ## 6. Contact
 
-Formulaire (support & demandes légales) : http://localhost:5174/contact
+Formulaire (support & demandes lÃ©gales) : http://localhost:5174/contact
 `;
 
   const defaultEn = `
 # Consumer Information (Global)
 
-**Version 2.2 – Last updated: 16 June 2025**
+**Version 2.2 â€“ Last updated: 16 June 2025**
 
 ---
 
@@ -312,8 +312,8 @@ Formulaire (support & demandes légales) : http://localhost:5174/contact
 
 ## 3. Price transparency (EUR / USD)
 
-3.1. **Lawyer call**: **€49 (EUR)** / **$49 (USD)** for **20 minutes** (tax included).  
-3.2. **Expat Helper call**: **€19 (EUR)** / **$19 (USD)** for **30 minutes** (tax included).  
+3.1. **Lawyer call**: **â‚¬49 (EUR)** / **$49 (USD)** for **20 minutes** (tax included).  
+3.2. **Expat Helper call**: **â‚¬19 (EUR)** / **$19 (USD)** for **30 minutes** (tax included).  
 3.3. **No hidden fees**; the displayed price includes, where applicable, the technical connection fee.  
 3.4. **USD** amounts can be displayed and charged at **checkout**; **FX rates/fees** from the payment processor may apply.
 
@@ -417,7 +417,7 @@ Contact form (support & legal requests): http://localhost:5174/contact
               </h1>
               <p className="text-lg sm:text-2xl text-gray-300 max-w-3xl mx-auto">{t.subtitle}</p>
 
-              {/* Points clés */}
+              {/* Points clÃ©s */}
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-white/90">
                 {[
                   { icon: <AlertTriangle className="w-6 h-6" />, text: t.features[0], gradient: 'from-emerald-500 to-green-500' },
@@ -498,14 +498,14 @@ Contact form (support & legal requests): http://localhost:5174/contact
                   {parseMarkdownContent(content || defaultContent)}
                 </div>
 
-                {/* Cartes prix (EUR / USD) visibles même si contenu provient d'admin, pour clarifier l'international */}
+                {/* Cartes prix (EUR / USD) visibles mÃªme si contenu provient d'admin, pour clarifier l'international */}
                 <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">
                       {selectedLanguage === 'fr' ? 'Appel Avocat' : 'Lawyer Call'}
                     </h3>
                     <div className="flex items-baseline gap-3">
-                      <span className="text-3xl font-extrabold text-gray-900">49€</span>
+                      <span className="text-3xl font-extrabold text-gray-900">49â‚¬</span>
                       <span className="text-gray-500 font-medium">EUR</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-3xl font-extrabold text-gray-900">$49</span>
@@ -523,10 +523,10 @@ Contact form (support & legal requests): http://localhost:5174/contact
 
                   <div className="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">
-                      {selectedLanguage === 'fr' ? 'Appel Expatrié Aidant' : 'Expat Helper Call'}
+                      {selectedLanguage === 'fr' ? 'Appel ExpatriÃ© Aidant' : 'Expat Helper Call'}
                     </h3>
                     <div className="flex items-baseline gap-3">
-                      <span className="text-3xl font-extrabold text-gray-900">19€</span>
+                      <span className="text-3xl font-extrabold text-gray-900">19â‚¬</span>
                       <span className="text-gray-500 font-medium">EUR</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-3xl font-extrabold text-gray-900">$19</span>
@@ -537,7 +537,7 @@ Contact form (support & legal requests): http://localhost:5174/contact
                     </div>
                     <p className="mt-2 text-sm text-gray-600">
                       {selectedLanguage === 'fr'
-                        ? 'Montants affichés à titre indicatif ; le taux/frais de conversion du prestataire de paiement peuvent s’appliquer.'
+                        ? 'Montants affichÃ©s Ã  titre indicatif ; le taux/frais de conversion du prestataire de paiement peuvent sâ€™appliquer.'
                         : 'Amounts are indicative; payment processor FX rates/fees may apply.'}
                     </p>
                   </div>
@@ -550,8 +550,8 @@ Contact form (support & legal requests): http://localhost:5174/contact
                   </h2>
                   <p className="text-gray-700">
                     {selectedLanguage === 'fr'
-                      ? 'Horaires : 24/7 • Temps de réponse : sous 24h. Pour toute demande, utilisez notre formulaire.'
-                      : 'Hours: 24/7 • Response time: within 24h. For any request, please use our contact form.'}
+                      ? 'Horaires : 24/7 â€¢ Temps de rÃ©ponse : sous 24h. Pour toute demande, utilisez notre formulaire.'
+                      : 'Hours: 24/7 â€¢ Response time: within 24h. For any request, please use our contact form.'}
                   </p>
                   <a
                     href="http://localhost:5174/contact"

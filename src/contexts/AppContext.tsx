@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   createContext,
   useContext,
   useState,
@@ -11,7 +11,7 @@ import {
   Notification,
   EnhancedSettings
 } from './types';
-import { ensureCollectionsExist } from '../utils/firestore'; // ✅ Actif maintenant
+import { ensureCollectionsExist } from '../utils/firestore'; // âœ… Actif maintenant
 
 interface AppContextType {
   services: Service[];
@@ -97,16 +97,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         name: 'Appel Avocat',
         price: 49,
         duration: 20,
-        description: 'Consultation juridique urgente par téléphone avec avocat certifié',
+        description: 'Consultation juridique urgente par tÃ©lÃ©phone avec avocat certifiÃ©',
         isActive: true
       },
       {
         id: 'expat_call',
         type: 'expat_call',
-        name: 'Appel Expatrié',
+        name: 'Appel ExpatriÃ©',
         price: 19,
         duration: 30,
-        description: 'Conseil pratique d\'un expatrié francophone qui connaît le pays',
+        description: 'Conseil pratique d\'un expatriÃ© francophone qui connaÃ®t le pays',
         isActive: true
       }
     ];
@@ -117,7 +117,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     if (savedLanguage) {
       setLanguage(savedLanguage);
     }
-  }, []); // ✅ AJOUTÉ : Array de dépendances manquant
+  }, []); // âœ… AJOUTÃ‰ : Array de dÃ©pendances manquant
 
   const handleSetLanguage = (lang: 'fr' | 'en') => {
     setLanguage(lang);

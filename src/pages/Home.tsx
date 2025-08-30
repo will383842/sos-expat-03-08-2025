@@ -1,4 +1,4 @@
-// src/pages/Home.tsx
+﻿// src/pages/Home.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -63,10 +63,10 @@ function PWAInstallIconWithHint({
     const isAndroid = /Android/i.test(ua);
     const isDesktop = !isIOS && !isAndroid;
 
-    const prefix = 'Votre navigateur ne permet pas l’installation automatique. ';
-    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari → « Partager » → « Sur l’écran d’accueil ».';
-    if (isAndroid) return prefix + 'Sur Android : Chrome → menu ⋮ → « Installer l’application ».';
-    if (isDesktop) return prefix + 'Sur ordinateur : Chrome/Edge → icône « Installer » dans la barre d’adresse.';
+    const prefix = 'Votre navigateur ne permet pas lâ€™installation automatique. ';
+    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari â†’ Â« Partager Â» â†’ Â« Sur lâ€™Ã©cran dâ€™accueil Â».';
+    if (isAndroid) return prefix + 'Sur Android : Chrome â†’ menu â‹® â†’ Â« Installer lâ€™application Â».';
+    if (isDesktop) return prefix + 'Sur ordinateur : Chrome/Edge â†’ icÃ´ne Â« Installer Â» dans la barre dâ€™adresse.';
     return prefix + 'Essayez avec Chrome/Edge (ordinateur) ou Safari/Chrome (mobile).';
   };
 
@@ -90,16 +90,16 @@ function PWAInstallIconWithHint({
       <button
         type="button"
         onClick={onClick}
-        onMouseEnter={() => { reveal('L’application qui fait du bien !'); }}
+        onMouseEnter={() => { reveal('Lâ€™application qui fait du bien !'); }}
         onMouseLeave={() => scheduleHide()}
-        onTouchStart={() => { reveal('L’application qui fait du bien !'); scheduleHide(1400); }}
+        onTouchStart={() => { reveal('Lâ€™application qui fait du bien !'); scheduleHide(1400); }}
         className="ml-1 w-14 h-14 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl overflow-hidden border border-white/20 hover:border-white/40 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/40 touch-manipulation"
         title="Installer l'application"
         aria-label="Installer l'application"
       >
         <img
           src="/icons/icon-512x512-maskable.png"
-          alt="Icône appli SOS Expat"
+          alt="IcÃ´ne appli SOS Expat"
           className={`${canInstall ? 'animate-bounce' : 'animate-pulse'} w-full h-full object-cover`}
         />
       </button>
@@ -112,7 +112,7 @@ function PWAInstallIconWithHint({
       >
         <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/95 rotate-45 border-l border-t border-gray-200" />
         <div className="px-4 py-3">
-          <div className="font-extrabold text-gray-900">L’application qui fait du bien !</div>
+          <div className="font-extrabold text-gray-900">Lâ€™application qui fait du bien !</div>
           {hintText && <div className="mt-1 leading-relaxed text-gray-700">{hintText}</div>}
         </div>
       </div>
@@ -121,9 +121,9 @@ function PWAInstallIconWithHint({
 }
 
 /* ================================
-   Données « Avis » (FR) + avatars humains + FALLBACK
+   DonnÃ©es Â« Avis Â» (FR) + avatars humains + FALLBACK
    ================================ */
-type TypeEchange = 'avocat' | 'expatrié';
+type TypeEchange = 'avocat' | 'expatriÃ©';
 interface Review {
   id: string;
   name: string;
@@ -145,17 +145,17 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=12',
     typeEchange: 'avocat',
     comment:
-      'Je redoutais d’appeler un avocat. Il a été cool, clair et ultra efficace : solution trouvée en 15 min grâce au droit local au Brésil.'
+      'Je redoutais dâ€™appeler un avocat. Il a Ã©tÃ© cool, clair et ultra efficace : solution trouvÃ©e en 15 min grÃ¢ce au droit local au BrÃ©sil.'
   },
   {
     id: 'us-woman',
     name: 'Emily Johnson',
-    city: 'Austin, États-Unis',
+    city: 'Austin, Ã‰tats-Unis',
     avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1' + faceParams,
     fallback: 'https://i.pravatar.cc/600?img=47',
-    typeEchange: 'expatrié',
+    typeEchange: 'expatriÃ©',
     comment:
-      'Nouvelle à Lyon, panique préfecture. Une expatriée m’a rappelée en quelques minutes, tout expliqué en FR/EN. Je me suis sentie accompagnée.'
+      'Nouvelle Ã  Lyon, panique prÃ©fecture. Une expatriÃ©e mâ€™a rappelÃ©e en quelques minutes, tout expliquÃ© en FR/EN. Je me suis sentie accompagnÃ©e.'
   },
   {
     id: 'cn-man',
@@ -165,42 +165,42 @@ const REVIEWS: Review[] = [
     fallback: 'https://i.pravatar.cc/600?img=32',
     typeEchange: 'avocat',
     comment:
-      'Assurance santé internationale : réglé dans la journée. L’avocat bilingue a tout clarifié au téléphone, documents à l’appui. Net et précis.'
+      'Assurance santÃ© internationale : rÃ©glÃ© dans la journÃ©e. Lâ€™avocat bilingue a tout clarifiÃ© au tÃ©lÃ©phone, documents Ã  lâ€™appui. Net et prÃ©cis.'
   },
   {
     id: 'th-woman',
     name: 'Nok Suphansa',
-    city: 'Bangkok, Thaïlande',
+    city: 'Bangkok, ThaÃ¯lande',
     avatar: 'https://images.unsplash.com/photo-1554151228-14d9def656e4' + faceParams,
     fallback: 'https://i.pravatar.cc/600?img=65',
-    typeEchange: 'expatrié',
+    typeEchange: 'expatriÃ©',
     comment:
-      'Hospitalisation imprévue en voyage. Une expatriée m’a guidée pour les démarches et a servi d’interprète. Humain, rassurant, efficace.'
+      'Hospitalisation imprÃ©vue en voyage. Une expatriÃ©e mâ€™a guidÃ©e pour les dÃ©marches et a servi dâ€™interprÃ¨te. Humain, rassurant, efficace.'
   },
   {
     id: 'ru-man',
     name: 'Ivan Petrov',
-    city: 'Saint-Pétersbourg, Russie',
+    city: 'Saint-PÃ©tersbourg, Russie',
     avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d' + faceParams,
     fallback: 'https://i.pravatar.cc/600?img=10',
     typeEchange: 'avocat',
     comment:
-      'Achat à Lisbonne : l’avocat m’a rappelé, vérifié les clauses, orienté vers la bonne étude notariale. Rapide et sans surprise.'
+      'Achat Ã  Lisbonne : lâ€™avocat mâ€™a rappelÃ©, vÃ©rifiÃ© les clauses, orientÃ© vers la bonne Ã©tude notariale. Rapide et sans surprise.'
   },
   {
     id: 'sn-woman',
     name: 'Awa Diop',
-    city: 'Dakar, Sénégal',
+    city: 'Dakar, SÃ©nÃ©gal',
     avatar: 'https://images.unsplash.com/photo-1544005316-00a74bdc7f77' + faceParams,
     fallback: 'https://i.pravatar.cc/600?img=68',
-    typeEchange: 'expatrié',
+    typeEchange: 'expatriÃ©',
     comment:
-      'Visa Canada en rade. Une expatriée à Montréal m’a donné les bons justificatifs et les vrais délais. J’ai gagné des semaines.'
+      'Visa Canada en rade. Une expatriÃ©e Ã  MontrÃ©al mâ€™a donnÃ© les bons justificatifs et les vrais dÃ©lais. Jâ€™ai gagnÃ© des semaines.'
   }
 ];
 
 /* ================================
-   Slider d’avis — mobile first, swipe, auto
+   Slider dâ€™avis â€” mobile first, swipe, auto
    (param "theme" pour clair/sombre)
    ================================ */
 function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
@@ -239,9 +239,9 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
   };
 
   const labelType = (t: TypeEchange) =>
-    t === 'avocat' ? 'Appel avec un avocat' : 'Appel avec un·e expatrié·e';
+    t === 'avocat' ? 'Appel avec un avocat' : 'Appel avec unÂ·e expatriÃ©Â·e';
 
-  // handler de fallback d’image
+  // handler de fallback dâ€™image
   const onImgError = (e: React.SyntheticEvent<HTMLImageElement>, fallback: string) => {
     const img = e.currentTarget;
     if (img.src !== fallback) {
@@ -274,7 +274,7 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
                 }
                 aria-label={`Voir les avis - ${r.name}`}
               >
-                {/* bandeau type échange */}
+                {/* bandeau type Ã©change */}
                 <div
                   className={
                     isDark
@@ -316,7 +316,7 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
 
                   {/* Texte */}
                   <blockquote className={`${isDark ? 'text-white/95' : 'text-gray-700'} text-base sm:text-lg md:text-xl leading-7 sm:leading-8 md:leading-9 max-w-[58ch]`}>
-                    “{r.comment}”
+                    â€œ{r.comment}â€
                   </blockquote>
                 </div>
               </Link>
@@ -325,7 +325,7 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
         </div>
       </div>
 
-      {/* flèches */}
+      {/* flÃ¨ches */}
       <button
         onClick={prev}
         className={
@@ -333,9 +333,9 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
             ? 'absolute left-1 sm:left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-4 w-10 h-10 sm:w-12 sm:h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/30 transition-all duration-300 flex items-center justify-center text-white active:scale-95'
             : 'absolute left-1 sm:left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-4 w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 hover:bg-gray-200 rounded-full border border-gray-200 transition-all duration-300 flex items-center justify-center text-gray-700 active:scale-95'
         }
-        aria-label="Précédent"
+        aria-label="PrÃ©cÃ©dent"
       >
-        {/* FIX cssConflict: h-5 + h-6 → sm:h-6 */}
+        {/* FIX cssConflict: h-5 + h-6 â†’ sm:h-6 */}
         <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
       <button
@@ -347,7 +347,7 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
         }
         aria-label="Suivant"
       >
-        {/* FIX cssConflict: h-5 + h-6 → sm:h-6 */}
+        {/* FIX cssConflict: h-5 + h-6 â†’ sm:h-6 */}
         <ChevronRightIcon className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
 
@@ -358,7 +358,7 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
             key={i}
             onClick={() => goTo(i)}
             className={`h-2 rounded-full transition-all duration-300 ${current === i ? 'w-8 bg-gradient-to-r from-red-500 to-orange-500' : isDark ? 'w-2 bg-white/40 hover:bg-white/60' : 'w-2 bg-gray-300 hover:bg-gray-400'}`}
-            aria-label={`Aller à l’avis ${i + 1}`}
+            aria-label={`Aller Ã  lâ€™avis ${i + 1}`}
           />
         ))}
       </div>
@@ -378,19 +378,19 @@ function ReviewsSlider({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
 }
 
 /* ================================
-   Plans de pricing (inchangé)
+   Plans de pricing (inchangÃ©)
    ================================ */
 const PRICING_PLANS: PricingPlan[] = [
   {
     name: 'Gratuit',
-    price: '0€',
+    price: '0â‚¬',
     period: 'par mois',
-    description: 'Pour découvrir nos services',
+    description: 'Pour dÃ©couvrir nos services',
     features: [
-      'Accès à la liste des experts',
-      'Recherche par spécialité',
+      'AccÃ¨s Ã  la liste des experts',
+      'Recherche par spÃ©cialitÃ©',
       'Consultation des avis',
-      'Chat communauté',
+      'Chat communautÃ©',
       'Support par email'
     ],
     cta: 'Commencer gratuitement',
@@ -398,14 +398,14 @@ const PRICING_PLANS: PricingPlan[] = [
   },
   {
     name: 'Essentiel',
-    price: '29€',
+    price: '29â‚¬',
     period: 'par mois',
-    description: 'Pour les expatriés occasionnels',
+    description: 'Pour les expatriÃ©s occasionnels',
     features: [
       'Tout du plan Gratuit',
       '2 consultations par mois',
       'Support prioritaire',
-      'Accès mobile offline',
+      'AccÃ¨s mobile offline',
       'Notifications urgentes'
     ],
     cta: 'Choisir Essentiel',
@@ -413,16 +413,16 @@ const PRICING_PLANS: PricingPlan[] = [
   },
   {
     name: 'Premium',
-    price: '79€',
+    price: '79â‚¬',
     period: 'par mois',
-    description: 'Pour les expatriés réguliers',
+    description: 'Pour les expatriÃ©s rÃ©guliers',
     features: [
       'Tout du plan Essentiel',
-      'Consultations illimitées',
+      'Consultations illimitÃ©es',
       'SOS 24/7 prioritaire',
-      'Experts dédiés',
+      'Experts dÃ©diÃ©s',
       'Documents juridiques',
-      'Traduction certifiée'
+      'Traduction certifiÃ©e'
     ],
     popular: true,
     cta: 'Choisir Premium',
@@ -436,9 +436,9 @@ const PRICING_PLANS: PricingPlan[] = [
     features: [
       'Tout du plan Premium',
       'Multi-utilisateurs',
-      'Gestionnaire dédié',
-      'Formation équipes',
-      'API & intégrations',
+      'Gestionnaire dÃ©diÃ©',
+      'Formation Ã©quipes',
+      'API & intÃ©grations',
       'Rapports analytics'
     ],
     cta: 'Nous contacter',
@@ -454,17 +454,17 @@ const OptimizedHomePage: React.FC = () => {
   const canInstall = !!canPrompt;
 
   const stats: Stat[] = [
-    { value: '15K+', label: 'Expatriés aidés',    icon: <Users className="w-8 h-8" />, color: 'from-blue-500 to-cyan-500' },
-    { value: '2K+',  label: 'Experts vérifiés',    icon: <Shield className="w-8 h-8" />, color: 'from-green-500 to-emerald-500' },
+    { value: '15K+', label: 'ExpatriÃ©s aidÃ©s',    icon: <Users className="w-8 h-8" />, color: 'from-blue-500 to-cyan-500' },
+    { value: '2K+',  label: 'Experts vÃ©rifiÃ©s',    icon: <Shield className="w-8 h-8" />, color: 'from-green-500 to-emerald-500' },
     { value: '50+',  label: 'Pays couverts',       icon: <Globe className="w-8 h-8" />,  color: 'from-purple-500 to-pink-500' },
     { value: '24/7', label: 'Support urgent',      icon: <Clock className="w-8 h-8" />,  color: 'from-orange-500 to-red-500' }
   ];
 
   const features = [
-    { icon: <Zap className="w-8 h-8" />,        title: 'Connexion instantanée', description: 'Un expert en moins de 5 minutes, 24h/24 et 7j/7.', color: 'from-yellow-500 to-orange-500' },
-    { icon: <Shield className="w-8 h-8" />,     title: 'Experts vérifiés',      description: 'Des pros certifiés et notés par la communauté.', color: 'from-green-500 to-teal-500' },
+    { icon: <Zap className="w-8 h-8" />,        title: 'Connexion instantanÃ©e', description: 'Un expert en moins de 5 minutes, 24h/24 et 7j/7.', color: 'from-yellow-500 to-orange-500' },
+    { icon: <Shield className="w-8 h-8" />,     title: 'Experts vÃ©rifiÃ©s',      description: 'Des pros certifiÃ©s et notÃ©s par la communautÃ©.', color: 'from-green-500 to-teal-500' },
     { icon: <Globe className="w-8 h-8" />,      title: 'Couverture mondiale',   description: '50+ pays, des experts locaux proches de vous.', color: 'from-blue-500 to-purple-500' },
-    { icon: <DollarSign className="w-8 h-8" />, title: 'Tarifs transparents',   description: 'Aucun frais caché. Dès 29€ la consultation.', color: 'from-pink-500 to-red-500' }
+    { icon: <DollarSign className="w-8 h-8" />, title: 'Tarifs transparents',   description: 'Aucun frais cachÃ©. DÃ¨s 29â‚¬ la consultation.', color: 'from-pink-500 to-red-500' }
   ];
 
   const onInstallClick = useCallback(() => { install(); }, [install]);
@@ -503,11 +503,11 @@ const OptimizedHomePage: React.FC = () => {
 
           <div className="relative z-10 max-w-7xl mx-auto px-6">
             <div className="text-center mb-20">
-              {/* Badge “Nouveau” + PWA */}
+              {/* Badge â€œNouveauâ€ + PWA */}
               <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full pl-6 pr-2 py-3 border border-white/20 mb-8 touch-manipulation">
                 <Sparkles className="w-5 h-5 text-yellow-400" />
                 <span className="text-white font-medium">
-                  Nouveau — téléchargez l’appli <strong>SOS Expat d’Ulixai</strong> !
+                  Nouveau â€” tÃ©lÃ©chargez lâ€™appli <strong>SOS Expat dâ€™Ulixai</strong> !
                 </span>
                 <PWAInstallIconWithHint canInstall={canInstall} onInstall={onInstallClick} />
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -519,17 +519,17 @@ const OptimizedHomePage: React.FC = () => {
                 </span>
                 <br />
                 <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
-                  Expatriés & Voyageurs
+                  ExpatriÃ©s & Voyageurs
                 </span>
               </h1>
 
-              {/* H2 - inchangé */}
+              {/* H2 - inchangÃ© */}
               <h2 className="text-2xl md:text-3xl text-white font-semibold max-w-4xl mx-auto mb-3 leading-relaxed">
-                Besoin d’aide, d’une solution, d’un coup de main immédiat ?
+                Besoin dâ€™aide, dâ€™une solution, dâ€™un coup de main immÃ©diat ?
               </h2>
               {/* H3 - plus fun */}
               <h3 className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed">
-                Un expert local vous répond en moins de 5&nbsp;minutes, partout sur la planète... Et dans votre langue !
+                Un expert local vous rÃ©pond en moins de 5&nbsp;minutes, partout sur la planÃ¨te... Et dans votre langue !
               </h3>
 
               <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
@@ -582,28 +582,28 @@ const OptimizedHomePage: React.FC = () => {
             <div className="text-center mb-14">
               <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-100 to-orange-100 backdrop-blur-sm rounded-full px-6 py-3 border border-red-200 mb-6">
                 <Shield className="w-5 h-5 text-red-600" />
-                <span className="text-red-700 font-bold">Avocats et Expatriés • Disponibles 24/7</span>
+                <span className="text-red-700 font-bold">Avocats et ExpatriÃ©s â€¢ Disponibles 24/7</span>
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               </div>
 
-              {/* H2 - inchangé */}
+              {/* H2 - inchangÃ© */}
               <h2 className="text-5xl font-black text-gray-900 mb-4">
-                Nos <span className="bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">experts</span> à votre service
+                Nos <span className="bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">experts</span> Ã  votre service
               </h2>
               {/* intro plus fun */}
               <p className="text-lg text-gray-700 max-w-3xl mx-auto">
-                Moins de 5&nbsp;minutes, et ça sonne : un expert décroche, où que vous soyez, dans votre langue.
+                Moins de 5&nbsp;minutes, et Ã§a sonne : un expert dÃ©croche, oÃ¹ que vous soyez, dans votre langue.
               </p>
             </div>
 
-            {/* Correction: suppression de la prop CardComponent non supportée */}
+            {/* Correction: suppression de la prop CardComponent non supportÃ©e */}
             <ProfilesCarousel />
           </div>
         </section>
 
-        {/* ================= Tarifs (DÉPLACÉ AVANT "Pourquoi choisir") ================= */}
+        {/* ================= Tarifs (DÃ‰PLACÃ‰ AVANT "Pourquoi choisir") ================= */}
         <section className="py-32 bg-gradient-to-b from-gray-950 to-gray-900 relative overflow-hidden" aria-labelledby="pricing-title">
-          {/* Évite un avertissement si PRICING_PLANS référencé ailleurs */}
+          {/* Ã‰vite un avertissement si PRICING_PLANS rÃ©fÃ©rencÃ© ailleurs */}
           {void PRICING_PLANS.length}
 
           {(() => {
@@ -621,7 +621,7 @@ const OptimizedHomePage: React.FC = () => {
               badge: string;
               title: string;
               minutes: number;
-              euroPrice: number; // utilisé comme "amount" générique en mode dynamique
+              euroPrice: number; // utilisÃ© comme "amount" gÃ©nÃ©rique en mode dynamique
               usdOverride?: number;
               description: string;
               features: string[];
@@ -640,12 +640,12 @@ const OptimizedHomePage: React.FC = () => {
               minutes: number;
               currency?: 'eur' | 'usd';
             }> = ({ euro, usdRate, usdOverride, minutes, currency }) => {
-              // Mode dynamique : on affiche uniquement la devise sélectionnée
+              // Mode dynamique : on affiche uniquement la devise sÃ©lectionnÃ©e
               if (currency) {
                 const code = currency.toUpperCase() as 'EUR' | 'USD';
                 const formatted = formatBothCurrencies(euro, code);
                 return (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durée">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durÃ©e">
                     <div className="flex items-end gap-3">
                       <span className="text-5xl font-black text-gray-900 leading-none">{formatted}</span>
                     </div>
@@ -657,12 +657,12 @@ const OptimizedHomePage: React.FC = () => {
                 );
               }
 
-              // Mode statique : EUR principal + USD entre parenthèses
+              // Mode statique : EUR principal + USD entre parenthÃ¨ses
               const effectiveRate: number = typeof usdRate === 'number' ? usdRate : DEFAULT_USD_RATE;
               const usdValue = typeof usdOverride === 'number' ? usdOverride : Math.round(euro * effectiveRate);
 
               return (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durée">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between" aria-label="Tarifs et durÃ©e">
                   <div className="flex items-end gap-3">
                     <span className="text-5xl font-black text-gray-900 leading-none">{formatBothCurrencies(euro, 'EUR')}</span>
                     <span className="text-2xl font-extrabold text-gray-700 leading-none">({formatBothCurrencies(usdValue, 'USD')})</span>
@@ -693,7 +693,7 @@ const OptimizedHomePage: React.FC = () => {
               return (
                 <article
                   className={`group relative h-full flex flex-col p-8 rounded-3xl border ${borderColor} ${lightColor} transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] focus-within:scale-[1.02] overflow-hidden`}
-                  aria-label={`${title} – ${minutes} minutes`}
+                  aria-label={`${title} â€“ ${minutes} minutes`}
                 >
                   <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentGradient} opacity-0 group-hover:opacity-[0.06] transition-opacity duration-300`} />
                   <div className="relative z-10 flex-1 flex flex-col">
@@ -710,7 +710,7 @@ const OptimizedHomePage: React.FC = () => {
 
                     <PriceBlock euro={euroPrice} usdRate={usdRate} usdOverride={usdOverride} minutes={minutes} currency={currency} />
 
-                    <ul className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3" role="list" aria-label="Bénéfices inclus">
+                    <ul className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3" role="list" aria-label="BÃ©nÃ©fices inclus">
                       {features.map((f, i) => (
                         <li key={i} role="listitem" className="flex items-start gap-3">
                           <span className={`mt-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r ${accentGradient}`}>
@@ -725,9 +725,9 @@ const OptimizedHomePage: React.FC = () => {
                       <Link
                         to="/sos-appel"
                         className={`inline-flex items-center justify-center w-full px-6 py-4 rounded-2xl font-bold text-lg text-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white ${`bg-gradient-to-r ${accentGradient}`} hover:scale-105`}
-                        aria-label={`Réserver ma consultation – ${title}`}
+                        aria-label={`RÃ©server ma consultation â€“ ${title}`}
                       >
-                        Réserver ma consultation
+                        RÃ©server ma consultation
                       </Link>
                     </div>
                   </div>
@@ -735,39 +735,39 @@ const OptimizedHomePage: React.FC = () => {
               );
             };
 
-            // Bénéfices (identiques)
+            // BÃ©nÃ©fices (identiques)
             const expatBenefits: string[] = [
-              'Retours d’expérience concrets',
-              'Conseils logement, banque, santé, transport',
-              'Infos à jour sur démarches et délais',
-              'Astuces culturelles & pièges à éviter',
-              'Réseau local (contacts utiles)',
+              'Retours dâ€™expÃ©rience concrets',
+              'Conseils logement, banque, santÃ©, transport',
+              'Infos Ã  jour sur dÃ©marches et dÃ©lais',
+              'Astuces culturelles & piÃ¨ges Ã  Ã©viter',
+              'RÃ©seau local (contacts utiles)',
               'Accompagnement bienveillant'
             ];
             const lawyerBenefits: string[] = [
               'Analyse rapide de votre situation',
-              'Conseils juridiques personnalisés',
-              'Confidentialité & sécurité garanties',
-              'Réponse en < 5 minutes',
-              'Expertise pays concerné',
-              'Orientation vers les bonnes procédures'
+              'Conseils juridiques personnalisÃ©s',
+              'ConfidentialitÃ© & sÃ©curitÃ© garanties',
+              'RÃ©ponse en < 5 minutes',
+              'Expertise pays concernÃ©',
+              'Orientation vers les bonnes procÃ©dures'
             ];
 
-            // Exemples (fusionnés)
+            // Exemples (fusionnÃ©s)
             const expatExamples: string[] = [
               'Installation : logement, forfait mobile, banque',
-              'Scolarité & assurances locales',
-              'Préfecture / immigration : RDV & dossiers'
+              'ScolaritÃ© & assurances locales',
+              'PrÃ©fecture / immigration : RDV & dossiers'
             ];
             const lawyerExamples: string[] = [
-              'Contrat de travail : clauses à vérifier',
-              'Conflit locatif / commercial — premiers réflexes',
-              'Accident / hospitalisation : droits & démarches'
+              'Contrat de travail : clauses Ã  vÃ©rifier',
+              'Conflit locatif / commercial â€” premiers rÃ©flexes',
+              'Accident / hospitalisation : droits & dÃ©marches'
             ];
             const additionalExamples: string[] = [
-              'Problèmes justice / police (droits & démarches)',
+              'ProblÃ¨mes justice / police (droits & dÃ©marches)',
               'Trouver un job (CV local, entretiens, contrats)',
-              'Rencontrer d’autres expatriés (réseau & entraide)'
+              'Rencontrer dâ€™autres expatriÃ©s (rÃ©seau & entraide)'
             ];
             const combinedExamples: string[] = Array.from(
               new Set([...expatExamples, ...lawyerExamples, ...additionalExamples])
@@ -780,25 +780,25 @@ const OptimizedHomePage: React.FC = () => {
                   <div className="text-center mb-16">
                     <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-6">
                       <DollarSign className="w-5 h-5 text-green-400" />
-                      <span className="text-green-300 font-bold">Transparence totale • Pas de frais cachés</span>
+                      <span className="text-green-300 font-bold">Transparence totale â€¢ Pas de frais cachÃ©s</span>
                       <Check className="w-5 h-5 text-green-400" />
                     </div>
 
-                    {/* H2 - inchangé */}
+                    {/* H2 - inchangÃ© */}
                     <h2 id="pricing-title" className="text-5xl font-black text-white mb-4">
-                      Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
+                      Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptÃ©s Ã  vos besoins
                     </h2>
                     {/* intro plus fun */}
                     <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                      Choisissez à qui vous voulez parler… <strong>un avocat</strong> ? <strong>Un expatrié</strong> ?
+                      Choisissez Ã  qui vous voulez parlerâ€¦ <strong>un avocat</strong> ? <strong>Un expatriÃ©</strong> ?
                     </p>
                   </div>
 
-                  {/* Ordre demandé : Expatrié AVANT Avocat */}
+                  {/* Ordre demandÃ© : ExpatriÃ© AVANT Avocat */}
                   <div className="grid gap-8 md:grid-cols-2 items-stretch">
                     <OfferCard
-                      badge="Offre Expatrié"
-                      title="1 échange avec un expatrié expérimenté"
+                      badge="Offre ExpatriÃ©"
+                      title="1 Ã©change avec un expatriÃ© expÃ©rimentÃ©"
                       minutes={30}
                       euroPrice={19}
                       usdOverride={25}
@@ -811,11 +811,11 @@ const OptimizedHomePage: React.FC = () => {
                     />
                     <OfferCard
                       badge="Offre Avocat"
-                      title="1 consultation avec un avocat qualifié"
+                      title="1 consultation avec un avocat qualifiÃ©"
                       minutes={20}
                       euroPrice={49}
                       usdOverride={55}
-                      description="Une réponse claire, exploitable, adaptée à votre cas."
+                      description="Une rÃ©ponse claire, exploitable, adaptÃ©e Ã  votre cas."
                       features={lawyerBenefits}
                       accentGradient="from-red-600 to-red-700"
                       icon={<Briefcase className="w-4 h-4" />}
@@ -836,7 +836,7 @@ const OptimizedHomePage: React.FC = () => {
                       </div>
                       {/* H3 - plus fun */}
                       <h3 id="examples-title" className="text-xl md:text-2xl font-extrabold text-white">
-                        Situations concrètes
+                        Situations concrÃ¨tes
                       </h3>
                       <p className="text-gray-300 text-sm md:text-base">
                         Un expert pour chaque besoin, point.
@@ -858,12 +858,12 @@ const OptimizedHomePage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Garanties / points-clés */}
+                  {/* Garanties / points-clÃ©s */}
                   <div className="mt-14 text-center">
                     <div className="inline-flex items-center space-x-6 bg-white/5 backdrop-blur-sm rounded-2xl px-8 py-4 border border-white/10">
                       <div className="flex items-center space-x-2 text-green-400">
                         <Shield className="w-5 h-5" />
-                        <span className="font-medium">Confidentialité & sécurité</span>
+                        <span className="font-medium">ConfidentialitÃ© & sÃ©curitÃ©</span>
                       </div>
                       <div className="w-px h-6 bg-white/20" />
                       <div className="flex items-center space-x-2 text-blue-400">
@@ -873,7 +873,7 @@ const OptimizedHomePage: React.FC = () => {
                       <div className="w-px h-6 bg-white/20" />
                       <div className="flex items-center space-x-2 text-purple-400">
                         <Zap className="w-5 h-5" />
-                        <span className="font-medium">Réservation instantanée — appel en 5 minutes</span>
+                        <span className="font-medium">RÃ©servation instantanÃ©e â€” appel en 5 minutes</span>
                       </div>
                     </div>
                   </div>
@@ -893,21 +893,21 @@ const OptimizedHomePage: React.FC = () => {
                   <div className="text-center mb-16">
                     <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-full px-6 py-3 border border-green-500/30 mb-6">
                       <DollarSign className="w-5 h-5 text-green-400" />
-                      <span className="text-green-300 font-bold">Transparence totale • Pas de frais cachés</span>
+                      <span className="text-green-300 font-bold">Transparence totale â€¢ Pas de frais cachÃ©s</span>
                       <Check className="w-5 h-5 text-green-400" />
                     </div>
 
-                    {/* H2 - inchangé */}
+                    {/* H2 - inchangÃ© */}
                     <h2 id="pricing-title" className="text-5xl font-black text-white mb-4">
-                      Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptés à vos besoins
+                      Des <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">tarifs</span> adaptÃ©s Ã  vos besoins
                     </h2>
                     {/* intro plus fun */}
                     <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                      Choisissez à qui vous voulez parler… <strong>un avocat</strong> ? <strong>Un expatrié</strong> ?
+                      Choisissez Ã  qui vous voulez parlerâ€¦ <strong>un avocat</strong> ? <strong>Un expatriÃ©</strong> ?
                     </p>
                   </div>
 
-                  {/* --- Intégration dynamique --- */}
+                  {/* --- IntÃ©gration dynamique --- */}
                   {pricingLoading ? (
                     <div className="text-center py-16">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4" />
@@ -917,7 +917,7 @@ const OptimizedHomePage: React.FC = () => {
                     renderStaticPricing()
                   ) : (
                     <>
-                      {/* Sélecteur de devise */}
+                      {/* SÃ©lecteur de devise */}
                       <div className="text-center mb-8">
                         <div className="inline-flex bg-white/10 rounded-full p-1 backdrop-blur-sm border border-white/20">
                           <button
@@ -928,7 +928,7 @@ const OptimizedHomePage: React.FC = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            🇪🇺 EUR
+                            ðŸ‡ªðŸ‡º EUR
                           </button>
                           <button
                             onClick={() => setSelectedCurrency('usd')}
@@ -938,17 +938,17 @@ const OptimizedHomePage: React.FC = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            🇺🇸 USD
+                            ðŸ‡ºðŸ‡¸ USD
                           </button>
                         </div>
                       </div>
 
                       {/* Grid avec prix dynamiques */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                        {/* Card Expatrié - Prix dynamique */}
+                        {/* Card ExpatriÃ© - Prix dynamique */}
                         <OfferCard
-                          badge="Offre Expatrié"
-                          title="1 échange avec un expatrié expérimenté"
+                          badge="Offre ExpatriÃ©"
+                          title="1 Ã©change avec un expatriÃ© expÃ©rimentÃ©"
                           minutes={pricing.expat[selectedCurrency].duration}
                           euroPrice={pricing.expat[selectedCurrency].totalAmount}
                           description="Des conseils concrets, locaux, et tout de suite."
@@ -963,10 +963,10 @@ const OptimizedHomePage: React.FC = () => {
                         {/* Card Avocat - Prix dynamique */}
                         <OfferCard
                           badge="Offre Avocat"
-                          title="1 consultation avec un avocat qualifié"
+                          title="1 consultation avec un avocat qualifiÃ©"
                           minutes={pricing.lawyer[selectedCurrency].duration}
                           euroPrice={pricing.lawyer[selectedCurrency].totalAmount}
-                          description="Une réponse claire, exploitable, adaptée à votre cas."
+                          description="Une rÃ©ponse claire, exploitable, adaptÃ©e Ã  votre cas."
                           features={lawyerBenefits}
                           accentGradient="from-red-600 to-red-700"
                           icon={<Briefcase className="w-4 h-4" />}
@@ -979,7 +979,7 @@ const OptimizedHomePage: React.FC = () => {
                       {/* Indicateur source prix */}
                       <div className="text-center mt-6">
                         <span className="text-xs text-white/60 bg-white/10 px-3 py-1 rounded-full">
-                          💰 Tarifs mis à jour depuis la console admin
+                          ðŸ’° Tarifs mis Ã  jour depuis la console admin
                         </span>
                       </div>
 
@@ -995,7 +995,7 @@ const OptimizedHomePage: React.FC = () => {
                           </div>
                           {/* H3 - plus fun */}
                           <h3 id="examples-title" className="text-xl md:text-2xl font-extrabold text-white">
-                            Situations concrètes
+                            Situations concrÃ¨tes
                           </h3>
                           <p className="text-gray-300 text-sm md:text-base">
                             Un expert pour chaque besoin, point.
@@ -1017,12 +1017,12 @@ const OptimizedHomePage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Garanties / points-clés */}
+                      {/* Garanties / points-clÃ©s */}
                       <div className="mt-14 text-center">
                         <div className="inline-flex items-center space-x-6 bg-white/5 backdrop-blur-sm rounded-2xl px-8 py-4 border border-white/10">
                           <div className="flex items-center space-x-2 text-green-400">
                             <Shield className="w-5 h-5" />
-                            <span className="font-medium">Confidentialité & sécurité</span>
+                            <span className="font-medium">ConfidentialitÃ© & sÃ©curitÃ©</span>
                           </div>
                           <div className="w-px h-6 bg-white/20" />
                           <div className="flex items-center space-x-2 text-blue-400">
@@ -1032,7 +1032,7 @@ const OptimizedHomePage: React.FC = () => {
                           <div className="w-px h-6 bg-white/20" />
                           <div className="flex items-center space-x-2 text-purple-400">
                             <Zap className="w-5 h-5" />
-                            <span className="font-medium">Réservation instantanée — appel en 5 minutes</span>
+                            <span className="font-medium">RÃ©servation instantanÃ©e â€” appel en 5 minutes</span>
                           </div>
                         </div>
                       </div>
@@ -1044,7 +1044,7 @@ const OptimizedHomePage: React.FC = () => {
           })()}
         </section>
 
-        {/* ================= Pourquoi choisir (MODIFIÉ) ================= */}
+        {/* ================= Pourquoi choisir (MODIFIÃ‰) ================= */}
         <section className="py-32 bg-gradient-to-b from-white to-gray-50" aria-labelledby="why-title">
           {void features.length}
 
@@ -1063,23 +1063,23 @@ const OptimizedHomePage: React.FC = () => {
                 id: 'speed-worldwide',
                 title: 'Un expert en 5 minutes',
                 tagline: 'Le service qui vous suit partout.',
-                caption: 'Partout • 24/7 • < 5 min',
+                caption: 'Partout â€¢ 24/7 â€¢ < 5 min',
                 icon: <Zap className="w-6 h-6" />,
                 gradient: 'from-red-500 to-orange-500'
               },
               {
                 id: 'coffee-fast',
-                title: 'Avant que votre café refroidisse',
-                tagline: 'Avocat ou expatrié, on vous connecte tout de suite.',
-                caption: 'Priorité à l’urgence',
+                title: 'Avant que votre cafÃ© refroidisse',
+                tagline: 'Avocat ou expatriÃ©, on vous connecte tout de suite.',
+                caption: 'PrioritÃ© Ã  lâ€™urgence',
                 icon: <Clock className="w-6 h-6" />,
                 gradient: 'from-yellow-500 to-red-500'
               },
               {
                 id: 'multi',
                 title: 'Multilingue. Multidevise. Multicountry.',
-                tagline: 'On s’adapte à vous — et c’est ultra-rapide.',
-                caption: 'Langues • Devises • Pays',
+                tagline: 'On sâ€™adapte Ã  vous â€” et câ€™est ultra-rapide.',
+                caption: 'Langues â€¢ Devises â€¢ Pays',
                 icon: <Globe className="w-6 h-6" />,
                 gradient: 'from-blue-500 to-purple-500'
               }
@@ -1130,13 +1130,13 @@ const OptimizedHomePage: React.FC = () => {
             return (
               <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center mb-12 sm:mb-16">
-                  {/* H2 - inchangé */}
+                  {/* H2 - inchangÃ© */}
                   <h2 id="why-title" className="text-5xl font-black text-gray-900 mb-6">
                     Pourquoi choisir <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">SOS Expats</span> ?
                   </h2>
                   {/* intro plus fun */}
                   <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
-                    Pensé pour aller vite, rester clair et vraiment vous accompagner — mobile d’abord.
+                    PensÃ© pour aller vite, rester clair et vraiment vous accompagner â€” mobile dâ€™abord.
                   </p>
                 </div>
 
@@ -1150,7 +1150,7 @@ const OptimizedHomePage: React.FC = () => {
           })()}
         </section>
 
-        {/* ================= Rejoignez SOS Expat — FOND SOMBRE ================= */}
+        {/* ================= Rejoignez SOS Expat â€” FOND SOMBRE ================= */}
         <section className="py-28 bg-gradient-to-b from-gray-900 to-gray-950 relative overflow-hidden" aria-labelledby="join-title">
           {(() => {
             interface JoinCardProps {
@@ -1210,7 +1210,7 @@ const OptimizedHomePage: React.FC = () => {
                         <ArrowRight className="w-5 h-5" />
                       </a>
                       <p className="mt-3 text-sm text-gray-500">
-                        Astuce : téléchargez l’appli <strong>SOS Expat d’Ulixai</strong> pour passer en ligne/hors ligne quand vous le souhaitez.
+                        Astuce : tÃ©lÃ©chargez lâ€™appli <strong>SOS Expat dâ€™Ulixai</strong> pour passer en ligne/hors ligne quand vous le souhaitez.
                       </p>
                     </div>
                   </div>
@@ -1218,21 +1218,21 @@ const OptimizedHomePage: React.FC = () => {
               );
             };
 
-            // H2 via variable — inchangé
-            const joinTitle = 'Faites partie du réseau SOS Expat';
+            // H2 via variable â€” inchangÃ©
+            const joinTitle = 'Faites partie du rÃ©seau SOS Expat';
             const joinSubtitle =
-              'Avocats ou expatriés : rejoignez-nous et transformez vos compétences en opportunités réelles.';
+              'Avocats ou expatriÃ©s : rejoignez-nous et transformez vos compÃ©tences en opportunitÃ©s rÃ©elles.';
 
             const lawyerCard: JoinCardProps = {
               label: 'Avocat',
-              title: 'Développez votre activité à l’international',
+              title: 'DÃ©veloppez votre activitÃ© Ã  lâ€™international',
               benefits: [
-                'Augmentez votre chiffre d’affaires avec des consultations de 20 minutes',
+                'Augmentez votre chiffre dâ€™affaires avec des consultations de 20 minutes',
                 'Paiement rapide : versement sous 24 h',
                 'Mettez-vous en ligne/hors ligne quand vous voulez',
-                'Visibilité mondiale, clients connectés en < 5 minutes',
+                'VisibilitÃ© mondiale, clients connectÃ©s en < 5 minutes',
                 'Toutes langues, euros et dollars',
-                'Répondez aux expats, voyageurs et vacanciers'
+                'RÃ©pondez aux expats, voyageurs et vacanciers'
               ],
               ctaLabel: 'Je suis avocat',
               ctaHref: 'http://localhost:5173/register/lawyer',
@@ -1241,19 +1241,19 @@ const OptimizedHomePage: React.FC = () => {
             };
 
             const expatCard: JoinCardProps = {
-              label: 'Expatrié',
-              title: 'Partagez votre expérience où que vous soyez dans le monde',
+              label: 'ExpatriÃ©',
+              title: 'Partagez votre expÃ©rience oÃ¹ que vous soyez dans le monde',
               benefits: [
-                'Mettez-vous en ligne ou hors ligne à tout moment (contrôle total)',
-                'Quand vous recevez des appels, vous gagnez — paiement sous 24 h',
-                '30 minutes par appel : des revenus à chaque échange',
-                'Plus vous êtes en ligne, plus vos revenus explosent',
+                'Mettez-vous en ligne ou hors ligne Ã  tout moment (contrÃ´le total)',
+                'Quand vous recevez des appels, vous gagnez â€” paiement sous 24 h',
+                '30 minutes par appel : des revenus Ã  chaque Ã©change',
+                'Plus vous Ãªtes en ligne, plus vos revenus explosent',
                 'Clients partout dans le monde, toutes langues',
-                'Euros et dollars acceptés',
+                'Euros et dollars acceptÃ©s',
                 'Je veux aider : expats, voyageurs, vacanciers',
-                'Inscrivez-vous et décrivez votre expérience & vos connaissances locales'
+                'Inscrivez-vous et dÃ©crivez votre expÃ©rience & vos connaissances locales'
               ],
-              ctaLabel: 'Je suis expatrié',
+              ctaLabel: 'Je suis expatriÃ©',
               ctaHref: 'http://localhost:5173/register/expat',
               icon: <User className="w-3.5 h-3.5" />,
               gradient: 'from-blue-600 to-indigo-600'
@@ -1270,7 +1270,7 @@ const OptimizedHomePage: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Même hauteur des deux cartes */}
+                {/* MÃªme hauteur des deux cartes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-stretch">
                   <JoinCard {...expatCard} />
                   <JoinCard {...lawyerCard} />
@@ -1280,7 +1280,7 @@ const OptimizedHomePage: React.FC = () => {
           })()}
         </section>
 
-        {/* ================= AVIS (slider auto) — FOND CLAIR ================= */}
+        {/* ================= AVIS (slider auto) â€” FOND CLAIR ================= */}
         <section className="py-28 sm:py-32 bg-gradient-to-b from-white to-gray-50 relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute -top-10 left-1/4 w-80 h-80 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl" />
@@ -1292,18 +1292,18 @@ const OptimizedHomePage: React.FC = () => {
               <span className="inline-flex rounded-full p-[1px] bg-gradient-to-r from-yellow-400 to-orange-400 shadow-md mb-5 sm:mb-6">
                 <span className="inline-flex items-center gap-2 rounded-full bg-white px-5 sm:px-6 py-2.5 sm:py-3 border border-yellow-200/70 text-yellow-700">
                   <Star className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="font-semibold">4,9/5 • +2 500 avis</span>
+                  <span className="font-semibold">4,9/5 â€¢ +2 500 avis</span>
                   <Award className="w-4 h-4 sm:w-5 sm:h-5" />
                 </span>
               </span>
 
-              {/* H2 - inchangé */}
+              {/* H2 - inchangÃ© */}
               <h2 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
                 Ce que disent nos <span className="bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">utilisateurs</span>
               </h2>
               {/* intro plus fun */}
               <p className="mt-3 sm:mt-4 text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
-                Témoignages réels, situations variées — pour que chacun·e s’identifie.
+                TÃ©moignages rÃ©els, situations variÃ©es â€” pour que chacunÂ·e sâ€™identifie.
               </p>
             </div>
 
@@ -1311,23 +1311,23 @@ const OptimizedHomePage: React.FC = () => {
           </div>
         </section>
 
-        {/* ================= CTA final — PRÊT À ÊTRE AIDÉ ================= */}
+        {/* ================= CTA final â€” PRÃŠT Ã€ ÃŠTRE AIDÃ‰ ================= */}
         <section className="py-32 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20" />
           <div className="relative z-10 max-w-5xl mx-auto text-center px-6">
-            {/* H2 - inchangé */}
+            {/* H2 - inchangÃ© */}
             <h2 className="text-5xl md:text-6xl font-black text-white mb-6 md:mb-8">
-              Prêt à être aidé ?
+              PrÃªt Ã  Ãªtre aidÃ© ?
             </h2>
             {/* intro plus fun */}
             <p className="text-xl md:text-2xl text-white/95 mb-10 md:mb-12 leading-relaxed">
-              Rejoignez plus de <strong>15&nbsp;000 expatriés</strong> qui nous font confiance pour avancer à l’étranger.
+              Rejoignez plus de <strong>15&nbsp;000 expatriÃ©s</strong> qui nous font confiance pour avancer Ã  lâ€™Ã©tranger.
             </p>
 
-            {/* Réassurance */}
+            {/* RÃ©assurance */}
             <div className="mb-10 flex flex-wrap items-center justify-center gap-3 text-white/90">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
-                <Shield className="w-4 h-4" /> Sécurisé
+                <Shield className="w-4 h-4" /> SÃ©curisÃ©
               </span>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
                 <Clock className="w-4 h-4" /> <span>Moins de 5&nbsp;minutes</span>

@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx
+﻿// src/contexts/AuthContext.tsx
 import React, { ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   signInWithEmailAndPassword,
@@ -226,13 +226,13 @@ const processProfilePhoto = async (
 };
 
 /* =========================================================
-   Création / lecture du user Firestore (helpers conservés)
+   CrÃ©ation / lecture du user Firestore (helpers conservÃ©s)
    ========================================================= */
-// ... toutes les autres fonctions createUserDocumentInFirestore, createSOSProfile, etc. inchangées
+// ... toutes les autres fonctions createUserDocumentInFirestore, createSOSProfile, etc. inchangÃ©es
 
 /**
- * getUserDocument : version existante conservée (utile à refreshUser),
- * mais ⚠️ la lecture initiale ne s’appuie PLUS dessus — elle passe par le flux 2 temps plus bas.
+ * getUserDocument : version existante conservÃ©e (utile Ã  refreshUser),
+ * mais âš ï¸ la lecture initiale ne sâ€™appuie PLUS dessus â€” elle passe par le flux 2 temps plus bas.
  */
 const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null> => {
   const refUser = doc(db, 'users', firebaseUser.uid);
@@ -296,7 +296,7 @@ const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null>
 };
 
 /* =========================================================
-   Mise à jour présence (sos_profiles = source de vérité)
+   Mise Ã  jour prÃ©sence (sos_profiles = source de vÃ©ritÃ©)
    ========================================================= */
 const writeSosPresence = async (
   userId: string,
@@ -344,7 +344,7 @@ const writeUsersPresenceBestEffort = async (
       updatedAt: serverTimestamp(),
     });
   } catch (e) {
-    console.warn('[Presence] update users ignoré (règles):', e);
+    console.warn('[Presence] update users ignorÃ© (rÃ¨gles):', e);
   }
 };
 
@@ -359,7 +359,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
   /** ================================
-   * 1) Écouter l’auth et stocker l’utilisateur
+   * 1) Ã‰couter lâ€™auth et stocker lâ€™utilisateur
    * ================================ */
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
@@ -380,17 +380,17 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const deviceInfo = useMemo(getDeviceInfo, []);
 
-  // Flag déconnexion pour éviter les réinjections via snapshot
+  // Flag dÃ©connexion pour Ã©viter les rÃ©injections via snapshot
   const signingOutRef = useRef<boolean>(false);
 
-  // onAuthStateChanged → ne fait que stocker l’utilisateur auth
+  // onAuthStateChanged â†’ ne fait que stocker lâ€™utilisateur auth
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setIsLoading(true);
       setAuthUser(u);
       setFirebaseUser(u ?? null);
       if (!u) {
-        // Pas d’utilisateur → on nettoie l’état applicatif
+        // Pas dâ€™utilisateur â†’ on nettoie lâ€™Ã©tat applicatif
         setUser(null);
         signingOutRef.current = false;
         setIsLoading(false);
@@ -401,15 +401,15 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, []);
 
   /** ============================================================
-   * 2) Accéder à /users/{uid} UNIQUEMENT quand on a un authUser
-   *    + protection StrictMode (double montage) pour éviter 2 abonnements
+   * 2) AccÃ©der Ã  /users/{uid} UNIQUEMENT quand on a un authUser
+   *    + protection StrictMode (double montage) pour Ã©viter 2 abonnements
    * ============================================================ */
   const subscribed = useRef(false);
   const firstSnapArrived = useRef(false);
 
   useEffect(() => {
-    if (!authUser) return;               // attendre l’auth
-    if (subscribed.current) return;      // éviter double abonnement en StrictMode
+    if (!authUser) return;               // attendre lâ€™auth
+    if (subscribed.current) return;      // Ã©viter double abonnement en StrictMode
     subscribed.current = true;
     firstSnapArrived.current = false;
     setIsLoading(true);
@@ -422,7 +422,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
     (async () => {
       try {
-        // Créer le doc si absent
+        // CrÃ©er le doc si absent
         const snap = await getDoc(refUser);
         if (!snap.exists()) {
           await setDoc(
@@ -434,7 +434,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
         if (cancelled) return;
 
-        // Ouvrir le listener après auth + doc présent
+        // Ouvrir le listener aprÃ¨s auth + doc prÃ©sent
         unsubUser = onSnapshot(
           refUser,
           (docSnap) => {
@@ -485,7 +485,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       }
     })();
 
-    // cleanup (StrictMode monte/démonte 2x)
+    // cleanup (StrictMode monte/dÃ©monte 2x)
     return () => {
       cancelled = true;
       subscribed.current = false;
@@ -494,7 +494,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [authUser?.uid, authUser?.emailVerified]);
 
   /* ============================
-     Méthodes d'auth (useCallback)
+     MÃ©thodes d'auth (useCallback)
      ============================ */
 
   const isUserLoggedIn = useCallback(() => !!user || !!firebaseUser, [user, firebaseUser]);
@@ -552,7 +552,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     } catch (e) {
       const msg =
         e instanceof Error && e.message === 'auth/timeout'
-          ? 'Connexion trop lente, réessayez.'
+          ? 'Connexion trop lente, rÃ©essayez.'
           : 'Email ou mot de passe invalide.';
       setError(msg);
       setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
@@ -604,7 +604,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
             failedLogins: m.failedLogins + 1,
             roleRestrictionBlocks: m.roleRestrictionBlocks + 1,
           }));
-          const msg = 'La connexion Google est réservée aux clients.';
+          const msg = 'La connexion Google est rÃ©servÃ©e aux clients.';
           setError(msg);
           await logAuthEvent('google_login_role_restriction', {
             userId: googleUser.uid,
@@ -649,7 +649,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
     } catch (e) {
       if (!(e instanceof Error && e.message === 'GOOGLE_ROLE_RESTRICTION')) {
-        const msg = 'Connexion Google annulée ou impossible.';
+        const msg = 'Connexion Google annulÃ©e ou impossible.';
         setError(msg);
         setAuthMetrics((m) => ({ ...m, failedLogins: m.failedLogins + 1 }));
         await logAuthEvent('google_login_failed', {
@@ -665,7 +665,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     }
   }, [deviceInfo]);
 
-  // Récupération redirect Google en contexte crossOriginIsolated
+  // RÃ©cupÃ©ration redirect Google en contexte crossOriginIsolated
   const redirectHandledRef = useRef<boolean>(false);
   useEffect(() => {
     (async () => {
@@ -689,7 +689,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
               failedLogins: m.failedLogins + 1,
               roleRestrictionBlocks: m.roleRestrictionBlocks + 1,
             }));
-            const msg = 'La connexion Google est réservée aux clients.';
+            const msg = 'La connexion Google est rÃ©servÃ©e aux clients.';
             setError(msg);
             await logAuthEvent('google_login_role_restriction', {
               userId: googleUser.uid,
@@ -740,7 +740,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
     try {
       if (!userData.role || !['client', 'lawyer', 'expat', 'admin'].includes(userData.role)) {
-        const err = new Error('Rôle utilisateur invalide ou manquant.') as AppError;
+        const err = new Error('RÃ´le utilisateur invalide ou manquant.') as AppError;
         err.code = 'sos/invalid-role';
         throw err;
       }
@@ -750,7 +750,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         throw err;
       }
       if (password.length < 6) {
-        const err = new Error('Le mot de passe doit contenir au moins 6 caractères') as AppError;
+        const err = new Error('Le mot de passe doit contenir au moins 6 caractÃ¨res') as AppError;
         err.code = 'auth/weak-password';
         throw err;
       }
@@ -765,16 +765,16 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       const methods = await fetchSignInMethodsForEmail(auth, email);
       if (methods.length > 0) {
         if (methods.includes('password')) {
-          const err = new Error('Cet email est déjà associé à un compte.') as AppError;
+          const err = new Error('Cet email est dÃ©jÃ  associÃ© Ã  un compte.') as AppError;
           err.code = 'auth/email-already-in-use';
           throw err;
         }
         if (methods.includes('google.com')) {
-          const err = new Error('Cet email est lié à un compte Google.') as AppError;
+          const err = new Error('Cet email est liÃ© Ã  un compte Google.') as AppError;
           err.code = 'sos/email-linked-to-google';
           throw err;
         }
-        const err = new Error("Email lié à un autre fournisseur d'identité.") as AppError;
+        const err = new Error("Email liÃ© Ã  un autre fournisseur d'identitÃ©.") as AppError;
         err.code = 'sos/email-linked-to-other';
         throw err;
       }
@@ -826,19 +826,19 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
     } catch (err) {
       const e = err as AppError;
-      let msg = 'Inscription impossible. Réessayez.';
+      let msg = 'Inscription impossible. RÃ©essayez.';
       switch (e?.code) {
         case 'auth/email-already-in-use':
-          msg = 'Cet email est déjà associé à un compte. Connectez-vous ou réinitialisez votre mot de passe.';
+          msg = 'Cet email est dÃ©jÃ  associÃ© Ã  un compte. Connectez-vous ou rÃ©initialisez votre mot de passe.';
           break;
         case 'sos/email-linked-to-google':
-          msg = 'Cet email est lié à un compte Google. Utilisez « Se connecter avec Google » puis complétez votre profil.';
+          msg = 'Cet email est liÃ© Ã  un compte Google. Utilisez Â« Se connecter avec Google Â» puis complÃ©tez votre profil.';
           break;
         case 'auth/invalid-email':
           msg = 'Adresse email invalide.';
           break;
         case 'auth/weak-password':
-          msg = 'Le mot de passe doit contenir au moins 6 caractères.';
+          msg = 'Le mot de passe doit contenir au moins 6 caractÃ¨res.';
           break;
         case 'sos/invalid-role':
         case 'sos/missing-credentials':
@@ -926,7 +926,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [user, deviceInfo]);
 
   const updateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
-    if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
+    if (!firebaseUser || !user) throw new Error('Utilisateur non connectÃ©');
 
     setAuthMetrics((m) => ({ ...m, profileUpdateAttempts: m.profileUpdateAttempts + 1 }));
 
@@ -990,7 +990,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [firebaseUser, user, deviceInfo]);
 
   const updateUserEmail = useCallback(async (newEmail: string): Promise<void> => {
-    if (!firebaseUser) throw new Error('Utilisateur non connecté');
+    if (!firebaseUser) throw new Error('Utilisateur non connectÃ©');
 
     setAuthMetrics((m) => ({ ...m, emailUpdateAttempts: m.emailUpdateAttempts + 1 }));
 
@@ -1002,7 +1002,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
       const methods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
       if (methods.length > 0) {
-        throw new Error('Cette adresse email est déjà utilisée');
+        throw new Error('Cette adresse email est dÃ©jÃ  utilisÃ©e');
       }
 
       await updateEmail(firebaseUser, normalizedEmail);
@@ -1034,10 +1034,10 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [firebaseUser, user?.email, deviceInfo]);
 
   const updateUserPassword = useCallback(async (newPassword: string): Promise<void> => {
-    if (!firebaseUser) throw new Error('Utilisateur non connecté');
+    if (!firebaseUser) throw new Error('Utilisateur non connectÃ©');
 
     if (newPassword.length < 6) {
-      throw new Error('Le mot de passe doit contenir au moins 6 caractères');
+      throw new Error('Le mot de passe doit contenir au moins 6 caractÃ¨res');
     }
 
     try {
@@ -1059,7 +1059,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [firebaseUser, deviceInfo]);
 
   const reauthenticateUser = useCallback(async (password: string): Promise<void> => {
-    if (!firebaseUser || !user?.email) throw new Error('Utilisateur non connecté');
+    if (!firebaseUser || !user?.email) throw new Error('Utilisateur non connectÃ©');
 
     try {
       const credential = EmailAuthProvider.credential(user.email, password);
@@ -1107,7 +1107,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [deviceInfo]);
 
   const sendVerificationEmail = useCallback(async (): Promise<void> => {
-    if (!firebaseUser) throw new Error('Utilisateur non connecté');
+    if (!firebaseUser) throw new Error('Utilisateur non connectÃ©');
 
     try {
       await sendEmailVerification(firebaseUser);
@@ -1129,7 +1129,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, [firebaseUser, deviceInfo]);
 
   const deleteUserAccount = useCallback(async (): Promise<void> => {
-    if (!firebaseUser || !user) throw new Error('Utilisateur non connecté');
+    if (!firebaseUser || !user) throw new Error('Utilisateur non connectÃ©');
 
     try {
       const userId = firebaseUser.uid;
@@ -1197,14 +1197,14 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         lastLoginAt: (doc.data() as any).lastLoginAt?.toDate() || new Date(),
       })) as User[];
     } catch (error) {
-      console.error('Erreur récupération utilisateurs:', error);
+      console.error('Erreur rÃ©cupÃ©ration utilisateurs:', error);
       return [];
     }
   }, []);
 
   // Version batch atomique
   const setUserAvailability = useCallback(async (availability: 'available' | 'busy' | 'offline'): Promise<void> => {
-    if (!user || !firebaseUser) throw new Error('Utilisateur non connecté');
+    if (!user || !firebaseUser) throw new Error('Utilisateur non connectÃ©');
     if (user.role !== 'lawyer' && user.role !== 'expat') return;
 
     try {
@@ -1244,7 +1244,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
       });
 
     } catch (error) {
-      console.error('Erreur mise à jour disponibilité:', error);
+      console.error('Erreur mise Ã  jour disponibilitÃ©:', error);
       throw error;
     }
   }, [firebaseUser, user, deviceInfo]);
@@ -1311,6 +1311,6 @@ export default AuthProvider;
    ========================================================= */
 export const useAuth = () => {
   const ctx = useContext(BaseAuthContext);
-  if (!ctx) throw new Error('useAuth doit être utilisé dans un AuthProvider');
+  if (!ctx) throw new Error('useAuth doit Ãªtre utilisÃ© dans un AuthProvider');
   return ctx;
 };

@@ -1,4 +1,4 @@
-// SendToSelection.tsx
+﻿// SendToSelection.tsx
 import React, { useState } from "react";
 import { functions } from "@/config/firebase";
 import { httpsCallable } from "firebase/functions";
@@ -8,12 +8,12 @@ import { getErrorMessage } from "../../../utils/errors";
 const sendEmail = httpsCallable<
   { to: string; subject: string; html: string },
   { success: boolean }
->(functions, "admin_sendEmail"); // à implémenter côté Functions
+>(functions, "admin_sendEmail"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const logEmail = httpsCallable<
   { type: string; count: number; error?: string },
   { logged: boolean }
->(functions, "admin_logEmail"); // à implémenter côté Functions
+>(functions, "admin_logEmail"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const SendToSelection: React.FC = () => {
   const [emailsRaw, setEmailsRaw] = useState("");
@@ -28,7 +28,7 @@ const SendToSelection: React.FC = () => {
       .filter(Boolean);
 
     if (emails.length === 0) {
-      setStatus("❌ Veuillez entrer au moins une adresse email");
+      setStatus("âŒ Veuillez entrer au moins une adresse email");
       return;
     }
 
@@ -38,15 +38,15 @@ const SendToSelection: React.FC = () => {
 
         await sendEmail({
           to: email,
-          subject: "Message personnalisé",
+          subject: "Message personnalisÃ©",
           html,
         });
       }
 
-      // ✅ log global
+      // âœ… log global
       await logEmail({ type: "newsletter", count: emails.length });
 
-      setStatus(`Emails envoyés à ${emails.length} destinataires ✅`);
+      setStatus(`Emails envoyÃ©s Ã  ${emails.length} destinataires âœ…`);
     } catch (err) {
       await logEmail({
         type: "newsletter",
@@ -54,13 +54,13 @@ const SendToSelection: React.FC = () => {
         error: getErrorMessage(err),
       });
 
-      setStatus("Erreur ❌ " + getErrorMessage(err));
+      setStatus("Erreur âŒ " + getErrorMessage(err));
     }
   };
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">✅ Envoi ciblé manuel</h2>
+      <h2 className="text-xl font-semibold mb-4">âœ… Envoi ciblÃ© manuel</h2>
       <div className="grid gap-4">
         <textarea
           value={emailsRaw}

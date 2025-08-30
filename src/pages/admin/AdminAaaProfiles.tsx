@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -40,7 +40,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import Modal from '../../components/common/Modal';
 import { useAuth } from '../../contexts/AuthContext';
 
-// ---------- IMPORTS DE DONNÉES CORRIGÉS ----------
+// ---------- IMPORTS DE DONNÃ‰ES CORRIGÃ‰S ----------
 import { countriesData } from '../../data/countries';
 import { languagesData } from '../../data/languages-spoken';
 import { flattenLawyerSpecialities } from '../../data/lawyer-specialties';
@@ -68,7 +68,7 @@ const getExpatHelpTypeNames = (): string[] => {
     .map(type => type.labelFr);
 };
 
-// Créer les constantes utilisées dans le composant
+// CrÃ©er les constantes utilisÃ©es dans le composant
 const COUNTRIES_LIST = getCountryNames();
 const LANGUAGE_OPTIONS = getLanguageNames();
 const LAWYER_SPECIALTIES = getLawyerSpecialtyNames();
@@ -161,7 +161,7 @@ const pickLanguages = (selected: string[]): string[] => {
     if (found) result.add(found);
   };
 
-  pushIf('Français');
+  pushIf('FranÃ§ais');
   pushIf('Anglais');
 
   const maxExtra = Math.min(3, pool.length);
@@ -174,10 +174,10 @@ const pickLanguages = (selected: string[]): string[] => {
 };
 
 const namesFR = {
-  male: ['Jean','Pierre','Michel','Philippe','Thomas','Nicolas','François','Laurent','Éric','David','Stéphane','Olivier','Christophe','Frédéric','Patrick','Antoine','Julien','Alexandre','Sébastien','Vincent','Maxime','Romain','Florian','Guillaume','Kévin'],
-  female: ['Marie','Sophie','Catherine','Isabelle','Anne','Nathalie','Sylvie','Céline','Julie','Valérie','Christine','Sandrine','Caroline','Stéphanie','Émilie','Aurélie','Camille','Laure','Virginie','Delphine','Manon','Clara','Léa','Emma','Chloé'],
+  male: ['Jean','Pierre','Michel','Philippe','Thomas','Nicolas','FranÃ§ois','Laurent','Ã‰ric','David','StÃ©phane','Olivier','Christophe','FrÃ©dÃ©ric','Patrick','Antoine','Julien','Alexandre','SÃ©bastien','Vincent','Maxime','Romain','Florian','Guillaume','KÃ©vin'],
+  female: ['Marie','Sophie','Catherine','Isabelle','Anne','Nathalie','Sylvie','CÃ©line','Julie','ValÃ©rie','Christine','Sandrine','Caroline','StÃ©phanie','Ã‰milie','AurÃ©lie','Camille','Laure','Virginie','Delphine','Manon','Clara','LÃ©a','Emma','ChloÃ©'],
 };
-const lastNamesFR = ['Martin','Bernard','Dubois','Thomas','Robert','Richard','Petit','Durand','Leroy','Moreau','Simon','Laurent','Lefebvre','Michel','Garcia','David','Bertrand','Roux','Vincent','Fournier','Morel','Girard','André','Lefevre','Mercier','Dupont','Lambert','Bonnet','François','Martinez'];
+const lastNamesFR = ['Martin','Bernard','Dubois','Thomas','Robert','Richard','Petit','Durand','Leroy','Moreau','Simon','Laurent','Lefebvre','Michel','Garcia','David','Bertrand','Roux','Vincent','Fournier','Morel','Girard','AndrÃ©','Lefevre','Mercier','Dupont','Lambert','Bonnet','FranÃ§ois','Martinez'];
 
 const genName = (gender: Gender) => {
   const f = namesFR[gender][randomInt(0, namesFR[gender].length - 1)];
@@ -274,7 +274,7 @@ async function claimPhoto(role: Role, gender: Gender, country: string): Promise<
     });
     return chosen.data.url;
   } catch (error) {
-    console.error('Erreur lors de la récupération de photo:', error);
+    console.error('Erreur lors de la rÃ©cupÃ©ration de photo:', error);
     return `https://images.unsplash.com/photo-${gender === 'male' ? '1560250097-0b93528c311a' : '1594736797933-d0501ba2fe65'}?w=400&h=400&fit=crop&crop=face`;
   }
 }
@@ -305,8 +305,8 @@ const AdminAaaProfiles: React.FC = () => {
     count: 10,
     roleDistribution: { lawyer: 50, expat: 50 },
     genderDistribution: { male: 50, female: 50 },
-    countries: ['Canada', 'Thaïlande', 'Australie', 'Espagne', 'Allemagne'],
-    languages: ['Français', 'Anglais'],
+    countries: ['Canada', 'ThaÃ¯lande', 'Australie', 'Espagne', 'Allemagne'],
+    languages: ['FranÃ§ais', 'Anglais'],
     minExperience: 2,
     maxExperience: 15,
     minAge: 28,
@@ -320,10 +320,10 @@ const AdminAaaProfiles: React.FC = () => {
   const [planner] = useState({
     enabled: false,
     dailyCount: 20,
-    regionCountries: ['Thaïlande', 'Vietnam', 'Cambodge'],
+    regionCountries: ['ThaÃ¯lande', 'Vietnam', 'Cambodge'],
     role: 'expat' as Role,
     genderBias: { male: 50, female: 50 },
-    languages: ['Français', 'Anglais'],
+    languages: ['FranÃ§ais', 'Anglais'],
   });
 
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
@@ -333,14 +333,14 @@ const AdminAaaProfiles: React.FC = () => {
     countries: [],
   });
 
-  // Gestion d'erreur pour les données manquantes
+  // Gestion d'erreur pour les donnÃ©es manquantes
   useEffect(() => {
     if (!COUNTRIES_LIST || COUNTRIES_LIST.length === 0) {
-      setError('Erreur de chargement des données pays');
+      setError('Erreur de chargement des donnÃ©es pays');
       return;
     }
     if (!LANGUAGE_OPTIONS || LANGUAGE_OPTIONS.length === 0) {
-      setError('Erreur de chargement des données langues');
+      setError('Erreur de chargement des donnÃ©es langues');
       return;
     }
   }, []);
@@ -366,14 +366,14 @@ const AdminAaaProfiles: React.FC = () => {
     [existingProfiles, searchTerm]
   );
 
-  // Affichage de fallback si les données ne sont pas chargées
+  // Affichage de fallback si les donnÃ©es ne sont pas chargÃ©es
   if (!COUNTRIES_LIST || !LANGUAGE_OPTIONS || !LAWYER_SPECIALTIES) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <Loader className="animate-spin mx-auto mb-4" size={48} />
-            <p className="text-gray-600">Chargement des données...</p>
+            <p className="text-gray-600">Chargement des donnÃ©es...</p>
           </div>
         </div>
       </AdminLayout>
@@ -454,14 +454,14 @@ const AdminAaaProfiles: React.FC = () => {
         useCustomPhone,
       } = formData;
 
-      if (count <= 0) return setError('Le nombre de profils doit être supérieur à 0');
-      if (countries.length === 0) return setError('Veuillez sélectionner au moins un pays');
-      if (languages.length === 0) return setError('Veuillez sélectionner au moins une langue');
+      if (count <= 0) return setError('Le nombre de profils doit Ãªtre supÃ©rieur Ã  0');
+      if (countries.length === 0) return setError('Veuillez sÃ©lectionner au moins un pays');
+      if (languages.length === 0) return setError('Veuillez sÃ©lectionner au moins une langue');
 
       const lawyerCount = Math.round((roleDistribution.lawyer / 100) * count);
       const expatCount = count - lawyerCount;
       const maleCount = Math.round((genderDistribution.male / 100) * count);
-      console.log(`Génération: ${lawyerCount} avocats, ${expatCount} expatriés, ${maleCount} hommes, ${count - maleCount} femmes`);
+      console.log(`GÃ©nÃ©ration: ${lawyerCount} avocats, ${expatCount} expatriÃ©s, ${maleCount} hommes, ${count - maleCount} femmes`);
 
       let malesGenerated = 0;
       let lawyersGenerated = 0;
@@ -477,11 +477,11 @@ const AdminAaaProfiles: React.FC = () => {
         setGeneratedCount((n) => n + 1);
       }
 
-      setSuccess(`${count} profils créés avec succès (${lawyerCount} avocats, ${expatCount} expatriés).`);
+      setSuccess(`${count} profils crÃ©Ã©s avec succÃ¨s (${lawyerCount} avocats, ${expatCount} expatriÃ©s).`);
       if (activeTab === 'manage') loadExistingProfiles();
     } catch (e: any) {
       console.error(e);
-      setError(`Erreur de génération: ${e.message || 'inconnue'}`);
+      setError(`Erreur de gÃ©nÃ©ration: ${e.message || 'inconnue'}`);
     } finally {
       setIsGenerating(false);
     }
@@ -565,7 +565,7 @@ const AdminAaaProfiles: React.FC = () => {
         const s = LAWYER_SPECIALTIES[randomInt(0, LAWYER_SPECIALTIES.length - 1)];
         if (!specialties.includes(s)) specialties.push(s);
       }
-      const bio = `Avocat${gender === 'female' ? 'e' : ''} en ${country} spécialisé${gender === 'female' ? 'e' : ''} en ${specialties.join(', ')} (${experience} ans). J'accompagne les expatriés francophones.`;
+      const bio = `Avocat${gender === 'female' ? 'e' : ''} en ${country} spÃ©cialisÃ©${gender === 'female' ? 'e' : ''} en ${specialties.join(', ')} (${experience} ans). J'accompagne les expatriÃ©s francophones.`;
 
       const lawyerData = {
         bio,
@@ -573,7 +573,7 @@ const AdminAaaProfiles: React.FC = () => {
         practiceCountries: [country],
         yearsOfExperience: experience,
         barNumber: `BAR${randomInt(10000, 99999)}`,
-        lawSchool: `Université de ${country}`,
+        lawSchool: `UniversitÃ© de ${country}`,
         graduationYear: new Date().getFullYear() - experience - 5,
         certifications: ['Certification Barreau'],
         needsVerification: false,
@@ -588,7 +588,7 @@ const AdminAaaProfiles: React.FC = () => {
         const s = EXPAT_HELP_TYPES[randomInt(0, EXPAT_HELP_TYPES.length - 1)];
         if (!help.includes(s)) help.push(s);
       }
-      const bio = `Expatrié${gender === 'female' ? 'e' : ''} en ${country} depuis ${experience} ans. Aide sur ${help.join(', ')}.`;
+      const bio = `ExpatriÃ©${gender === 'female' ? 'e' : ''} en ${country} depuis ${experience} ans. Aide sur ${help.join(', ')}.`;
 
       const expatData = {
         bio,
@@ -626,7 +626,7 @@ const AdminAaaProfiles: React.FC = () => {
       id: uid,
       uid,
       title: fullName,
-      subtitle: role === 'lawyer' ? 'Avocat' : 'Expatrié',
+      subtitle: role === 'lawyer' ? 'Avocat' : 'ExpatriÃ©',
       country,
       photo: profilePhoto,
       rating,
@@ -641,11 +641,11 @@ const AdminAaaProfiles: React.FC = () => {
 
     // reviews
     const reviewPhrases = [
-      'Très pro et efficace.',
-      'Conseils précieux, réponse rapide.',
+      'TrÃ¨s pro et efficace.',
+      'Conseils prÃ©cieux, rÃ©ponse rapide.',
       'Je recommande vivement.',
-      'Service de qualité.',
-      'Parfait pour résoudre mon problème.',
+      'Service de qualitÃ©.',
+      'Parfait pour rÃ©soudre mon problÃ¨me.',
     ];
     const reviewsToCreate = reviewCount;
     for (let i = 0; i < reviewsToCreate; i++) {
@@ -709,10 +709,10 @@ const AdminAaaProfiles: React.FC = () => {
       setShowEditModal(false);
       setSelectedProfile(null);
       await loadExistingProfiles();
-      alert('Profil mis à jour avec succès');
+      alert('Profil mis Ã  jour avec succÃ¨s');
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de la mise à jour du profil');
+      alert('Erreur lors de la mise Ã  jour du profil');
     } finally {
       setIsLoading(false);
     }
@@ -727,7 +727,7 @@ const AdminAaaProfiles: React.FC = () => {
       setShowDeleteModal(false);
       setSelectedProfile(null);
       await loadExistingProfiles();
-      alert('Profil supprimé');
+      alert('Profil supprimÃ©');
     } catch (e) {
       console.error(e);
       alert('Erreur lors de la suppression');
@@ -758,7 +758,7 @@ const AdminAaaProfiles: React.FC = () => {
   const handleToggleOnline = async (profileId: string, currentOnline: boolean) => {
     const profile = existingProfiles.find((p) => p.id === profileId);
     if (!currentOnline && (!profile?.phone || profile.phone === '')) {
-      alert('Téléphone requis pour mettre en ligne');
+      alert('TÃ©lÃ©phone requis pour mettre en ligne');
       return;
     }
     try {
@@ -781,7 +781,7 @@ const AdminAaaProfiles: React.FC = () => {
 
   const handleBulkToggleOnline = async (online: boolean) => {
     if (selectedProfiles.length === 0) {
-      alert('Sélectionnez au moins un profil');
+      alert('SÃ©lectionnez au moins un profil');
       return;
     }
     if (online) {
@@ -790,7 +790,7 @@ const AdminAaaProfiles: React.FC = () => {
         return !p?.phone;
       });
       if (missing.length > 0) {
-        alert(`${missing.length} profil(s) sans téléphone`);
+        alert(`${missing.length} profil(s) sans tÃ©lÃ©phone`);
         return;
       }
     }
@@ -861,7 +861,7 @@ const AdminAaaProfiles: React.FC = () => {
         });
         added++;
       }
-      alert(`${added} photo(s) ajoutée(s) à la bibliothèque`);
+      alert(`${added} photo(s) ajoutÃ©e(s) Ã  la bibliothÃ¨que`);
     } catch (e) {
       console.error(e);
       alert('Erreur import photos');
@@ -885,7 +885,7 @@ const AdminAaaProfiles: React.FC = () => {
                   : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <UserPlus className="mr-2" size={18} /> Générer
+              <UserPlus className="mr-2" size={18} /> GÃ©nÃ©rer
             </button>
             <button
               onClick={() => setActiveTab('manage')}
@@ -895,7 +895,7 @@ const AdminAaaProfiles: React.FC = () => {
                   : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <List className="mr-2" size={18} /> Gérer ({existingProfiles.length})
+              <List className="mr-2" size={18} /> GÃ©rer ({existingProfiles.length})
             </button>
             <button
               onClick={() => setActiveTab('photos')}
@@ -924,7 +924,7 @@ const AdminAaaProfiles: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">Paramètres de génération</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">ParamÃ¨tres de gÃ©nÃ©ration</h2>
                 <div className="space-y-6">
                   {/* Count */}
                   <div>
@@ -942,7 +942,7 @@ const AdminAaaProfiles: React.FC = () => {
                   {/* Role & Gender sliders */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Distribution des rôles</h3>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">Distribution des rÃ´les</h3>
                       <div className="space-y-3">
                         <div>
                           <label className="flex justify-between text-sm text-gray-600 mb-1">
@@ -964,7 +964,7 @@ const AdminAaaProfiles: React.FC = () => {
                         </div>
                         <div>
                           <label className="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Expatriés</span>
+                            <span>ExpatriÃ©s</span>
                             <span>{formData.roleDistribution.expat}%</span>
                           </label>
                           <input
@@ -1029,7 +1029,7 @@ const AdminAaaProfiles: React.FC = () => {
                   {/* Countries */}
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 mb-3">
-                      Pays d'intervention ({formData.countries.length} sélectionnés)
+                      Pays d'intervention ({formData.countries.length} sÃ©lectionnÃ©s)
                     </h3>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -1051,7 +1051,7 @@ const AdminAaaProfiles: React.FC = () => {
                   {/* Languages */}
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 mb-3">
-                      Langues parlées ({formData.languages.length} sélectionnées)
+                      Langues parlÃ©es ({formData.languages.length} sÃ©lectionnÃ©es)
                     </h3>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -1081,7 +1081,7 @@ const AdminAaaProfiles: React.FC = () => {
                         className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                       />
                       <label htmlFor="useCustomPhone" className="ml-2 text-sm font-medium text-gray-700">
-                        Utiliser un numéro de téléphone personnalisé
+                        Utiliser un numÃ©ro de tÃ©lÃ©phone personnalisÃ©
                       </label>
                     </div>
                     {formData.useCustomPhone && (
@@ -1094,7 +1094,7 @@ const AdminAaaProfiles: React.FC = () => {
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Numéro utilisé pour tous les profils générés
+                          NumÃ©ro utilisÃ© pour tous les profils gÃ©nÃ©rÃ©s
                         </p>
                       </>
                     )}
@@ -1103,7 +1103,7 @@ const AdminAaaProfiles: React.FC = () => {
                   {/* Experience / Age */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Expérience (années)</h3>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">ExpÃ©rience (annÃ©es)</h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm text-gray-600 mb-1">Minimum</label>
@@ -1131,7 +1131,7 @@ const AdminAaaProfiles: React.FC = () => {
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Âge</h3>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">Ã‚ge</h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm text-gray-600 mb-1">Minimum</label>
@@ -1169,7 +1169,7 @@ const AdminAaaProfiles: React.FC = () => {
                       className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                     />
                     <label htmlFor="allowRealCalls" className="ml-2 block text-sm text-gray-700">
-                      Autoriser les appels réels
+                      Autoriser les appels rÃ©els
                     </label>
                   </div>
 
@@ -1183,12 +1183,12 @@ const AdminAaaProfiles: React.FC = () => {
                       {isGenerating ? (
                         <>
                           <Loader className="animate-spin mr-2" size={20} />
-                          Génération en cours ({generatedCount}/{formData.count})
+                          GÃ©nÃ©ration en cours ({generatedCount}/{formData.count})
                         </>
                       ) : (
                         <>
                           <UserPlus className="mr-2" size={20} />
-                          Générer {formData.count} profils
+                          GÃ©nÃ©rer {formData.count} profils
                         </>
                       )}
                     </button>
@@ -1211,7 +1211,7 @@ const AdminAaaProfiles: React.FC = () => {
                       <div className="flex">
                         <Check className="h-5 w-5 text-green-400" />
                         <div className="ml-3">
-                          <h3 className="text-sm font-medium text-green-800">Succès</h3>
+                          <h3 className="text-sm font-medium text-green-800">SuccÃ¨s</h3>
                           <div className="mt-2 text-sm text-green-700">{success}</div>
                         </div>
                       </div>
@@ -1224,7 +1224,7 @@ const AdminAaaProfiles: React.FC = () => {
             {/* Presets */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">Préréglages rapides</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">PrÃ©rÃ©glages rapides</h2>
 
                 <div className="space-y-4">
                   <button
@@ -1234,15 +1234,15 @@ const AdminAaaProfiles: React.FC = () => {
                         count: 20,
                         roleDistribution: { lawyer: 100, expat: 0 },
                         genderDistribution: { male: 0, female: 100 },
-                        countries: ['Thaïlande'],
-                        languages: ['Français', 'Anglais', 'Thaï'],
+                        countries: ['ThaÃ¯lande'],
+                        languages: ['FranÃ§ais', 'Anglais', 'ThaÃ¯'],
                       }))
                     }
                     className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg border border-blue-200 transition-colors flex items-center justify-between"
                   >
                     <div className="flex items-center">
                       <Scale className="w-5 h-5 mr-2" />
-                      <span>20 avocates en Thaïlande</span>
+                      <span>20 avocates en ThaÃ¯lande</span>
                     </div>
                     <RefreshCw className="w-4 h-4" />
                   </button>
@@ -1254,15 +1254,15 @@ const AdminAaaProfiles: React.FC = () => {
                         count: 50,
                         roleDistribution: { lawyer: 0, expat: 100 },
                         genderDistribution: { male: 50, female: 50 },
-                        countries: ['Thaïlande', 'Vietnam', 'Cambodge', 'Malaisie', 'Singapour', 'Indonésie'],
-                        languages: ['Français', 'Anglais'],
+                        countries: ['ThaÃ¯lande', 'Vietnam', 'Cambodge', 'Malaisie', 'Singapour', 'IndonÃ©sie'],
+                        languages: ['FranÃ§ais', 'Anglais'],
                       }))
                     }
                     className="w-full bg-green-50 hover:bg-green-100 text-green-700 font-medium py-3 px-4 rounded-lg border border-green-200 transition-colors flex items-center justify-between"
                   >
                     <div className="flex items-center">
                       <Users className="w-5 h-5 mr-2" />
-                      <span>50 expatriés Asie du Sud-Est</span>
+                      <span>50 expatriÃ©s Asie du Sud-Est</span>
                     </div>
                     <RefreshCw className="w-4 h-4" />
                   </button>
@@ -1274,8 +1274,8 @@ const AdminAaaProfiles: React.FC = () => {
                         count: 40,
                         roleDistribution: { lawyer: 50, expat: 50 },
                         genderDistribution: { male: 50, female: 50 },
-                        countries: ['Espagne', 'Portugal', 'Italie', 'Grèce'],
-                        languages: ['Français', 'Anglais', 'Espagnol', 'Italien'],
+                        countries: ['Espagne', 'Portugal', 'Italie', 'GrÃ¨ce'],
+                        languages: ['FranÃ§ais', 'Anglais', 'Espagnol', 'Italien'],
                       }))
                     }
                     className="w-full bg-yellow-50 hover:bg-yellow-100 text-yellow-700 font-medium py-3 px-4 rounded-lg border border-yellow-200 transition-colors flex items-center justify-between"
@@ -1350,9 +1350,9 @@ const AdminAaaProfiles: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pays</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Téléphone</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TÃ©lÃ©phone</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Créé le</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CrÃ©Ã© le</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -1363,7 +1363,7 @@ const AdminAaaProfiles: React.FC = () => {
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
                           </div>
-                          <p className="mt-2 text-gray-500">Chargement…</p>
+                          <p className="mt-2 text-gray-500">Chargementâ€¦</p>
                         </td>
                       </tr>
                     ) : filteredProfiles.length > 0 ? (
@@ -1401,7 +1401,7 @@ const AdminAaaProfiles: React.FC = () => {
                                   : 'bg-green-100 text-green-800'
                               }`}
                             >
-                              {(profile.type || profile.role) === 'lawyer' ? 'Avocat' : 'Expatrié'}
+                              {(profile.type || profile.role) === 'lawyer' ? 'Avocat' : 'ExpatriÃ©'}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{profile.country}</td>
@@ -1418,7 +1418,7 @@ const AdminAaaProfiles: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {profile.phone || 'Non défini'}
+                            {profile.phone || 'Non dÃ©fini'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col space-y-1">
@@ -1430,7 +1430,7 @@ const AdminAaaProfiles: React.FC = () => {
                                 {profile.isOnline ? 'En ligne' : 'Hors ligne'}
                               </span>
                               {!profile.isVisible && (
-                                <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">Masqué</span>
+                                <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">MasquÃ©</span>
                               )}
                             </div>
                           </td>
@@ -1489,7 +1489,7 @@ const AdminAaaProfiles: React.FC = () => {
                     ) : (
                       <tr>
                         <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
-                          Aucun profil trouvé
+                          Aucun profil trouvÃ©
                         </td>
                       </tr>
                     )}
@@ -1503,9 +1503,9 @@ const AdminAaaProfiles: React.FC = () => {
         {activeTab === 'photos' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Bibliothèque de photos</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">BibliothÃ¨que de photos</h2>
               <p className="text-sm text-gray-600 mb-4">
-                1) Clique sur <b>Importer le catalogue</b> pour créer les entrées Firestore à partir du fichier
+                1) Clique sur <b>Importer le catalogue</b> pour crÃ©er les entrÃ©es Firestore Ã  partir du fichier
                 <code className="mx-1 px-1 rounded bg-gray-100">src/data/profile-photos.ts</code>.
                 <br />
                 2) Ajoute autant d'images que tu veux via l'upload ci-dessous (renommage SEO &amp; cache).
@@ -1514,7 +1514,7 @@ const AdminAaaProfiles: React.FC = () => {
                 <button
                   onClick={async () => {
                     const inserted = await seedPhotoLibraryFromCatalog();
-                    alert(inserted === 0 ? 'La bibliothèque existe déjà.' : `${inserted} photos importées depuis le catalogue.`);
+                    alert(inserted === 0 ? 'La bibliothÃ¨que existe dÃ©jÃ .' : `${inserted} photos importÃ©es depuis le catalogue.`);
                   }}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
@@ -1525,7 +1525,7 @@ const AdminAaaProfiles: React.FC = () => {
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">RÃ´le</label>
                     <select
                       value={photoMeta.role}
                       onChange={(e) =>
@@ -1534,7 +1534,7 @@ const AdminAaaProfiles: React.FC = () => {
                       className="w-full px-3 py-2 border rounded"
                     >
                       <option value="lawyer">Avocat</option>
-                      <option value="expat">Expatrié</option>
+                      <option value="expat">ExpatriÃ©</option>
                     </select>
                   </div>
                   <div>
@@ -1551,7 +1551,7 @@ const AdminAaaProfiles: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pays ciblés (optionnel)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Pays ciblÃ©s (optionnel)</label>
                     <select
                       multiple
                       value={photoMeta.countries}
@@ -1577,13 +1577,13 @@ const AdminAaaProfiles: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Uploader des images</label>
                   <input type="file" accept="image/*" multiple onChange={(e) => handleUploadPhotos(e.target.files)} />
                   <p className="text-xs text-gray-500 mt-2">
-                    Les fichiers seront renommés (role-genre-pays-slug-xxxx.ext), mis en cache CDN et indexés en base.
+                    Les fichiers seront renommÃ©s (role-genre-pays-slug-xxxx.ext), mis en cache CDN et indexÃ©s en base.
                   </p>
                 </div>
 
                 {isUploadingPhotos && (
                   <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-700">
-                    Téléversement en cours…
+                    TÃ©lÃ©versement en coursâ€¦
                   </div>
                 )}
               </div>
@@ -1592,10 +1592,10 @@ const AdminAaaProfiles: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Bonnes pratiques</h2>
               <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
-                <li>Résolution conseillée : 800×800 (affichage net, recadrage carré possible).</li>
-                <li>Noms descriptifs (SEO) générés automatiquement.</li>
-                <li>Chaque photo est marquée <i>inUse</i> au moment de sa première attribution (unicité garantie).</li>
-                <li>Tu peux fournir des images DALL·E et libres de droits : renseigne bien rôle/genre/pays.</li>
+                <li>RÃ©solution conseillÃ©e : 800Ã—800 (affichage net, recadrage carrÃ© possible).</li>
+                <li>Noms descriptifs (SEO) gÃ©nÃ©rÃ©s automatiquement.</li>
+                <li>Chaque photo est marquÃ©e <i>inUse</i> au moment de sa premiÃ¨re attribution (unicitÃ© garantie).</li>
+                <li>Tu peux fournir des images DALLÂ·E et libres de droits : renseigne bien rÃ´le/genre/pays.</li>
               </ul>
             </div>
           </div>
@@ -1603,7 +1603,7 @@ const AdminAaaProfiles: React.FC = () => {
 
         {activeTab === 'planner' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Planification (génération assistée)</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Planification (gÃ©nÃ©ration assistÃ©e)</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Activer un plan</label>
@@ -1628,21 +1628,21 @@ const AdminAaaProfiles: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">RÃ´le</label>
                 <select
                   value={planner.role}
                   disabled
                   className="w-full px-3 py-2 border rounded"
                 >
                   <option value="lawyer">Avocat</option>
-                  <option value="expat">Expatrié</option>
+                  <option value="expat">ExpatriÃ©</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pays (région)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pays (rÃ©gion)</label>
                 <select
                   multiple
                   value={planner.regionCountries}
@@ -1671,7 +1671,7 @@ const AdminAaaProfiles: React.FC = () => {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Français/Anglais seront privilégiés automatiquement si présents.
+                  FranÃ§ais/Anglais seront privilÃ©giÃ©s automatiquement si prÃ©sents.
                 </p>
               </div>
             </div>
@@ -1719,18 +1719,18 @@ const AdminAaaProfiles: React.FC = () => {
                         formData.useCustomPhone
                       );
                     }
-                    alert(`${planner.dailyCount} profils générés via le plan du jour`);
+                    alert(`${planner.dailyCount} profils gÃ©nÃ©rÃ©s via le plan du jour`);
                   }}
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                 >
-                  Lancer la génération du jour
+                  Lancer la gÃ©nÃ©ration du jour
                 </button>
               </div>
             </div>
 
             <p className="text-xs text-gray-500 mt-6">
-              Pour une exécution automatique quotidienne, ajoute une Cloud Function/CRON qui appelle un endpoint admin
-              et réutilise cette logique côté serveur.
+              Pour une exÃ©cution automatique quotidienne, ajoute une Cloud Function/CRON qui appelle un endpoint admin
+              et rÃ©utilise cette logique cÃ´tÃ© serveur.
             </p>
           </div>
         )}
@@ -1741,7 +1741,7 @@ const AdminAaaProfiles: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PrÃ©nom</label>
                   <input
                     type="text"
                     value={editFormData.firstName || ''}
@@ -1777,7 +1777,7 @@ const AdminAaaProfiles: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">TÃ©lÃ©phone</label>
                   <input
                     type="text"
                     value={editFormData.phone || ''}
@@ -1803,7 +1803,7 @@ const AdminAaaProfiles: React.FC = () => {
                       onChange={(e) => setNewProfilePhoto(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Utilise une image nette (≥ 400×400)</p>
+                    <p className="text-xs text-gray-500 mt-1">Utilise une image nette (â‰¥ 400Ã—400)</p>
                   </div>
                 </div>
               </div>
@@ -1837,7 +1837,7 @@ const AdminAaaProfiles: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Années d'expérience</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">AnnÃ©es d'expÃ©rience</label>
                   <input
                     type="number"
                     min={1}
@@ -1884,7 +1884,7 @@ const AdminAaaProfiles: React.FC = () => {
                     }
                     className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Appels réels autorisés</span>
+                  <span className="ml-2 text-sm text-gray-700">Appels rÃ©els autorisÃ©s</span>
                 </label>
               </div>
 
@@ -1917,10 +1917,10 @@ const AdminAaaProfiles: React.FC = () => {
                 <div className="flex">
                   <AlertTriangle className="h-5 w-5 text-red-400" />
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">Action irréversible</h3>
+                    <h3 className="text-sm font-medium text-red-800">Action irrÃ©versible</h3>
                     <div className="mt-2 text-sm text-red-700">
                       <p>
-                        Supprimer définitivement :
+                        Supprimer dÃ©finitivement :
                         <br />
                         <strong>{selectedProfile.fullName}</strong>
                       </p>

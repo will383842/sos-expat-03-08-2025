@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FileText, 
@@ -49,13 +49,13 @@ const AdminDocuments: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Exemple de documents pour le développement
+      // Exemple de documents pour le dÃ©veloppement
       const mockDocuments: Document[] = [
         {
           id: 'doc1',
           userId: 'user123',
           type: 'identity',
-          documentType: 'Carte d\'identité',
+          documentType: 'Carte d\'identitÃ©',
           filename: 'carte-identite.jpg',
           url: 'https://images.pexels.com/photos/2694434/pexels-photo-2694434.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
           mimeType: 'image/jpeg',
@@ -67,7 +67,7 @@ const AdminDocuments: React.FC = () => {
           id: 'doc2',
           userId: 'user456',
           type: 'diploma',
-          documentType: 'Diplôme d\'avocat',
+          documentType: 'DiplÃ´me d\'avocat',
           filename: 'diplome-avocat.pdf',
           url: 'https://example.com/documents/diplome-avocat.pdf',
           mimeType: 'application/pdf',
@@ -75,7 +75,7 @@ const AdminDocuments: React.FC = () => {
           status: 'approved',
           uploadedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           reviewedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-          reviewNotes: 'Document vérifié et validé',
+          reviewNotes: 'Document vÃ©rifiÃ© et validÃ©',
           verifiedBy: 'admin1'
         },
         {
@@ -95,7 +95,7 @@ const AdminDocuments: React.FC = () => {
         }
       ];
       
-      // Filtrer par statut et type si nécessaire
+      // Filtrer par statut et type si nÃ©cessaire
       let filteredDocuments = mockDocuments;
       if (selectedStatus !== 'all') {
         filteredDocuments = filteredDocuments.filter(doc => doc.status === selectedStatus);
@@ -174,7 +174,7 @@ const AdminDocuments: React.FC = () => {
     try {
       setIsActionLoading(true);
       
-      // En production, on mettrait à jour dans Firestore
+      // En production, on mettrait Ã  jour dans Firestore
       // await updateDoc(doc(db, 'documents', selectedDocument.id), {
       //   status: 'approved',
       //   reviewedAt: serverTimestamp(),
@@ -202,7 +202,7 @@ const AdminDocuments: React.FC = () => {
       setSelectedDocument(null);
       
       // Show success message
-      alert('Document approuvé avec succès');
+      alert('Document approuvÃ© avec succÃ¨s');
       
     } catch (error) {
       console.error('Error approving document:', error);
@@ -218,7 +218,7 @@ const AdminDocuments: React.FC = () => {
     try {
       setIsActionLoading(true);
       
-      // En production, on mettrait à jour dans Firestore
+      // En production, on mettrait Ã  jour dans Firestore
       // await updateDoc(doc(db, 'documents', selectedDocument.id), {
       //   status: 'rejected',
       //   reviewedAt: serverTimestamp(),
@@ -246,7 +246,7 @@ const AdminDocuments: React.FC = () => {
       setSelectedDocument(null);
       
       // Show success message
-      alert('Document rejeté avec succès');
+      alert('Document rejetÃ© avec succÃ¨s');
       
     } catch (error) {
       console.error('Error rejecting document:', error);
@@ -287,14 +287,14 @@ const AdminDocuments: React.FC = () => {
         return (
           <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center">
             <CheckCircle size={12} className="mr-1" />
-            Approuvé
+            ApprouvÃ©
           </span>
         );
       case 'rejected':
         return (
           <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium flex items-center">
             <XCircle size={12} className="mr-1" />
-            Rejeté
+            RejetÃ©
           </span>
         );
       case 'pending':
@@ -313,13 +313,13 @@ const AdminDocuments: React.FC = () => {
       case 'identity':
         return (
           <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-            Identité
+            IdentitÃ©
           </span>
         );
       case 'diploma':
         return (
           <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-            Diplôme
+            DiplÃ´me
           </span>
         );
       case 'certificate':
@@ -331,7 +331,7 @@ const AdminDocuments: React.FC = () => {
       case 'residence_proof':
         return (
           <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-            Justificatif de résidence
+            Justificatif de rÃ©sidence
           </span>
         );
       case 'insurance':
@@ -362,7 +362,7 @@ const AdminDocuments: React.FC = () => {
 
   return (
     <AdminLayout>
-      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des documents. Veuillez réessayer.</div>}>
+      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des documents. Veuillez rÃ©essayer.</div>}>
         <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Gestion des documents</h1>
@@ -384,8 +384,8 @@ const AdminDocuments: React.FC = () => {
               >
                 <option value="all">Tous les statuts</option>
                 <option value="pending">En attente</option>
-                <option value="approved">Approuvés</option>
-                <option value="rejected">Rejetés</option>
+                <option value="approved">ApprouvÃ©s</option>
+                <option value="rejected">RejetÃ©s</option>
               </select>
               <select
                 value={selectedType}
@@ -393,10 +393,10 @@ const AdminDocuments: React.FC = () => {
                 className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="all">Tous les types</option>
-                <option value="identity">Identité</option>
-                <option value="diploma">Diplôme</option>
+                <option value="identity">IdentitÃ©</option>
+                <option value="diploma">DiplÃ´me</option>
                 <option value="certificate">Certificat</option>
-                <option value="residence_proof">Justificatif de résidence</option>
+                <option value="residence_proof">Justificatif de rÃ©sidence</option>
                 <option value="insurance">Assurance</option>
               </select>
             </div>
@@ -482,7 +482,7 @@ const AdminDocuments: React.FC = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-gray-600 hover:text-gray-800"
-                                title="Télécharger"
+                                title="TÃ©lÃ©charger"
                               >
                                 <Download size={18} />
                               </a>
@@ -520,7 +520,7 @@ const AdminDocuments: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                        Aucun document trouvé
+                        Aucun document trouvÃ©
                       </td>
                     </tr>
                   )}
@@ -534,7 +534,7 @@ const AdminDocuments: React.FC = () => {
         <Modal
           isOpen={showDocumentModal}
           onClose={() => setShowDocumentModal(false)}
-          title="Vérification du document"
+          title="VÃ©rification du document"
           size="large"
         >
           {selectedDocument && (
@@ -544,7 +544,7 @@ const AdminDocuments: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-gray-900">{selectedDocument.documentType}</h3>
                     <p className="text-sm text-gray-500">
-                      Ajouté le {formatDate(selectedDocument.uploadedAt)}
+                      AjoutÃ© le {formatDate(selectedDocument.uploadedAt)}
                     </p>
                   </div>
                   <div>
@@ -565,7 +565,7 @@ const AdminDocuments: React.FC = () => {
                         <div className="flex items-center justify-center h-64 bg-gray-100">
                           <div className="text-center">
                             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                            <p className="text-gray-600">Aperçu non disponible</p>
+                            <p className="text-gray-600">AperÃ§u non disponible</p>
                             <a 
                               href={selectedDocument.url} 
                               target="_blank" 
@@ -615,19 +615,19 @@ const AdminDocuments: React.FC = () => {
                     </div>
                     {selectedDocument.documentNumber && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Numéro de document:</span>
+                        <span className="text-gray-600">NumÃ©ro de document:</span>
                         <span className="font-medium">{selectedDocument.documentNumber}</span>
                       </div>
                     )}
                     {selectedDocument.issuedBy && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Émis par:</span>
+                        <span className="text-gray-600">Ã‰mis par:</span>
                         <span className="font-medium">{selectedDocument.issuedBy}</span>
                       </div>
                     )}
                     {selectedDocument.issuedDate && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Date d'émission:</span>
+                        <span className="text-gray-600">Date d'Ã©mission:</span>
                         <span className="font-medium">{formatDate(new Date(selectedDocument.issuedDate))}</span>
                       </div>
                     )}
@@ -647,7 +647,7 @@ const AdminDocuments: React.FC = () => {
                       <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                         <div>
                           <label htmlFor="adminNotes" className="block text-sm font-medium text-gray-700 mb-1">
-                            Notes de vérification
+                            Notes de vÃ©rification
                           </label>
                           <textarea
                             id="adminNotes"
@@ -655,7 +655,7 @@ const AdminDocuments: React.FC = () => {
                             onChange={(e) => setAdminNotes(e.target.value)}
                             rows={4}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="Ajoutez des notes sur la vérification de ce document..."
+                            placeholder="Ajoutez des notes sur la vÃ©rification de ce document..."
                           />
                         </div>
                         
@@ -684,7 +684,7 @@ const AdminDocuments: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Statut de vérification</h4>
+                      <h4 className="text-sm font-medium text-gray-500 mb-2">Statut de vÃ©rification</h4>
                       <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                         <div>
                           <div className="flex items-center mb-2">
@@ -698,7 +698,7 @@ const AdminDocuments: React.FC = () => {
                           
                           {selectedDocument.reviewNotes && (
                             <div className="mt-2">
-                              <h5 className="text-sm font-medium text-gray-700 mb-1">Notes de vérification</h5>
+                              <h5 className="text-sm font-medium text-gray-700 mb-1">Notes de vÃ©rification</h5>
                               <p className="text-sm text-gray-700 whitespace-pre-line">{selectedDocument.reviewNotes}</p>
                             </div>
                           )}

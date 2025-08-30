@@ -1,4 +1,4 @@
-// src/pages/CallCheckoutWrapper.tsx - Version corrigée complète
+﻿// src/pages/CallCheckoutWrapper.tsx - Version corrigÃ©e complÃ¨te
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import CallCheckout from './CallCheckout';
@@ -10,9 +10,9 @@ import {
   detectUserCurrency,
 } from '../services/pricingService';
 
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 // Types
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 interface LoadingState {
   isLoading: boolean;
   error: string | null;
@@ -52,9 +52,9 @@ interface BookingData {
   clientPhone?: string;
 }
 
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 // i18n light
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 import { useApp } from '../contexts/AppContext';
 
 const useTranslation = () => {
@@ -62,50 +62,50 @@ const useTranslation = () => {
   const t = (key: string): string => {
     const tr: Record<string, Record<string, string>> = {
       'loading.title': { fr: 'Chargement', en: 'Loading' },
-      'loading.subtitle': { fr: 'Préparation de votre consultation...', en: 'Preparing your consultation...' },
-      'loading.progress': { fr: 'Recherche des données de consultation', en: 'Fetching consultation data' },
-      'error.title': { fr: 'Données manquantes', en: 'Missing data' },
+      'loading.subtitle': { fr: 'PrÃ©paration de votre consultation...', en: 'Preparing your consultation...' },
+      'loading.progress': { fr: 'Recherche des donnÃ©es de consultation', en: 'Fetching consultation data' },
+      'error.title': { fr: 'DonnÃ©es manquantes', en: 'Missing data' },
       'error.body': {
-        fr: 'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.',
+        fr: 'Les informations de consultation sont manquantes. Veuillez sÃ©lectionner Ã  nouveau un expert.',
         en: 'Consultation details are missing. Please select an expert again.',
       },
-      'cta.select_expert': { fr: '🔍 Sélectionner un expert', en: '🔍 Choose an expert' },
-      'cta.home': { fr: '🏠 Retour à l\'accueil', en: '🏠 Back to home' },
-      'cta.back': { fr: '← Retour', en: '← Back' },
-      'cta.clear_cache': { fr: '🗑️ Vider le cache et recharger', en: '🗑️ Clear cache & reload' },
+      'cta.select_expert': { fr: 'ðŸ” SÃ©lectionner un expert', en: 'ðŸ” Choose an expert' },
+      'cta.home': { fr: 'ðŸ  Retour Ã  l\'accueil', en: 'ðŸ  Back to home' },
+      'cta.back': { fr: 'â† Retour', en: 'â† Back' },
+      'cta.clear_cache': { fr: 'ðŸ—‘ï¸ Vider le cache et recharger', en: 'ðŸ—‘ï¸ Clear cache & reload' },
     };
     return tr[key]?.[language] ?? tr[key]?.fr ?? key;
   };
   return { t, language };
 };
 
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 // Helpers
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
-// ✅ CORRECTION: Fonction pour normaliser un numéro de téléphone
+// âœ… CORRECTION: Fonction pour normaliser un numÃ©ro de tÃ©lÃ©phone
 const normalizePhoneNumber = (phone?: string): string => {
   if (!phone) return '';
   
-  // Nettoyer le numéro
+  // Nettoyer le numÃ©ro
   const cleaned = phone.replace(/[^\d+]/g, '');
   
-  // Si c'est déjà au format international, le retourner
+  // Si c'est dÃ©jÃ  au format international, le retourner
   if (cleaned.startsWith('+')) {
     return cleaned;
   }
   
-  // Si c'est un numéro français commençant par 0, le convertir
+  // Si c'est un numÃ©ro franÃ§ais commenÃ§ant par 0, le convertir
   if (cleaned.startsWith('0') && cleaned.length === 10) {
     return `+33${cleaned.substring(1)}`;
   }
   
-  // Si c'est un numéro français sans le 0, ajouter +33
+  // Si c'est un numÃ©ro franÃ§ais sans le 0, ajouter +33
   if (cleaned.length === 9) {
     return `+33${cleaned}`;
   }
   
-  // Pour les autres cas, essayer d'ajouter +33 par défaut
+  // Pour les autres cas, essayer d'ajouter +33 par dÃ©faut
   if (cleaned.length >= 8) {
     return `+33${cleaned}`;
   }
@@ -113,15 +113,15 @@ const normalizePhoneNumber = (phone?: string): string => {
   return cleaned;
 };
 
-// ✅ CORRECTION: Fonction améliorée pour reconstruire un provider depuis BookingData
+// âœ… CORRECTION: Fonction amÃ©liorÃ©e pour reconstruire un provider depuis BookingData
 const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
-  // Normaliser le numéro de téléphone
+  // Normaliser le numÃ©ro de tÃ©lÃ©phone
   const normalizedPhone = normalizePhoneNumber(bookingData.providerPhone);
   
-  // Générer un numéro par défaut valide si pas de numéro fourni
+  // GÃ©nÃ©rer un numÃ©ro par dÃ©faut valide si pas de numÃ©ro fourni
   const phoneToUse = normalizedPhone || `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
   
-  console.log('🔧 Reconstruction provider depuis booking:', {
+  console.log('ðŸ”§ Reconstruction provider depuis booking:', {
     originalPhone: bookingData.providerPhone,
     normalizedPhone,
     finalPhone: phoneToUse,
@@ -142,7 +142,7 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
     avatar: bookingData.providerAvatar || '/default-avatar.png',
     profilePhoto: bookingData.providerAvatar || '/default-avatar.png',
     email: `${(bookingData.providerName || 'expert').toLowerCase().replace(/\s+/g, '')}@example.com`,
-    // ✅ CORRECTION: S'assurer que tous les champs de téléphone sont remplis
+    // âœ… CORRECTION: S'assurer que tous les champs de tÃ©lÃ©phone sont remplis
     phone: phoneToUse,
     phoneNumber: phoneToUse,
     telephone: phoneToUse,
@@ -151,14 +151,14 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
     languagesSpoken: bookingData.providerLanguages || ['fr'],
     languages: bookingData.providerLanguages || ['fr'],
     preferredLanguage: 'fr',
-    // ✅ CORRECTION: Ne plus utiliser de prix par défaut, laisser CallCheckout gérer via adminPricing
-    price: 0, // Sera remplacé par adminPricing
-    duration: 0, // Sera remplacé par adminPricing
+    // âœ… CORRECTION: Ne plus utiliser de prix par dÃ©faut, laisser CallCheckout gÃ©rer via adminPricing
+    price: 0, // Sera remplacÃ© par adminPricing
+    duration: 0, // Sera remplacÃ© par adminPricing
     rating: bookingData.providerRating || 4.5,
     reviewCount: bookingData.providerReviewCount || 0,
-    specialties: bookingData.providerSpecialties || ['Conseil général'],
-    description: `Expert ${bookingData.providerType || 'expat'} spécialisé en conseil`,
-    bio: `Professionnel expérimenté en ${bookingData.providerType === 'lawyer' ? 'droit' : 'expatriation'}`,
+    specialties: bookingData.providerSpecialties || ['Conseil gÃ©nÃ©ral'],
+    description: `Expert ${bookingData.providerType || 'expat'} spÃ©cialisÃ© en conseil`,
+    bio: `Professionnel expÃ©rimentÃ© en ${bookingData.providerType === 'lawyer' ? 'droit' : 'expatriation'}`,
     yearsOfExperience: 5,
     isActive: true,
     isApproved: true,
@@ -168,13 +168,13 @@ const reconstructProviderFromBooking = (bookingData: BookingData): Provider => {
   });
 };
 
-// ✅ CORRECTION: Fonction améliorée pour créer un provider par défaut
+// âœ… CORRECTION: Fonction amÃ©liorÃ©e pour crÃ©er un provider par dÃ©faut
 const createImprovedDefaultProvider = (providerId: string): Provider => {
-  // Générer un numéro de téléphone valide par défaut
+  // GÃ©nÃ©rer un numÃ©ro de tÃ©lÃ©phone valide par dÃ©faut
   const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
   const providerShortId = providerId.substring(0, 6);
   
-  console.log('🔧 Création provider par défaut:', {
+  console.log('ðŸ”§ CrÃ©ation provider par dÃ©faut:', {
     providerId,
     shortId: providerShortId,
     defaultPhone
@@ -186,14 +186,14 @@ const createImprovedDefaultProvider = (providerId: string): Provider => {
     fullName: `Expert ${providerShortId}`,
     firstName: 'Expert',
     lastName: providerShortId,
-    role: 'expat', // Par défaut expat
+    role: 'expat', // Par dÃ©faut expat
     type: 'expat',
     country: 'FR',
     currentCountry: 'FR',
     avatar: '/default-avatar.png',
     profilePhoto: '/default-avatar.png',
     email: `expert${providerShortId}@example.com`,
-    // ✅ IMPORTANT: Fournir un numéro de téléphone valide pour tous les champs
+    // âœ… IMPORTANT: Fournir un numÃ©ro de tÃ©lÃ©phone valide pour tous les champs
     phone: defaultPhone,
     phoneNumber: defaultPhone,
     telephone: defaultPhone,
@@ -202,13 +202,13 @@ const createImprovedDefaultProvider = (providerId: string): Provider => {
     languagesSpoken: ['fr'],
     languages: ['fr'],
     preferredLanguage: 'fr',
-    price: 0, // Sera géré par adminPricing
-    duration: 0, // Sera géré par adminPricing
+    price: 0, // Sera gÃ©rÃ© par adminPricing
+    duration: 0, // Sera gÃ©rÃ© par adminPricing
     rating: 4.5,
     reviewCount: 0,
-    specialties: ['Conseil général'],
-    description: 'Expert conseil généraliste pour expatriés',
-    bio: 'Professionnel expérimenté en conseil expatriation',
+    specialties: ['Conseil gÃ©nÃ©ral'],
+    description: 'Expert conseil gÃ©nÃ©raliste pour expatriÃ©s',
+    bio: 'Professionnel expÃ©rimentÃ© en conseil expatriation',
     yearsOfExperience: 5,
     isActive: true,
     isApproved: true,
@@ -218,16 +218,16 @@ const createImprovedDefaultProvider = (providerId: string): Provider => {
   });
 };
 
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 // Component
-// —————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 const CallCheckoutWrapper: React.FC = () => {
   const { t } = useTranslation();
   const location = useLocation() as { state: RouterState };
   const navigate = useNavigate();
   const { providerId } = useParams<{ providerId: string }>();
 
-  // Devise sélectionnée (source d'autorité côté wrapper)
+  // Devise sÃ©lectionnÃ©e (source d'autoritÃ© cÃ´tÃ© wrapper)
   const [selectedCurrency, setSelectedCurrency] = useState<'eur' | 'usd'>(() => {
     try {
       const fromSession = sessionStorage.getItem('selectedCurrency') as 'eur' | 'usd' | null;
@@ -240,14 +240,14 @@ const CallCheckoutWrapper: React.FC = () => {
     return detectUserCurrency();
   });
 
-  // Persistance immédiate
+  // Persistance immÃ©diate
   useEffect(() => {
     try {
       sessionStorage.setItem('selectedCurrency', selectedCurrency);
       localStorage.setItem('preferredCurrency', selectedCurrency);
     } catch { /* noop */ }
     if (import.meta.env.DEV) {
-      console.log('💱 [Wrapper] currency:', selectedCurrency);
+      console.log('ðŸ’± [Wrapper] currency:', selectedCurrency);
     }
   }, [selectedCurrency]);
 
@@ -276,20 +276,20 @@ const CallCheckoutWrapper: React.FC = () => {
     const loadData = async (): Promise<void> => {
       try {
         if (import.meta.env.DEV) {
-          console.log('🔍 CallCheckoutWrapper - providerId:', providerId);
+          console.log('ðŸ” CallCheckoutWrapper - providerId:', providerId);
         }
 
-        // 1) location.state → on lit uniquement le provider
+        // 1) location.state â†’ on lit uniquement le provider
         const stateProvider =
           locState?.selectedProvider || locState?.providerData || locState?.provider;
 
         if (stateProvider && (stateProvider as ProviderLike).id) {
-          if (import.meta.env.DEV) console.log('✅ Provider via location.state');
+          if (import.meta.env.DEV) console.log('âœ… Provider via location.state');
           const normalized = normalizeProvider(stateProvider as Provider);
           
-          // ✅ CORRECTION: Vérifier que le provider a un numéro de téléphone valide
+          // âœ… CORRECTION: VÃ©rifier que le provider a un numÃ©ro de tÃ©lÃ©phone valide
           if (!normalized.phone && !normalized.phoneNumber) {
-            console.warn('⚠️ Provider sans numéro, ajout d\'un numéro par défaut');
+            console.warn('âš ï¸ Provider sans numÃ©ro, ajout d\'un numÃ©ro par dÃ©faut');
             const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
             normalized.phone = defaultPhone;
             normalized.phoneNumber = defaultPhone;
@@ -300,8 +300,8 @@ const CallCheckoutWrapper: React.FC = () => {
           return;
         }
 
-        // 2) sessionStorage → uniquement le provider
-        if (import.meta.env.DEV) console.log('🔎 sessionStorage…');
+        // 2) sessionStorage â†’ uniquement le provider
+        if (import.meta.env.DEV) console.log('ðŸ”Ž sessionStorageâ€¦');
         try {
           const savedProvider = sessionStorage.getItem('selectedProvider');
           if (savedProvider) {
@@ -309,7 +309,7 @@ const CallCheckoutWrapper: React.FC = () => {
             if (!providerId || savedProviderData.id === providerId) {
               const normalized = normalizeProvider(savedProviderData);
               
-              // ✅ CORRECTION: Vérifier le numéro de téléphone
+              // âœ… CORRECTION: VÃ©rifier le numÃ©ro de tÃ©lÃ©phone
               if (!normalized.phone && !normalized.phoneNumber) {
                 const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
                 normalized.phone = defaultPhone;
@@ -325,7 +325,7 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse selectedProvider error', err);
         }
 
-        // 3) bookingRequest → reconstruire uniquement le provider
+        // 3) bookingRequest â†’ reconstruire uniquement le provider
         try {
           const savedBookingRequest = sessionStorage.getItem('bookingRequest');
           if (savedBookingRequest) {
@@ -348,7 +348,7 @@ const CallCheckoutWrapper: React.FC = () => {
             if (!providerId || profileData.id === providerId) {
               const normalized = normalizeProvider(profileData);
               
-              // ✅ CORRECTION: Vérifier le numéro de téléphone
+              // âœ… CORRECTION: VÃ©rifier le numÃ©ro de tÃ©lÃ©phone
               if (!normalized.phone && !normalized.phoneNumber) {
                 const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
                 normalized.phone = defaultPhone;
@@ -364,7 +364,7 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse providerProfile error', err);
         }
 
-        // 5) autres clés sessionStorage (provider-like)
+        // 5) autres clÃ©s sessionStorage (provider-like)
         const sessionStorageKeys = ['providerData', 'selectedExpert', 'expertData', 'consultationData', 'callData'] as const;
         for (const key of sessionStorageKeys) {
           try {
@@ -374,7 +374,7 @@ const CallCheckoutWrapper: React.FC = () => {
               if (parsed && (parsed.id || parsed.providerId) && (!providerId || parsed.id === providerId || parsed.providerId === providerId)) {
                 const normalized = normalizeProvider(parsed as Provider);
                 
-                // ✅ CORRECTION: Vérifier le numéro de téléphone
+                // âœ… CORRECTION: VÃ©rifier le numÃ©ro de tÃ©lÃ©phone
                 if (!normalized.phone && !normalized.phoneNumber) {
                   const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
                   normalized.phone = defaultPhone;
@@ -398,7 +398,7 @@ const CallCheckoutWrapper: React.FC = () => {
           if (historyProvider && (historyProvider as ProviderLike).id && (!providerId || (historyProvider as ProviderLike).id === providerId)) {
             const normalized = normalizeProvider(historyProvider as Provider);
             
-            // ✅ CORRECTION: Vérifier le numéro de téléphone
+            // âœ… CORRECTION: VÃ©rifier le numÃ©ro de tÃ©lÃ©phone
             if (!normalized.phone && !normalized.phoneNumber) {
               const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
               normalized.phone = defaultPhone;
@@ -423,7 +423,7 @@ const CallCheckoutWrapper: React.FC = () => {
               if (parsed && parsed.id && (!providerId || parsed.id === providerId)) {
                 const normalized = normalizeProvider(parsed);
                 
-                // ✅ CORRECTION: Vérifier le numéro de téléphone
+                // âœ… CORRECTION: VÃ©rifier le numÃ©ro de tÃ©lÃ©phone
                 if (!normalized.phone && !normalized.phoneNumber) {
                   const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
                   normalized.phone = defaultPhone;
@@ -440,7 +440,7 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse localStorage provider error', err);
         }
 
-        // 8) paramètres URL → provider + currency uniquement
+        // 8) paramÃ¨tres URL â†’ provider + currency uniquement
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const providerParam = urlParams.get('provider');
@@ -452,7 +452,7 @@ const CallCheckoutWrapper: React.FC = () => {
             if (providerData && providerData.id && (!providerId || providerData.id === providerId)) {
               const normalized = normalizeProvider(providerData);
               
-              // ✅ CORRECTION: Vérifier le numéro de téléphone
+              // âœ… CORRECTION: VÃ©rifier le numÃ©ro de tÃ©lÃ©phone
               if (!normalized.phone && !normalized.phoneNumber) {
                 const defaultPhone = `+33${Math.floor(100000000 + Math.random() * 900000000)}`;
                 normalized.phone = defaultPhone;
@@ -468,7 +468,7 @@ const CallCheckoutWrapper: React.FC = () => {
           if (import.meta.env.DEV) console.error('[Wrapper] parse URL params error', err);
         }
 
-        // 9) fallback avec providerId (strict — mais avec numéro de téléphone valide)
+        // 9) fallback avec providerId (strict â€” mais avec numÃ©ro de tÃ©lÃ©phone valide)
         if (providerId) {
           const defaultProvider = createImprovedDefaultProvider(providerId);
           setState({
@@ -479,15 +479,15 @@ const CallCheckoutWrapper: React.FC = () => {
           return;
         }
 
-        // 10) rien trouvé
-        console.warn('❌ [Wrapper] Aucune donnée de provider trouvée');
+        // 10) rien trouvÃ©
+        console.warn('âŒ [Wrapper] Aucune donnÃ©e de provider trouvÃ©e');
         setState({
           isLoading: false,
           error: t('error.body'),
           provider: null,
         });
       } catch (err) {
-        if (import.meta.env.DEV) console.error('❌ loadData error', err);
+        if (import.meta.env.DEV) console.error('âŒ loadData error', err);
         setState({
           isLoading: false,
           error: t('error.body'),
@@ -500,7 +500,7 @@ const CallCheckoutWrapper: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locState, providerId, t]);
 
-  // ✅ Vérification stricte : un prix admin doit exister (pas de fallback permissif)
+  // âœ… VÃ©rification stricte : un prix admin doit exister (pas de fallback permissif)
   useEffect(() => {
     if (!state.provider || state.isLoading) return;
 
@@ -509,7 +509,7 @@ const CallCheckoutWrapper: React.FC = () => {
     (async () => {
       try {
         const res = await calculateServiceAmounts(role, selectedCurrency);
-        // Si la config renvoie des montants incohérents → on considère que le prix admin est manquant
+        // Si la config renvoie des montants incohÃ©rents â†’ on considÃ¨re que le prix admin est manquant
         const ok =
           res &&
           typeof res.totalAmount === 'number' &&
@@ -524,23 +524,23 @@ const CallCheckoutWrapper: React.FC = () => {
         }
         setPricingError(null);
       } catch (e) {
-        const msg = `Configuration tarifaire manquante pour le rôle « ${role} » en ${selectedCurrency.toUpperCase()}. Contactez un administrateur.`;
+        const msg = `Configuration tarifaire manquante pour le rÃ´le Â« ${role} Â» en ${selectedCurrency.toUpperCase()}. Contactez un administrateur.`;
         if (import.meta.env.DEV) console.error('[CallCheckoutWrapper] Admin pricing error:', e);
         setPricingError(msg);
       }
     })();
   }, [state.provider, state.isLoading, selectedCurrency]);
 
-  // Sauvegarde session (❌ pas de serviceData — on garde seulement le provider)
+  // Sauvegarde session (âŒ pas de serviceData â€” on garde seulement le provider)
   useEffect(() => {
     if (state.provider && !state.isLoading && !state.error) {
       try {
         sessionStorage.setItem('selectedProvider', JSON.stringify(state.provider));
         localStorage.setItem('lastSelectedProvider', JSON.stringify(state.provider));
         
-        // ✅ CORRECTION: Log pour debug
+        // âœ… CORRECTION: Log pour debug
         if (import.meta.env.DEV) {
-          console.log('💾 Provider sauvegardé:', {
+          console.log('ðŸ’¾ Provider sauvegardÃ©:', {
             id: state.provider.id,
             name: state.provider.name,
             phone: state.provider.phone,
@@ -559,9 +559,9 @@ const CallCheckoutWrapper: React.FC = () => {
     else navigate('/');
   };
 
-  // —————————————————————————————————————————————————————
-  // UI States — mobile-first, i18n
-  // —————————————————————————————————————————————————————
+  // â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+  // UI States â€” mobile-first, i18n
+  // â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
   if (state.isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
@@ -585,11 +585,11 @@ const CallCheckoutWrapper: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 sm:p-8 text-center w-full max-w-lg">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Données manquantes</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">DonnÃ©es manquantes</h2>
           <p className="text-gray-600 text-sm mb-5">
             {pricingError ||
               state.error ||
-              'Les informations de consultation sont manquantes. Veuillez sélectionner à nouveau un expert.'}
+              'Les informations de consultation sont manquantes. Veuillez sÃ©lectionner Ã  nouveau un expert.'}
           </p>
 
           <div className="space-y-2">
@@ -616,7 +616,7 @@ const CallCheckoutWrapper: React.FC = () => {
                 try { 
                   sessionStorage.clear(); 
                   localStorage.clear(); 
-                  console.log('🗑️ Cache vidé');
+                  console.log('ðŸ—‘ï¸ Cache vidÃ©');
                 } catch { /* noop */ }
                 finally { window.location.reload(); }
               }}
@@ -630,9 +630,9 @@ const CallCheckoutWrapper: React.FC = () => {
     );
   }
 
-  // ✅ CORRECTION: Debug final avant de passer à CallCheckout
+  // âœ… CORRECTION: Debug final avant de passer Ã  CallCheckout
   if (import.meta.env.DEV && state.provider) {
-    console.log('🎯 Provider final avant CallCheckout:', {
+    console.log('ðŸŽ¯ Provider final avant CallCheckout:', {
       id: state.provider.id,
       name: state.provider.name,
       phone: state.provider.phone,
@@ -643,7 +643,7 @@ const CallCheckoutWrapper: React.FC = () => {
     });
   }
 
-  // Success — CallCheckout (✅ on ne passe plus de serviceData depuis le wrapper)
+  // Success â€” CallCheckout (âœ… on ne passe plus de serviceData depuis le wrapper)
   return (
     <CallCheckout
       selectedProvider={state.provider}

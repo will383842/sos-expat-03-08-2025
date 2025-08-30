@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 import Button from '../common/Button';
 import { useAuth } from '../../contexts/AuthContext';
@@ -6,7 +6,7 @@ import { createReviewRecord } from '../../utils/firestore';
 
 interface ReviewFormProps {
   providerId: string;
-  providerName?: string; // optionnel, utilisé dans le titre si fourni
+  providerName?: string; // optionnel, utilisÃ© dans le titre si fourni
   callId: string;
   serviceType: 'lawyer_call' | 'expat_call';
   onSuccess?: () => void;
@@ -42,19 +42,19 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     }
 
     if (!user) {
-      setError('Vous devez être connecté pour laisser un avis');
+      setError('Vous devez Ãªtre connectÃ© pour laisser un avis');
       setIsSubmitting(false);
       return;
     }
 
     if (rating < 1) {
-      setError('Veuillez sélectionner une note');
+      setError('Veuillez sÃ©lectionner une note');
       setIsSubmitting(false);
       return;
     }
 
     try {
-      // ✅ NE PAS forcer status ni isPublic : la logique est dans createReviewRecord
+      // âœ… NE PAS forcer status ni isPublic : la logique est dans createReviewRecord
       await createReviewRecord({
         clientId: user.id,
         clientName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
@@ -78,7 +78,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Erreur inconnue";
-      setError(`Une erreur est survenue lors de l'envoi de votre avis: ${message}. Veuillez réessayer.`);
+      setError(`Une erreur est survenue lors de l'envoi de votre avis: ${message}. Veuillez rÃ©essayer.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -87,8 +87,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   return (
     <div className="bg-white rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-900 mb-4">
-        Évaluer {isLawyer ? "l'Avocat" : "l'Expatrié"}
-        {providerName ? ` — ${providerName}` : ''}
+        Ã‰valuer {isLawyer ? "l'Avocat" : "l'ExpatriÃ©"}
+        {providerName ? ` â€” ${providerName}` : ''}
       </h3>
 
       {error && (
@@ -109,7 +109,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                 type="button"
                 onClick={() => setRating(star)}
                 className="focus:outline-none"
-                aria-label={`Donner ${star} étoile${star > 1 ? 's' : ''}`}
+                aria-label={`Donner ${star} Ã©toile${star > 1 ? 's' : ''}`}
               >
                 <Star
                   size={32}
@@ -130,7 +130,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setComment(e.target.value)}
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-            placeholder="Partagez votre expérience avec ce prestataire..."
+            placeholder="Partagez votre expÃ©rience avec ce prestataire..."
           />
         </div>
 

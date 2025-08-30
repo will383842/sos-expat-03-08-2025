@@ -44,7 +44,13 @@ const twilio_1 = require("../lib/twilio");
  * Webhook pour les événements de conférence Twilio
  * Gère: start, end, join, leave, mute, hold
  */
-exports.twilioConferenceWebhook = (0, https_1.onRequest)({ secrets: [twilio_1.TWILIO_ACCOUNT_SID, twilio_1.TWILIO_AUTH_TOKEN, twilio_1.TWILIO_PHONE_NUMBER] }, async (req, res) => {
+exports.twilioConferenceWebhook = (0, https_1.onRequest)({ region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1,
+    secrets: [twilio_1.TWILIO_ACCOUNT_SID, twilio_1.TWILIO_AUTH_TOKEN, twilio_1.TWILIO_PHONE_NUMBER] }, async (req, res) => {
     try {
         const body = req.body;
         console.log('🔔 Conference Webhook reçu:', {

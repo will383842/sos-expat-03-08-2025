@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Phone,
@@ -122,11 +122,11 @@ const StatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ status,
   const getConfig = () => {
     switch (status) {
       case 'completed':
-        return { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, label: 'Terminé' };
+        return { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, label: 'TerminÃ©' };
       case 'failed':
-        return { color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle, label: 'Échoué' };
+        return { color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle, label: 'Ã‰chouÃ©' };
       case 'cancelled':
-        return { color: 'bg-gray-100 text-gray-800 border-gray-200', icon: StopCircle, label: 'Annulé' };
+        return { color: 'bg-gray-100 text-gray-800 border-gray-200', icon: StopCircle, label: 'AnnulÃ©' };
       case 'active':
         return { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: PlayCircle, label: 'Actif' };
       case 'pending':
@@ -154,13 +154,13 @@ const PaymentStatusBadge: React.FC<{ status: string; amount: number }> = ({ stat
   const getConfig = () => {
     switch (status) {
       case 'captured':
-        return { color: 'bg-green-100 text-green-800', label: 'Capturé' };
+        return { color: 'bg-green-100 text-green-800', label: 'CapturÃ©' };
       case 'authorized':
-        return { color: 'bg-blue-100 text-blue-800', label: 'Autorisé' };
+        return { color: 'bg-blue-100 text-blue-800', label: 'AutorisÃ©' };
       case 'refunded':
-        return { color: 'bg-orange-100 text-orange-800', label: 'Remboursé' };
+        return { color: 'bg-orange-100 text-orange-800', label: 'RemboursÃ©' };
       case 'failed':
-        return { color: 'bg-red-100 text-red-800', label: 'Échoué' };
+        return { color: 'bg-red-100 text-red-800', label: 'Ã‰chouÃ©' };
       case 'pending':
         return { color: 'bg-yellow-100 text-yellow-800', label: 'En attente' };
       default:
@@ -177,7 +177,7 @@ const PaymentStatusBadge: React.FC<{ status: string; amount: number }> = ({ stat
         {config.label}
       </span>
       <div className="text-sm font-medium text-gray-900 mt-1">
-        {amount.toFixed(2)}€
+        {amount.toFixed(2)}â‚¬
       </div>
     </div>
   );
@@ -241,7 +241,7 @@ const ParticipantInfo: React.FC<{
   return (
     <div className="flex items-center space-x-2">
       <div className="flex-shrink-0">
-        {type === 'provider' ? '👨‍💼' : '👤'}
+        {type === 'provider' ? 'ðŸ‘¨â€ðŸ’¼' : 'ðŸ‘¤'}
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-gray-900 truncate">
@@ -251,10 +251,10 @@ const ParticipantInfo: React.FC<{
           {participant.phone}
         </div>
         <div className={`text-xs font-medium ${getStatusColor()}`}>
-          {participant.status === 'connected' ? 'Connecté' :
-           participant.status === 'disconnected' ? 'Déconnecté' :
+          {participant.status === 'connected' ? 'ConnectÃ©' :
+           participant.status === 'disconnected' ? 'DÃ©connectÃ©' :
            participant.status === 'ringing' ? 'Sonnerie' :
-           participant.status === 'no_answer' ? 'Pas de réponse' :
+           participant.status === 'no_answer' ? 'Pas de rÃ©ponse' :
            'En attente'}
         </div>
       </div>
@@ -272,7 +272,7 @@ const AdminCallsSessions: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
-  // States des données
+  // States des donnÃ©es
   const [sessions, setSessions] = useState<CallSession[]>([]);
   const [sessionStats, setSessionStats] = useState<SessionStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -297,7 +297,7 @@ const AdminCallsSessions: React.FC = () => {
 
   const ITEMS_PER_PAGE = 25;
 
-  // Vérification d'authentification
+  // VÃ©rification d'authentification
   useEffect(() => {
     if (!currentUser || (currentUser as any).role !== 'admin') {
       navigate('/admin/login');
@@ -432,7 +432,7 @@ const AdminCallsSessions: React.FC = () => {
 
   const calculateStats = async () => {
     try {
-      // Calculer les stats sur toutes les sessions (pas seulement celles affichées)
+      // Calculer les stats sur toutes les sessions (pas seulement celles affichÃ©es)
       const allSessionsQuery = query(
         collection(db, 'call_sessions'),
         where('metadata.createdAt', '>=', getDateRangeStart())
@@ -512,13 +512,13 @@ const AdminCallsSessions: React.FC = () => {
       'Type Prestataire': session.metadata.providerType,
       'Prestataire': session.metadata.providerName || 'N/A',
       'Client': session.metadata.clientName || 'N/A',
-      'Téléphone Prestataire': session.participants.provider.phone,
-      'Téléphone Client': session.participants.client.phone,
-      'Durée (s)': session.conference.duration || 0,
-      'Montant (€)': session.payment.amount,
+      'TÃ©lÃ©phone Prestataire': session.participants.provider.phone,
+      'TÃ©lÃ©phone Client': session.participants.client.phone,
+      'DurÃ©e (s)': session.conference.duration || 0,
+      'Montant (â‚¬)': session.payment.amount,
       'Statut Paiement': session.payment.status,
-      'Date Création': session.metadata.createdAt.toDate().toLocaleString('fr-FR'),
-      'Date Début': session.conference.startedAt?.toDate().toLocaleString('fr-FR') || 'N/A',
+      'Date CrÃ©ation': session.metadata.createdAt.toDate().toLocaleString('fr-FR'),
+      'Date DÃ©but': session.conference.startedAt?.toDate().toLocaleString('fr-FR') || 'N/A',
       'Date Fin': session.conference.endedAt?.toDate().toLocaleString('fr-FR') || 'N/A',
       'Tentatives Prestataire': session.participants.provider.attemptCount,
       'Tentatives Client': session.participants.client.attemptCount,
@@ -585,7 +585,7 @@ const AdminCallsSessions: React.FC = () => {
                 Historique des Sessions d'Appels
               </h1>
               <p className="text-gray-600 mt-1">
-                Consultation et analyse des sessions d'appels passées
+                Consultation et analyse des sessions d'appels passÃ©es
               </p>
             </div>
             
@@ -640,7 +640,7 @@ const AdminCallsSessions: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Taux de Succès</p>
+                    <p className="text-sm font-medium text-gray-600">Taux de SuccÃ¨s</p>
                     <p className="text-2xl font-bold text-gray-900">{sessionStats.successRate.toFixed(1)}%</p>
                   </div>
                   <div className="p-3 rounded-full bg-green-100">
@@ -653,7 +653,7 @@ const AdminCallsSessions: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Revenus Total</p>
-                    <p className="text-2xl font-bold text-gray-900">{sessionStats.totalRevenue.toFixed(2)}€</p>
+                    <p className="text-2xl font-bold text-gray-900">{sessionStats.totalRevenue.toFixed(2)}â‚¬</p>
                   </div>
                   <div className="p-3 rounded-full bg-purple-100">
                     <DollarSign className="w-6 h-6 text-purple-600" />
@@ -664,7 +664,7 @@ const AdminCallsSessions: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Durée Moyenne</p>
+                    <p className="text-sm font-medium text-gray-600">DurÃ©e Moyenne</p>
                     <p className="text-2xl font-bold text-gray-900">{Math.round(sessionStats.averageDuration / 60)}min</p>
                   </div>
                   <div className="p-3 rounded-full bg-orange-100">
@@ -675,7 +675,7 @@ const AdminCallsSessions: React.FC = () => {
             </div>
           )}
 
-          {/* Filtres et contrôles */}
+          {/* Filtres et contrÃ´les */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
@@ -687,22 +687,22 @@ const AdminCallsSessions: React.FC = () => {
                 >
                   <option value="all">Tous types</option>
                   <option value="lawyer">Avocat</option>
-                  <option value="expat">Expatrié</option>
+                  <option value="expat">ExpatriÃ©</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Période</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PÃ©riode</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="1d">Dernières 24h</option>
+                  <option value="1d">DerniÃ¨res 24h</option>
                   <option value="7d">7 derniers jours</option>
                   <option value="30d">30 derniers jours</option>
                   <option value="90d">90 derniers jours</option>
-                  <option value="all">Toutes les périodes</option>
+                  <option value="all">Toutes les pÃ©riodes</option>
                 </select>
               </div>
 
@@ -714,14 +714,14 @@ const AdminCallsSessions: React.FC = () => {
                     onChange={(e) => setSortBy(e.target.value as any)}
                     className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="createdAt">Date création</option>
-                    <option value="duration">Durée</option>
+                    <option value="createdAt">Date crÃ©ation</option>
+                    <option value="duration">DurÃ©e</option>
                     <option value="amount">Montant</option>
                   </select>
                   <button
                     onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                     className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    title={`Tri ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`}
+                    title={`Tri ${sortOrder === 'asc' ? 'croissant' : 'dÃ©croissant'}`}
                   >
                     <ArrowUpDown size={16} />
                   </button>
@@ -733,7 +733,7 @@ const AdminCallsSessions: React.FC = () => {
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Rechercher par ID session, nom, téléphone, Intent ID..."
+                  placeholder="Rechercher par ID session, nom, tÃ©lÃ©phone, Intent ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -742,7 +742,7 @@ const AdminCallsSessions: React.FC = () => {
               </div>
               
               <div className="text-sm text-gray-600">
-                {filteredSessions.length} session{filteredSessions.length > 1 ? 's' : ''} trouvée{filteredSessions.length > 1 ? 's' : ''}
+                {filteredSessions.length} session{filteredSessions.length > 1 ? 's' : ''} trouvÃ©e{filteredSessions.length > 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -763,7 +763,7 @@ const AdminCallsSessions: React.FC = () => {
                       Participants
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Durée
+                      DurÃ©e
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Paiement
@@ -785,7 +785,7 @@ const AdminCallsSessions: React.FC = () => {
                             {session.id.substring(0, 12)}...
                           </div>
                           <div className="text-xs text-gray-500">
-                            {session.metadata.serviceType === 'lawyer_call' ? '⚖️ Avocat' : '🌍 Expatrié'}
+                            {session.metadata.serviceType === 'lawyer_call' ? 'âš–ï¸ Avocat' : 'ðŸŒ ExpatriÃ©'}
                           </div>
                         </div>
                       </td>
@@ -830,7 +830,7 @@ const AdminCallsSessions: React.FC = () => {
                         </div>
                         {session.conference.startedAt && (
                           <div className="text-xs text-gray-500">
-                            Démarré: {formatDateTime(session.conference.startedAt)}
+                            DÃ©marrÃ©: {formatDateTime(session.conference.startedAt)}
                           </div>
                         )}
                       </td>
@@ -843,7 +843,7 @@ const AdminCallsSessions: React.FC = () => {
                               setShowDetailModal(true);
                             }}
                             className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Voir détails"
+                            title="Voir dÃ©tails"
                           >
                             <Eye size={16} />
                           </button>
@@ -860,7 +860,7 @@ const AdminCallsSessions: React.FC = () => {
                             <button
                               onClick={() => window.open(session.conference.recordingUrl, '_blank')}
                               className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Écouter enregistrement"
+                              title="Ã‰couter enregistrement"
                             >
                               <Volume2 size={16} />
                             </button>
@@ -877,9 +877,9 @@ const AdminCallsSessions: React.FC = () => {
             {filteredSessions.length === 0 && (
               <div className="text-center py-12">
                 <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune session trouvée</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune session trouvÃ©e</h3>
                 <p className="text-gray-600">
-                  Aucune session ne correspond aux critères de recherche sélectionnés.
+                  Aucune session ne correspond aux critÃ¨res de recherche sÃ©lectionnÃ©s.
                 </p>
               </div>
             )}
@@ -900,11 +900,11 @@ const AdminCallsSessions: React.FC = () => {
           </div>
         </div>
 
-        {/* Modal détails de session */}
+        {/* Modal dÃ©tails de session */}
         <Modal
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
-          title="Détails de la session"
+          title="DÃ©tails de la session"
           size="large"
         >
           {selectedSession && (
@@ -922,7 +922,7 @@ const AdminCallsSessions: React.FC = () => {
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {selectedSession.metadata.serviceType === 'lawyer_call' ? '⚖️ Appel Avocat' : '🌍 Appel Expatrié'}
+                      {selectedSession.metadata.serviceType === 'lawyer_call' ? 'âš–ï¸ Appel Avocat' : 'ðŸŒ Appel ExpatriÃ©'}
                     </span>
                   </div>
                 </div>
@@ -933,12 +933,12 @@ const AdminCallsSessions: React.FC = () => {
                     endTime={selectedSession.conference.endedAt}
                   />
                   <div className="text-sm text-gray-500 mt-1">
-                    {selectedSession.payment.amount.toFixed(2)}€
+                    {selectedSession.payment.amount.toFixed(2)}â‚¬
                   </div>
                 </div>
               </div>
 
-              {/* Détails participants */}
+              {/* DÃ©tails participants */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
@@ -955,7 +955,7 @@ const AdminCallsSessions: React.FC = () => {
                       <span className="text-sm font-mono ml-2">{selectedSession.metadata.providerId.substring(0, 12)}...</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-600">Téléphone:</span>
+                      <span className="text-sm text-gray-600">TÃ©lÃ©phone:</span>
                       <span className="text-sm font-mono ml-2">{selectedSession.participants.provider.phone}</span>
                     </div>
                     <div>
@@ -984,7 +984,7 @@ const AdminCallsSessions: React.FC = () => {
                       <span className="text-sm font-mono ml-2">{selectedSession.metadata.clientId.substring(0, 12)}...</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-600">Téléphone:</span>
+                      <span className="text-sm text-gray-600">TÃ©lÃ©phone:</span>
                       <span className="text-sm font-mono ml-2">{selectedSession.participants.client.phone}</span>
                     </div>
                     <div>
@@ -999,7 +999,7 @@ const AdminCallsSessions: React.FC = () => {
                 </div>
               </div>
 
-              {/* Paiement et métadonnées */}
+              {/* Paiement et mÃ©tadonnÃ©es */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
@@ -1009,7 +1009,7 @@ const AdminCallsSessions: React.FC = () => {
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                     <div>
                       <span className="text-sm text-gray-600">Montant:</span>
-                      <span className="text-sm font-medium ml-2">{selectedSession.payment.amount.toFixed(2)}€</span>
+                      <span className="text-sm font-medium ml-2">{selectedSession.payment.amount.toFixed(2)}â‚¬</span>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Statut:</span>
@@ -1025,7 +1025,7 @@ const AdminCallsSessions: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                     <FileText className="mr-2" size={16} />
-                    Métadonnées
+                    MÃ©tadonnÃ©es
                   </h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                     <div>
@@ -1033,11 +1033,11 @@ const AdminCallsSessions: React.FC = () => {
                       <span className="text-sm font-medium ml-2">{selectedSession.metadata.providerType}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-600">Durée max:</span>
+                      <span className="text-sm text-gray-600">DurÃ©e max:</span>
                       <span className="text-sm font-medium ml-2">{selectedSession.metadata.maxDuration / 60} min</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-600">Créée:</span>
+                      <span className="text-sm text-gray-600">CrÃ©Ã©e:</span>
                       <span className="text-sm font-medium ml-2">{formatDateTime(selectedSession.metadata.createdAt)}</span>
                     </div>
                   </div>
@@ -1083,7 +1083,7 @@ const AdminCallsSessions: React.FC = () => {
         <Modal
           isOpen={showStatsModal}
           onClose={() => setShowStatsModal(false)}
-          title="Statistiques détaillées"
+          title="Statistiques dÃ©taillÃ©es"
           size="large"
         >
           {sessionStats && (
@@ -1095,11 +1095,11 @@ const AdminCallsSessions: React.FC = () => {
                 </div>
                 <div className="text-center p-6 bg-green-50 rounded-lg">
                   <div className="text-3xl font-bold text-green-600 mb-2">{sessionStats.completedSessions}</div>
-                  <div className="text-sm text-green-800">Sessions Réussies</div>
+                  <div className="text-sm text-green-800">Sessions RÃ©ussies</div>
                 </div>
                 <div className="text-center p-6 bg-red-50 rounded-lg">
                   <div className="text-3xl font-bold text-red-600 mb-2">{sessionStats.failedSessions}</div>
-                  <div className="text-sm text-red-800">Sessions Échouées</div>
+                  <div className="text-sm text-red-800">Sessions Ã‰chouÃ©es</div>
                 </div>
               </div>
 

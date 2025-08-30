@@ -1,4 +1,4 @@
-// src/pages/PasswordReset.tsx
+﻿// src/pages/PasswordReset.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle, Shield, Globe, Smartphone, RefreshCw, Sparkles, Lock, Zap, ChevronRight } from 'lucide-react';
@@ -19,7 +19,7 @@ interface FormErrors {
 }
 
 
-/** gtag typé (évite any et les redéclarations globales) */
+/** gtag typÃ© (Ã©vite any et les redÃ©clarations globales) */
 type GtagFunction = (...args: unknown[]) => void;
 interface GtagWindow {
   gtag?: GtagFunction;
@@ -27,50 +27,50 @@ interface GtagWindow {
 const getGtag = (): GtagFunction | undefined =>
   (typeof window !== 'undefined' ? (window as unknown as GtagWindow).gtag : undefined);
 
-// Hook de traduction optimisé avec contexte App
+// Hook de traduction optimisÃ© avec contexte App
 const useTranslation = () => {
   const { language } = useApp();
   
   const t = (key: string, defaultValue?: string) => {
     const translations: Record<string, Record<string, string>> = {
       'meta.title': { 
-        fr: 'Réinitialisation du mot de passe - SOS Expats | Récupération de compte',
+        fr: 'RÃ©initialisation du mot de passe - SOS Expats | RÃ©cupÃ©ration de compte',
         en: 'Password Reset - SOS Expats | Account Recovery'
       },
       'meta.description': { 
-        fr: 'Réinitialisez votre mot de passe SOS Expats en toute sécurité. Récupérez l\'accès à votre compte d\'assistance aux expatriés en quelques clics.',
+        fr: 'RÃ©initialisez votre mot de passe SOS Expats en toute sÃ©curitÃ©. RÃ©cupÃ©rez l\'accÃ¨s Ã  votre compte d\'assistance aux expatriÃ©s en quelques clics.',
         en: 'Reset your SOS Expats password securely. Recover access to your expat assistance account in just a few clicks.'
       },
       'meta.keywords': { 
-        fr: 'réinitialisation mot de passe, récupération compte, SOS Expats, expatriés, sécurité',
+        fr: 'rÃ©initialisation mot de passe, rÃ©cupÃ©ration compte, SOS Expats, expatriÃ©s, sÃ©curitÃ©',
         en: 'password reset, account recovery, SOS Expats, expats, security'
       },
       'meta.og_title': { 
-        fr: 'Réinitialisation sécurisée - SOS Expats',
+        fr: 'RÃ©initialisation sÃ©curisÃ©e - SOS Expats',
         en: 'Secure Password Reset - SOS Expats'
       },
       'meta.og_description': { 
-        fr: 'Récupérez l\'accès à votre compte SOS Expats de manière sécurisée. Processus simple et rapide.',
+        fr: 'RÃ©cupÃ©rez l\'accÃ¨s Ã  votre compte SOS Expats de maniÃ¨re sÃ©curisÃ©e. Processus simple et rapide.',
         en: 'Securely recover access to your SOS Expats account. Simple and fast process.'
       },
       'meta.og_image_alt': { 
-        fr: 'Réinitialisation mot de passe SOS Expats',
+        fr: 'RÃ©initialisation mot de passe SOS Expats',
         en: 'SOS Expats password reset'
       },
       'meta.twitter_image_alt': { 
-        fr: 'Interface de réinitialisation SOS Expats',
+        fr: 'Interface de rÃ©initialisation SOS Expats',
         en: 'SOS Expats password reset interface'
       },
       'reset.title': { 
-        fr: 'Oups, mot de passe oublié ? 🤔',
-        en: 'Oops, forgot your password? 🤔'
+        fr: 'Oups, mot de passe oubliÃ© ? ðŸ¤”',
+        en: 'Oops, forgot your password? ðŸ¤”'
       },
       'reset.subtitle': { 
-        fr: 'Pas de panique ! On va t\'envoyer un lien magique ✨',
-        en: 'No worries! We\'ll send you a magic link ✨'
+        fr: 'Pas de panique ! On va t\'envoyer un lien magique âœ¨',
+        en: 'No worries! We\'ll send you a magic link âœ¨'
       },
       'reset.back_to_login': { 
-        fr: 'Retour à la connexion',
+        fr: 'Retour Ã  la connexion',
         en: 'Back to login'
       },
       'reset.email_label': { 
@@ -82,44 +82,44 @@ const useTranslation = () => {
         en: 'your@email.com'
       },
       'reset.email_help': { 
-        fr: 'Utilise l\'email de ton compte (celui que tu connais par cœur ! 💝)',
-        en: 'Use your account email (the one you know by heart! 💝)'
+        fr: 'Utilise l\'email de ton compte (celui que tu connais par cÅ“ur ! ðŸ’)',
+        en: 'Use your account email (the one you know by heart! ðŸ’)'
       },
       'reset.submit_button': { 
-        fr: 'Envoie-moi le lien ! 🎯',
-        en: 'Send me the link! 🎯'
+        fr: 'Envoie-moi le lien ! ðŸŽ¯',
+        en: 'Send me the link! ðŸŽ¯'
       },
       'reset.submitting': { 
-        fr: 'C\'est parti... 🏃‍♂️',
-        en: 'Here we go... 🏃‍♂️'
+        fr: 'C\'est parti... ðŸƒâ€â™‚ï¸',
+        en: 'Here we go... ðŸƒâ€â™‚ï¸'
       },
       'reset.success_title': { 
-        fr: 'C\'est parti ! 🚀',
-        en: 'All set! 🚀'
+        fr: 'C\'est parti ! ðŸš€',
+        en: 'All set! ðŸš€'
       },
       'reset.success_message': { 
-        fr: 'Si on te connaît (spoiler : on vérifie discrètement 🕵️), tu vas recevoir un super email avec un lien magique !',
-        en: 'If we know you (spoiler: we\'re checking discretely 🕵️), you\'ll receive an awesome email with a magic link!'
+        fr: 'Si on te connaÃ®t (spoiler : on vÃ©rifie discrÃ¨tement ðŸ•µï¸), tu vas recevoir un super email avec un lien magique !',
+        en: 'If we know you (spoiler: we\'re checking discretely ðŸ•µï¸), you\'ll receive an awesome email with a magic link!'
       },
       'reset.success_note': { 
-        fr: 'Patience, ça arrive ! Check tes spams aussi, parfois notre email fait une petite sieste là-bas 😴',
-        en: 'Be patient, it\'s coming! Check your spam too, sometimes our email takes a nap there 😴'
+        fr: 'Patience, Ã§a arrive ! Check tes spams aussi, parfois notre email fait une petite sieste lÃ -bas ðŸ˜´',
+        en: 'Be patient, it\'s coming! Check your spam too, sometimes our email takes a nap there ðŸ˜´'
       },
       'reset.security_info': {
-        fr: '🤫 Psst... Pour ta sécurité, on fait semblant de rien même si on ne te connaît pas !',
-        en: '🤫 Psst... For your security, we play it cool even if we don\'t know you!'
+        fr: 'ðŸ¤« Psst... Pour ta sÃ©curitÃ©, on fait semblant de rien mÃªme si on ne te connaÃ®t pas !',
+        en: 'ðŸ¤« Psst... For your security, we play it cool even if we don\'t know you!'
       },
       'reset.email_sent_label': {
-        fr: '📬 On a envoyé la sauce à :',
-        en: '📬 We sent the goods to:'
+        fr: 'ðŸ“¬ On a envoyÃ© la sauce Ã  :',
+        en: 'ðŸ“¬ We sent the goods to:'
       },
       'reset.resend_button': { 
-        fr: 'Renvoyer (au cas où 📮)',
-        en: 'Resend (just in case 📮)'
+        fr: 'Renvoyer (au cas oÃ¹ ðŸ“®)',
+        en: 'Resend (just in case ðŸ“®)'
       },
       'reset.different_email': { 
-        fr: 'Essayer un autre email 🔄',
-        en: 'Try another email 🔄'
+        fr: 'Essayer un autre email ðŸ”„',
+        en: 'Try another email ðŸ”„'
       },
       'validation.email_required': { 
         fr: 'L\'adresse email est requise',
@@ -130,15 +130,15 @@ const useTranslation = () => {
         en: 'Invalid email format'
       },
       'error.title': { 
-        fr: 'Erreur de réinitialisation',
+        fr: 'Erreur de rÃ©initialisation',
         en: 'Reset error'
       },
       'error.description': { 
-        fr: 'Une erreur est survenue. Veuillez réessayer.',
+        fr: 'Une erreur est survenue. Veuillez rÃ©essayer.',
         en: 'An error occurred. Please try again.'
       },
       'error.retry': { 
-        fr: 'Réessayer',
+        fr: 'RÃ©essayer',
         en: 'Retry'
       },
       'error.offline': { 
@@ -146,11 +146,11 @@ const useTranslation = () => {
         en: 'Internet connection required'
       },
       'error.user_not_found': { 
-        fr: 'Aucun compte trouvé avec cette adresse email',
+        fr: 'Aucun compte trouvÃ© avec cette adresse email',
         en: 'No account found with this email address'
       },
       'error.too_many_requests': { 
-        fr: 'Trop de tentatives. Attendez avant de réessayer.',
+        fr: 'Trop de tentatives. Attendez avant de rÃ©essayer.',
         en: 'Too many attempts. Please wait before trying again.'
       },
       'loading.message': { 
@@ -158,7 +158,7 @@ const useTranslation = () => {
         en: 'Processing...'
       },
       'offline.message': { 
-        fr: 'Mode hors ligne - Connexion requise pour la réinitialisation',
+        fr: 'Mode hors ligne - Connexion requise pour la rÃ©initialisation',
         en: 'Offline mode - Connection required for password reset'
       },
       'pwa.install': { 
@@ -170,11 +170,11 @@ const useTranslation = () => {
         en: 'Install'
       },
       'security.ssl': { 
-        fr: 'Connexion sécurisée SSL',
+        fr: 'Connexion sÃ©curisÃ©e SSL',
         en: 'Secure SSL connection'
       },
       'trust.secure': { 
-        fr: 'Sécurisé',
+        fr: 'SÃ©curisÃ©',
         en: 'Secure'
       },
       'trust.support_24_7': { 
@@ -190,52 +190,52 @@ const useTranslation = () => {
         en: 'required'
       },
       'info.why_reset': {
-        fr: 'Pourquoi réinitialiser ?',
+        fr: 'Pourquoi rÃ©initialiser ?',
         en: 'Why reset?'
       },
       'info.security_note': {
-        fr: 'Tes mots de passe ? On les garde secrets comme la recette du Coca ! 🔐',
-        en: 'Your passwords? We keep them as secret as the Coca-Cola recipe! 🔐'
+        fr: 'Tes mots de passe ? On les garde secrets comme la recette du Coca ! ðŸ”',
+        en: 'Your passwords? We keep them as secret as the Coca-Cola recipe! ðŸ”'
       },
       'info.process_steps': {
-        fr: 'Comment ça marche ? 🎬',
-        en: 'How does it work? 🎬'
+        fr: 'Comment Ã§a marche ? ðŸŽ¬',
+        en: 'How does it work? ðŸŽ¬'
       },
       'steps.step1': {
-        fr: 'Tu mets ton email (le bon hein ! 😉)',
-        en: 'You enter your email (the right one! 😉)'
+        fr: 'Tu mets ton email (le bon hein ! ðŸ˜‰)',
+        en: 'You enter your email (the right one! ðŸ˜‰)'
       },
       'steps.step2': {
-        fr: 'Tu cours checker tes emails 📧',
-        en: 'You run to check your emails 📧'
+        fr: 'Tu cours checker tes emails ðŸ“§',
+        en: 'You run to check your emails ðŸ“§'
       },
       'steps.step3': {
-        fr: 'Tu cliques sur notre lien magique ✨',
-        en: 'You click our magic link ✨'
+        fr: 'Tu cliques sur notre lien magique âœ¨',
+        en: 'You click our magic link âœ¨'
       },
       'steps.step4': {
-        fr: 'Tu choisis un nouveau mot de passe (costaud cette fois ! 💪)',
-        en: 'You choose a new password (a strong one this time! 💪)'
+        fr: 'Tu choisis un nouveau mot de passe (costaud cette fois ! ðŸ’ª)',
+        en: 'You choose a new password (a strong one this time! ðŸ’ª)'
       },
       'help.contact': {
-        fr: 'Coincé ? 🆘',
-        en: 'Stuck? 🆘'
+        fr: 'CoincÃ© ? ðŸ†˜',
+        en: 'Stuck? ðŸ†˜'
       },
       'pwa.banner_title': {
-        fr: 'Accès rapide et hors ligne',
+        fr: 'AccÃ¨s rapide et hors ligne',
         en: 'Quick and offline access'
       },
       'security.badge_text': {
-        fr: 'Fort Knox niveau sécurité 🔒',
-        en: 'Fort Knox level security 🔒'
+        fr: 'Fort Knox niveau sÃ©curitÃ© ðŸ”’',
+        en: 'Fort Knox level security ðŸ”’'
       },
       'security.ninja_title': {
-        fr: 'Sécurité niveau ninja 🥷',
-        en: 'Ninja level security 🥷'
+        fr: 'SÃ©curitÃ© niveau ninja ðŸ¥·',
+        en: 'Ninja level security ðŸ¥·'
       },
       'help.team_message': {
-        fr: 'Bloqué ? Pas de stress, notre équipe de super-héros est là ! 🦸‍♂️',
-        en: 'Stuck? No stress, our superhero team is here! 🦸‍♂️'
+        fr: 'BloquÃ© ? Pas de stress, notre Ã©quipe de super-hÃ©ros est lÃ  ! ðŸ¦¸â€â™‚ï¸',
+        en: 'Stuck? No stress, our superhero team is here! ðŸ¦¸â€â™‚ï¸'
       },
       'button.close': {
         fr: 'Fermer',
@@ -249,7 +249,7 @@ const useTranslation = () => {
   return { t, language };
 };
 
-// Error Boundary optimisé
+// Error Boundary optimisÃ©
 interface ErrorBoundaryProps {
   children: React.ReactNode;
   FallbackComponent: React.ComponentType<ErrorFallbackProps>;
@@ -334,7 +334,7 @@ const PasswordReset: React.FC = () => {
   const [lastSentEmail, setLastSentEmail] = useState<string>('');
   const [cooldownTime, setCooldownTime] = useState(0);
   
-  // Type pour l'événement BeforeInstallPrompt
+  // Type pour l'Ã©vÃ©nement BeforeInstallPrompt
   type BeforeInstallPromptEvent = Event & {
     prompt: () => Promise<void>;
     userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
@@ -563,7 +563,7 @@ const PasswordReset: React.FC = () => {
     updateMetaTag('author', 'SOS Expats');
     updateMetaTag('language', currentLang);
     
-    // og:locale sûr (évite le type never)
+    // og:locale sÃ»r (Ã©vite le type never)
     const ogLocale =
       currentLang === 'fr'
         ? 'fr_FR'
@@ -690,7 +690,7 @@ const PasswordReset: React.FC = () => {
       performance.mark('password-reset-attempt-end');
       performance.measure('password-reset-attempt', { start: 'password-reset-attempt-start', end: 'password-reset-attempt-end' });
       
-      // Toujours afficher le succès (même si l'email n'existe pas)
+      // Toujours afficher le succÃ¨s (mÃªme si l'email n'existe pas)
       setIsSuccess(true);
       setLastSentEmail(formData.email);
       setCooldownTime(60); // 1 minute cooldown
@@ -711,9 +711,9 @@ const PasswordReset: React.FC = () => {
       
       const code = (err as { code?: string })?.code;
       
-      // Pour la sécurité : toujours afficher le succès même si l'email n'existe pas
+      // Pour la sÃ©curitÃ© : toujours afficher le succÃ¨s mÃªme si l'email n'existe pas
       if (code === 'auth/user-not-found') {
-        // On affiche quand même le succès pour ne pas révéler que l'email n'existe pas
+        // On affiche quand mÃªme le succÃ¨s pour ne pas rÃ©vÃ©ler que l'email n'existe pas
         setIsSuccess(true);
         setLastSentEmail(formData.email);
         setCooldownTime(60);
@@ -727,11 +727,11 @@ const PasswordReset: React.FC = () => {
       } else if (code === 'auth/invalid-email') {
         setFormErrors({ email: t('validation.email_invalid') });
       } else {
-        // Pour les autres erreurs, on affiche un message générique
+        // Pour les autres erreurs, on affiche un message gÃ©nÃ©rique
         setFormErrors({ general: t('error.description') });
       }
       
-      // Error analytics (sans révéler si l'email existe)
+      // Error analytics (sans rÃ©vÃ©ler si l'email existe)
       const gtag = getGtag();
       if (gtag && code !== 'auth/user-not-found') {
         gtag('event', 'password_reset_failed', {
@@ -760,7 +760,7 @@ const PasswordReset: React.FC = () => {
   }, []);
 
 
-  // Classes CSS pour inputs (clé typée)
+  // Classes CSS pour inputs (clÃ© typÃ©e)
   const inputClass = useCallback(
     (fieldName: keyof FormErrors) =>
       `appearance-none block w-full px-5 py-4 text-base text-white border-2 rounded-2xl placeholder-gray-400 bg-gray-800/50 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-500/30 focus:border-red-500 hover:border-gray-500 hover:bg-gray-800/70 ${
@@ -834,7 +834,7 @@ const PasswordReset: React.FC = () => {
                     className="text-red-100 hover:text-white p-2.5 rounded-2xl hover:bg-white/10 transition-all duration-300"
                     aria-label={t('button.close')}
                   >
-                    ✕
+                    âœ•
                   </button>
                 </div>
               </div>
@@ -842,7 +842,7 @@ const PasswordReset: React.FC = () => {
           )}
 
           <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-lg">
-            {/* Header optimisé mobile-first */}
+            {/* Header optimisÃ© mobile-first */}
             <header className="text-center mb-10">
               {/* Badge moderne */}
               <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-5 py-2.5 border border-white/20 mb-8">
@@ -1118,7 +1118,7 @@ const PasswordReset: React.FC = () => {
                     <Shield className="h-4 w-4 mr-2 text-green-400" />
                     {t('trust.secure')}
                   </span>
-                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-600">â€¢</span>
                   <span className="flex items-center">
                     <Zap className="h-4 w-4 mr-2 text-yellow-400" />
                     {t('trust.support_24_7')}
@@ -1128,7 +1128,7 @@ const PasswordReset: React.FC = () => {
                 {/* Performance indicator (dev only) */}
                 {process.env.NODE_ENV === 'development' && (
                   <div className="text-xs text-gray-500 text-center">
-                    ⚡ Optimized for Core Web Vitals
+                    âš¡ Optimized for Core Web Vitals
                   </div>
                 )}
               </div>

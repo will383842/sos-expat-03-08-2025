@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Phone,
@@ -252,19 +252,19 @@ const CallStatusBadge: React.FC<{ status: string; animated?: boolean }> = ({ sta
         return { 
           color: 'bg-green-100 text-green-800 border-green-200', 
           icon: CheckCircle, 
-          label: 'Terminé' 
+          label: 'TerminÃ©' 
         };
       case 'failed':
         return { 
           color: 'bg-red-100 text-red-800 border-red-200', 
           icon: XCircle, 
-          label: 'Échoué' 
+          label: 'Ã‰chouÃ©' 
         };
       case 'cancelled':
         return { 
           color: 'bg-gray-100 text-gray-800 border-gray-200', 
           icon: PhoneOff, 
-          label: 'Annulé' 
+          label: 'AnnulÃ©' 
         };
       default:
         return { 
@@ -324,7 +324,7 @@ const ParticipantStatusIndicator: React.FC<{
         <div className={`w-3 h-3 rounded-full ${getStatusColor()}`}></div>
         <div className="text-sm">
           <div className="font-medium text-gray-900">
-            {type === 'provider' ? '👨‍💼' : '👤'} {name || 'Anonyme'}
+            {type === 'provider' ? 'ðŸ‘¨â€ðŸ’¼' : 'ðŸ‘¤'} {name || 'Anonyme'}
           </div>
           <div className="text-gray-500 font-mono text-xs">{phone}</div>
         </div>
@@ -332,7 +332,7 @@ const ParticipantStatusIndicator: React.FC<{
       
       <div className="flex items-center space-x-2 ml-auto">
         {audioQuality && (
-          <div className="flex items-center space-x-1" title={`Qualité audio: ${audioQuality}`}>
+          <div className="flex items-center space-x-1" title={`QualitÃ© audio: ${audioQuality}`}>
             {getAudioQualityIcon()}
           </div>
         )}
@@ -358,11 +358,11 @@ const ParticipantStatusIndicator: React.FC<{
           status === 'disconnected' ? 'bg-red-100 text-red-800' :
           'bg-gray-100 text-gray-800'
         }`}>
-          {status === 'connected' ? 'Connecté' :
+          {status === 'connected' ? 'ConnectÃ©' :
            status === 'ringing' ? 'Sonnerie' :
            status === 'pending' ? 'En attente' :
-           status === 'disconnected' ? 'Déconnecté' :
-           status === 'no_answer' ? 'Pas de réponse' : status}
+           status === 'disconnected' ? 'DÃ©connectÃ©' :
+           status === 'no_answer' ? 'Pas de rÃ©ponse' : status}
         </span>
       </div>
     </div>
@@ -458,7 +458,7 @@ const AdminCallsMonitoring: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
-  // States des données
+  // States des donnÃ©es
   const [liveCalls, setLiveCalls] = useState<LiveCallSession[]>([]);
   const [callMetrics, setCallMetrics] = useState<CallMetrics | null>(null);
   const [callAlerts, setCallAlerts] = useState<CallAlert[]>([]);
@@ -481,7 +481,7 @@ const AdminCallsMonitoring: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Formatters
-  const formatCurrency = (amount: number) => `${amount.toFixed(2)}€`;
+  const formatCurrency = (amount: number) => `${amount.toFixed(2)}â‚¬`;
   const formatDateTime = (timestamp: Timestamp | Date) => {
     const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
     return new Intl.DateTimeFormat('fr-FR', {
@@ -491,7 +491,7 @@ const AdminCallsMonitoring: React.FC = () => {
     }).format(date);
   };
 
-  // Vérification d'authentification
+  // VÃ©rification d'authentification
   useEffect(() => {
     if (!currentUser || (currentUser as any).role !== 'admin') {
       navigate('/admin/login');
@@ -499,13 +499,13 @@ const AdminCallsMonitoring: React.FC = () => {
     }
   }, [currentUser, navigate]);
 
-  // Chargement des données en temps réel
+  // Chargement des donnÃ©es en temps rÃ©el
   useEffect(() => {
     if (!currentUser || !isRealTimeActive) return;
 
-    console.log('🔴 Démarrage du monitoring des appels en temps réel');
+    console.log('ðŸ”´ DÃ©marrage du monitoring des appels en temps rÃ©el');
 
-    // Écoute des sessions d'appel actives et en cours
+    // Ã‰coute des sessions d'appel actives et en cours
     const callSessionsQuery = query(
       collection(db, 'call_sessions'),
       where('status', 'in', [
@@ -529,7 +529,7 @@ const AdminCallsMonitoring: React.FC = () => {
           } as LiveCallSession;
         });
 
-        console.log(`📞 ${sessions.length} appels actifs détectés`);
+        console.log(`ðŸ“ž ${sessions.length} appels actifs dÃ©tectÃ©s`);
         setLiveCalls(sessions);
 
         // Jouer un son pour les nouveaux appels
@@ -538,7 +538,7 @@ const AdminCallsMonitoring: React.FC = () => {
         }
       },
       (error) => {
-        console.error('Erreur lors de l\'écoute des appels:', error);
+        console.error('Erreur lors de l\'Ã©coute des appels:', error);
         logError({
           origin: 'frontend',
           error: `Erreur monitoring appels: ${error.message}`,
@@ -550,12 +550,12 @@ const AdminCallsMonitoring: React.FC = () => {
     setIsLoading(false);
 
     return () => {
-      console.log('🔴 Arrêt du monitoring des appels');
+      console.log('ðŸ”´ ArrÃªt du monitoring des appels');
       unsubscribeCalls();
     };
   }, [currentUser, isRealTimeActive, soundEnabled, liveCalls.length]);
 
-  // Calcul des métriques en temps réel basé sur les vraies données
+  // Calcul des mÃ©triques en temps rÃ©el basÃ© sur les vraies donnÃ©es
   useEffect(() => {
     if (liveCalls.length === 0) {
       setCallMetrics(null);
@@ -568,12 +568,12 @@ const AdminCallsMonitoring: React.FC = () => {
     );
     const pendingCalls = liveCalls.filter(call => call.status === 'pending');
 
-    // Calculs des métriques réelles
+    // Calculs des mÃ©triques rÃ©elles
     const totalActiveCalls = activeCalls.length;
     const totalConnectingCalls = connectingCalls.length;
     const totalPendingCalls = pendingCalls.length;
 
-    // Durée moyenne des appels actifs
+    // DurÃ©e moyenne des appels actifs
     const activeCallsWithDuration = activeCalls.filter(call => call.conference.startedAt);
     const averageCallDuration = activeCallsWithDuration.length > 0
       ? activeCallsWithDuration.reduce((sum, call) => {
@@ -587,7 +587,7 @@ const AdminCallsMonitoring: React.FC = () => {
     const revenueInProgress = activeCalls.reduce((sum, call) => sum + call.payment.amount, 0);
     const estimatedTotalRevenue = liveCalls.reduce((sum, call) => sum + call.payment.amount, 0);
 
-    // Qualité audio moyenne
+    // QualitÃ© audio moyenne
     const callsWithAudioQuality = liveCalls.filter(call => call.conference.audioQuality);
     const audioQualityMap = { poor: 1, fair: 2, good: 3, excellent: 4 };
     const audioQualityAverage = callsWithAudioQuality.length > 0
@@ -596,7 +596,7 @@ const AdminCallsMonitoring: React.FC = () => {
         }, 0) / callsWithAudioQuality.length
       : 0;
 
-    // Latence réseau moyenne
+    // Latence rÃ©seau moyenne
     const callsWithLatency = liveCalls.filter(call => call.realTimeData?.latency);
     const networkLatencyAverage = callsWithLatency.length > 0
       ? callsWithLatency.reduce((sum, call) => sum + (call.realTimeData!.latency || 0), 0) / callsWithLatency.length
@@ -607,7 +607,7 @@ const AdminCallsMonitoring: React.FC = () => {
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = Timestamp.fromDate(today);
 
-    // Ces valeurs seront calculées via une requête Firestore séparée
+    // Ces valeurs seront calculÃ©es via une requÃªte Firestore sÃ©parÃ©e
     const loadTodayStats = async () => {
       try {
         const todayQuery = query(
@@ -636,7 +636,7 @@ const AdminCallsMonitoring: React.FC = () => {
           ? connectionTimes.reduce((sum, time) => sum + time, 0) / connectionTimes.length
           : 0;
 
-        // Calcul des taux de réponse
+        // Calcul des taux de rÃ©ponse
         const providerResponses = todayData.filter(call => 
           call.participants.provider.status === 'connected'
         ).length;
@@ -666,19 +666,19 @@ const AdminCallsMonitoring: React.FC = () => {
 
         setCallMetrics(metrics);
       } catch (error) {
-        console.error('Erreur lors du calcul des métriques:', error);
+        console.error('Erreur lors du calcul des mÃ©triques:', error);
       }
     };
 
     loadTodayStats();
   }, [liveCalls]);
 
-  // Génération d'alertes automatiques basées sur les vraies données
+  // GÃ©nÃ©ration d'alertes automatiques basÃ©es sur les vraies donnÃ©es
   useEffect(() => {
     const newAlerts: CallAlert[] = [];
 
     liveCalls.forEach(call => {
-      // Alerte pour les appels bloqués
+      // Alerte pour les appels bloquÃ©s
       const timeSinceCreation = Date.now() - call.metadata.createdAt.toDate().getTime();
       if (['pending', 'provider_connecting', 'client_connecting'].includes(call.status) && 
           timeSinceCreation > 5 * 60 * 1000) { // Plus de 5 minutes
@@ -687,48 +687,48 @@ const AdminCallsMonitoring: React.FC = () => {
           type: 'timeout',
           severity: 'high',
           callSessionId: call.id,
-          message: `Appel bloqué depuis ${Math.floor(timeSinceCreation / 60000)} minutes`,
+          message: `Appel bloquÃ© depuis ${Math.floor(timeSinceCreation / 60000)} minutes`,
           timestamp: new Date(),
           isResolved: false,
           autoActions: ['retry_connection', 'escalate_support']
         });
       }
 
-      // Alerte pour la qualité audio
+      // Alerte pour la qualitÃ© audio
       if (call.status === 'active' && call.conference.audioQuality === 'poor') {
         newAlerts.push({
           id: `audio_${call.id}`,
           type: 'audio_problem',
           severity: 'medium',
           callSessionId: call.id,
-          message: 'Qualité audio dégradée détectée',
+          message: 'QualitÃ© audio dÃ©gradÃ©e dÃ©tectÃ©e',
           timestamp: new Date(),
           isResolved: false,
           autoActions: ['check_connection', 'suggest_callback']
         });
       }
 
-      // Alerte pour la latence réseau
+      // Alerte pour la latence rÃ©seau
       if (call.realTimeData?.latency && call.realTimeData.latency > 300) {
         newAlerts.push({
           id: `latency_${call.id}`,
           type: 'connection_issue',
           severity: 'medium',
           callSessionId: call.id,
-          message: `Latence élevée: ${call.realTimeData.latency.toFixed(0)}ms`,
+          message: `Latence Ã©levÃ©e: ${call.realTimeData.latency.toFixed(0)}ms`,
           timestamp: new Date(),
           isResolved: false,
         });
       }
 
-      // Alerte pour les échecs de paiement
+      // Alerte pour les Ã©checs de paiement
       if (call.payment.status === 'failed') {
         newAlerts.push({
           id: `payment_${call.id}`,
           type: 'payment_issue',
           severity: 'high',
           callSessionId: call.id,
-          message: `Échec de paiement: ${call.payment.failureReason || 'Raison inconnue'}`,
+          message: `Ã‰chec de paiement: ${call.payment.failureReason || 'Raison inconnue'}`,
           timestamp: new Date(),
           isResolved: false,
           autoActions: ['retry_payment', 'contact_client']
@@ -736,14 +736,14 @@ const AdminCallsMonitoring: React.FC = () => {
       }
     });
 
-    // Alerte pour surcharge système
+    // Alerte pour surcharge systÃ¨me
     if (callMetrics && callMetrics.totalActiveCalls > 30) {
       newAlerts.push({
         id: 'system_overload',
         type: 'system_overload',
         severity: 'critical',
         callSessionId: 'system',
-        message: `${callMetrics.totalActiveCalls} appels simultanés - Capacité proche de la limite`,
+        message: `${callMetrics.totalActiveCalls} appels simultanÃ©s - CapacitÃ© proche de la limite`,
         timestamp: new Date(),
         isResolved: false,
         autoActions: ['scale_resources', 'alert_team']
@@ -753,21 +753,21 @@ const AdminCallsMonitoring: React.FC = () => {
     setCallAlerts(prev => {
       const existingIds = prev.map(alert => alert.id);
       const uniqueNewAlerts = newAlerts.filter(alert => !existingIds.includes(alert.id));
-      return [...prev, ...uniqueNewAlerts].slice(-10); // Garder seulement les 10 dernières
+      return [...prev, ...uniqueNewAlerts].slice(-10); // Garder seulement les 10 derniÃ¨res
     });
   }, [liveCalls, callMetrics]);
 
-  // Chargement de la santé du système via une API réelle
+  // Chargement de la santÃ© du systÃ¨me via une API rÃ©elle
   useEffect(() => {
     const loadSystemHealth = async () => {
       try {
-        // Appel à l'API de santé du système (si disponible)
+        // Appel Ã  l'API de santÃ© du systÃ¨me (si disponible)
         const healthResponse = await fetch('/api/system/health');
         if (healthResponse.ok) {
           const healthData = await healthResponse.json();
           setSystemHealth(healthData);
         } else {
-          // Fallback avec des données basiques basées sur les appels réels
+          // Fallback avec des donnÃ©es basiques basÃ©es sur les appels rÃ©els
           setSystemHealth({
             apiStatus: 'operational',
             responseTime: 95,
@@ -788,8 +788,8 @@ const AdminCallsMonitoring: React.FC = () => {
           });
         }
       } catch (error) {
-        console.error('Erreur lors du chargement de la santé système:', error);
-        // Données minimales en cas d'erreur
+        console.error('Erreur lors du chargement de la santÃ© systÃ¨me:', error);
+        // DonnÃ©es minimales en cas d'erreur
         setSystemHealth({
           apiStatus: 'degraded',
           responseTime: 0,
@@ -833,7 +833,7 @@ const AdminCallsMonitoring: React.FC = () => {
   const playNotificationSound = useCallback((type: 'new_call' | 'call_ended' | 'alert') => {
     if (!soundEnabled) return;
     
-    // Création d'un son simple avec Web Audio API
+    // CrÃ©ation d'un son simple avec Web Audio API
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
@@ -867,17 +867,17 @@ const AdminCallsMonitoring: React.FC = () => {
 
   // Actions sur les appels via Firebase Functions
   const handleForceDisconnect = useCallback(async (sessionId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir forcer la déconnexion de cet appel ?')) return;
+    if (!confirm('ÃŠtes-vous sÃ»r de vouloir forcer la dÃ©connexion de cet appel ?')) return;
     
     try {
       const forceDisconnectFunction = httpsCallable(functions, 'adminForceDisconnectCall');
       await forceDisconnectFunction({ sessionId, reason: 'Admin force disconnect' });
       
       playNotificationSound('call_ended');
-      console.log(`Appel ${sessionId} forcé à se déconnecter`);
+      console.log(`Appel ${sessionId} forcÃ© Ã  se dÃ©connecter`);
     } catch (error) {
-      console.error('Erreur lors de la déconnexion forcée:', error);
-      alert('Erreur lors de la déconnexion de l\'appel');
+      console.error('Erreur lors de la dÃ©connexion forcÃ©e:', error);
+      alert('Erreur lors de la dÃ©connexion de l\'appel');
     }
   }, [playNotificationSound]);
 
@@ -910,7 +910,7 @@ const AdminCallsMonitoring: React.FC = () => {
       const transferCallFunction = httpsCallable(functions, 'adminTransferCall');
       await transferCallFunction({ sessionId, newProviderId });
       
-      console.log(`Appel ${sessionId} transféré vers ${newProviderId}`);
+      console.log(`Appel ${sessionId} transfÃ©rÃ© vers ${newProviderId}`);
     } catch (error) {
       console.error('Erreur lors du transfert:', error);
       alert('Erreur lors du transfert de l\'appel');
@@ -922,7 +922,7 @@ const AdminCallsMonitoring: React.FC = () => {
       const muteCallFunction = httpsCallable(functions, 'adminMuteParticipant');
       await muteCallFunction({ sessionId, participantType });
       
-      console.log(`${participantType} muté pour l'appel ${sessionId}`);
+      console.log(`${participantType} mutÃ© pour l'appel ${sessionId}`);
     } catch (error) {
       console.error('Erreur lors du mute:', error);
       alert('Erreur lors de la mise en sourdine');
@@ -969,7 +969,7 @@ const AdminCallsMonitoring: React.FC = () => {
           <button
             onClick={() => onForceDisconnect(session.id)}
             className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            title="Forcer la déconnexion"
+            title="Forcer la dÃ©connexion"
           >
             <PhoneOff size={16} />
           </button>
@@ -979,7 +979,7 @@ const AdminCallsMonitoring: React.FC = () => {
           <button
             onClick={() => onTransferCall(session.id)}
             className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            title="Transférer l'appel"
+            title="TransfÃ©rer l'appel"
           >
             <RotateCcw size={16} />
           </button>
@@ -1032,7 +1032,7 @@ const AdminCallsMonitoring: React.FC = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center">
                 <Phone className="mr-3 text-red-600" size={28} />
-                Monitoring des appels en temps réel
+                Monitoring des appels en temps rÃ©el
                 {isRealTimeActive && (
                   <div className="ml-3 flex items-center">
                     <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2"></div>
@@ -1041,7 +1041,7 @@ const AdminCallsMonitoring: React.FC = () => {
                 )}
               </h1>
               <p className="text-gray-600 mt-1">
-                Surveillance et gestion des appels téléphoniques actifs
+                Surveillance et gestion des appels tÃ©lÃ©phoniques actifs
               </p>
             </div>
             
@@ -1063,7 +1063,7 @@ const AdminCallsMonitoring: React.FC = () => {
                 )}
               </button>
 
-              {/* Contrôles audio */}
+              {/* ContrÃ´les audio */}
               <button
                 onClick={() => setSoundEnabled(!soundEnabled)}
                 className={`p-2 rounded-lg border transition-colors ${
@@ -1071,12 +1071,12 @@ const AdminCallsMonitoring: React.FC = () => {
                     ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' 
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 }`}
-                title={soundEnabled ? 'Désactiver les sons' : 'Activer les sons'}
+                title={soundEnabled ? 'DÃ©sactiver les sons' : 'Activer les sons'}
               >
                 {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
               </button>
 
-              {/* Mode temps réel */}
+              {/* Mode temps rÃ©el */}
               <button
                 onClick={() => setIsRealTimeActive(!isRealTimeActive)}
                 className={`p-2 rounded-lg border transition-colors ${
@@ -1084,7 +1084,7 @@ const AdminCallsMonitoring: React.FC = () => {
                     ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100' 
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 }`}
-                title={isRealTimeActive ? 'Pause temps réel' : 'Activer temps réel'}
+                title={isRealTimeActive ? 'Pause temps rÃ©el' : 'Activer temps rÃ©el'}
               >
                 {isRealTimeActive ? <Pause size={20} /> : <Play size={20} />}
               </button>
@@ -1093,7 +1093,7 @@ const AdminCallsMonitoring: React.FC = () => {
               <button
                 onClick={() => setShowStatsModal(true)}
                 className="p-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors"
-                title="Statistiques système"
+                title="Statistiques systÃ¨me"
               >
                 <Activity size={20} />
               </button>
@@ -1109,7 +1109,7 @@ const AdminCallsMonitoring: React.FC = () => {
             </div>
           </div>
 
-          {/* Métriques temps réel */}
+          {/* MÃ©triques temps rÃ©el */}
           {callMetrics && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <MetricsCard
@@ -1144,7 +1144,7 @@ const AdminCallsMonitoring: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <AlertTriangle className="mr-2 text-red-500" size={20} />
-                Alertes actives ({unreadAlertsCount} non résolues)
+                Alertes actives ({unreadAlertsCount} non rÃ©solues)
               </h3>
               <div className="space-y-3">
                 {callAlerts.slice(0, 3).map((alert) => (
@@ -1171,7 +1171,7 @@ const AdminCallsMonitoring: React.FC = () => {
                           <span className="text-sm font-medium">{alert.message}</span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          Session: {alert.callSessionId} • {alert.timestamp.toLocaleTimeString('fr-FR')}
+                          Session: {alert.callSessionId} â€¢ {alert.timestamp.toLocaleTimeString('fr-FR')}
                         </div>
                         {alert.autoActions && (
                           <div className="flex space-x-2 mt-2">
@@ -1192,7 +1192,7 @@ const AdminCallsMonitoring: React.FC = () => {
                           <button
                             onClick={() => handleResolveAlert(alert.id)}
                             className="text-gray-400 hover:text-green-600"
-                            title="Marquer comme résolu"
+                            title="Marquer comme rÃ©solu"
                           >
                             <CheckCircle size={16} />
                           </button>
@@ -1212,7 +1212,7 @@ const AdminCallsMonitoring: React.FC = () => {
             </div>
           )}
 
-          {/* Filtres et contrôles */}
+          {/* Filtres et contrÃ´les */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center space-x-2">
@@ -1240,7 +1240,7 @@ const AdminCallsMonitoring: React.FC = () => {
               >
                 <option value="all">Tous les services</option>
                 <option value="lawyer_call">Appels avocat</option>
-                <option value="expat_call">Appels expatrié</option>
+                <option value="expat_call">Appels expatriÃ©</option>
               </select>
 
               <label className="flex items-center">
@@ -1250,7 +1250,7 @@ const AdminCallsMonitoring: React.FC = () => {
                   onChange={(e) => setFilters(prev => ({ ...prev, showCompleted: e.target.checked }))}
                   className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mr-2"
                 />
-                <span className="text-sm text-gray-700">Inclure terminés</span>
+                <span className="text-sm text-gray-700">Inclure terminÃ©s</span>
               </label>
 
               <div className="flex items-center space-x-2">
@@ -1280,7 +1280,7 @@ const AdminCallsMonitoring: React.FC = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Rechercher appel, nom, téléphone..."
+                  placeholder="Rechercher appel, nom, tÃ©lÃ©phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 pr-4 py-1 border border-gray-300 rounded-md text-sm w-64"
@@ -1290,7 +1290,7 @@ const AdminCallsMonitoring: React.FC = () => {
             </div>
           </div>
 
-          {/* Liste des appels selon la vue sélectionnée */}
+          {/* Liste des appels selon la vue sÃ©lectionnÃ©e */}
           {selectedView === 'grid' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredCalls.map((call) => (
@@ -1305,7 +1305,7 @@ const AdminCallsMonitoring: React.FC = () => {
                         ID: {call.id.substring(0, 8)}...
                       </div>
                       <div className="text-xs text-gray-400">
-                        Créé: {formatDateTime(call.metadata.createdAt)}
+                        CrÃ©Ã©: {formatDateTime(call.metadata.createdAt)}
                       </div>
                     </div>
                     
@@ -1335,7 +1335,7 @@ const AdminCallsMonitoring: React.FC = () => {
                     />
                   </div>
 
-                  {/* Métriques de qualité */}
+                  {/* MÃ©triques de qualitÃ© */}
                   {call.realTimeData && (
                     <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
                       <div className="bg-gray-50 p-2 rounded">
@@ -1343,7 +1343,7 @@ const AdminCallsMonitoring: React.FC = () => {
                         <div className="font-medium">{call.realTimeData.latency?.toFixed(0)}ms</div>
                       </div>
                       <div className="bg-gray-50 p-2 rounded">
-                        <div className="text-gray-600">Qualité</div>
+                        <div className="text-gray-600">QualitÃ©</div>
                         <div className="font-medium">{call.realTimeData.connectionQuality?.toFixed(0)}%</div>
                       </div>
                     </div>
@@ -1362,7 +1362,7 @@ const AdminCallsMonitoring: React.FC = () => {
                           setShowCallModal(true);
                         }}
                         className="p-1 text-blue-600 hover:text-blue-800"
-                        title="Voir détails"
+                        title="Voir dÃ©tails"
                       >
                         <Eye size={16} />
                       </button>
@@ -1397,10 +1397,10 @@ const AdminCallsMonitoring: React.FC = () => {
                         Participants
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Durée
+                        DurÃ©e
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Qualité
+                        QualitÃ©
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Montant
@@ -1422,13 +1422,13 @@ const AdminCallsMonitoring: React.FC = () => {
                               <span className={`w-2 h-2 rounded-full ${
                                 call.participants.provider.status === 'connected' ? 'bg-green-500' : 'bg-gray-300'
                               }`}></span>
-                              <span>👨‍💼 {call.metadata.providerName || 'Prestataire'}</span>
+                              <span>ðŸ‘¨â€ðŸ’¼ {call.metadata.providerName || 'Prestataire'}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <span className={`w-2 h-2 rounded-full ${
                                 call.participants.client.status === 'connected' ? 'bg-green-500' : 'bg-gray-300'
                               }`}></span>
-                              <span>👤 {call.metadata.clientName || 'Client'}</span>
+                              <span>ðŸ‘¤ {call.metadata.clientName || 'Client'}</span>
                             </div>
                           </div>
                         </td>
@@ -1442,7 +1442,7 @@ const AdminCallsMonitoring: React.FC = () => {
                           {call.realTimeData && (
                             <div className="text-sm">
                               <div>Latence: {call.realTimeData.latency?.toFixed(0)}ms</div>
-                              <div>Qualité: {call.realTimeData.connectionQuality?.toFixed(0)}%</div>
+                              <div>QualitÃ©: {call.realTimeData.connectionQuality?.toFixed(0)}%</div>
                             </div>
                           )}
                         </td>
@@ -1502,7 +1502,7 @@ const AdminCallsMonitoring: React.FC = () => {
                           </div>
                           
                           <div className="text-xs text-gray-500 mb-2">
-                            {call.metadata.providerType === 'lawyer' ? '⚖️ Appel Avocat' : '🌍 Appel Expatrié'} 
+                            {call.metadata.providerType === 'lawyer' ? 'âš–ï¸ Appel Avocat' : 'ðŸŒ Appel ExpatriÃ©'} 
                             - {formatCurrency(call.payment.amount)}
                           </div>
                           
@@ -1541,18 +1541,18 @@ const AdminCallsMonitoring: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun appel en cours</h3>
               <p className="text-gray-600">
                 {isRealTimeActive 
-                  ? 'Le monitoring est actif. Les nouveaux appels apparaîtront automatiquement.' 
-                  : 'Activez le monitoring temps réel pour voir les appels en cours.'}
+                  ? 'Le monitoring est actif. Les nouveaux appels apparaÃ®tront automatiquement.' 
+                  : 'Activez le monitoring temps rÃ©el pour voir les appels en cours.'}
               </p>
             </div>
           )}
         </div>
 
-        {/* Modal détails d'appel */}
+        {/* Modal dÃ©tails d'appel */}
         <Modal
           isOpen={showCallModal}
           onClose={() => setShowCallModal(false)}
-          title="Détails de l'appel en temps réel"
+          title="DÃ©tails de l'appel en temps rÃ©el"
           size="large"
         >
           {selectedCall && (
@@ -1589,7 +1589,7 @@ const AdminCallsMonitoring: React.FC = () => {
                 </div>
               </div>
 
-              {/* Participants détaillés */}
+              {/* Participants dÃ©taillÃ©s */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
@@ -1646,7 +1646,7 @@ const AdminCallsMonitoring: React.FC = () => {
                     
                     {selectedCall.participants.provider.connectedAt && (
                       <div className="mt-2 text-xs text-gray-500">
-                        Connecté à {formatDateTime(selectedCall.participants.provider.connectedAt)}
+                        ConnectÃ© Ã  {formatDateTime(selectedCall.participants.provider.connectedAt)}
                       </div>
                     )}
                   </div>
@@ -1707,19 +1707,19 @@ const AdminCallsMonitoring: React.FC = () => {
                     
                     {selectedCall.participants.client.connectedAt && (
                       <div className="mt-2 text-xs text-gray-500">
-                        Connecté à {formatDateTime(selectedCall.participants.client.connectedAt)}
+                        ConnectÃ© Ã  {formatDateTime(selectedCall.participants.client.connectedAt)}
                       </div>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Informations de conférence et qualité */}
+              {/* Informations de confÃ©rence et qualitÃ© */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                     <Radio className="mr-2" size={16} />
-                    Conférence Twilio
+                    ConfÃ©rence Twilio
                   </h4>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="space-y-2 text-sm">
@@ -1750,7 +1750,7 @@ const AdminCallsMonitoring: React.FC = () => {
                       )}
                       {selectedCall.conference.audioQuality && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Qualité audio:</span>
+                          <span className="text-gray-600">QualitÃ© audio:</span>
                           <span className="font-medium">{selectedCall.conference.audioQuality}</span>
                         </div>
                       )}
@@ -1761,7 +1761,7 @@ const AdminCallsMonitoring: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                     <Network className="mr-2" size={16} />
-                    Métriques temps réel
+                    MÃ©triques temps rÃ©el
                   </h4>
                   {selectedCall.realTimeData ? (
                     <div className="bg-gray-50 rounded-lg p-4">
@@ -1771,7 +1771,7 @@ const AdminCallsMonitoring: React.FC = () => {
                           <div className="font-medium">{selectedCall.realTimeData.latency?.toFixed(0)}ms</div>
                         </div>
                         <div className="bg-white p-2 rounded">
-                          <div className="text-gray-600 text-xs">Qualité</div>
+                          <div className="text-gray-600 text-xs">QualitÃ©</div>
                           <div className="font-medium">{selectedCall.realTimeData.connectionQuality?.toFixed(0)}%</div>
                         </div>
                         <div className="bg-white p-2 rounded">
@@ -1786,13 +1786,13 @@ const AdminCallsMonitoring: React.FC = () => {
                       
                       {selectedCall.realTimeData.lastPing && (
                         <div className="mt-2 text-xs text-gray-500">
-                          Dernière mesure: {formatDateTime(selectedCall.realTimeData.lastPing)}
+                          DerniÃ¨re mesure: {formatDateTime(selectedCall.realTimeData.lastPing)}
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
-                      Aucune donnée temps réel disponible
+                      Aucune donnÃ©e temps rÃ©el disponible
                     </div>
                   )}
                 </div>
@@ -1835,7 +1835,7 @@ const AdminCallsMonitoring: React.FC = () => {
                 </div>
               </div>
 
-              {/* Langues et métadonnées */}
+              {/* Langues et mÃ©tadonnÃ©es */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
@@ -1869,11 +1869,11 @@ const AdminCallsMonitoring: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                     <Info className="mr-2" size={16} />
-                    Métadonnées
+                    MÃ©tadonnÃ©es
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Durée max:</span>
+                      <span className="text-gray-600">DurÃ©e max:</span>
                       <span className="font-medium">{selectedCall.metadata.maxDuration / 60} min</span>
                     </div>
                     <div className="flex justify-between">
@@ -1887,11 +1887,11 @@ const AdminCallsMonitoring: React.FC = () => {
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Créé:</span>
+                      <span className="text-gray-600">CrÃ©Ã©:</span>
                       <span className="font-medium">{formatDateTime(selectedCall.metadata.createdAt)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Mis à jour:</span>
+                      <span className="text-gray-600">Mis Ã  jour:</span>
                       <span className="font-medium">{formatDateTime(selectedCall.metadata.updatedAt)}</span>
                     </div>
                   </div>
@@ -1901,7 +1901,7 @@ const AdminCallsMonitoring: React.FC = () => {
               {/* Actions d'administration */}
               <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                 <div className="text-sm text-gray-500">
-                  Session surveillée en temps réel
+                  Session surveillÃ©e en temps rÃ©el
                 </div>
                 
                 <div className="flex space-x-3">
@@ -1935,11 +1935,11 @@ const AdminCallsMonitoring: React.FC = () => {
           )}
         </Modal>
 
-        {/* Modal statistiques système */}
+        {/* Modal statistiques systÃ¨me */}
         <Modal
           isOpen={showStatsModal}
           onClose={() => setShowStatsModal(false)}
-          title="Statistiques système en temps réel"
+          title="Statistiques systÃ¨me en temps rÃ©el"
           size="large"
         >
           {systemHealth && (
@@ -1952,7 +1952,7 @@ const AdminCallsMonitoring: React.FC = () => {
                   color={systemHealth.apiStatus === 'operational' ? 'bg-green-500' : 'bg-red-500'}
                 />
                 <MetricsCard
-                  title="Temps de réponse"
+                  title="Temps de rÃ©ponse"
                   value={`${systemHealth.responseTime.toFixed(0)}ms`}
                   icon={Timer}
                   color="bg-blue-500"
@@ -1967,7 +1967,7 @@ const AdminCallsMonitoring: React.FC = () => {
 
               {Object.keys(systemHealth.regionHealth).length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Santé des régions</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">SantÃ© des rÃ©gions</h3>
                   <div className="space-y-3">
                     {Object.entries(systemHealth.regionHealth).map(([region, health]) => (
                       <div key={region} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -1992,7 +1992,7 @@ const AdminCallsMonitoring: React.FC = () => {
                             <span className="font-medium">{health.latency.toFixed(0)}ms</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Disponibilité: </span>
+                            <span className="text-gray-600">DisponibilitÃ©: </span>
                             <span className="font-medium">{health.availability}%</span>
                           </div>
                         </div>
@@ -2004,14 +2004,14 @@ const AdminCallsMonitoring: React.FC = () => {
 
               {callMetrics && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Métriques détaillées</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">MÃ©triques dÃ©taillÃ©es</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-sm text-gray-600">Taux de succès</div>
+                      <div className="text-sm text-gray-600">Taux de succÃ¨s</div>
                       <div className="text-xl font-bold text-gray-900">{callMetrics.successRate.toFixed(1)}%</div>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-sm text-gray-600">Durée moyenne</div>
+                      <div className="text-sm text-gray-600">DurÃ©e moyenne</div>
                       <div className="text-xl font-bold text-gray-900">{Math.round(callMetrics.averageCallDuration / 60)}min</div>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">
@@ -2019,11 +2019,11 @@ const AdminCallsMonitoring: React.FC = () => {
                       <div className="text-xl font-bold text-gray-900">{Math.round(callMetrics.averageConnectionTime)}s</div>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-sm text-gray-600">Qualité audio</div>
+                      <div className="text-sm text-gray-600">QualitÃ© audio</div>
                       <div className="text-xl font-bold text-gray-900">{callMetrics.audioQualityAverage.toFixed(1)}/4</div>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-sm text-gray-600">Latence réseau</div>
+                      <div className="text-sm text-gray-600">Latence rÃ©seau</div>
                       <div className="text-xl font-bold text-gray-900">{Math.round(callMetrics.networkLatencyAverage)}ms</div>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">

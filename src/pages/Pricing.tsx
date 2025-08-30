@@ -1,4 +1,4 @@
-// src/pages/Pricing.tsx
+﻿// src/pages/Pricing.tsx
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
@@ -64,7 +64,7 @@ const Pricing: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // 🔥 Hook pricing dynamique
+  // ðŸ”¥ Hook pricing dynamique
   const { pricing, loading: pricingLoading, error: pricingError } = usePricingConfig();
 
   const [promoCode, setPromoCode] = useState<string>('');
@@ -72,7 +72,7 @@ const Pricing: React.FC = () => {
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  // 🔥 Gestion devise
+  // ðŸ”¥ Gestion devise
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(() => {
     try {
       const saved = sessionStorage.getItem('selectedCurrency') as CurrencyCode | null;
@@ -178,32 +178,32 @@ const Pricing: React.FC = () => {
   const texts = {
     fr: {
       title: 'Tarifs transparents',
-      subtitle: "Obtenez de l'aide immédiate avec nos tarifs fixes, sans surprise",
+      subtitle: "Obtenez de l'aide immÃ©diate avec nos tarifs fixes, sans surprise",
       promoPlaceholder: 'Code promo',
       apply: 'Appliquer',
       validating: 'Validation...',
       lawyerTitle: 'Appel Avocat',
-      expatTitle: 'Appel Expatrié',
+      expatTitle: 'Appel ExpatriÃ©',
       chooseService: 'Choisir ce service',
-      securePayment: 'Paiement sécurisé',
+      securePayment: 'Paiement sÃ©curisÃ©',
       securePaymentDesc:
-        "Toutes vos transactions sont protégées par un cryptage SSL 256-bit. Nous n'enregistrons jamais vos données de carte bancaire.",
+        "Toutes vos transactions sont protÃ©gÃ©es par un cryptage SSL 256-bit. Nous n'enregistrons jamais vos donnÃ©es de carte bancaire.",
       satisfactionGuarantee: 'Garantie satisfaction',
       satisfactionGuaranteeDesc:
-        "Si l'expert ne répond pas après 3 tentatives, vous êtes automatiquement remboursé. Nous garantissons votre satisfaction à 100%.",
+        "Si l'expert ne rÃ©pond pas aprÃ¨s 3 tentatives, vous Ãªtes automatiquement remboursÃ©. Nous garantissons votre satisfaction Ã  100%.",
       refundTime: 'Remboursement sous 24h',
-      faq: 'Questions fréquentes',
+      faq: 'Questions frÃ©quentes',
       paymentQuestion: 'Comment fonctionne le paiement ?',
       paymentAnswer:
-        "Le paiement se fait en ligne de manière sécurisée via Stripe. Vous n'êtes débité qu'après la confirmation de votre appel.",
+        "Le paiement se fait en ligne de maniÃ¨re sÃ©curisÃ©e via Stripe. Vous n'Ãªtes dÃ©bitÃ© qu'aprÃ¨s la confirmation de votre appel.",
       availabilityQuestion: "Que se passe-t-il si l'expert n'est pas disponible ?",
       availabilityAnswer:
-        "Si l'expert ne répond pas après 3 tentatives, vous êtes automatiquement remboursé et pouvez choisir un autre profil.",
+        "Si l'expert ne rÃ©pond pas aprÃ¨s 3 tentatives, vous Ãªtes automatiquement remboursÃ© et pouvez choisir un autre profil.",
       invoiceQuestion: 'Puis-je obtenir une facture ?',
       invoiceAnswer:
-        'Oui, vous recevez automatiquement une facture PDF après chaque appel, téléchargeable depuis votre tableau de bord.',
-      discount: 'de réduction',
-      applied: 'appliqué'
+        'Oui, vous recevez automatiquement une facture PDF aprÃ¨s chaque appel, tÃ©lÃ©chargeable depuis votre tableau de bord.',
+      discount: 'de rÃ©duction',
+      applied: 'appliquÃ©'
     },
     en: {
       title: 'Transparent pricing',
@@ -240,7 +240,7 @@ const Pricing: React.FC = () => {
   const getServiceFeatures = useCallback(
     (isLawyer: boolean): string[] => {
       const commonFeatures: string[] = [
-        language === 'fr' ? 'Appel téléphonique sécurisé' : 'Secure phone call',
+        language === 'fr' ? 'Appel tÃ©lÃ©phonique sÃ©curisÃ©' : 'Secure phone call',
         language === 'fr' ? 'Facture PDF automatique' : 'Automatic PDF invoice',
         language === 'fr' ? 'Support 24/7' : '24/7 support',
         language === 'fr' ? 'Garantie remboursement' : 'Money back guarantee'
@@ -249,25 +249,25 @@ const Pricing: React.FC = () => {
       if (isLawyer) {
         return [
           language === 'fr'
-            ? 'Consultation avec avocat certifié'
+            ? 'Consultation avec avocat certifiÃ©'
             : 'Consultation with certified lawyer',
           ...commonFeatures.slice(0, 1),
-          language === 'fr' ? 'Durée : 20 minutes' : 'Duration: 20 minutes',
+          language === 'fr' ? 'DurÃ©e : 20 minutes' : 'Duration: 20 minutes',
           ...commonFeatures.slice(1)
         ];
       }
 
       return [
-        language === 'fr' ? "Conseil d'expatrié expérimenté" : 'Advice from experienced expat',
+        language === 'fr' ? "Conseil d'expatriÃ© expÃ©rimentÃ©" : 'Advice from experienced expat',
         ...commonFeatures.slice(0, 1),
-        language === 'fr' ? 'Durée : 30 minutes' : 'Duration: 30 minutes',
+        language === 'fr' ? 'DurÃ©e : 30 minutes' : 'Duration: 30 minutes',
         ...commonFeatures.slice(1)
       ];
     },
     [language]
   );
 
-  // 🔥 SERVICES DYNAMIQUES depuis admin config
+  // ðŸ”¥ SERVICES DYNAMIQUES depuis admin config
   const dynamicServices = useMemo<DynamicService[]>(() => {
     if (!pricing) return [];
     return [
@@ -280,7 +280,7 @@ const Pricing: React.FC = () => {
         currency: selectedCurrency,
         description:
           language === 'fr'
-            ? "Obtenez des conseils pratiques d'un expatrié expérimenté dans votre pays de destination."
+            ? "Obtenez des conseils pratiques d'un expatriÃ© expÃ©rimentÃ© dans votre pays de destination."
             : 'Get practical advice from an experienced expat in your destination country.',
         isActive: true,
         connectionFee: pricing.expat[selectedCurrency].connectionFeeAmount,
@@ -295,7 +295,7 @@ const Pricing: React.FC = () => {
         currency: selectedCurrency,
         description:
           language === 'fr'
-            ? "Consultez un avocat qualifié pour toutes vos questions juridiques liées à l'expatriation."
+            ? "Consultez un avocat qualifiÃ© pour toutes vos questions juridiques liÃ©es Ã  l'expatriation."
             : 'Consult a qualified lawyer for all your legal questions related to expatriation.',
         isActive: true,
         connectionFee: pricing.lawyer[selectedCurrency].connectionFeeAmount,
@@ -332,7 +332,7 @@ const Pricing: React.FC = () => {
     }
   }, [promoCode, validatePromoCode, activePromo]);
 
-  const currencySymbol = selectedCurrency === 'eur' ? '€' : '$';
+  const currencySymbol = selectedCurrency === 'eur' ? 'â‚¬' : '$';
 
   return (
     <Layout>
@@ -345,10 +345,10 @@ const Pricing: React.FC = () => {
                 <AlertCircle className="w-5 h-5" />
                 {pricingLoading
                   ? (language === 'fr'
-                      ? 'Chargement des tarifs en cours…'
-                      : 'Loading pricing…')
+                      ? 'Chargement des tarifs en coursâ€¦'
+                      : 'Loading pricingâ€¦')
                   : (language === 'fr'
-                      ? 'Configuration des prix indisponible. Affichage limité.'
+                      ? 'Configuration des prix indisponible. Affichage limitÃ©.'
                       : 'Pricing configuration unavailable. Limited display.')}
               </p>
               {!pricingLoading && (
@@ -363,7 +363,7 @@ const Pricing: React.FC = () => {
           </div>
         )}
 
-        {/* Hero Section avec sélecteur de devise */}
+        {/* Hero Section avec sÃ©lecteur de devise */}
         <section className="relative pt-20 pb-32 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
           <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-blue-500/10" />
@@ -378,7 +378,7 @@ const Pricing: React.FC = () => {
               <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 mb-8">
                 <Sparkles className="w-5 h-5 text-yellow-400" />
                 <span className="text-white font-medium">
-                  Tarifs fixes • Sans surprise • Paiement sécurisé
+                  Tarifs fixes â€¢ Sans surprise â€¢ Paiement sÃ©curisÃ©
                 </span>
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               </div>
@@ -396,7 +396,7 @@ const Pricing: React.FC = () => {
                 {currentText.subtitle}
               </h2>
 
-              {/* Sélecteur de devise */}
+              {/* SÃ©lecteur de devise */}
               <div className="mb-8">
                 <div className="inline-flex bg-white/10 rounded-full p-1 backdrop-blur-sm border border-white/20">
                   <button
@@ -408,7 +408,7 @@ const Pricing: React.FC = () => {
                         : 'text-white hover:bg-white/10'
                     } ${pricingLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    🇪🇺 EUR
+                    ðŸ‡ªðŸ‡º EUR
                   </button>
                   <button
                     onClick={() => setSelectedCurrency('usd')}
@@ -419,7 +419,7 @@ const Pricing: React.FC = () => {
                         : 'text-white hover:bg-white/10'
                     } ${pricingLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    🇺🇸 USD
+                    ðŸ‡ºðŸ‡¸ USD
                   </button>
                 </div>
               </div>
@@ -491,7 +491,7 @@ const Pricing: React.FC = () => {
           </div>
         </section>
 
-        {/* 🔥 PRICING CARDS DYNAMIQUES */}
+        {/* ðŸ”¥ PRICING CARDS DYNAMIQUES */}
         <section className="py-28 bg-gradient-to-b from-white via-rose-50 to-white relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-red-400/10 to-orange-400/10 rounded-full blur-2xl" />
@@ -507,7 +507,7 @@ const Pricing: React.FC = () => {
                 </span>
               </h2>
               <p className="text-xl text-gray-700 max-w-3xl mx-auto">
-                Choisissez le service qui correspond à vos besoins
+                Choisissez le service qui correspond Ã  vos besoins
               </p>
             </div>
 
@@ -540,7 +540,7 @@ const Pricing: React.FC = () => {
                           <div className="flex items-center justify-between mb-8">
                             <div className="inline-flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-white/80 rounded-full px-4 py-2 text-gray-900 text-sm font-semibold">
                               {isLawyer ? <Briefcase className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                              {isLawyer ? 'Offre Avocat' : 'Offre Expatrié'}
+                              {isLawyer ? 'Offre Avocat' : 'Offre ExpatriÃ©'}
                             </div>
                             <div className="text-sm text-gray-600">Appel en ~5 min</div>
                           </div>
@@ -557,7 +557,7 @@ const Pricing: React.FC = () => {
                           {/* Description */}
                           <p className="text-gray-700 mb-8 leading-relaxed text-lg">{service.description}</p>
 
-                          {/* 🔥 PRIX DYNAMIQUE */}
+                          {/* ðŸ”¥ PRIX DYNAMIQUE */}
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-8">
                             <div className="flex items-end gap-3">
                               {hasDiscount ? (
@@ -585,7 +585,7 @@ const Pricing: React.FC = () => {
                           </div>
 
                           {/* Features */}
-                          <ul className="space-y-4 mb-10" role="list" aria-label="Bénéfices inclus">
+                          <ul className="space-y-4 mb-10" role="list" aria-label="BÃ©nÃ©fices inclus">
                             {getServiceFeatures(isLawyer).map((feature, index) => (
                               <li key={index} role="listitem" className="flex items-start gap-3">
                                 <span
@@ -608,7 +608,7 @@ const Pricing: React.FC = () => {
                                 ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
                                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
                             } hover:scale-105`}
-                            aria-label={`${currentText.chooseService} – ${service.title}`}
+                            aria-label={`${currentText.chooseService} â€“ ${service.title}`}
                           >
                             {currentText.chooseService}
                             <ArrowRight className="w-5 h-5" />
@@ -623,8 +623,8 @@ const Pricing: React.FC = () => {
                     <p className="text-gray-800 text-lg mb-4">
                       {pricingLoading
                         ? (language === 'fr'
-                            ? 'Chargement des offres…'
-                            : 'Loading plans…')
+                            ? 'Chargement des offresâ€¦'
+                            : 'Loading plansâ€¦')
                         : (language === 'fr'
                             ? 'Les tarifs sont temporairement indisponibles.'
                             : 'Pricing is temporarily unavailable.')}
@@ -645,7 +645,7 @@ const Pricing: React.FC = () => {
             {/* Indicateur source prix */}
             <div className="text-center mt-8">
               <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                💰 Tarifs synchronisés depuis la console admin
+                ðŸ’° Tarifs synchronisÃ©s depuis la console admin
               </span>
             </div>
           </div>
@@ -661,13 +661,13 @@ const Pricing: React.FC = () => {
           <div className="relative z-10 max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
               <h2 className="text-5xl font-black text-white mb-4">
-                Sécurité &{' '}
+                SÃ©curitÃ© &{' '}
                 <span className="bg-gradient-to-r from-green-500 to-blue-500 bg-clip-text text-transparent">
                   garanties
                 </span>
               </h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Votre tranquillité d'esprit est notre priorité
+                Votre tranquillitÃ© d'esprit est notre prioritÃ©
               </p>
             </div>
 
@@ -746,10 +746,10 @@ const Pricing: React.FC = () => {
         <section className="py-32 bg-gradient-to-r from-red-600 via-red-500 to-orange-500 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20" />
           <div className="relative z-10 max-w-4xl mx-auto text-center px-6">
-            <h2 className="text-5xl md:text-6xl font-black text-white mb-8">Prêt à commencer ?</h2>
+            <h2 className="text-5xl md:text-6xl font-black text-white mb-8">PrÃªt Ã  commencer ?</h2>
             <p className="text-2xl text-white/90 mb-12 leading-relaxed">
-              Rejoignez plus de <strong>15 000 expatriés</strong> qui font confiance à SOS Expats pour leurs
-              démarches à l'étranger.
+              Rejoignez plus de <strong>15 000 expatriÃ©s</strong> qui font confiance Ã  SOS Expats pour leurs
+              dÃ©marches Ã  l'Ã©tranger.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
@@ -767,7 +767,7 @@ const Pricing: React.FC = () => {
                 className="group bg-transparent border-2 border-white hover:bg-white hover:text-red-600 text-white px-12 py-6 rounded-3xl font-bold text-xl transition-all duration-300 hover:scale-105 flex items-center space-x-4 touch-manipulation"
               >
                 <User className="w-6 h-6" />
-                <span>Créer un compte</span>
+                <span>CrÃ©er un compte</span>
               </button>
             </div>
           </div>

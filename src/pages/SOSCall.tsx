@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Phone, Star, MapPin, Search, ChevronDown, Wifi, WifiOff, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { collection, query, limit, onSnapshot, where, DocumentData, doc, getDoc, getDocs } from 'firebase/firestore';
@@ -73,33 +73,33 @@ const normalize = (s: string) =>
   slugify(s).replace(/-/g, '');
 
 const LANGUAGE_LABELS_FR: Record<string, string> = {
-  // ISO → Français
-  af: 'Afrikaans', sq: 'Albanais', am: 'Amharique', ar: 'Arabe', hy: 'Arménien',
-  az: 'Azéri', eu: 'Basque', be: 'Biélorusse', bn: 'Bengali', bs: 'Bosniaque',
+  // ISO â†’ FranÃ§ais
+  af: 'Afrikaans', sq: 'Albanais', am: 'Amharique', ar: 'Arabe', hy: 'ArmÃ©nien',
+  az: 'AzÃ©ri', eu: 'Basque', be: 'BiÃ©lorusse', bn: 'Bengali', bs: 'Bosniaque',
   bg: 'Bulgare', my: 'Birman', ca: 'Catalan', zh: 'Chinois', 'zh-cn': 'Chinois', 'zh-tw': 'Chinois',
-  hr: 'Croate', cs: 'Tchèque', da: 'Danois', nl: 'Néerlandais', en: 'Anglais',
-  et: 'Estonien', fi: 'Finnois', fr: 'Français', ka: 'Géorgien', de: 'Allemand',
-  el: 'Grec', gu: 'Gujarati', he: 'Hébreu', hi: 'Hindi', hu: 'Hongrois',
-  is: 'Islandais', id: 'Indonésien', ga: 'Irlandais', it: 'Italien', ja: 'Japonais',
-  kn: 'Kannada', kk: 'Kazakh', km: 'Khmer', ko: 'Coréen', ky: 'Kirghize',
-  lo: 'Laotien', lv: 'Letton', lt: 'Lituanien', lb: 'Luxembourgeois', mk: 'Macédonien',
+  hr: 'Croate', cs: 'TchÃ¨que', da: 'Danois', nl: 'NÃ©erlandais', en: 'Anglais',
+  et: 'Estonien', fi: 'Finnois', fr: 'FranÃ§ais', ka: 'GÃ©orgien', de: 'Allemand',
+  el: 'Grec', gu: 'Gujarati', he: 'HÃ©breu', hi: 'Hindi', hu: 'Hongrois',
+  is: 'Islandais', id: 'IndonÃ©sien', ga: 'Irlandais', it: 'Italien', ja: 'Japonais',
+  kn: 'Kannada', kk: 'Kazakh', km: 'Khmer', ko: 'CorÃ©en', ky: 'Kirghize',
+  lo: 'Laotien', lv: 'Letton', lt: 'Lituanien', lb: 'Luxembourgeois', mk: 'MacÃ©donien',
   ms: 'Malais', ml: 'Malayalam', mt: 'Maltais', mr: 'Marathi', mn: 'Mongol',
-  ne: 'Népalais', no: 'Norvégien', nb: 'Norvégien', nn: 'Norvégien',
+  ne: 'NÃ©palais', no: 'NorvÃ©gien', nb: 'NorvÃ©gien', nn: 'NorvÃ©gien',
   fa: 'Persan', ps: 'Pachto', pl: 'Polonais', pt: 'Portugais', 'pt-br': 'Portugais',
   pa: 'Punjabi', ro: 'Roumain', ru: 'Russe', sr: 'Serbe', si: 'Singhalais',
-  sk: 'Slovaque', sl: 'Slovène', es: 'Espagnol', sw: 'Swahili', sv: 'Suédois',
-  ta: 'Tamoul', te: 'Telugu', th: 'Thaï', tr: 'Turc', tk: 'Turkmène',
+  sk: 'Slovaque', sl: 'SlovÃ¨ne', es: 'Espagnol', sw: 'Swahili', sv: 'SuÃ©dois',
+  ta: 'Tamoul', te: 'Telugu', th: 'ThaÃ¯', tr: 'Turc', tk: 'TurkmÃ¨ne',
   uk: 'Ukrainien', ur: 'Ourdou', vi: 'Vietnamien', cy: 'Gallois'
 };
 
 const LANGUAGE_ALIASES: Record<string, string> = {
-  // Anglais/variantes → Français
-  english: 'Anglais', french: 'Français', spanish: 'Espagnol', espanol: 'Espagnol',
+  // Anglais/variantes â†’ FranÃ§ais
+  english: 'Anglais', french: 'FranÃ§ais', spanish: 'Espagnol', espanol: 'Espagnol',
   german: 'Allemand', deutsch: 'Allemand', italian: 'Italien', italiano: 'Italien',
-  portuguese: 'Portugais', portugues: 'Portugais', russian: 'Russe', русский: 'Russe',
-  chinese: 'Chinois', 中文: 'Chinois', japanese: 'Japonais', 日本語: 'Japonais',
-  korean: 'Coréen', 한국어: 'Coréen', arabic: 'Arabe', العربية: 'Arabe',
-  hindi: 'Hindi', thai: 'Thaï', thaii: 'Thaï'
+  portuguese: 'Portugais', portugues: 'Portugais', russian: 'Russe', Ñ€ÑƒÑÑÐºÐ¸Ð¹: 'Russe',
+  chinese: 'Chinois', ä¸­æ–‡: 'Chinois', japanese: 'Japonais', æ—¥æœ¬èªž: 'Japonais',
+  korean: 'CorÃ©en', í•œêµ­ì–´: 'CorÃ©en', arabic: 'Arabe', Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©: 'Arabe',
+  hindi: 'Hindi', thai: 'ThaÃ¯', thaii: 'ThaÃ¯'
 };
 
 const getLanguageLabel = (language: string): string => {
@@ -113,12 +113,12 @@ const getLanguageLabel = (language: string): string => {
   if (LANGUAGE_LABELS_FR[k2]) return LANGUAGE_LABELS_FR[k2];
   // alias anglais/var
   if (LANGUAGE_ALIASES[key]) return LANGUAGE_ALIASES[key];
-  // déjà en français ? (capitalisation)
+  // dÃ©jÃ  en franÃ§ais ? (capitalisation)
   const frenchGuess: Record<string, string> = {
-    'francais': 'Français', 'anglais': 'Anglais', 'espagnol': 'Espagnol', 'allemand': 'Allemand',
+    'francais': 'FranÃ§ais', 'anglais': 'Anglais', 'espagnol': 'Espagnol', 'allemand': 'Allemand',
     'italien': 'Italien', 'portugais': 'Portugais', 'russe': 'Russe', 'chinois': 'Chinois',
-    'japonais': 'Japonais', 'coréen': 'Coréen', 'arabe': 'Arabe', 'hindi': 'Hindi', 'thaï': 'Thaï',
-    'neerlandais': 'Néerlandais', 'néerlandais': 'Néerlandais', 'polonais': 'Polonais'
+    'japonais': 'Japonais', 'corÃ©en': 'CorÃ©en', 'arabe': 'Arabe', 'hindi': 'Hindi', 'thaÃ¯': 'ThaÃ¯',
+    'neerlandais': 'NÃ©erlandais', 'nÃ©erlandais': 'NÃ©erlandais', 'polonais': 'Polonais'
   };
   const norm = normalize(raw);
   for (const [k, v] of Object.entries(frenchGuess)) {
@@ -132,45 +132,45 @@ const getLanguageLabel = (language: string): string => {
    Filtres (options)
 -----------------------------*/
 const countryOptions = [
-  'Afghanistan','Afrique du Sud','Albanie','Algérie','Allemagne','Andorre','Angola',
-  'Arabie Saoudite','Argentine','Arménie','Australie','Autriche','Azerbaïdjan',
-  'Bahamas','Bahreïn','Bangladesh','Barbade','Belgique','Belize','Bénin',
-  'Bhoutan','Biélorussie','Birmanie','Bolivie','Bosnie-Herzégovine','Botswana',
-  'Brésil','Brunei','Bulgarie','Burkina Faso','Burundi','Cambodge','Cameroun',
+  'Afghanistan','Afrique du Sud','Albanie','AlgÃ©rie','Allemagne','Andorre','Angola',
+  'Arabie Saoudite','Argentine','ArmÃ©nie','Australie','Autriche','AzerbaÃ¯djan',
+  'Bahamas','BahreÃ¯n','Bangladesh','Barbade','Belgique','Belize','BÃ©nin',
+  'Bhoutan','BiÃ©lorussie','Birmanie','Bolivie','Bosnie-HerzÃ©govine','Botswana',
+  'BrÃ©sil','Brunei','Bulgarie','Burkina Faso','Burundi','Cambodge','Cameroun',
   'Canada','Cap-Vert','Chili','Chine','Chypre','Colombie','Comores',
-  'Congo','Corée du Nord','Corée du Sud','Costa Rica','Côte d\'Ivoire','Croatie','Cuba',
-  'Danemark','Djibouti','Dominique','Égypte','Émirats arabes unis','Équateur','Érythrée',
-  'Espagne','Estonie','États-Unis','Éthiopie','Fidji','Finlande','France',
-  'Gabon','Gambie','Géorgie','Ghana','Grèce','Grenade','Guatemala','Guinée',
-  'Guinée-Bissau','Guinée équatoriale','Guyana','Haïti','Honduras','Hongrie',
-  'Îles Cook','Îles Marshall','Îles Salomon','Inde','Indonésie','Irak','Iran',
-  'Irlande','Islande','Israël','Italie','Jamaïque','Japon','Jordanie',
-  'Kazakhstan','Kenya','Kirghizistan','Kiribati','Koweït','Laos','Lesotho',
+  'Congo','CorÃ©e du Nord','CorÃ©e du Sud','Costa Rica','CÃ´te d\'Ivoire','Croatie','Cuba',
+  'Danemark','Djibouti','Dominique','Ã‰gypte','Ã‰mirats arabes unis','Ã‰quateur','Ã‰rythrÃ©e',
+  'Espagne','Estonie','Ã‰tats-Unis','Ã‰thiopie','Fidji','Finlande','France',
+  'Gabon','Gambie','GÃ©orgie','Ghana','GrÃ¨ce','Grenade','Guatemala','GuinÃ©e',
+  'GuinÃ©e-Bissau','GuinÃ©e Ã©quatoriale','Guyana','HaÃ¯ti','Honduras','Hongrie',
+  'ÃŽles Cook','ÃŽles Marshall','ÃŽles Salomon','Inde','IndonÃ©sie','Irak','Iran',
+  'Irlande','Islande','IsraÃ«l','Italie','JamaÃ¯que','Japon','Jordanie',
+  'Kazakhstan','Kenya','Kirghizistan','Kiribati','KoweÃ¯t','Laos','Lesotho',
   'Lettonie','Liban','Liberia','Libye','Liechtenstein','Lituanie','Luxembourg',
-  'Macédoine du Nord','Madagascar','Malaisie','Malawi','Maldives','Mali','Malte',
-  'Maroc','Maurice','Mauritanie','Mexique','Micronésie','Moldavie','Monaco',
-  'Mongolie','Monténégro','Mozambique','Namibie','Nauru','Népal','Nicaragua',
-  'Niger','Nigeria','Niue','Norvège','Nouvelle-Zélande','Oman','Ouganda',
-  'Ouzbékistan','Pakistan','Palaos','Palestine','Panama','Papouasie-Nouvelle-Guinée',
-  'Paraguay','Pays-Bas','Pérou','Philippines','Pologne','Portugal','Qatar',
-  'République centrafricaine','République démocratique du Congo','République dominicaine',
-  'République tchèque','Roumanie','Royaume-Uni','Russie','Rwanda','Saint-Kitts-et-Nevis',
+  'MacÃ©doine du Nord','Madagascar','Malaisie','Malawi','Maldives','Mali','Malte',
+  'Maroc','Maurice','Mauritanie','Mexique','MicronÃ©sie','Moldavie','Monaco',
+  'Mongolie','MontÃ©nÃ©gro','Mozambique','Namibie','Nauru','NÃ©pal','Nicaragua',
+  'Niger','Nigeria','Niue','NorvÃ¨ge','Nouvelle-ZÃ©lande','Oman','Ouganda',
+  'OuzbÃ©kistan','Pakistan','Palaos','Palestine','Panama','Papouasie-Nouvelle-GuinÃ©e',
+  'Paraguay','Pays-Bas','PÃ©rou','Philippines','Pologne','Portugal','Qatar',
+  'RÃ©publique centrafricaine','RÃ©publique dÃ©mocratique du Congo','RÃ©publique dominicaine',
+  'RÃ©publique tchÃ¨que','Roumanie','Royaume-Uni','Russie','Rwanda','Saint-Kitts-et-Nevis',
   'Saint-Marin','Saint-Vincent-et-les-Grenadines','Sainte-Lucie','Salvador','Samoa',
-  'São Tomé-et-Principe','Sénégal','Serbie','Seychelles','Sierra Leone','Singapour',
-  'Slovaquie','Slovénie','Somalie','Soudan','Soudan du Sud','Sri Lanka','Suède',
-  'Suisse','Suriname','Syrie','Tadjikistan','Tanzanie','Tchad','Thaïlande',
-  'Timor oriental','Togo','Tonga','Trinité-et-Tobago','Tunisie','Turkménistan',
+  'SÃ£o TomÃ©-et-Principe','SÃ©nÃ©gal','Serbie','Seychelles','Sierra Leone','Singapour',
+  'Slovaquie','SlovÃ©nie','Somalie','Soudan','Soudan du Sud','Sri Lanka','SuÃ¨de',
+  'Suisse','Suriname','Syrie','Tadjikistan','Tanzanie','Tchad','ThaÃ¯lande',
+  'Timor oriental','Togo','Tonga','TrinitÃ©-et-Tobago','Tunisie','TurkmÃ©nistan',
   'Turquie','Tuvalu','Ukraine','Uruguay','Vanuatu','Vatican','Venezuela',
-  'Vietnam','Yémen','Zambie','Zimbabwe'
+  'Vietnam','YÃ©men','Zambie','Zimbabwe'
 ];
 
 const languageOptions = [
-  'Français','Anglais','Espagnol','Allemand','Italien','Portugais','Russe','Chinois','Japonais','Coréen',
-  'Arabe','Hindi','Thaï','Néerlandais','Polonais','Roumain','Turc','Vietnamien','Suédois','Norvégien',
-  'Danois','Finnois','Tchèque','Slovaque','Ukrainien','Grec','Hébreu','Indonésien','Malais','Persan',
+  'FranÃ§ais','Anglais','Espagnol','Allemand','Italien','Portugais','Russe','Chinois','Japonais','CorÃ©en',
+  'Arabe','Hindi','ThaÃ¯','NÃ©erlandais','Polonais','Roumain','Turc','Vietnamien','SuÃ©dois','NorvÃ©gien',
+  'Danois','Finnois','TchÃ¨que','Slovaque','Ukrainien','Grec','HÃ©breu','IndonÃ©sien','Malais','Persan',
   'Ourdou','Tamoul','Telugu','Gujarati','Bengali','Punjabi','Serbe','Croate','Bulgarie','Hongrois',
-  'Letton','Lituanien','Estonien','Slovène','Albanais','Islandais','Irlandais','Maltais','Macédonien',
-  'Swahili','Afrikaans','Azéri','Arménien','Géorgien','Khmer','Laotien','Mongol','Népalais','Singhalais',
+  'Letton','Lituanien','Estonien','SlovÃ¨ne','Albanais','Islandais','Irlandais','Maltais','MacÃ©donien',
+  'Swahili','Afrikaans','AzÃ©ri','ArmÃ©nien','GÃ©orgien','Khmer','Laotien','Mongol','NÃ©palais','Singhalais',
 ];
 
 /* ----------------------------
@@ -182,7 +182,7 @@ const SOSCall: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // États filtres
+  // Ã‰tats filtres
   const [selectedType, setSelectedType] = useState<'all' | 'lawyer' | 'expat'>(
     searchParams.get('type') === 'lawyer' ? 'lawyer' :
     searchParams.get('type') === 'expat' ? 'expat' : 'all'
@@ -198,7 +198,7 @@ const SOSCall: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [onlineOnly, setOnlineOnly] = useState<boolean>(false);
 
-  // Données
+  // DonnÃ©es
   const [isLoadingProviders, setIsLoadingProviders] = useState<boolean>(true);
   const [realProviders, setRealProviders] = useState<Provider[]>([]);
   const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
@@ -225,16 +225,16 @@ const SOSCall: React.FC = () => {
       setSearchParams({ type: typeParam });
     }
 
-    // 🔧 DÉBUT DEBUG SOSCall
-    console.log('\n🔍 DEBUG SOSCALL - DÉBUT');
+    // ðŸ”§ DÃ‰BUT DEBUG SOSCall
+    console.log('\nðŸ” DEBUG SOSCALL - DÃ‰BUT');
     
-    // Test requête simple AVANT la requête principale
+    // Test requÃªte simple AVANT la requÃªte principale
     const debugQueries = async () => {
       try {
-        console.log('📡 SOSCall - Test requête basique...');
+        console.log('ðŸ“¡ SOSCall - Test requÃªte basique...');
         const simpleQuery = query(collection(db, 'sos_profiles'));
         const simpleSnap = await getDocs(simpleQuery);
-        console.log(`📊 SOSCall - Tous les documents: ${simpleSnap.size}`);
+        console.log(`ðŸ“Š SOSCall - Tous les documents: ${simpleSnap.size}`);
         
         simpleSnap.docs.forEach((doc, i) => {
           const data = doc.data();
@@ -247,7 +247,7 @@ const SOSCall: React.FC = () => {
           });
         });
 
-        console.log('📡 SOSCall - Test avec filtres...');
+        console.log('ðŸ“¡ SOSCall - Test avec filtres...');
         const filteredQuery = query(
           collection(db, 'sos_profiles'),
           where('type', 'in', ['lawyer', 'expat']),
@@ -255,7 +255,7 @@ const SOSCall: React.FC = () => {
           limit(100)
         );
         const filteredSnap = await getDocs(filteredQuery);
-        console.log(`📊 SOSCall - Avec filtres: ${filteredSnap.size}`);
+        console.log(`ðŸ“Š SOSCall - Avec filtres: ${filteredSnap.size}`);
         
         filteredSnap.docs.forEach((doc, i) => {
           const data = doc.data();
@@ -266,8 +266,8 @@ const SOSCall: React.FC = () => {
           });
         });
 
-        // 🔍 VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS dans SOSCall
-        console.log('\n🔍 SOSCall - VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS');
+        // ðŸ” VÃ‰RIFICATION SPÃ‰CIFIQUE DE VOS PROFILS dans SOSCall
+        console.log('\nðŸ” SOSCall - VÃ‰RIFICATION SPÃ‰CIFIQUE DE VOS PROFILS');
         const targetProfiles = ['expat2', 'expat3', 'avocat1']; // Adaptez les IDs
         
         for (const profileId of targetProfiles) {
@@ -277,7 +277,7 @@ const SOSCall: React.FC = () => {
             
             if (docSnap.exists()) {
               const data = docSnap.data();
-              console.log(`✅ SOSCall - ${profileId} existe:`, {
+              console.log(`âœ… SOSCall - ${profileId} existe:`, {
                 type: data.type,
                 isVisible: data.isVisible,
                 isActive: data.isActive,
@@ -287,20 +287,20 @@ const SOSCall: React.FC = () => {
                 passesFilters: data.isVisible === true && ['lawyer', 'expat'].includes(data.type)
               });
             } else {
-              console.log(`❌ SOSCall - ${profileId} N'EXISTE PAS`);
+              console.log(`âŒ SOSCall - ${profileId} N'EXISTE PAS`);
             }
           } catch (err) {
-            console.error(`💥 SOSCall - Erreur ${profileId}:`, err);
+            console.error(`ðŸ’¥ SOSCall - Erreur ${profileId}:`, err);
           }
         }
         
       } catch (error) {
-        console.error('🔍 Erreur debug SOSCall:', error);
+        console.error('ðŸ” Erreur debug SOSCall:', error);
       }
     };
     
     debugQueries();
-    // 🔧 FIN DEBUG SOSCall
+    // ðŸ”§ FIN DEBUG SOSCall
 
     const sosProfilesQuery = query(
       collection(db, 'sos_profiles'),
@@ -312,10 +312,10 @@ const SOSCall: React.FC = () => {
     const unsubscribe = onSnapshot(
       sosProfilesQuery,
       (snapshot) => {
-        console.log(`🔍 SOSCall onSnapshot reçu: ${snapshot.size} documents`);
+        console.log(`ðŸ” SOSCall onSnapshot reÃ§u: ${snapshot.size} documents`);
         
         if (snapshot.empty) {
-          console.log('⚠️ SOSCall: Snapshot vide - Aucun document trouvé');
+          console.log('âš ï¸ SOSCall: Snapshot vide - Aucun document trouvÃ©');
           setRealProviders([]);
           setFilteredProviders([]);
           setIsLoadingProviders(false);
@@ -328,12 +328,12 @@ const SOSCall: React.FC = () => {
           const data = doc.data() as RawProfile;
           const docId = doc.id;
 
-          console.log(`\n🔄 SOSCall TRAITEMENT ${docId} (${index + 1}/${snapshot.size}):`);
+          console.log(`\nðŸ”„ SOSCall TRAITEMENT ${docId} (${index + 1}/${snapshot.size}):`);
 
           const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Expert';
           const type: 'lawyer' | 'expat' = data.type === 'lawyer' ? 'lawyer' : 'expat';
 
-          console.log(`1️⃣ SOSCall - Nom: "${fullName}", Type: "${type}"`);
+          console.log(`1ï¸âƒ£ SOSCall - Nom: "${fullName}", Type: "${type}"`);
 
           const isApproved = data.isApproved !== false;
           const isActive = data.isActive !== false;
@@ -343,10 +343,10 @@ const SOSCall: React.FC = () => {
           const presenceCountry = data.currentPresenceCountry || data.country || '';
           const hasValidCountry = !!presenceCountry && getCountryCoordinates(presenceCountry) !== null;
 
-          console.log(`2️⃣ SOSCall - Validations:`, {
-            isApproved: `${data.isApproved} → ${isApproved}`,
-            isActive: `${data.isActive} → ${isActive}`,
-            isVisible: `${data.isVisible} → ${isVisible}`,
+          console.log(`2ï¸âƒ£ SOSCall - Validations:`, {
+            isApproved: `${data.isApproved} â†’ ${isApproved}`,
+            isActive: `${data.isActive} â†’ ${isActive}`,
+            isVisible: `${data.isVisible} â†’ ${isVisible}`,
             hasValidCountry,
             presenceCountry
           });
@@ -380,7 +380,7 @@ const SOSCall: React.FC = () => {
                 : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&dpr=2',
           };
 
-          // 🔧 VALIDATION SOSCall avec logs détaillés
+          // ðŸ”§ VALIDATION SOSCall avec logs dÃ©taillÃ©s
           const validations = {
             typeValid: provider.type === 'lawyer' || provider.type === 'expat',
             notBanned: provider.isBanned !== true,
@@ -392,20 +392,20 @@ const SOSCall: React.FC = () => {
 
           const shouldInclude = Object.values(validations).every(Boolean);
 
-          console.log(`3️⃣ SOSCall - Décision finale ${provider.name}:`, {
+          console.log(`3ï¸âƒ£ SOSCall - DÃ©cision finale ${provider.name}:`, {
             ...validations,
             shouldInclude
           });
 
           if (shouldInclude) {
             allProfiles.push(provider);
-            console.log(`✅ SOSCall - ${provider.name} (${provider.type}) AJOUTÉ - Total: ${allProfiles.length}`);
+            console.log(`âœ… SOSCall - ${provider.name} (${provider.type}) AJOUTÃ‰ - Total: ${allProfiles.length}`);
           } else {
-            console.log(`❌ SOSCall - ${provider.name} (${provider.type}) REJETÉ`);
+            console.log(`âŒ SOSCall - ${provider.name} (${provider.type}) REJETÃ‰`);
           }
         });
 
-        console.log(`\n🏁 SOSCall RÉSULTAT FINAL: ${allProfiles.length} profils ajoutés`);
+        console.log(`\nðŸ SOSCall RÃ‰SULTAT FINAL: ${allProfiles.length} profils ajoutÃ©s`);
         console.log('SOSCall Profils finaux:', allProfiles.map(p => ({ id: p.id, name: p.name, type: p.type })));
 
         const onlyProviders = allProfiles.filter(
@@ -463,7 +463,7 @@ const SOSCall: React.FC = () => {
     return normalizedProv.some((v) => v === target);
   };
 
-  // Filtrage + tri (conserve la logique d'origine, ajoute statut étendu)
+  // Filtrage + tri (conserve la logique d'origine, ajoute statut Ã©tendu)
   useEffect(() => {
     if (realProviders.length === 0) {
       setFilteredProviders([]);
@@ -496,7 +496,7 @@ const SOSCall: React.FC = () => {
     });
 
     setFilteredProviders(next);
-    setPage(1); // UX: reset à la première page si filtres changent
+    setPage(1); // UX: reset Ã  la premiÃ¨re page si filtres changent
     setOnlineOnly(statusFilter === 'online'); // compat
   }, [
     realProviders,
@@ -577,12 +577,12 @@ const SOSCall: React.FC = () => {
           selectedType === 'lawyer'
             ? 'Avocats'
             : selectedType === 'expat'
-            ? 'Expatriés'
+            ? 'ExpatriÃ©s'
             : 'Experts'
         } disponibles | SOS Expat & Travelers`}
         description={`Trouvez un ${
-          selectedType === 'lawyer' ? 'avocat' : selectedType === 'expat' ? 'expatrié' : 'expert'
-        } vérifié disponible immédiatement. Consultation en ligne 24h/24, 7j/7 dans plus de 150 pays.`}
+          selectedType === 'lawyer' ? 'avocat' : selectedType === 'expat' ? 'expatriÃ©' : 'expert'
+        } vÃ©rifiÃ© disponible immÃ©diatement. Consultation en ligne 24h/24, 7j/7 dans plus de 150 pays.`}
         canonicalUrl="/sos-appel"
         structuredData={{
           '@context': 'https://schema.org',
@@ -623,7 +623,7 @@ const SOSCall: React.FC = () => {
           <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
             <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full pl-6 pr-3 py-2.5 border border-white/20 mb-7">
               <Phone className="w-5 h-5 text-red-300" />
-              <span className="text-white font-semibold">SOS — appel d'urgence en &lt; 5 minutes</span>
+              <span className="text-white font-semibold">SOS â€” appel d'urgence en &lt; 5 minutes</span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             </div>
 
@@ -631,7 +631,7 @@ const SOSCall: React.FC = () => {
               Trouvez un <span className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 bg-clip-text text-transparent">expert</span> maintenant
             </h1>
             <p className="text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto">
-              Avocats & Expatriés vérifiés • Disponibles 24/7 • <strong>150+ pays</strong>
+              Avocats & ExpatriÃ©s vÃ©rifiÃ©s â€¢ Disponibles 24/7 â€¢ <strong>150+ pays</strong>
             </p>
           </div>
         </section>
@@ -642,7 +642,7 @@ const SOSCall: React.FC = () => {
             {/* Titre + Filtres */}
             <div className="text-center mb-8 sm:mb-6">
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-4">
-                {selectedType === 'lawyer' ? 'Avocats disponibles' : selectedType === 'expat' ? 'Expatriés disponibles' : 'Experts disponibles'}
+                {selectedType === 'lawyer' ? 'Avocats disponibles' : selectedType === 'expat' ? 'ExpatriÃ©s disponibles' : 'Experts disponibles'}
               </h2>
 
               {/* FILTRES */}
@@ -669,7 +669,7 @@ const SOSCall: React.FC = () => {
                       >
                         <option value="all">Tous</option>
                         <option value="lawyer">Avocats</option>
-                        <option value="expat">Expatriés</option>
+                        <option value="expat">ExpatriÃ©s</option>
                       </select>
                       <ChevronDown
                         className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-300 pointer-events-none"
@@ -829,7 +829,7 @@ const SOSCall: React.FC = () => {
                       }}
                       className="w-full px-3 py-2 border border-white/15 rounded-xl text-gray-100 hover:bg-white/10 active:bg-white/15 transition-colors text-sm font-semibold h-10"
                     >
-                      Réinitialiser
+                      RÃ©initialiser
                     </button>
                   </div>
                 </div>
@@ -839,7 +839,7 @@ const SOSCall: React.FC = () => {
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                     {filteredProviders.filter((p) => p.isOnline).length} en ligne
                   </span>
-                  <span className="mx-2 text-white/30">•</span>
+                  <span className="mx-2 text-white/30">â€¢</span>
                   {filteredProviders.length} au total
                 </div>
               </div>
@@ -891,7 +891,7 @@ const SOSCall: React.FC = () => {
                         <div className="relative aspect-[3/4] overflow-hidden">
                           <img
                             src={provider.avatar}
-                            alt={`${provider.name} - ${provider.type === 'lawyer' ? 'Avocat' : 'Expatrié'}`}
+                            alt={`${provider.name} - ${provider.type === 'lawyer' ? 'Avocat' : 'ExpatriÃ©'}`}
                             className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
                             itemProp="image"
                             loading="lazy"
@@ -908,7 +908,7 @@ const SOSCall: React.FC = () => {
                           {/* type badge */}
                           <div className="absolute top-4 left-4">
                             <div className="px-4 py-2 rounded-2xl text-sm font-bold backdrop-blur-xl border bg-white/10 text-white border-white/20">
-                              {provider.type === 'lawyer' ? '⚖️ Avocat' : '🌍 Expatrié'}
+                              {provider.type === 'lawyer' ? 'âš–ï¸ Avocat' : 'ðŸŒ ExpatriÃ©'}
                             </div>
                           </div>
 
@@ -951,7 +951,7 @@ const SOSCall: React.FC = () => {
                               {provider.name}
                             </h3>
                             <div className="flex items-center justify-between text-sm text-gray-300">
-                              <span>{provider.yearsOfExperience} ans d'expérience</span>
+                              <span>{provider.yearsOfExperience} ans d'expÃ©rience</span>
                               <div className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4 text-green-400" />
                                 <span className="font-medium">{provider.country}</span>
@@ -964,9 +964,9 @@ const SOSCall: React.FC = () => {
                             <div>
                               <div className="flex items-center gap-2 mb-2">
                                 <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">
-                                  <span className="text-sm">🗣️</span>
+                                  <span className="text-sm">ðŸ—£ï¸</span>
                                 </div>
-                                <span className="text-sm font-semibold text-gray-200">Langues parlées</span>
+                                <span className="text-sm font-semibold text-gray-200">Langues parlÃ©es</span>
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {langs.map((lang, idx) => (
@@ -990,9 +990,9 @@ const SOSCall: React.FC = () => {
                               <div>
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">
-                                    <span className="text-sm">📋</span>
+                                    <span className="text-sm">ðŸ“‹</span>
                                   </div>
-                                  <span className="text-sm font-semibold text-gray-200">Présentation</span>
+                                  <span className="text-sm font-semibold text-gray-200">PrÃ©sentation</span>
                                 </div>
                                 <p className="text-sm text-gray-200/90 leading-relaxed" itemProp="description">
                                   {truncatedDescription}
@@ -1006,7 +1006,7 @@ const SOSCall: React.FC = () => {
                                     className="text-sm text-red-300 hover:text-red-200 font-semibold mt-1 hover:underline transition-colors inline-flex items-center gap-1"
                                   >
                                     Lire la suite
-                                    <span className="text-xs">→</span>
+                                    <span className="text-xs">â†’</span>
                                   </button>
                                 )}
                               </div>
@@ -1025,7 +1025,7 @@ const SOSCall: React.FC = () => {
                                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
                               }`}
                             >
-                              <span className="text-xl">👤</span>
+                              <span className="text-xl">ðŸ‘¤</span>
                               <span>Voir le profil</span>
                             </button>
                           </div>
@@ -1044,7 +1044,7 @@ const SOSCall: React.FC = () => {
                 {/* Pagination (bas) */}
                 <div className="flex items-center justify-between mt-6">
                   <div className="text-sm text-gray-300">
-                    Page <strong>{page}</strong> / {totalPages} — {filteredProviders.length} résultats
+                    Page <strong>{page}</strong> / {totalPages} â€” {filteredProviders.length} rÃ©sultats
                   </div>
                   <Pagination page={page} totalPages={totalPages} onChange={setPage} />
                 </div>
@@ -1056,10 +1056,10 @@ const SOSCall: React.FC = () => {
                     <Search className="w-8 h-8 text-gray-200" />
                   </div>
                   <h3 className="text-xl font-semibold text-white mb-2">
-                    Aucun expert trouvé
+                    Aucun expert trouvÃ©
                   </h3>
                   <p className="text-gray-300 mb-6">
-                    Aucun expert ne correspond à vos critères de recherche actuels.
+                    Aucun expert ne correspond Ã  vos critÃ¨res de recherche actuels.
                   </p>
                   <button
                     onClick={() => {
@@ -1075,20 +1075,20 @@ const SOSCall: React.FC = () => {
                     }}
                     className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold rounded-xl transition-colors"
                   >
-                    Réinitialiser les filtres
+                    RÃ©initialiser les filtres
                   </button>
                 </div>
               </div>
             )}
 
-            {/* CTA alignée Home, 150+ pays */}
+            {/* CTA alignÃ©e Home, 150+ pays */}
             <section className="text-center mt-12 sm:mt-16">
               <div className="rounded-[28px] border border-white/10 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md p-8 sm:p-12">
                 <h3 className="text-2xl sm:text-3xl font-black text-white mb-3">
-                  Besoin d'aide immédiate ?
+                  Besoin d'aide immÃ©diate ?
                 </h3>
                 <p className="text-lg text-gray-300 mb-8 max-w-2xl mx-auto">
-                  Plus de 200 experts vérifiés disponibles dans <strong>150+ pays</strong> pour vous accompagner.
+                  Plus de 200 experts vÃ©rifiÃ©s disponibles dans <strong>150+ pays</strong> pour vous accompagner.
                 </p>
                 <button
                   onClick={() => navigate('/sos-appel')}
@@ -1135,12 +1135,12 @@ const Pagination: React.FC<{
     }
     if (totalPages > 1) add(totalPages);
 
-    // dédoublonne et ordonne
+    // dÃ©doublonne et ordonne
     const sorted = Array.from(new Set(pages)).sort((a, b) =>
       typeof a === 'number' && typeof b === 'number' ? a - b : 0
     );
 
-    // insère ellipses
+    // insÃ¨re ellipses
     const withEllipses: Array<number | 'ellipsis'> = [];
     for (let i = 0; i < sorted.length; i++) {
       const cur = sorted[i] as number;
@@ -1162,15 +1162,15 @@ const Pagination: React.FC<{
         onClick={() => go(page - 1)}
         className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/15 bg-white/10 text-white hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={page <= 1}
-        aria-label="Page précédente"
+        aria-label="Page prÃ©cÃ©dente"
       >
         <ChevronLeft className="w-4 h-4" />
-        <span className="hidden sm:inline">Précédent</span>
+        <span className="hidden sm:inline">PrÃ©cÃ©dent</span>
       </button>
 
       {items.map((it, idx) =>
         it === 'ellipsis' ? (
-          <span key={`el-${idx}`} className="px-2 text-gray-300">…</span>
+          <span key={`el-${idx}`} className="px-2 text-gray-300">â€¦</span>
         ) : (
           <button
             key={`p-${it}`}
@@ -1181,7 +1181,7 @@ const Pagination: React.FC<{
                 ? 'bg-white/20 text-white border-white/30'
                 : 'bg-white/10 text-gray-200 border-white/20 hover:bg-white/15'
             }`}
-            title={`Aller à la page ${it}`}
+            title={`Aller Ã  la page ${it}`}
           >
             {it}
           </button>

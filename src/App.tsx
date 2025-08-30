@@ -1,4 +1,4 @@
-// App.tsx
+﻿// App.tsx
 import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
@@ -8,6 +8,7 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoutesV2 from '@/components/admin/AdminRoutesV2';
 import './App.css';
+import AdminLayout from "./components/admin/AdminLayout";
 
 // --------------------------------------------
 // Types
@@ -69,6 +70,12 @@ const HelpCenter = lazy(() => import('./pages/HelpCenter'));
 const FAQ = lazy(() => import('./pages/FAQ'));
 const Contact = lazy(() => import('./pages/Contact'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
+
+// --- Admin Comms (lazy imports) ---
+const AdminCommsTemplates = lazy(() => import('@/pages/admin/comms/AdminCommsTemplates'));
+const AdminNotifications = lazy(() => import('@/pages/admin/comms/AdminNotifications'));
+const AdminClientMessages = lazy(() => import('@/pages/admin/comms/AdminClientMessages'));
+const AdminCommsDeliverability = lazy(() => import('@/pages/admin/comms/AdminCommsDeliverability'));
 
 // --------------------------------------------
 // Routes config
@@ -257,6 +264,20 @@ const App: React.FC = () => {
             {/* Admin routes - Fix: Redirect /admin to /admin/dashboard */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/*" element={<AdminRoutesV2 />} />
+
+            {/* === COMMS (console admin Marketing & Comms) === */}
+            <Route path="/admin/comms/templates" element={
+              <ProtectedRoute><AdminLayout><AdminCommsTemplates/></AdminLayout></ProtectedRoute>
+            }/>
+            <Route path="/admin/comms/notifications" element={
+              <ProtectedRoute><AdminLayout><AdminNotifications/></AdminLayout></ProtectedRoute>
+            }/>
+            <Route path="/admin/comms/deliverability" element={
+              <ProtectedRoute><AdminLayout><AdminCommsDeliverability/></AdminLayout></ProtectedRoute>
+            }/>
+            <Route path="/admin/comms/messages" element={
+              <ProtectedRoute><AdminLayout><AdminClientMessages/></AdminLayout></ProtectedRoute>
+            }/>
           </Routes>
 
           {/* Routes admin gérées par AdminRoutesV2 */}

@@ -1,4 +1,4 @@
-// src/pages/admin/AdminReviews.tsx
+﻿// src/pages/admin/AdminReviews.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -69,7 +69,7 @@ type ChartType = 'line' | 'bar';
 type Lang = 'fr' | 'en';
 type CardKey = 'chart' | 'histogram' | 'stacked' | 'kpi' | 'topCountries' | 'topProviders';
 
-/** Palette sûre (lisible / ok daltonisme) */
+/** Palette sÃ»re (lisible / ok daltonisme) */
 const PALETTE = [
   '#4C78A8', // blue
   '#F58518', // orange
@@ -83,7 +83,7 @@ const PALETTE = [
   '#BAB0AC'  // gray
 ];
 const colorForIndex = (i: number) => PALETTE[i % PALETTE.length];
-/** Palette fixe pour les barres 1★→5★ */
+/** Palette fixe pour les barres 1â˜…â†’5â˜… */
 const RATING_COLORS: Record<'1' | '2' | '3' | '4' | '5', string> = {
   '1': '#E45756',
   '2': '#F58518',
@@ -122,65 +122,65 @@ const STRINGS: Record<Lang, Record<string, string>> = {
   fr: {
     reviewsMgmt: 'Gestion des avis',
     searchPlaceholder: 'Rechercher un avis...',
-    advancedFilters: 'Filtres avancés',
+    advancedFilters: 'Filtres avancÃ©s',
     exportCSV: 'Export CSV',
     layout: 'Disposition',
-    layoutTip: 'Activez/désactivez l’affichage de chaque tableau indépendamment.',
-    chartCard: 'Évolution mensuelle (multi-années)',
-    day: 'Jour', week: 'Semaine', month: 'Mois', year: 'Année', custom: 'Personnalisé',
+    layoutTip: 'Activez/dÃ©sactivez lâ€™affichage de chaque tableau indÃ©pendamment.',
+    chartCard: 'Ã‰volution mensuelle (multi-annÃ©es)',
+    day: 'Jour', week: 'Semaine', month: 'Mois', year: 'AnnÃ©e', custom: 'PersonnalisÃ©',
     from: 'Du', to: 'Au', apply: 'Appliquer',
     totalReviews: 'Total des avis',
     avgRating: 'Note moyenne',
-    published: 'Avis publiés',
+    published: 'Avis publiÃ©s',
     pending: 'En attente',
     chartType: 'Graphique', line: 'Courbe', bars: 'Barres',
     status: 'Statut', allStatuses: 'Tous les statuts',
     filterByRating: 'Filtrer par note', all: 'Toutes',
-    sortByRating: 'Trier par étoiles', noSort: 'Aucun tri',
-    highToLow: 'Plus haut → plus bas', lowToHigh: 'Plus bas → plus haut',
-    reset: 'Réinitialiser', bulkDelete: 'Supprimer sélection',
-    loading: 'Chargement...', loadMore: "Charger plus d'avis", noneFound: 'Aucun avis trouvé',
+    sortByRating: 'Trier par Ã©toiles', noSort: 'Aucun tri',
+    highToLow: 'Plus haut â†’ plus bas', lowToHigh: 'Plus bas â†’ plus haut',
+    reset: 'RÃ©initialiser', bulkDelete: 'Supprimer sÃ©lection',
+    loading: 'Chargement...', loadMore: "Charger plus d'avis", noneFound: 'Aucun avis trouvÃ©',
     client: 'Client', rating: 'Note', comment: 'Commentaire',
     type: 'Type', date: 'Date', statusCol: 'Statut', actions: 'Actions',
     hide: 'Masquer', show: 'Afficher', delete: 'Supprimer',
-    reviewDetails: "Détails de l'avis", info: 'Informations',
+    reviewDetails: "DÃ©tails de l'avis", info: 'Informations',
     country: 'Pays', provider: 'Prestataire', callId: "ID d'appel",
     helpfulVotes: 'Votes utiles', reports: 'Signalements',
     quickLinks: 'Liens rapides', providerProfile: 'Profil prestataire',
-    clientProfile: 'Profil client', callDetails: "Détails de l'appel",
-    moderation: 'Modération', saveRating: 'Enregistrer la note',
+    clientProfile: 'Profil client', callDetails: "DÃ©tails de l'appel",
+    moderation: 'ModÃ©ration', saveRating: 'Enregistrer la note',
     confirmDelete: 'Confirmer la suppression',
-    irreversible: 'Attention : Cette action est irréversible',
-    youWillDelete: "Vous êtes sur le point de supprimer définitivement l'avis de :",
+    irreversible: 'Attention : Cette action est irrÃ©versible',
+    youWillDelete: "Vous Ãªtes sur le point de supprimer dÃ©finitivement l'avis de :",
     cancel: 'Annuler', confirm: 'Confirmer la suppression',
-    quality: 'Qualité', autoPublished: 'Auto-publiés (J+2)', hiddenPct: 'Masqués',
-    reportedPct: 'Avis signalés', avgHelpful: 'Votes utiles (moy.)',
-    ratingSplit: 'Répartition des notes (1★→5★)',
+    quality: 'QualitÃ©', autoPublished: 'Auto-publiÃ©s (J+2)', hiddenPct: 'MasquÃ©s',
+    reportedPct: 'Avis signalÃ©s', avgHelpful: 'Votes utiles (moy.)',
+    ratingSplit: 'RÃ©partition des notes (1â˜…â†’5â˜…)',
     ratingShare: 'Part des notes par mois', topCountries: 'Top pays (volume)',
     topProviders: 'Top prestataires', reviewsCount: "Nombre d'avis",
-    monthlyReviews: 'Avis créés',
-    anomalyWarning: 'Surveillance qualité : hausse significative des avis 1★ sur 7 jours.',
+    monthlyReviews: 'Avis crÃ©Ã©s',
+    anomalyWarning: 'Surveillance qualitÃ© : hausse significative des avis 1â˜… sur 7 jours.',
     lowStarAlerts: 'Alerte notes faibles',
-    lowStarExplainer: 'Bannières affichées si des notes faibles existent sur la période (plus c’est faible, plus c’est visible).',
-    drawerTitle: 'Filtres avancés',
+    lowStarExplainer: 'BanniÃ¨res affichÃ©es si des notes faibles existent sur la pÃ©riode (plus câ€™est faible, plus câ€™est visible).',
+    drawerTitle: 'Filtres avancÃ©s',
     serviceType: 'Type de prestataire', allTypes: 'Tous',
-    lawyer: 'Avocat', expat: 'Expatrié',
+    lawyer: 'Avocat', expat: 'ExpatriÃ©',
     clientCountry: 'Pays (client)', minRating: 'Note min', maxRating: 'Note max',
-    reportedOnly: 'Signalés uniquement', minHelpfulVotes: 'Votes utiles min',
+    reportedOnly: 'SignalÃ©s uniquement', minHelpfulVotes: 'Votes utiles min',
     providerId: 'Provider ID', clientIdLabel: 'Client ID',
     hideCard: 'Masquer ce tableau', showCard: 'Afficher ce tableau',
     language: 'Langue',
-    manageCards: 'Gérer les tableaux',
-    chart: 'Graphique multi-années',
+    manageCards: 'GÃ©rer les tableaux',
+    chart: 'Graphique multi-annÃ©es',
     histogram: 'Histogramme des notes',
-    stacked: 'Répartition mensuelle des notes',
-    kpi: 'KPI Qualité',
+    stacked: 'RÃ©partition mensuelle des notes',
+    kpi: 'KPI QualitÃ©',
     topCountriesCard: 'Top pays',
     topProvidersCard: 'Top prestataires'
   },
   en: {
     reviewsMgmt: 'Reviews management',
-    searchPlaceholder: 'Search a review…',
+    searchPlaceholder: 'Search a reviewâ€¦',
     advancedFilters: 'Advanced filters',
     exportCSV: 'Export CSV',
     layout: 'Layout',
@@ -196,7 +196,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     status: 'Status', allStatuses: 'All statuses',
     filterByRating: 'Filter by rating', all: 'All',
     sortByRating: 'Sort by stars', noSort: 'No sort',
-    highToLow: 'High → Low', lowToHigh: 'Low → High',
+    highToLow: 'High â†’ Low', lowToHigh: 'Low â†’ High',
     reset: 'Reset', bulkDelete: 'Delete selection',
     loading: 'Loading...', loadMore: 'Load more reviews', noneFound: 'No reviews found',
     client: 'Client', rating: 'Rating', comment: 'Comment',
@@ -214,11 +214,11 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     cancel: 'Cancel', confirm: 'Confirm deletion',
     quality: 'Quality', autoPublished: 'Auto-published (D+2)', hiddenPct: 'Hidden',
     reportedPct: 'Reported', avgHelpful: 'Avg. helpful votes',
-    ratingSplit: 'Rating distribution (1★→5★)',
+    ratingSplit: 'Rating distribution (1â˜…â†’5â˜…)',
     ratingShare: 'Share of ratings per month', topCountries: 'Top countries (volume)',
     topProviders: 'Top providers', reviewsCount: 'Reviews count',
     monthlyReviews: 'Reviews created',
-    anomalyWarning: 'Quality watch: significant spike of 1★ reviews in last 7 days.',
+    anomalyWarning: 'Quality watch: significant spike of 1â˜… reviews in last 7 days.',
     lowStarAlerts: 'Low-star alerts',
     lowStarExplainer: 'Banners show low ratings in the selected period (the fewer stars, the more prominent).',
     drawerTitle: 'Advanced filters',
@@ -482,7 +482,7 @@ const AdminReviews: React.FC = () => {
             status: 'published',
             publishedAt: serverTimestamp(),
             moderatedAt: serverTimestamp(),
-            moderatorNotes: lang === 'fr' ? 'Publication automatique après 2 jours' : 'Auto-published after 2 days'
+            moderatorNotes: lang === 'fr' ? 'Publication automatique aprÃ¨s 2 jours' : 'Auto-published after 2 days'
           })
         )
       );
@@ -563,7 +563,7 @@ const AdminReviews: React.FC = () => {
 
       const alert1 = buckets[1], alert2 = buckets[2], alert3 = buckets[3];
 
-      // anomaly 1★ spike week over week
+      // anomaly 1â˜… spike week over week
       const sevenAgo = new Date(); sevenAgo.setDate(sevenAgo.getDate() - 7);
       const fourteenAgo = new Date(); fourteenAgo.setDate(fourteenAgo.getDate() - 14);
       const weekNow = data.filter((r) => {
@@ -700,11 +700,11 @@ const AdminReviews: React.FC = () => {
       await updateDoc(doc(db, 'reviews', reviewId), {
         status: 'hidden',
         moderatedAt: serverTimestamp(),
-        moderatorNotes: lang === 'fr' ? "Masqué par l'administrateur" : 'Hidden by admin'
+        moderatorNotes: lang === 'fr' ? "MasquÃ© par l'administrateur" : 'Hidden by admin'
       });
       setReviews((prev) => prev.map((r) => (r.id === reviewId ? { ...r, status: 'hidden' } : r)));
       if (selectedReview?.id === reviewId) setSelectedReview({ ...selectedReview, status: 'hidden' });
-      alert(lang === 'fr' ? 'Avis masqué avec succès' : 'Review hidden');
+      alert(lang === 'fr' ? 'Avis masquÃ© avec succÃ¨s' : 'Review hidden');
       await loadStats();
     } catch (err) {
       console.error('Error hiding review:', err);
@@ -723,7 +723,7 @@ const AdminReviews: React.FC = () => {
       setShowDeleteModal(false);
       setShowReviewModal(false);
       setSelectedReview(null);
-      alert(lang === 'fr' ? 'Avis supprimé avec succès' : 'Review deleted');
+      alert(lang === 'fr' ? 'Avis supprimÃ© avec succÃ¨s' : 'Review deleted');
       await loadStats();
     } catch (err) {
       console.error('Error deleting review:', err);
@@ -737,7 +737,7 @@ const AdminReviews: React.FC = () => {
     if (selectedIds.size === 0) return;
     const ok = confirm(
       lang === 'fr'
-        ? `Supprimer définitivement ${selectedIds.size} avis ?`
+        ? `Supprimer dÃ©finitivement ${selectedIds.size} avis ?`
         : `Permanently delete ${selectedIds.size} review(s)?`
     );
     if (!ok) return;
@@ -746,7 +746,7 @@ const AdminReviews: React.FC = () => {
       await Promise.all(Array.from(selectedIds).map((id) => deleteDoc(doc(db, 'reviews', id))));
       setReviews((prev) => prev.filter((r) => !selectedIds.has(r.id)));
       setSelectedIds(new Set());
-      alert(lang === 'fr' ? 'Avis supprimés avec succès' : 'Reviews deleted');
+      alert(lang === 'fr' ? 'Avis supprimÃ©s avec succÃ¨s' : 'Reviews deleted');
       await loadStats();
     } catch (err) {
       console.error('Bulk delete error:', err);
@@ -763,17 +763,17 @@ const AdminReviews: React.FC = () => {
       await updateDoc(doc(db, 'reviews', selectedReview.id), {
         rating: editedRating,
         moderatedAt: serverTimestamp(),
-        moderatorNotes: lang === 'fr' ? "Note modifiée par l'administrateur" : 'Rating updated by admin'
+        moderatorNotes: lang === 'fr' ? "Note modifiÃ©e par l'administrateur" : 'Rating updated by admin'
       });
       setReviews((prev) =>
         prev.map((r) => (r.id === selectedReview.id ? { ...r, rating: editedRating } : r))
       );
       setSelectedReview({ ...selectedReview, rating: editedRating });
-      alert(lang === 'fr' ? 'Note mise à jour' : 'Rating saved');
+      alert(lang === 'fr' ? 'Note mise Ã  jour' : 'Rating saved');
       await loadStats();
     } catch (err) {
       console.error('Error updating rating:', err);
-      alert(lang === 'fr' ? 'Erreur lors de la mise à jour de la note' : 'Failed to save rating');
+      alert(lang === 'fr' ? 'Erreur lors de la mise Ã  jour de la note' : 'Failed to save rating');
     } finally {
       setIsActionLoading(false);
     }
@@ -852,7 +852,7 @@ const AdminReviews: React.FC = () => {
       case 'expat_call':
         return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">{t('expat')}</span>;
       default:
-        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">{serviceType || '—'}</span>;
+        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">{serviceType || 'â€”'}</span>;
     }
   };
 
@@ -883,7 +883,7 @@ const AdminReviews: React.FC = () => {
       {Array.from({ length: 5 }).map((_, i) => {
         const filled = i < value;
         return (
-          <button key={i} type="button" className="p-1" title={`${i + 1}★`} onClick={() => onChange(i + 1)}>
+          <button key={i} type="button" className="p-1" title={`${i + 1}â˜…`} onClick={() => onChange(i + 1)}>
             <Star size={20} className={filled ? 'text-yellow-500 fill-current' : 'text-gray-300'} />
           </button>
         );
@@ -996,7 +996,7 @@ const AdminReviews: React.FC = () => {
         fallback={
           <div className="p-8 text-center">
             {lang === 'fr'
-              ? 'Une erreur est survenue lors du chargement des avis. Veuillez réessayer.'
+              ? 'Une erreur est survenue lors du chargement des avis. Veuillez rÃ©essayer.'
               : 'An error occurred while loading reviews. Please try again.'}
           </div>
         }
@@ -1060,8 +1060,8 @@ const AdminReviews: React.FC = () => {
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 flex items-start">
                 <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 mr-2" />
                 <div>
-                  <strong>{t('lowStarAlerts')} — 1★:</strong> {kpi.alert1}{' '}
-                  {lang === 'fr' ? 'avis sur la période sélectionnée.' : 'review(s) in the selected period.'}
+                  <strong>{t('lowStarAlerts')} â€” 1â˜…:</strong> {kpi.alert1}{' '}
+                  {lang === 'fr' ? 'avis sur la pÃ©riode sÃ©lectionnÃ©e.' : 'review(s) in the selected period.'}
                 </div>
               </div>
             )}
@@ -1069,8 +1069,8 @@ const AdminReviews: React.FC = () => {
               <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 flex items-start">
                 <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 mr-2" />
                 <div>
-                  <strong>{t('lowStarAlerts')} — 2★:</strong> {kpi.alert2}{' '}
-                  {lang === 'fr' ? 'avis sur la période sélectionnée.' : 'review(s) in the selected period.'}
+                  <strong>{t('lowStarAlerts')} â€” 2â˜…:</strong> {kpi.alert2}{' '}
+                  {lang === 'fr' ? 'avis sur la pÃ©riode sÃ©lectionnÃ©e.' : 'review(s) in the selected period.'}
                 </div>
               </div>
             )}
@@ -1078,8 +1078,8 @@ const AdminReviews: React.FC = () => {
               <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 flex items-start">
                 <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
                 <div>
-                  <strong>{t('lowStarAlerts')} — 3★:</strong> {kpi.alert3}{' '}
-                  {lang === 'fr' ? 'avis sur la période sélectionnée.' : 'review(s) in the selected period.'}
+                  <strong>{t('lowStarAlerts')} â€” 3â˜…:</strong> {kpi.alert3}{' '}
+                  {lang === 'fr' ? 'avis sur la pÃ©riode sÃ©lectionnÃ©e.' : 'review(s) in the selected period.'}
                 </div>
               </div>
             )}
@@ -1166,13 +1166,13 @@ const AdminReviews: React.FC = () => {
             </div>
           </div>
 
-          {/* Stats bar — period aware */}
+          {/* Stats bar â€” period aware */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {[
-              { title: t('totalReviews'), value: isStatsLoading ? '—' : stats.totalReviews, color: '#4C78A8' },
-              { title: t('avgRating'), value: isStatsLoading ? '—' : stats.averageRating.toFixed(1), color: '#EECA3B' },
-              { title: t('published'), value: isStatsLoading ? '—' : stats.publishedReviews, color: '#54A24B' },
-              { title: t('pending'), value: isStatsLoading ? '—' : stats.pendingReviews, color: '#F58518' }
+              { title: t('totalReviews'), value: isStatsLoading ? 'â€”' : stats.totalReviews, color: '#4C78A8' },
+              { title: t('avgRating'), value: isStatsLoading ? 'â€”' : stats.averageRating.toFixed(1), color: '#EECA3B' },
+              { title: t('published'), value: isStatsLoading ? 'â€”' : stats.publishedReviews, color: '#54A24B' },
+              { title: t('pending'), value: isStatsLoading ? 'â€”' : stats.pendingReviews, color: '#F58518' }
             ].map((card, i) => (
               <div key={i} className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <div className="flex items-center justify-between">
@@ -1184,7 +1184,7 @@ const AdminReviews: React.FC = () => {
                     className="w-12 h-12 rounded-lg flex items-center justify-center"
                     style={{ backgroundColor: `${card.color}22` }}
                   >
-                    <span style={{ color: card.color }} className="font-bold text-lg">●</span>
+                    <span style={{ color: card.color }} className="font-bold text-lg">â—</span>
                   </div>
                 </div>
               </div>
@@ -1223,11 +1223,11 @@ const AdminReviews: React.FC = () => {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart
                     data={[
-                      { rating: '1★', count: kpi.ratingBuckets[1] },
-                      { rating: '2★', count: kpi.ratingBuckets[2] },
-                      { rating: '3★', count: kpi.ratingBuckets[3] },
-                      { rating: '4★', count: kpi.ratingBuckets[4] },
-                      { rating: '5★', count: kpi.ratingBuckets[5] }
+                      { rating: '1â˜…', count: kpi.ratingBuckets[1] },
+                      { rating: '2â˜…', count: kpi.ratingBuckets[2] },
+                      { rating: '3â˜…', count: kpi.ratingBuckets[3] },
+                      { rating: '4â˜…', count: kpi.ratingBuckets[4] },
+                      { rating: '5â˜…', count: kpi.ratingBuckets[5] }
                     ]}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -1235,18 +1235,18 @@ const AdminReviews: React.FC = () => {
                     <YAxis allowDecimals={false} />
                     <Tooltip />
                     <Bar dataKey="count" name={t('reviewsCount')}>
-                      {/* couleurs fixes par catégorie */}
+                      {/* couleurs fixes par catÃ©gorie */}
                     </Bar>
-                    {/* 5 barres "fausses" avec couleurs par catégorie (legend accessible) */}
+                    {/* 5 barres "fausses" avec couleurs par catÃ©gorie (legend accessible) */}
                     <Legend />
                   </BarChart>
                 </ResponsiveContainer>
-                {/* Légende personnalisée avec couleurs */}
+                {/* LÃ©gende personnalisÃ©e avec couleurs */}
                 <div className="flex gap-4 mt-2 text-xs text-gray-700">
                   {(['1','2','3','4','5'] as const).map((k) => (
                     <span key={k} className="flex items-center gap-1">
                       <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: RATING_COLORS[k] }} />
-                      {k}★
+                      {k}â˜…
                     </span>
                   ))}
                 </div>
@@ -1256,7 +1256,7 @@ const AdminReviews: React.FC = () => {
             {visible.stacked && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-700">{t('ratingShare')} — {currentYear}</h3>
+                  <h3 className="text-sm font-medium text-gray-700">{t('ratingShare')} â€” {currentYear}</h3>
                   <button
                     className="text-xs text-gray-600 hover:underline flex items-center gap-1"
                     onClick={() => setVisible((v) => ({ ...v, stacked: false }))}
@@ -1271,11 +1271,11 @@ const AdminReviews: React.FC = () => {
                     <YAxis allowDecimals={false} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="1" stackId="a" name="1★" fill={RATING_COLORS['1']} />
-                    <Bar dataKey="2" stackId="a" name="2★" fill={RATING_COLORS['2']} />
-                    <Bar dataKey="3" stackId="a" name="3★" fill={RATING_COLORS['3']} />
-                    <Bar dataKey="4" stackId="a" name="4★" fill={RATING_COLORS['4']} />
-                    <Bar dataKey="5" stackId="a" name="5★" fill={RATING_COLORS['5']} />
+                    <Bar dataKey="1" stackId="a" name="1â˜…" fill={RATING_COLORS['1']} />
+                    <Bar dataKey="2" stackId="a" name="2â˜…" fill={RATING_COLORS['2']} />
+                    <Bar dataKey="3" stackId="a" name="3â˜…" fill={RATING_COLORS['3']} />
+                    <Bar dataKey="4" stackId="a" name="4â˜…" fill={RATING_COLORS['4']} />
+                    <Bar dataKey="5" stackId="a" name="5â˜…" fill={RATING_COLORS['5']} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1325,7 +1325,7 @@ const AdminReviews: React.FC = () => {
                   <tbody>
                     {Object.entries(
                       filteredAndSorted.reduce<Record<string, number>>((acc, r) => {
-                        const k = (r.clientCountry || '—').trim() || '—';
+                        const k = (r.clientCountry || 'â€”').trim() || 'â€”';
                         acc[k] = (acc[k] || 0) + 1;
                         return acc;
                       }, {})
@@ -1367,8 +1367,8 @@ const AdminReviews: React.FC = () => {
                       filteredAndSorted.reduce<
                         Record<string, { name: string; count: number; sum: number }>
                       >((acc, r) => {
-                        const key = r.providerId || r.providerName || '—';
-                        const name = r.providerName || r.providerId || '—';
+                        const key = r.providerId || r.providerName || 'â€”';
+                        const name = r.providerName || r.providerId || 'â€”';
                         if (!acc[key]) acc[key] = { name, count: 0, sum: 0 };
                         acc[key].count += 1;
                         acc[key].sum += Number(r.rating) || 0;
@@ -1421,11 +1421,11 @@ const AdminReviews: React.FC = () => {
                   className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 >
                   <option value="all">{t('all')}</option>
-                  <option value="5">5 ★</option>
-                  <option value="4">4 ★</option>
-                  <option value="3">3 ★</option>
-                  <option value="2">2 ★</option>
-                  <option value="1">1 ★</option>
+                  <option value="5">5 â˜…</option>
+                  <option value="4">4 â˜…</option>
+                  <option value="3">3 â˜…</option>
+                  <option value="2">2 â˜…</option>
+                  <option value="1">1 â˜…</option>
                 </select>
               </div>
               <div>
@@ -1631,7 +1631,7 @@ const AdminReviews: React.FC = () => {
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div className="flex justify-between"><span className="text-gray-600">{t('client')}:</span><span className="font-medium">{selectedReview.clientName}</span></div>
                     <div className="flex justify-between"><span className="text-gray-600">{t('country')}:</span><span className="font-medium">{selectedReview.clientCountry}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">{t('provider')}:</span><span className="font-medium">{selectedReview.providerName || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-600">{t('provider')}:</span><span className="font-medium">{selectedReview.providerName || 'â€”'}</span></div>
                     <div className="flex justify-between"><span className="text-gray-600">{t('callId')}:</span><span className="font-medium">{selectedReview.callId}</span></div>
                     <div className="flex justify-between"><span className="text-gray-600">{t('helpfulVotes')}:</span><span className="font-medium">{selectedReview.helpfulVotes || 0}</span></div>
                     <div className="flex justify-between"><span className="text-gray-600">{t('reports')}:</span><span className="font-medium">{selectedReview.reportedCount || 0}</span></div>
@@ -1730,7 +1730,7 @@ const AdminReviews: React.FC = () => {
 
               <p className="text-xs text-gray-500 mb-4">
                 {lang === 'fr'
-                  ? 'Les filtres s’appliquent aux statistiques, graphiques et à la liste.'
+                  ? 'Les filtres sâ€™appliquent aux statistiques, graphiques et Ã  la liste.'
                   : 'Filters apply to stats, charts and the list.'}
               </p>
 

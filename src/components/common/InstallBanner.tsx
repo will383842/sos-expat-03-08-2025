@@ -1,25 +1,25 @@
-// src/components/common/InstallBanner.tsx
+﻿// src/components/common/InstallBanner.tsx
 import React, { useMemo, useState } from 'react';
 import { X, Download } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 /**
- * Bandeau PWA — bas droite, persistant, dégradé violet
- * - S'affiche SEULEMENT si: canInstall === true ET isInstalled === false ET pas fermé récemment
- * - À inclure UNE FOIS dans le Layout (global)
+ * Bandeau PWA â€” bas droite, persistant, dÃ©gradÃ© violet
+ * - S'affiche SEULEMENT si: canInstall === true ET isInstalled === false ET pas fermÃ© rÃ©cemment
+ * - Ã€ inclure UNE FOIS dans le Layout (global)
  */
 interface InstallBannerProps {
-  /** Espace à droite pour laisser la place au bouton "remonter en haut" (px) */
+  /** Espace Ã  droite pour laisser la place au bouton "remonter en haut" (px) */
   offsetRightPx?: number;
-  /** Décalage vertical depuis le bas (px) */
+  /** DÃ©calage vertical depuis le bas (px) */
   bottomPx?: number;
   /** z-index Tailwind */
   zIndexClass?: string;
   /** Classe gradient Tailwind */
   gradientClass?: string;
-  /** Nombre de jours de masquage après fermeture */
+  /** Nombre de jours de masquage aprÃ¨s fermeture */
   closeForDays?: number;
-  /** Classes supplémentaires */
+  /** Classes supplÃ©mentaires */
   className?: string;
 }
 
@@ -46,7 +46,7 @@ const InstallBanner: React.FC<InstallBannerProps> = ({
 
   const handleClose = () => {
     try { closeForAWhile(); } catch {}
-    setClosedNow(true); // masque immédiatement
+    setClosedNow(true); // masque immÃ©diatement
   };
 
   return (
@@ -54,10 +54,10 @@ const InstallBanner: React.FC<InstallBannerProps> = ({
       className={`fixed ${zIndexClass} pointer-events-auto ${className}`}
       style={{ right: offsetRightPx, bottom: bottomPx }}
       role="dialog"
-      aria-label="Installer l’application"
+      aria-label="Installer lâ€™application"
     >
       <div className="relative max-w-[360px] sm:max-w-[420px] rounded-2xl shadow-2xl border border-white/20 overflow-hidden backdrop-blur-xl">
-        {/* Couche décorative — ne doit PAS capter les clics */}
+        {/* Couche dÃ©corative â€” ne doit PAS capter les clics */}
         <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${gradientClass} opacity-95`} />
 
         {/* Contenu cliquable */}
@@ -68,9 +68,9 @@ const InstallBanner: React.FC<InstallBannerProps> = ({
             </div>
 
             <div className="flex-1">
-              <div className="font-extrabold text-white leading-tight">Installez l’app SOS Expat</div>
+              <div className="font-extrabold text-white leading-tight">Installez lâ€™app SOS Expat</div>
               <p className="text-white/90 text-sm mt-1">
-                Accès rapide, notifications, mode hors ligne — l’app qui fait du bien !
+                AccÃ¨s rapide, notifications, mode hors ligne â€” lâ€™app qui fait du bien !
               </p>
 
               <div className="mt-3 flex items-center gap-2">
@@ -99,7 +99,7 @@ const InstallBanner: React.FC<InstallBannerProps> = ({
             type="button"
             onClick={handleClose}
             className="absolute top-2.5 right-2.5 p-2 rounded-md hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/50"
-            aria-label="Fermer le bandeau d’installation"
+            aria-label="Fermer le bandeau dâ€™installation"
           >
             <X className="w-4 h-4 text-white" />
           </button>

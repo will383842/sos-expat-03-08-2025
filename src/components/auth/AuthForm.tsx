@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+﻿import React, { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -19,7 +19,7 @@ interface FormState {
 }
 
 const AuthForm: React.FC = () => {
-  // i18n — appelé en haut, sans condition → pas d’erreur de hooks
+  // i18n â€” appelÃ© en haut, sans condition â†’ pas dâ€™erreur de hooks
   const { t } = useTranslation();
 
   const [formState, setFormState] = useState<FormState>({

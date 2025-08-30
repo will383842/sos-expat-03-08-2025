@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { Handshake, TrendingUp, DollarSign } from 'lucide-react';
 
@@ -10,7 +10,7 @@ const AdminAffiliates: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center">
               <Handshake className="w-7 h-7 mr-2 text-indigo-600" />
-              Gestion des Affiliés
+              Gestion des AffiliÃ©s
             </h1>
             <p className="text-gray-600 mt-1">Programme d'affiliation et partenaires</p>
           </div>
@@ -25,15 +25,15 @@ const AdminAffiliates: React.FC = () => {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
               <div className="bg-indigo-50 p-4 rounded-lg">
-                <h4 className="font-medium text-indigo-900 mb-2">👥 Affiliés actifs</h4>
+                <h4 className="font-medium text-indigo-900 mb-2">ðŸ‘¥ AffiliÃ©s actifs</h4>
                 <p className="text-sm text-indigo-700">12 partenaires</p>
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
-                <h4 className="font-medium text-green-900 mb-2">💰 Commissions</h4>
-                <p className="text-sm text-green-700">2,450€ ce mois</p>
+                <h4 className="font-medium text-green-900 mb-2">ðŸ’° Commissions</h4>
+                <p className="text-sm text-green-700">2,450â‚¬ ce mois</p>
               </div>
               <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">📈 Conversions</h4>
+                <h4 className="font-medium text-blue-900 mb-2">ðŸ“ˆ Conversions</h4>
                 <p className="text-sm text-blue-700">3.2% taux moyen</p>
               </div>
             </div>

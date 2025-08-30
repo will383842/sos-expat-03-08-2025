@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Shield, Eye, Lock, Users, Check, Globe, Clock, Languages } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
@@ -55,37 +55,37 @@ const PrivacyPolicy: React.FC = () => {
   const texts: Translations = useMemo(
     () => ({
       fr: {
-        title: 'Politique de confidentialité',
-        subtitle: 'Votre vie privée est notre priorité',
-        lastUpdated: 'Version 2.2 – Dernière mise à jour : 16 juin 2025',
-        dataCollection: 'Collecte des données',
-        dataProtection: 'Protection des données',
-        dataSharing: 'Partage des données',
+        title: 'Politique de confidentialitÃ©',
+        subtitle: 'Votre vie privÃ©e est notre prioritÃ©',
+        lastUpdated: 'Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025',
+        dataCollection: 'Collecte des donnÃ©es',
+        dataProtection: 'Protection des donnÃ©es',
+        dataSharing: 'Partage des donnÃ©es',
         yourRights: 'Vos droits',
         contact: 'Contact',
         dataCollectionContent:
-          "Nous collectons uniquement les informations nécessaires pour fournir nos services d'assistance. Cela inclut vos informations de contact, des métadonnées techniques (appels, messagerie) et les détails indispensables à votre demande.",
+          "Nous collectons uniquement les informations nÃ©cessaires pour fournir nos services d'assistance. Cela inclut vos informations de contact, des mÃ©tadonnÃ©es techniques (appels, messagerie) et les dÃ©tails indispensables Ã  votre demande.",
         dataProtectionContent:
-          "Vos données sont chiffrées en transit et au repos lorsque c'est possible et stockées de manière sécurisée. Des mesures techniques et organisationnelles sont mises en œuvre pour prévenir tout accès non autorisé.",
+          "Vos donnÃ©es sont chiffrÃ©es en transit et au repos lorsque c'est possible et stockÃ©es de maniÃ¨re sÃ©curisÃ©e. Des mesures techniques et organisationnelles sont mises en Å“uvre pour prÃ©venir tout accÃ¨s non autorisÃ©.",
         dataSharingContent:
-          "Nous ne vendons jamais vos données personnelles. Nous partageons uniquement les informations nécessaires avec des prestataires vérifiés (paiements, téléphonie, hébergement) pour fournir le service demandé.",
+          "Nous ne vendons jamais vos donnÃ©es personnelles. Nous partageons uniquement les informations nÃ©cessaires avec des prestataires vÃ©rifiÃ©s (paiements, tÃ©lÃ©phonie, hÃ©bergement) pour fournir le service demandÃ©.",
         rights: [
-          "Droit d'accès à vos données",
+          "Droit d'accÃ¨s Ã  vos donnÃ©es",
           'Droit de rectification',
-          "Droit à l'effacement (dans les limites légales)",
-          'Droit à la portabilité',
-          'Droit d’opposition et de limitation',
+          "Droit Ã  l'effacement (dans les limites lÃ©gales)",
+          'Droit Ã  la portabilitÃ©',
+          'Droit dâ€™opposition et de limitation',
         ],
         contactContent:
-          'Pour toute question ou pour exercer vos droits, utilisez le formulaire dédié ci-dessous.',
-        features: ['Chiffrement', 'Transparence', 'Contrôle utilisateur', 'Pas de revente de données'],
+          'Pour toute question ou pour exercer vos droits, utilisez le formulaire dÃ©diÃ© ci-dessous.',
+        features: ['Chiffrement', 'Transparence', 'ContrÃ´le utilisateur', 'Pas de revente de donnÃ©es'],
         contactCta: 'Formulaire de contact',
-        editHint: 'Document éditable depuis la console admin (FR/EN)',
+        editHint: 'Document Ã©ditable depuis la console admin (FR/EN)',
       },
       en: {
         title: 'Privacy Policy',
         subtitle: 'Your privacy is our priority',
-        lastUpdated: 'Version 2.2 – Last updated: 16 June 2025',
+        lastUpdated: 'Version 2.2 â€“ Last updated: 16 June 2025',
         dataCollection: 'Data Collection',
         dataProtection: 'Data Protection',
         dataSharing: 'Data Sharing',
@@ -151,7 +151,7 @@ const PrivacyPolicy: React.FC = () => {
         }
       } catch (err) {
         console.error('Error fetching privacy policy:', err);
-        setError(selectedLanguage === 'fr' ? 'Échec du chargement' : 'Failed to load');
+        setError(selectedLanguage === 'fr' ? 'Ã‰chec du chargement' : 'Failed to load');
         setContent('');
       } finally {
         setIsLoading(false);
@@ -165,7 +165,7 @@ const PrivacyPolicy: React.FC = () => {
     setSelectedLanguage(newLang);
   };
 
-  // ----- Markdown → UI (design only) -----
+  // ----- Markdown â†’ UI (design only) -----
   const parseMarkdownContent = (text: string) => {
     const lines = text.split('\n');
     const elements: JSX.Element[] = [];
@@ -308,20 +308,20 @@ const PrivacyPolicy: React.FC = () => {
 
   // --- Default bilingual content (shown if no Firestore content) ---
   const defaultFr = `
-# Politique de confidentialité
+# Politique de confidentialitÃ©
 
 **${t.lastUpdated}**
 
 ---
 
 ## 1. ${t.dataCollection}
-Nous collectons les **données strictement nécessaires** à la fourniture de nos services (coordonnées, métadonnées techniques, détails de la demande).
+Nous collectons les **donnÃ©es strictement nÃ©cessaires** Ã  la fourniture de nos services (coordonnÃ©es, mÃ©tadonnÃ©es techniques, dÃ©tails de la demande).
 
 ## 2. ${t.dataProtection}
-Chiffrement **en transit** et **au repos** lorsque possible. Mesures techniques et organisationnelles renforcées.
+Chiffrement **en transit** et **au repos** lorsque possible. Mesures techniques et organisationnelles renforcÃ©es.
 
 ## 3. ${t.dataSharing}
-Aucun **commerce des données**. Partage limité à des prestataires **vérifiés** pour l'exécution du service.
+Aucun **commerce des donnÃ©es**. Partage limitÃ© Ã  des prestataires **vÃ©rifiÃ©s** pour l'exÃ©cution du service.
 
 ## 4. ${t.yourRights}
 - ${t.rights[0]}
@@ -474,7 +474,7 @@ http://localhost:5174/contact
               ) : error ? (
                 <div className="text-center py-8">
                   <p className="text-red-600 mb-4">{error}</p>
-                  <p className="text-gray-600">{selectedLanguage === 'fr' ? 'Affichage du contenu par défaut' : 'Showing default content'}</p>
+                  <p className="text-gray-600">{selectedLanguage === 'fr' ? 'Affichage du contenu par dÃ©faut' : 'Showing default content'}</p>
                 </div>
               ) : (
                 <div className="prose max-w-none">

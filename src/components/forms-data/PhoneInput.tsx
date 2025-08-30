@@ -1,5 +1,5 @@
-// ========================================
-// PhoneInput.tsx — Country dial code select + number input
+﻿// ========================================
+// PhoneInput.tsx â€” Country dial code select + number input
 // ========================================
 import React, { useMemo, useState, useCallback } from 'react';
 import Select from 'react-select';
@@ -12,7 +12,7 @@ export interface PhoneValue {
   number: string;
 }
 
-// Interface avec toutes les propriétés requises
+// Interface avec toutes les propriÃ©tÃ©s requises
 export interface DialOption extends SharedOption {
   phoneCode: string;
   isShared?: boolean;
@@ -46,7 +46,7 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
     if (!inputValue) return phoneCodesData.filter(r => !r.disabled);
     const q = normalize(inputValue);
     return phoneCodesData.filter(r => !r.disabled).filter(r => {
-      // Correction: utiliser la bonne propriété selon la langue actuelle
+      // Correction: utiliser la bonne propriÃ©tÃ© selon la langue actuelle
       const label = getLocalizedLabel(r, currentLocale, r.code);
       return [label, r.code, r.phoneCode].some(f => normalize(f).includes(q));
     });
@@ -55,7 +55,7 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
   const options = useMemo<DialOption[]>(() => {
     return filtered.map(r => ({
       value: r.code,
-      // Correction: utiliser la bonne propriété selon la langue actuelle
+      // Correction: utiliser la bonne propriÃ©tÃ© selon la langue actuelle
       label: `${getLocalizedLabel(r, currentLocale, r.code)} (${r.phoneCode})`,
       isShared: highlightShared && providerLanguages.includes(r.code),
       phoneCode: r.phoneCode
@@ -70,7 +70,7 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
   const selected = useMemo(() => {
     if (!value?.countryCode) return null;
     const found = options.find(o => o.value === value.countryCode);
-    // Correction: retourner l'objet complet avec toutes les propriétés requises
+    // Correction: retourner l'objet complet avec toutes les propriÃ©tÃ©s requises
     return found ? { 
       value: found.value, 
       label: found.label, 
@@ -95,10 +95,10 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
     return input;
   }, []);
 
-  // Correction: enlever le paramètre générique qui n'est pas attendu
+  // Correction: enlever le paramÃ¨tre gÃ©nÃ©rique qui n'est pas attendu
   const styles = useMemo(() => makeAdaptiveStyles(!!highlightShared), [highlightShared]);
 
-  const numberPlaceholder = currentLocale === 'fr' ? 'Numéro de téléphone' : 'Phone number';
+  const numberPlaceholder = currentLocale === 'fr' ? 'NumÃ©ro de tÃ©lÃ©phone' : 'Phone number';
   const selectPlaceholder = placeholder || (currentLocale === 'fr' ? 'Indicatif' : 'Dial code');
 
   return (
@@ -119,7 +119,7 @@ const PhoneInput: React.FC<PhoneInputProps> = React.memo(({
           isSearchable={true}
           isDisabled={disabled}
           noOptionsMessage={({ inputValue }) => currentLocale === 'fr'
-            ? (inputValue ? `Aucun indicatif trouvé pour "${inputValue}"` : 'Aucun indicatif disponible')
+            ? (inputValue ? `Aucun indicatif trouvÃ© pour "${inputValue}"` : 'Aucun indicatif disponible')
             : (inputValue ? `No dial code found for "${inputValue}"` : 'No dial codes available')
           }
           filterOption={() => true}

@@ -1,4 +1,4 @@
-// LogsPage.tsx
+﻿// LogsPage.tsx
 import React, { useEffect, useState } from 'react';
 import { db } from '../../config/firebase';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
@@ -26,7 +26,7 @@ const LogsPage: React.FC = () => {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">🕓 Historique des envois</h2>
+      <h2 className="text-xl font-semibold mb-4">ðŸ•“ Historique des envois</h2>
       <div className="overflow-x-auto">
         <table className="min-w-full table-auto border">
           <thead>

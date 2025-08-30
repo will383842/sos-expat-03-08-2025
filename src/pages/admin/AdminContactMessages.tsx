@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   collection,
   getDocs,
@@ -55,7 +55,7 @@ const AdminContactMessages: React.FC = () => {
 
     setLoading(true);
     try {
-      // Adapter à la signature attendue: { to, firstName, userMessage, adminReply }
+      // Adapter Ã  la signature attendue: { to, firstName, userMessage, adminReply }
       const firstName = msg.name?.split(' ')[0] ?? 'there';
       await sendContactReply({
         to: msg.email,
@@ -99,7 +99,7 @@ const AdminContactMessages: React.FC = () => {
                   {msg.name} ({msg.email})
                 </p>
                 <p className="text-sm text-gray-500">
-                  Reçu le{' '}
+                  ReÃ§u le{' '}
                   {msg.createdAt
                     ? msg.createdAt.toDate().toLocaleString()
                     : '?'}
@@ -127,10 +127,10 @@ const AdminContactMessages: React.FC = () => {
 
             {msg.reply ? (
               <div className="mt-4 bg-green-50 p-3 rounded border text-sm">
-                <p className="text-green-700 font-semibold">Réponse envoyée :</p>
+                <p className="text-green-700 font-semibold">RÃ©ponse envoyÃ©e :</p>
                 <p className="whitespace-pre-wrap">{msg.reply}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Répondu le{' '}
+                  RÃ©pondu le{' '}
                   {msg.repliedAt
                     ? msg.repliedAt.toDate().toLocaleString()
                     : '?'}
@@ -146,7 +146,7 @@ const AdminContactMessages: React.FC = () => {
                       [msg.id]: e.target.value,
                     }))
                   }
-                  placeholder="Votre réponse..."
+                  placeholder="Votre rÃ©ponse..."
                   className="w-full p-2 border rounded mb-2"
                   rows={3}
                 />

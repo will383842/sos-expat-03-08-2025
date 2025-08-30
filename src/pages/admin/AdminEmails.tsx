@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 import { logError } from '../../utils/logging';
 import { Tabs, Tab } from "../../components/ui/tabs"; 
 
-// Importation des composants des pages (à créer)
+// Importation des composants des pages (Ã  crÃ©er)
 import CampaignsPage from "../../emails/admin/AdminEmails/CampaignsPage";
 import TemplatesManager from "../../emails/admin/AdminEmails/TemplatesManager";
 import SendToContact from "../../emails/admin/AdminEmails/SendToContact";
@@ -20,7 +20,7 @@ const AdminEmailsPage: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Vérification de l'authentification et du rôle admin
+  // VÃ©rification de l'authentification et du rÃ´le admin
   useEffect(() => {
     if (user) {
       setIsLoading(false);
@@ -45,10 +45,10 @@ const AdminEmailsPage: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Accès non autorisé
+              AccÃ¨s non autorisÃ©
             </h1>
             <p className="text-gray-600">
-              Vous devez être administrateur pour accéder à cette page.
+              Vous devez Ãªtre administrateur pour accÃ©der Ã  cette page.
             </p>
           </div>
         </div>
@@ -88,10 +88,10 @@ const AdminEmailsPage: React.FC = () => {
               <div className="flex justify-between items-center py-6">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">
-                    📬 Gestion des Emails
+                    ðŸ“¬ Gestion des Emails
                   </h1>
                   <p className="text-gray-600 mt-1">
-                    Centre de contrôle pour toutes les communications par email
+                    Centre de contrÃ´le pour toutes les communications par email
                   </p>
                 </div>
               </div>
@@ -100,30 +100,30 @@ const AdminEmailsPage: React.FC = () => {
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Tabs defaultValue="campaigns" className="w-full">
-              <Tab value="campaigns" label="📆 Campagnes programmées">
+              <Tab value="campaigns" label="ðŸ“† Campagnes programmÃ©es">
                 <CampaignsPage />
               </Tab>
-              <Tab value="templates" label="🧱 Templates d'emails">
+              <Tab value="templates" label="ðŸ§± Templates d'emails">
                 <TemplatesManager />
               </Tab>
-              <Tab value="contact" label="✉️ Répondre à un message de contact">
+              <Tab value="contact" label="âœ‰ï¸ RÃ©pondre Ã  un message de contact">
                 <SendToContact />
               </Tab>
-              <Tab value="sendOne" label="👤 Envoi individuel">
+              <Tab value="sendOne" label="ðŸ‘¤ Envoi individuel">
                 <SendToOne />
               </Tab>
-              <Tab value="sendRole" label="👥 Envoi par rôle">
+              <Tab value="sendRole" label="ðŸ‘¥ Envoi par rÃ´le">
                 <SendToRoles />
               </Tab>
-              <Tab value="sendSelection" label="✅ Envoi ciblé manuel">
+              <Tab value="sendSelection" label="âœ… Envoi ciblÃ© manuel">
                 <SendToSelection />
               </Tab>
-              <Tab value="logs" label="🕓 Historique des envois">
+              <Tab value="logs" label="ðŸ•“ Historique des envois">
                 <LogsPage />
               </Tab>
             </Tabs>
 
-            {/* Aperçu HTML/MJML à activer globalement si nécessaire */}
+            {/* AperÃ§u HTML/MJML Ã  activer globalement si nÃ©cessaire */}
             <EmailPreviewModal />
           </div>
         </div>

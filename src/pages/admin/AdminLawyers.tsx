@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   collection,
   query as fsQuery,
@@ -55,7 +55,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
   fr: {
     title: "Avocats",
     subtitle: "Gestion des avocats (validation, KYC, statut, notation)",
-    search: "Nom, email, N° barreau…",
+    search: "Nom, email, NÂ° barreauâ€¦",
     filters: "Filtres",
     columns: "Colonnes",
     showAll: "Tout",
@@ -66,42 +66,42 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     active: "Actifs",
     suspended: "Suspendus",
     pending: "En attente",
-    validated: "Validés",
-    notValidated: "Non validés",
+    validated: "ValidÃ©s",
+    notValidated: "Non validÃ©s",
     kyc: "KYC",
     kycPending: "En cours",
-    kycVerified: "Vérifié",
-    kycRejected: "Refusé",
-    kycRequested: "Demandé",
+    kycVerified: "VÃ©rifiÃ©",
+    kycRejected: "RefusÃ©",
+    kycRequested: "DemandÃ©",
     status: "Statut",
     all: "Tous",
-    blocked: "Bloqué",
-    emailVerified: "Email vérifié",
-    verified: "Vérifié",
-    unverified: "Non vérifié",
+    blocked: "BloquÃ©",
+    emailVerified: "Email vÃ©rifiÃ©",
+    verified: "VÃ©rifiÃ©",
+    unverified: "Non vÃ©rifiÃ©",
     validationStatus: "Validation",
-    period: "Période",
+    period: "PÃ©riode",
     today: "Aujourd'hui",
     week: "Cette semaine",
     month: "Ce mois",
     country: "Pays",
-    specialties: "Spécialités (contient)",
+    specialties: "SpÃ©cialitÃ©s (contient)",
     languages: "Langues (contient)",
-    barId: "N° barreau (contient)",
+    barId: "NÂ° barreau (contient)",
     tableName: "Nom",
     tableEmail: "Email",
-    tableEmailVerif: "Email vérifié",
-    tablePhone: "Téléphone",
+    tableEmailVerif: "Email vÃ©rifiÃ©",
+    tablePhone: "TÃ©lÃ©phone",
     tableCountry: "Pays",
     tableCity: "Ville",
-    tableBarId: "N° barreau",
+    tableBarId: "NÂ° barreau",
     tableBarCountry: "Pays du barreau",
     tableLanguages: "Langues",
-    tableSpecialties: "Spécialités",
+    tableSpecialties: "SpÃ©cialitÃ©s",
     tableRating: "Note",
     tableReviews: "Avis",
     tableSignup: "Inscription",
-    tableLastLogin: "Dernière connexion",
+    tableLastLogin: "DerniÃ¨re connexion",
     tableAccount: "Compte",
     tableValidation: "Validation",
     tableKyc: "KYC",
@@ -109,8 +109,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     approve: "Valider",
     reject: "Refuser",
     requestKyc: "Demander KYC",
-    setKycVerified: "KYC Vérifié",
-    setKycRejected: "KYC Refusé",
+    setKycVerified: "KYC VÃ©rifiÃ©",
+    setKycRejected: "KYC RefusÃ©",
     activate: "Activer",
     suspend: "Suspendre",
     delete: "Supprimer",
@@ -119,45 +119,45 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     bulkReject: "Refuser",
     bulkSuspend: "Suspendre",
     bulkDelete: "Supprimer",
-    selected: "sélectionné(s)",
-    noneTitle: "Aucun avocat trouvé",
-    noneBody: "Aucun avocat ne correspond aux critères.",
-    loading: "Chargement…",
+    selected: "sÃ©lectionnÃ©(s)",
+    noneTitle: "Aucun avocat trouvÃ©",
+    noneBody: "Aucun avocat ne correspond aux critÃ¨res.",
+    loading: "Chargementâ€¦",
     rowsPerPage: "Lignes / page",
     page: "Page",
     of: "sur",
-    successUpdate: "Mise à jour réussie.",
-    errorUpdate: "Erreur lors de la mise à jour.",
-    retry: "Réessayer",
+    successUpdate: "Mise Ã  jour rÃ©ussie.",
+    errorUpdate: "Erreur lors de la mise Ã  jour.",
+    retry: "RÃ©essayer",
     lang: "Langue",
     reasonTitleSuspend: "Raison de suspension",
     reasonTitleDelete: "Confirmer la suppression",
     reasonTitleReject: "Raison de refus de validation",
     reasonTitleKycRequest: "Message de demande KYC (optionnel)",
     reasonLabel: "Raison (obligatoire)",
-    reasonPlaceholder: "Ex: pièce non conforme, incohérence identité…",
+    reasonPlaceholder: "Ex: piÃ¨ce non conforme, incohÃ©rence identitÃ©â€¦",
     optionalMessage: "Message (optionnel)",
     cancel: "Annuler",
     confirm: "Confirmer",
-    copied: "Copié ✅",
-    exportAllRunning: "Export en cours…",
-    exportAllDone: "Export terminé ✅",
+    copied: "CopiÃ© âœ…",
+    exportAllRunning: "Export en coursâ€¦",
+    exportAllDone: "Export terminÃ© âœ…",
     exportAllCap: "Limite atteinte (5000 lignes). Affinez vos filtres.",
     contact: "Contacter",
     copyEmail: "Copier email",
     copyId: "Copier ID",
-    sortAsc: "Tri ↑",
-    sortDesc: "Tri ↓",
+    sortAsc: "Tri â†‘",
+    sortDesc: "Tri â†“",
     dateFrom: "Du",
     dateTo: "Au",
     quick: "Raccourcis",
-    syncedStripe: "Synchronisé Stripe",
-    resetLayout: "Réinitialiser colonnes",
+    syncedStripe: "SynchronisÃ© Stripe",
+    resetLayout: "RÃ©initialiser colonnes",
   },
   en: {
     title: "Lawyers",
     subtitle: "Lawyers management (validation, KYC, status, rating)",
-    search: "Name, email, Bar ID…",
+    search: "Name, email, Bar IDâ€¦",
     filters: "Filters",
     columns: "Columns",
     showAll: "All",
@@ -224,7 +224,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     selected: "selected",
     noneTitle: "No lawyers found",
     noneBody: "No lawyers match your filters.",
-    loading: "Loading…",
+    loading: "Loadingâ€¦",
     rowsPerPage: "Rows / page",
     page: "Page",
     of: "of",
@@ -237,19 +237,19 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     reasonTitleReject: "Validation rejection reason",
     reasonTitleKycRequest: "KYC request message (optional)",
     reasonLabel: "Reason (required)",
-    reasonPlaceholder: "Eg: non compliant document, identity mismatch…",
+    reasonPlaceholder: "Eg: non compliant document, identity mismatchâ€¦",
     optionalMessage: "Message (optional)",
     cancel: "Cancel",
     confirm: "Confirm",
-    copied: "Copied ✅",
-    exportAllRunning: "Export running…",
-    exportAllDone: "Export finished ✅",
+    copied: "Copied âœ…",
+    exportAllRunning: "Export runningâ€¦",
+    exportAllDone: "Export finished âœ…",
     exportAllCap: "Cap reached (5000 rows). Refine filters.",
     contact: "Contact",
     copyEmail: "Copy email",
     copyId: "Copy ID",
-    sortAsc: "Sort ↑",
-    sortDesc: "Sort ↓",
+    sortAsc: "Sort â†‘",
+    sortDesc: "Sort â†“",
     dateFrom: "From",
     dateTo: "To",
     quick: "Shortcuts",
@@ -521,7 +521,7 @@ const AdminLawyers: React.FC = () => {
   const [hasNext, setHasNext] = useState(false);
   const [totalExact, setTotalExact] = useState<number | null>(null);
 
-  // listeners temps réel par doc visible
+  // listeners temps rÃ©el par doc visible
   const docUnsubsRef = useRef<Record<string, Unsubscribe>>({});
 
   useEffect(() => {
@@ -675,7 +675,7 @@ const AdminLawyers: React.FC = () => {
         };
       });
 
-      // filtres "contient" côté page
+      // filtres "contient" cÃ´tÃ© page
       const hasTerm = filters.searchTerm.trim();
       const hasSpec = filters.specialties.trim();
       const hasLang = filters.langs.trim();
@@ -709,7 +709,7 @@ const AdminLawyers: React.FC = () => {
 
       setRows(data);
 
-      // temps réel
+      // temps rÃ©el
       data.forEach((row) => {
         const id = row.id;
         const ref = doc(db, "users", id);
@@ -815,7 +815,7 @@ const AdminLawyers: React.FC = () => {
   const setKyc = async (id: string, next: KycStatus, message?: string) => {
     try {
       const row = rows.find((r) => r.id === id);
-      if (row?.kycProvider === "stripe") return; // read-only si piloté Stripe
+      if (row?.kycProvider === "stripe") return; // read-only si pilotÃ© Stripe
       const payload: Record<string, unknown> = { kycStatus: next, updatedAt: new Date() };
       if (message) payload["kycMessage"] = message;
       await updateDoc(doc(db, "users", id), payload);
@@ -844,7 +844,7 @@ const AdminLawyers: React.FC = () => {
   // Bulk
   const onBulk = (action: "approve" | "reject" | "suspend" | "delete") => {
     if (selected.length === 0) {
-      alert("Sélection vide.");
+      alert("SÃ©lection vide.");
       return;
     }
     if (action === "reject" || action === "suspend" || action === "delete") {
@@ -913,7 +913,7 @@ const AdminLawyers: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Export all (filters) — cap 5000
+  // Export all (filters) â€” cap 5000
   const exportAll = async () => {
     try {
       alert(t("exportAllRunning"));
@@ -1165,36 +1165,36 @@ const AdminLawyers: React.FC = () => {
           </div>
         );
       case "phone":
-        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.phone || "—"}</div>;
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.phone || "â€”"}</div>;
       case "country":
-        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.country || "—"}</div>;
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.country || "â€”"}</div>;
       case "city":
-        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.city || "—"}</div>;
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.city || "â€”"}</div>;
       case "barId":
-        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.barId || "—"}</div>;
+        return <div style={cellStyleFor(col)} className="text-sm truncate">{l.barId || "â€”"}</div>;
       case "barCountry":
         return (
           <div style={cellStyleFor(col)} className="text-sm truncate">
-            {l.barCountry || "—"}
+            {l.barCountry || "â€”"}
           </div>
         );
       case "languages":
         return (
           <div style={cellStyleFor(col)} className="text-sm truncate flex items-center gap-2">
             <LanguagesIcon className="w-4 h-4 text-gray-400" />
-            {(l.languages || []).join(", ") || "—"}
+            {(l.languages || []).join(", ") || "â€”"}
           </div>
         );
       case "specialties":
         return (
           <div style={cellStyleFor(col)} className="text-sm truncate">
-            {(l.specialties || []).join(", ") || "—"}
+            {(l.specialties || []).join(", ") || "â€”"}
           </div>
         );
       case "rating":
         return (
           <div style={cellStyleFor(col)} className="text-sm">
-            {typeof l.rating === "number" ? l.rating.toFixed(1) : "—"}
+            {typeof l.rating === "number" ? l.rating.toFixed(1) : "â€”"}
           </div>
         );
       case "reviews":
@@ -1208,7 +1208,7 @@ const AdminLawyers: React.FC = () => {
       case "lastLogin":
         return (
           <div style={cellStyleFor(col)} className="text-sm">
-            {l.lastLoginAt ? l.lastLoginAt.toLocaleDateString() : "—"}
+            {l.lastLoginAt ? l.lastLoginAt.toLocaleDateString() : "â€”"}
           </div>
         );
       case "accountStatus":
@@ -1239,7 +1239,7 @@ const AdminLawyers: React.FC = () => {
       case "kyc":
         return (
           <div style={cellStyleFor(col)} className="text-sm">
-            {l.kycStatus} {l.kycProvider === "stripe" ? `• ${t("syncedStripe")}` : ""}
+            {l.kycStatus} {l.kycProvider === "stripe" ? `â€¢ ${t("syncedStripe")}` : ""}
           </div>
         );
       default:
@@ -1388,7 +1388,7 @@ const AdminLawyers: React.FC = () => {
               onChange={(e) => setLang(e.target.value as Lang)}
               className="border border-gray-300 rounded-md px-2 py-2 text-sm"
             >
-              <option value="fr">Français</option>
+              <option value="fr">FranÃ§ais</option>
               <option value="en">English</option>
             </select>
 
@@ -1409,7 +1409,7 @@ const AdminLawyers: React.FC = () => {
           </div>
         </div>
 
-        {/* Cards synthèse */}
+        {/* Cards synthÃ¨se */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center">
@@ -1418,7 +1418,7 @@ const AdminLawyers: React.FC = () => {
               </div>
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-500">{t("totalExact")}</h3>
-                <p className="text-2xl font-bold text-gray-900">{totalExact ?? "—"}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalExact ?? "â€”"}</p>
               </div>
             </div>
           </div>
@@ -1575,7 +1575,7 @@ const AdminLawyers: React.FC = () => {
                       country: (e.target.value || "all") as FilterOptions["country"],
                     })
                   }
-                  placeholder="FR, MA, SN…"
+                  placeholder="FR, MA, SNâ€¦"
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
@@ -1588,7 +1588,7 @@ const AdminLawyers: React.FC = () => {
                   type="text"
                   value={filters.specialties}
                   onChange={(e) => setFilters({ ...filters, specialties: e.target.value })}
-                  placeholder="Ex: droit fiscal, pénal…"
+                  placeholder="Ex: droit fiscal, pÃ©nalâ€¦"
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
@@ -1601,7 +1601,7 @@ const AdminLawyers: React.FC = () => {
                   type="text"
                   value={filters.langs}
                   onChange={(e) => setFilters({ ...filters, langs: e.target.value })}
-                  placeholder="fr, en, ar…"
+                  placeholder="fr, en, arâ€¦"
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
@@ -1614,7 +1614,7 @@ const AdminLawyers: React.FC = () => {
                   type="text"
                   value={filters.barId}
                   onChange={(e) => setFilters({ ...filters, barId: e.target.value })}
-                  placeholder="N° barreau"
+                  placeholder="NÂ° barreau"
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
               </div>
@@ -1959,7 +1959,7 @@ const AdminLawyers: React.FC = () => {
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <span className="text-sm">
-                  {pageIndex} {t("of")} {hasNext ? "…" : pageIndex}
+                  {pageIndex} {t("of")} {hasNext ? "â€¦" : pageIndex}
                 </span>
                 <Button
                   variant="secondary"
@@ -1973,7 +1973,7 @@ const AdminLawyers: React.FC = () => {
             </div>
 
             <div className="text-xs text-gray-500">
-              {t("totalExact")}: {totalExact ?? "—"}
+              {t("totalExact")}: {totalExact ?? "â€”"}
             </div>
           </div>
         </div>

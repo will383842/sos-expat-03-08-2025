@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Search, Phone, Mail, Book, Users, CreditCard, HelpCircle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
@@ -20,54 +20,54 @@ const HelpCenter: React.FC = () => {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [isLoading] = useState(false);
 
-  // --- Articles (couverture mondiale + toutes langues, prix 19€ / 25$ et 49€ / 55$ partout) ---
+  // --- Articles (couverture mondiale + toutes langues, prix 19â‚¬ / 25$ et 49â‚¬ / 55$ partout) ---
   const articles: Article[] = [
     // Appels d'urgence
     {
       id: '1',
       title: language === 'fr'
-        ? "Appel d'urgence : comment ça marche"
+        ? "Appel d'urgence : comment Ã§a marche"
         : 'Emergency call: how it works',
       excerpt: language === 'fr'
-        ? 'Mise en relation immédiate avec un avocat ou un expatrié — couverture mondiale'
-        : 'Instant match with a lawyer or an expat — worldwide coverage',
+        ? 'Mise en relation immÃ©diate avec un avocat ou un expatriÃ© â€” couverture mondiale'
+        : 'Instant match with a lawyer or an expat â€” worldwide coverage',
       category: 'emergency_calls',
       tags: ['sos', 'urgence', 'mise en relation', 'international'],
       readTime: 3,
       content: language === 'fr'
-        ? `# Appel d'urgence : comment ça marche
+        ? `# Appel d'urgence : comment Ã§a marche
 
-Notre plateforme est **une solution de mise en relation internationale** (couverture mondiale, selon disponibilité des appels et paiements). Nous ne sommes **pas** un cabinet ; les **experts sont indépendants**.
+Notre plateforme est **une solution de mise en relation internationale** (couverture mondiale, selon disponibilitÃ© des appels et paiements). Nous ne sommes **pas** un cabinet ; les **experts sont indÃ©pendants**.
 
-## Étape 1 — Choisissez le type d'aide
-- **Avocat** : 49€ / 55$ — 20 min
-- **Expatrié** : 19€ / 25$ — 30 min
+## Ã‰tape 1 â€” Choisissez le type d'aide
+- **Avocat** : 49â‚¬ / 55$ â€” 20 min
+- **ExpatriÃ©** : 19â‚¬ / 25$ â€” 30 min
 
-## Étape 2 — Décrivez votre situation
-En quelques lignes pour être aidé efficacement.
+## Ã‰tape 2 â€” DÃ©crivez votre situation
+En quelques lignes pour Ãªtre aidÃ© efficacement.
 
-## Étape 3 — Paiement sécurisé (Stripe)
-Vous n'êtes débité **qu'après la confirmation** de l'appel.
+## Ã‰tape 3 â€” Paiement sÃ©curisÃ© (Stripe)
+Vous n'Ãªtes dÃ©bitÃ© **qu'aprÃ¨s la confirmation** de l'appel.
 
-## Étape 4 — Mise en relation automatique
+## Ã‰tape 4 â€” Mise en relation automatique
 Vous recevez un appel **sous 5 minutes** en moyenne.
 
-**Langue** : vous pouvez être aidé **dans toute langue parlée par au moins un expert** (avocat ou expatrié).`
+**Langue** : vous pouvez Ãªtre aidÃ© **dans toute langue parlÃ©e par au moins un expert** (avocat ou expatriÃ©).`
         : `# Emergency call: how it works
 
 We are **an international matchmaking platform** (worldwide coverage, where calls and payments are possible). We are **not** a law firm; experts are **independent**.
 
-## Step 1 — Pick the help type
-- **Lawyer**: €49 / $55 — 20 min
-- **Expat**: €19 / $25 — 30 min
+## Step 1 â€” Pick the help type
+- **Lawyer**: â‚¬49 / $55 â€” 20 min
+- **Expat**: â‚¬19 / $25 â€” 30 min
 
-## Step 2 — Describe your situation
+## Step 2 â€” Describe your situation
 A short summary helps the expert assist you efficiently.
 
-## Step 3 — Secure payment (Stripe)
+## Step 3 â€” Secure payment (Stripe)
 You are charged **only after the call is confirmed**.
 
-## Step 4 — Automatic connection
+## Step 4 â€” Automatic connection
 You typically receive a call **within 5 minutes**.
 
 **Language**: you can get help **in any language spoken by at least one expert** (lawyer or expat).`
@@ -76,26 +76,26 @@ You typically receive a call **within 5 minutes**.
     {
       id: '2',
       title: language === 'fr'
-        ? "Si l'expert ne répond pas"
+        ? "Si l'expert ne rÃ©pond pas"
         : "If the expert doesn't answer",
       excerpt: language === 'fr'
-        ? 'Remboursement automatique et immédiat, puis alternatives'
+        ? 'Remboursement automatique et immÃ©diat, puis alternatives'
         : 'Automatic and immediate refund, plus alternatives',
       category: 'emergency_calls',
-      tags: ['remboursement', 'immédiat', 'disponibilité'],
+      tags: ['remboursement', 'immÃ©diat', 'disponibilitÃ©'],
       readTime: 2,
       content: language === 'fr'
-        ? `# Si l'expert ne répond pas
+        ? `# Si l'expert ne rÃ©pond pas
 
-## Remboursement immédiat
-Après **3 tentatives d'appel** espacées de 2 minutes, vous êtes **automatiquement remboursé immédiatement** via Stripe.
+## Remboursement immÃ©diat
+AprÃ¨s **3 tentatives d'appel** espacÃ©es de 2 minutes, vous Ãªtes **automatiquement remboursÃ© immÃ©diatement** via Stripe.
 
 ## Alternatives
 1. **Choisir un autre expert** tout de suite
-2. **Réessayer plus tard** avec le même expert
+2. **RÃ©essayer plus tard** avec le mÃªme expert
 3. **Contacter le support** si besoin
 
-*Note : pas de "garantie satisfaction" commerciale. Nous appliquons une **politique de remboursement immédiat** en cas de non-réponse.*`
+*Note : pas de "garantie satisfaction" commerciale. Nous appliquons une **politique de remboursement immÃ©diat** en cas de non-rÃ©ponse.*`
         : `# If the expert doesn't answer
 
 ## Immediate refund
@@ -113,27 +113,27 @@ After **3 call attempts** spaced 2 minutes apart, you are **automatically refund
     {
       id: '3',
       title: language === 'fr'
-        ? 'Langues et disponibilité'
+        ? 'Langues et disponibilitÃ©'
         : 'Languages & availability',
       excerpt: language === 'fr'
-        ? 'Aide possible dans toute langue parlée par un expert — couverture mondiale'
-        : 'Help in any language spoken by an expert — worldwide coverage',
+        ? 'Aide possible dans toute langue parlÃ©e par un expert â€” couverture mondiale'
+        : 'Help in any language spoken by an expert â€” worldwide coverage',
       category: 'user_account',
       tags: ['langues', 'monde', 'international'],
       readTime: 3,
       content: language === 'fr'
-        ? `# Langues et disponibilité
+        ? `# Langues et disponibilitÃ©
 
-- **Couverture mondiale** : nos experts sont répartis sur tous les continents.
-- **Langues** : si un **avocat** ou un **expatrié** parle une langue, **elle est disponible** sur la plateforme.
-- Vous pouvez filtrer/choisir un expert selon **sa langue**, **son pays**, ou **sa spécialité**.
-- Si votre langue n'apparaît pas, contactez le support : nous vous prévenons dès qu'un expert correspondant est disponible.`
+- **Couverture mondiale** : nos experts sont rÃ©partis sur tous les continents.
+- **Langues** : si un **avocat** ou un **expatriÃ©** parle une langue, **elle est disponible** sur la plateforme.
+- Vous pouvez filtrer/choisir un expert selon **sa langue**, **son pays**, ou **sa spÃ©cialitÃ©**.
+- Si votre langue n'apparaÃ®t pas, contactez le support : nous vous prÃ©venons dÃ¨s qu'un expert correspondant est disponible.`
         : `# Languages & availability
 
 - **Worldwide coverage**: experts are located across all continents.
-- **Languages**: if a **lawyer** or an **expat** speaks a language, **it’s available** on the platform.
+- **Languages**: if a **lawyer** or an **expat** speaks a language, **itâ€™s available** on the platform.
 - You can filter/select an expert by **language**, **country**, or **specialty**.
-- If your language isn’t listed, contact support: we’ll notify you once a matching expert is available.`
+- If your language isnâ€™t listed, contact support: weâ€™ll notify you once a matching expert is available.`
     },
 
     {
@@ -142,17 +142,17 @@ After **3 call attempts** spaced 2 minutes apart, you are **automatically refund
         ? 'Qui sont les experts ?'
         : 'Who are the experts?',
       excerpt: language === 'fr'
-        ? "Professionnels et expatriés expérimentés, **indépendants** — la plateforme organise la mise en relation"
-        : 'Professionals and experienced expats, **independent** — the platform handles matchmaking',
+        ? "Professionnels et expatriÃ©s expÃ©rimentÃ©s, **indÃ©pendants** â€” la plateforme organise la mise en relation"
+        : 'Professionals and experienced expats, **independent** â€” the platform handles matchmaking',
       category: 'user_account',
-      tags: ['experts', 'indépendants', 'mise en relation'],
+      tags: ['experts', 'indÃ©pendants', 'mise en relation'],
       readTime: 3,
       content: language === 'fr'
         ? `# Qui sont les experts ?
 
-- **Indépendants** : avocats et expatriés ne sont **pas nos employés**.
-- **Vérifications** : nous réalisons des contrôles documentaires et de profil.
-- **Rôles** : l'expert est responsable de ses conseils ; la **plateforme** gère la **mise en relation**, le **routage des appels**, le **paiement sécurisé** et l'**assistance**.`
+- **IndÃ©pendants** : avocats et expatriÃ©s ne sont **pas nos employÃ©s**.
+- **VÃ©rifications** : nous rÃ©alisons des contrÃ´les documentaires et de profil.
+- **RÃ´les** : l'expert est responsable de ses conseils ; la **plateforme** gÃ¨re la **mise en relation**, le **routage des appels**, le **paiement sÃ©curisÃ©** et l'**assistance**.`
         : `# Who are the experts?
 
 - **Independent**: lawyers and expats are **not our employees**.
@@ -167,55 +167,55 @@ After **3 call attempts** spaced 2 minutes apart, you are **automatically refund
         ? 'Frais de mise en relation et tarifs'
         : 'Matchmaking fee & pricing',
       excerpt: language === 'fr'
-        ? 'Aucune commission — un **frais de mise en relation** inclus dans un prix fixe'
-        : 'No commissions — a **matchmaking fee** included in a fixed price',
+        ? 'Aucune commission â€” un **frais de mise en relation** inclus dans un prix fixe'
+        : 'No commissions â€” a **matchmaking fee** included in a fixed price',
       category: 'payments',
       tags: ['tarifs', 'frais', 'mise en relation', 'prix fixes'],
       readTime: 3,
       content: language === 'fr'
         ? `# Frais de mise en relation et tarifs
 
-- **Pas de commission** : nous ne prenons pas de commission sur votre échange.
+- **Pas de commission** : nous ne prenons pas de commission sur votre Ã©change.
 - Un **frais de mise en relation** est **inclus** dans le **prix fixe** :
-  - **Avocat** : 49€ / 55$ (20 min)
-  - **Expatrié** : 19€ / 25$ (30 min)
-- **Aucun frais caché**. Le frais de mise en relation couvre l'**infrastructure**, le **paiement sécurisé**, le **support**, et la **mise en relation internationale**.`
+  - **Avocat** : 49â‚¬ / 55$ (20 min)
+  - **ExpatriÃ©** : 19â‚¬ / 25$ (30 min)
+- **Aucun frais cachÃ©**. Le frais de mise en relation couvre l'**infrastructure**, le **paiement sÃ©curisÃ©**, le **support**, et la **mise en relation internationale**.`
         : `# Matchmaking fee & pricing
 
 - **No commissions**: we do not take a commission on your conversation.
 - A **matchmaking fee** is **included** in the **fixed price**:
-  - **Lawyer**: €49 / $55 (20 min)
-  - **Expat**: €19 / $25 (30 min)
+  - **Lawyer**: â‚¬49 / $55 (20 min)
+  - **Expat**: â‚¬19 / $25 (30 min)
 - **No hidden fees**. The matchmaking fee covers **infrastructure**, **secure payments**, **support**, and **international matchmaking**.`
     },
 
     {
       id: '6',
       title: language === 'fr'
-        ? 'Paiement et sécurité'
+        ? 'Paiement et sÃ©curitÃ©'
         : 'Payment & security',
       excerpt: language === 'fr'
-        ? 'Stripe, chiffrement, aucune donnée bancaire stockée, facture automatique'
+        ? 'Stripe, chiffrement, aucune donnÃ©e bancaire stockÃ©e, facture automatique'
         : 'Stripe, encryption, no card data stored, automatic invoice',
       category: 'payments',
-      tags: ['stripe', 'sécurité', 'facture'],
+      tags: ['stripe', 'sÃ©curitÃ©', 'facture'],
       readTime: 3,
       content: language === 'fr'
-        ? `# Paiement et sécurité
+        ? `# Paiement et sÃ©curitÃ©
 
 ## Moyens de paiement
 - Visa, Mastercard, American Express
 - Apple Pay, Google Pay
-- Cartes de débit/crédit internationales
+- Cartes de dÃ©bit/crÃ©dit internationales
 
-## Sécurité
+## SÃ©curitÃ©
 - Paiements via **Stripe**
 - Chiffrement **SSL 256-bit**
-- **Aucune donnée bancaire stockée** chez nous
+- **Aucune donnÃ©e bancaire stockÃ©e** chez nous
 
 ## Facturation
 - **Facture PDF automatique** dans votre dashboard
-- Montants affichés en **€ et $**`
+- Montants affichÃ©s en **â‚¬ et $**`
         : `# Payment & security
 
 ## Payment methods
@@ -230,7 +230,7 @@ After **3 call attempts** spaced 2 minutes apart, you are **automatically refund
 
 ## Billing
 - **Automatic PDF invoice** in your dashboard
-- Prices shown in **€ and $**`
+- Prices shown in **â‚¬ and $**`
     },
 
     // Guides pratiques internationaux
@@ -240,44 +240,44 @@ After **3 call attempts** spaced 2 minutes apart, you are **automatically refund
         ? 'Couverture mondiale'
         : 'Worldwide coverage',
       excerpt: language === 'fr'
-        ? "Fonctionne dans la plupart des pays du monde — pensez au fuseau horaire et au numéro international"
-        : 'Works in most countries worldwide — mind time zones and international numbers',
+        ? "Fonctionne dans la plupart des pays du monde â€” pensez au fuseau horaire et au numÃ©ro international"
+        : 'Works in most countries worldwide â€” mind time zones and international numbers',
       category: 'practical_guides',
       tags: ['monde', 'fuseaux horaires', 'international'],
       readTime: 4,
       content: language === 'fr'
         ? `# Couverture mondiale
 
-- Disponible **dans le monde entier** (là où les appels téléphoniques et paiements sont possibles).
-- Vérifiez votre **numéro de téléphone** (inclure l'**indicatif international**).
+- Disponible **dans le monde entier** (lÃ  oÃ¹ les appels tÃ©lÃ©phoniques et paiements sont possibles).
+- VÃ©rifiez votre **numÃ©ro de tÃ©lÃ©phone** (inclure l'**indicatif international**).
 - Tenez compte du **fuseau horaire** de l'expert.
-- En cas de restrictions d'itinérance/VoIP, privilégiez un numéro joignable ou contactez le support.`
+- En cas de restrictions d'itinÃ©rance/VoIP, privilÃ©giez un numÃ©ro joignable ou contactez le support.`
         : `# Worldwide coverage
 
 - Available **worldwide** (where phone calls and payments are possible).
 - Ensure your **phone number** includes the **international prefix**.
-- Consider the expert’s **time zone**.
+- Consider the expertâ€™s **time zone**.
 - If roaming/VoIP is restricted, use a reachable number or contact support.`
     },
 
     {
       id: '8',
       title: language === 'fr'
-        ? 'Conseils pour un appel réussi'
+        ? 'Conseils pour un appel rÃ©ussi'
         : 'Tips for a successful call',
       excerpt: language === 'fr'
-        ? 'Préparez un bref résumé, gardez votre téléphone disponible, choisissez la langue'
+        ? 'PrÃ©parez un bref rÃ©sumÃ©, gardez votre tÃ©lÃ©phone disponible, choisissez la langue'
         : 'Prepare a short summary, keep your phone available, pick the right language',
       category: 'practical_guides',
-      tags: ['conseils', 'qualité', 'préparation'],
+      tags: ['conseils', 'qualitÃ©', 'prÃ©paration'],
       readTime: 3,
       content: language === 'fr'
-        ? `# Conseils pour un appel réussi
+        ? `# Conseils pour un appel rÃ©ussi
 
-- Préparez un **résumé clair** de votre situation.
+- PrÃ©parez un **rÃ©sumÃ© clair** de votre situation.
 - Choisissez la **langue** qui vous convient avec l'expert (toutes langues possibles si un expert la parle).
-- Assurez-vous d'être dans un **endroit calme** et d'avoir une **bonne réception**.
-- Laissez votre **téléphone disponible** juste après le paiement.`
+- Assurez-vous d'Ãªtre dans un **endroit calme** et d'avoir une **bonne rÃ©ception**.
+- Laissez votre **tÃ©lÃ©phone disponible** juste aprÃ¨s le paiement.`
         : `# Tips for a successful call
 
 - Prepare a **clear summary** of your situation.
@@ -286,62 +286,62 @@ After **3 call attempts** spaced 2 minutes apart, you are **automatically refund
 - Keep your **phone available** right after payment.`
     },
 
-    // ====== Questions diverses (FAQ étendue) ======
+    // ====== Questions diverses (FAQ Ã©tendue) ======
     {
       id: '9',
       title: language === 'fr'
-        ? 'Puis-je choisir un expert précis ?'
+        ? 'Puis-je choisir un expert prÃ©cis ?'
         : 'Can I pick a specific expert?',
       excerpt: language === 'fr'
-        ? 'Oui. Filtrez par langue, pays, spécialité et disponibilités.'
+        ? 'Oui. Filtrez par langue, pays, spÃ©cialitÃ© et disponibilitÃ©s.'
         : 'Yes. Filter by language, country, specialty, and availability.',
       category: 'general_faq',
       tags: ['choisir', 'expert', 'filtre'],
       readTime: 2,
       content: language === 'fr'
-        ? `# Puis-je choisir un expert précis ?
+        ? `# Puis-je choisir un expert prÃ©cis ?
 
-Oui. Utilisez les filtres (**langue**, **pays**, **spécialité**) et sélectionnez l'expert qui vous convient. Si l'expert ne répond pas, vous êtes **remboursé immédiatement** et pouvez en choisir un autre.`
+Oui. Utilisez les filtres (**langue**, **pays**, **spÃ©cialitÃ©**) et sÃ©lectionnez l'expert qui vous convient. Si l'expert ne rÃ©pond pas, vous Ãªtes **remboursÃ© immÃ©diatement** et pouvez en choisir un autre.`
         : `# Can I pick a specific expert?
 
-Yes. Use filters (**language**, **country**, **specialty**) to select the expert you want. If the expert doesn’t answer, you get an **immediate refund** and can pick another.`
+Yes. Use filters (**language**, **country**, **specialty**) to select the expert you want. If the expert doesnâ€™t answer, you get an **immediate refund** and can pick another.`
     },
 
     {
       id: '10',
       title: language === 'fr'
-        ? "Puis-je reprogrammer ou annuler avant l’appel ?"
+        ? "Puis-je reprogrammer ou annuler avant lâ€™appel ?"
         : 'Can I reschedule or cancel before the call?',
       excerpt: language === 'fr'
-        ? 'Annulation avant connexion : remboursement immédiat.'
+        ? 'Annulation avant connexion : remboursement immÃ©diat.'
         : 'Cancel before connection: immediate refund.',
       category: 'general_faq',
       tags: ['annulation', 'reprogrammation', 'remboursement'],
       readTime: 2,
       content: language === 'fr'
-        ? `# Puis-je reprogrammer ou annuler avant l’appel ?
+        ? `# Puis-je reprogrammer ou annuler avant lâ€™appel ?
 
-Oui. Tant que l'appel n'est pas établi, vous pouvez **annuler** et êtes **remboursé immédiatement**. Pour reprogrammer, lancez une nouvelle mise en relation au créneau souhaité.`
+Oui. Tant que l'appel n'est pas Ã©tabli, vous pouvez **annuler** et Ãªtes **remboursÃ© immÃ©diatement**. Pour reprogrammer, lancez une nouvelle mise en relation au crÃ©neau souhaitÃ©.`
         : `# Can I reschedule or cancel before the call?
 
-Yes. As long as the call hasn’t started, you can **cancel** and get an **immediate refund**. To reschedule, simply start a new match at your preferred time.`
+Yes. As long as the call hasnâ€™t started, you can **cancel** and get an **immediate refund**. To reschedule, simply start a new match at your preferred time.`
     },
 
     {
       id: '11',
       title: language === 'fr'
-        ? 'Que se passe-t-il si mon numéro est incorrect ?'
+        ? 'Que se passe-t-il si mon numÃ©ro est incorrect ?'
         : 'What if my phone number is wrong?',
       excerpt: language === 'fr'
-        ? 'Corrigez le numéro dans votre profil et relancez la mise en relation.'
+        ? 'Corrigez le numÃ©ro dans votre profil et relancez la mise en relation.'
         : 'Update your number in profile and restart matchmaking.',
       category: 'general_faq',
-      tags: ['numéro', 'profil', 'appel'],
+      tags: ['numÃ©ro', 'profil', 'appel'],
       readTime: 2,
       content: language === 'fr'
-        ? `# Que se passe-t-il si mon numéro est incorrect ?
+        ? `# Que se passe-t-il si mon numÃ©ro est incorrect ?
 
-Mettez à jour votre **numéro de téléphone** dans votre profil (avec l'**indicatif pays**) puis relancez la mise en relation.`
+Mettez Ã  jour votre **numÃ©ro de tÃ©lÃ©phone** dans votre profil (avec l'**indicatif pays**) puis relancez la mise en relation.`
         : `# What if my phone number is wrong?
 
 Update your **phone number** in your profile (with the **country code**) and start the matchmaking again.`
@@ -353,15 +353,15 @@ Update your **phone number** in your profile (with the **country code**) and sta
         ? "Est-ce un service d'urgence officiel ?"
         : 'Is this an official emergency service?',
       excerpt: language === 'fr'
-        ? 'Non. Plateforme de mise en relation avec des experts indépendants.'
+        ? 'Non. Plateforme de mise en relation avec des experts indÃ©pendants.'
         : 'No. We are a matchmaking platform with independent experts.',
       category: 'general_faq',
-      tags: ['urgence', 'disclaimer', 'indépendants'],
+      tags: ['urgence', 'disclaimer', 'indÃ©pendants'],
       readTime: 2,
       content: language === 'fr'
         ? `# Est-ce un service d'urgence officiel ?
 
-Non. Nous sommes une **plateforme de mise en relation** internationale. Les experts sont **indépendants**. En cas de danger immédiat, contactez les **services d'urgence locaux** de votre pays.`
+Non. Nous sommes une **plateforme de mise en relation** internationale. Les experts sont **indÃ©pendants**. En cas de danger immÃ©diat, contactez les **services d'urgence locaux** de votre pays.`
         : `# Is this an official emergency service?
 
 No. We are an **international matchmaking platform**. Experts are **independent**. In immediate danger, call your **local emergency services**.`
@@ -373,15 +373,15 @@ No. We are an **international matchmaking platform**. Experts are **independent*
         ? 'Prolongez-vous les appels ?'
         : 'Can I extend the call?',
       excerpt: language === 'fr'
-        ? 'Actuellement : durées fixes. Pour prolonger, refaites une mise en relation.'
+        ? 'Actuellement : durÃ©es fixes. Pour prolonger, refaites une mise en relation.'
         : 'Currently fixed durations. To extend, start a new match.',
       category: 'general_faq',
-      tags: ['durée', 'extension', 'appel'],
+      tags: ['durÃ©e', 'extension', 'appel'],
       readTime: 2,
       content: language === 'fr'
         ? `# Prolongez-vous les appels ?
 
-Les appels sont **à durée fixe** (Avocat 20 min, Expatrié 30 min). Pour prolonger, lancez **une nouvelle mise en relation** après l'appel.`
+Les appels sont **Ã  durÃ©e fixe** (Avocat 20 min, ExpatriÃ© 30 min). Pour prolonger, lancez **une nouvelle mise en relation** aprÃ¨s l'appel.`
         : `# Can I extend the call?
 
 Calls have **fixed durations** (Lawyer 20 min, Expat 30 min). To extend, **start a new matchmaking** after the call.`
@@ -390,40 +390,40 @@ Calls have **fixed durations** (Lawyer 20 min, Expat 30 min). To extend, **start
     {
       id: '14',
       title: language === 'fr'
-        ? 'Confidentialité de l’échange'
+        ? 'ConfidentialitÃ© de lâ€™Ã©change'
         : 'Privacy of your conversation',
       excerpt: language === 'fr'
-        ? 'Les experts sont tenus à la confidentialité selon leurs règles locales.'
+        ? 'Les experts sont tenus Ã  la confidentialitÃ© selon leurs rÃ¨gles locales.'
         : 'Experts follow confidentiality rules under their local regulations.',
       category: 'general_faq',
-      tags: ['confidentialité', 'vie privée', 'données'],
+      tags: ['confidentialitÃ©', 'vie privÃ©e', 'donnÃ©es'],
       readTime: 3,
       content: language === 'fr'
-        ? `# Confidentialité de l’échange
+        ? `# ConfidentialitÃ© de lâ€™Ã©change
 
-Les experts appliquent les **règles de confidentialité** et de **déontologie** propres à leur pays et à leur profession. Ne partagez pas d'informations sensibles si vous n'êtes pas à l'aise.`
+Les experts appliquent les **rÃ¨gles de confidentialitÃ©** et de **dÃ©ontologie** propres Ã  leur pays et Ã  leur profession. Ne partagez pas d'informations sensibles si vous n'Ãªtes pas Ã  l'aise.`
         : `# Privacy of your conversation
 
-Experts follow **confidentiality** and **professional conduct** rules applicable in their country and profession. Avoid sharing sensitive information if you’re not comfortable.`
+Experts follow **confidentiality** and **professional conduct** rules applicable in their country and profession. Avoid sharing sensitive information if youâ€™re not comfortable.`
     },
 
     {
       id: '15',
       title: language === 'fr'
-        ? 'Après le paiement, que reçois-je ?'
+        ? 'AprÃ¨s le paiement, que reÃ§ois-je ?'
         : 'What do I receive after payment?',
       excerpt: language === 'fr'
         ? 'Appel en quelques minutes + facture PDF dans le dashboard.'
         : 'A call within minutes + a PDF invoice in your dashboard.',
       category: 'general_faq',
-      tags: ['facture', 'récapitulatif', 'dashboard'],
+      tags: ['facture', 'rÃ©capitulatif', 'dashboard'],
       readTime: 2,
       content: language === 'fr'
-        ? `# Après le paiement, que reçois-je ?
+        ? `# AprÃ¨s le paiement, que reÃ§ois-je ?
 
 - Un **appel** dans les minutes qui suivent.
 - Une **facture PDF automatique** dans votre **dashboard**.
-- Un **récapitulatif** de l’échange peut être partagé par l’expert s’il le souhaite.`
+- Un **rÃ©capitulatif** de lâ€™Ã©change peut Ãªtre partagÃ© par lâ€™expert sâ€™il le souhaite.`
         : `# What do I receive after payment?
 
 - A **call** within minutes.
@@ -434,21 +434,21 @@ Experts follow **confidentiality** and **professional conduct** rules applicable
     {
       id: '16',
       title: language === 'fr'
-        ? 'Dans quelles langues puis-je être aidé ?'
+        ? 'Dans quelles langues puis-je Ãªtre aidÃ© ?'
         : 'Which languages are available?',
       excerpt: language === 'fr'
-        ? 'Toutes les langues parlées par au moins un expert sur la plateforme.'
+        ? 'Toutes les langues parlÃ©es par au moins un expert sur la plateforme.'
         : 'Any language that at least one expert on the platform speaks.',
       category: 'general_faq',
-      tags: ['langues', 'international', 'disponibilité'],
+      tags: ['langues', 'international', 'disponibilitÃ©'],
       readTime: 2,
       content: language === 'fr'
-        ? `# Dans quelles langues puis-je être aidé ?
+        ? `# Dans quelles langues puis-je Ãªtre aidÃ© ?
 
-**Toutes les langues** parlées par **au moins un** avocat ou expatrié sont disponibles. Filtrez la **langue** de l’expert lors de la recherche.`
+**Toutes les langues** parlÃ©es par **au moins un** avocat ou expatriÃ© sont disponibles. Filtrez la **langue** de lâ€™expert lors de la recherche.`
         : `# Which languages are available?
 
-**Any language** spoken by **at least one** lawyer or expat is available. Filter by the expert’s **language** when searching.`
+**Any language** spoken by **at least one** lawyer or expat is available. Filter by the expertâ€™s **language** when searching.`
     },
 
     // Nouvelles Q/R pour couverture mondiale explicite
@@ -458,7 +458,7 @@ Experts follow **confidentiality** and **professional conduct** rules applicable
         ? 'Est-ce disponible dans mon pays ?'
         : 'Is it available in my country?',
       excerpt: language === 'fr'
-        ? 'Oui, nous couvrons le monde entier (selon faisabilité appels/paiements).'
+        ? 'Oui, nous couvrons le monde entier (selon faisabilitÃ© appels/paiements).'
         : 'Yes, we cover the whole world (where calls/payments are feasible).',
       category: 'general_faq',
       tags: ['pays', 'monde', 'couverture'],
@@ -466,7 +466,7 @@ Experts follow **confidentiality** and **professional conduct** rules applicable
       content: language === 'fr'
         ? `# Est-ce disponible dans mon pays ?
 
-Oui, la **couverture est mondiale**. Dans certains pays, des restrictions télécom/paiement peuvent s'appliquer. Si une mise en relation ne peut pas être finalisée, vous êtes **remboursé immédiatement**.`
+Oui, la **couverture est mondiale**. Dans certains pays, des restrictions tÃ©lÃ©com/paiement peuvent s'appliquer. Si une mise en relation ne peut pas Ãªtre finalisÃ©e, vous Ãªtes **remboursÃ© immÃ©diatement**.`
         : `# Is it available in my country?
 
 Yes, **coverage is worldwide**. In some countries, telecom/payment restrictions may apply. If a match cannot be completed, you receive an **immediate refund**.`
@@ -477,26 +477,26 @@ Yes, **coverage is worldwide**. In some countries, telecom/payment restrictions 
         ? 'Et les langues rares ?'
         : 'What about rare languages?',
       excerpt: language === 'fr'
-        ? "Si un expert parle votre langue, c'est disponible ; sinon, on vous notifie dès qu'il y en a un."
-        : 'If an expert speaks your language, it’s available; otherwise we notify you when one is.',
+        ? "Si un expert parle votre langue, c'est disponible ; sinon, on vous notifie dÃ¨s qu'il y en a un."
+        : 'If an expert speaks your language, itâ€™s available; otherwise we notify you when one is.',
       category: 'general_faq',
-      tags: ['langues rares', 'notification', 'disponibilité'],
+      tags: ['langues rares', 'notification', 'disponibilitÃ©'],
       readTime: 2,
       content: language === 'fr'
         ? `# Et les langues rares ?
 
-Dès qu’un **expert** (avocat/expatrié) parlant votre langue est disponible, vous pouvez être mis en relation. Sinon, **contactez le support** pour être **notifié** dès qu’un expert correspondant rejoint la plateforme.`
+DÃ¨s quâ€™un **expert** (avocat/expatriÃ©) parlant votre langue est disponible, vous pouvez Ãªtre mis en relation. Sinon, **contactez le support** pour Ãªtre **notifiÃ©** dÃ¨s quâ€™un expert correspondant rejoint la plateforme.`
         : `# What about rare languages?
 
 As soon as an **expert** (lawyer/expat) speaking your language is available, you can be matched. Otherwise, **contact support** to be **notified** when a matching expert joins the platform.`
     }
   ];
 
-  // --- Catégories (avec FAQ générale) ---
+  // --- CatÃ©gories (avec FAQ gÃ©nÃ©rale) ---
   const categories = [
     {
       id: 'all',
-      name: language === 'fr' ? 'Toutes les catégories' : 'All categories',
+      name: language === 'fr' ? 'Toutes les catÃ©gories' : 'All categories',
       icon: Book,
       count: articles.length
     },
@@ -532,7 +532,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
     }
   ];
 
-  // --- Filtrage (inchangé) ---
+  // --- Filtrage (inchangÃ©) ---
   const filteredArticles = articles.filter((article) => {
     const matchesCategory =
       selectedCategory === 'all' || article.category === selectedCategory;
@@ -544,7 +544,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
     return matchesCategory && matchesSearch;
   });
 
-  // --- Handlers (inchangés) ---
+  // --- Handlers (inchangÃ©s) ---
   const handleCategoryClick = (categoryId: string) => {
     setSelectedCategory(categoryId);
     setSearchTerm('');
@@ -559,9 +559,9 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
     setSelectedArticle(null);
   };
 
-  // --- Helper rendu markdown léger (présentation uniquement) ---
+  // --- Helper rendu markdown lÃ©ger (prÃ©sentation uniquement) ---
   const mdToHtml = (md: string): string => {
-    // Échapper le HTML brut
+    // Ã‰chapper le HTML brut
     let html = md
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -594,7 +594,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
     return html;
   };
 
-  // ======================= Vue article détaillé =======================
+  // ======================= Vue article dÃ©taillÃ© =======================
   if (selectedArticle) {
     return (
       <Layout>
@@ -608,7 +608,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
                 className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors font-semibold"
                 aria-label={language === 'fr' ? 'Retour aux articles' : 'Back to articles'}
               >
-                <span className="text-white/70">←</span>
+                <span className="text-white/70">â†</span>
                 <span>{language === 'fr' ? 'Retour aux articles' : 'Back to articles'}</span>
               </button>
             </div>
@@ -623,7 +623,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
                 </h1>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
                   <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
-                    ⏱ {selectedArticle.readTime}{' '}
+                    â± {selectedArticle.readTime}{' '}
                     {language === 'fr' ? 'min de lecture' : 'min read'}
                   </span>
                   <div className="flex flex-wrap gap-2">
@@ -663,7 +663,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
             </h1>
             <p className="text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8">
               {language === 'fr'
-                ? 'Trouvez rapidement des réponses et des guides internationaux.'
+                ? 'Trouvez rapidement des rÃ©ponses et des guides internationaux.'
                 : 'Quickly find international answers and guides.'}
             </p>
 
@@ -698,11 +698,11 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
         {/* Contenu */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Sidebar catégories */}
+            {/* Sidebar catÃ©gories */}
             <aside className="lg:col-span-1">
               <div className="sticky top-6 rounded-3xl bg-white border border-gray-200 shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  {language === 'fr' ? 'Catégories' : 'Categories'}
+                  {language === 'fr' ? 'CatÃ©gories' : 'Categories'}
                 </h3>
                 <div className="space-y-2">
                   {categories.map((category) => {
@@ -747,7 +747,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
               </div>
             </aside>
 
-            {/* Liste d’articles */}
+            {/* Liste dâ€™articles */}
             <section className="lg:col-span-3">
               {isLoading ? (
                 <div className="text-center py-16">
@@ -770,7 +770,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
                     </h2>
                     <p className="text-gray-600">
                       {filteredArticles.length}{' '}
-                      {language === 'fr' ? 'article(s) trouvé(s)' : 'article(s) found'}
+                      {language === 'fr' ? 'article(s) trouvÃ©(s)' : 'article(s) found'}
                     </p>
                   </div>
 
@@ -801,7 +801,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
                             ))}
                           </div>
                           <span className="inline-flex items-center gap-1 text-sm text-gray-500">
-                            ⏱ {article.readTime}{' '}
+                            â± {article.readTime}{' '}
                             {language === 'fr' ? 'min de lecture' : 'min read'}
                           </span>
                         </div>
@@ -813,7 +813,7 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
                     <div className="text-center py-16">
                       <div className="text-gray-600 text-lg mb-4">
                         {language === 'fr'
-                          ? 'Aucun article trouvé pour ces critères'
+                          ? 'Aucun article trouvÃ© pour ces critÃ¨res'
                           : 'No articles found for these criteria'}
                       </div>
                       <button
@@ -823,9 +823,9 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
                         }}
                         className="inline-flex items-center gap-2 font-semibold text-blue-700 hover:text-blue-800"
                       >
-                        ↻{' '}
+                        â†»{' '}
                         {language === 'fr'
-                          ? 'Réinitialiser la recherche'
+                          ? 'RÃ©initialiser la recherche'
                           : 'Reset search'}
                       </button>
                     </div>
@@ -842,12 +842,12 @@ As soon as an **expert** (lawyer/expat) speaking your language is available, you
           <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
               {language === 'fr'
-                ? 'Vous ne trouvez pas votre réponse ?'
+                ? 'Vous ne trouvez pas votre rÃ©ponse ?'
                 : "Can't find your answer?"}
             </h2>
             <p className="text-lg md:text-xl text-white/95 mb-8">
               {language === 'fr'
-                ? 'Notre équipe support est disponible 24/7 pour vous aider'
+                ? 'Notre Ã©quipe support est disponible 24/7 pour vous aider'
                 : 'Our support team is available 24/7 to help you'}
             </p>
 

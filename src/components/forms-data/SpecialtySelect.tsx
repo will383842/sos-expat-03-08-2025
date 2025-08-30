@@ -1,5 +1,5 @@
-// ========================================
-// SpecialtySelect.tsx — Multi-select of lawyer specialties (grouped)
+﻿// ========================================
+// SpecialtySelect.tsx â€” Multi-select of lawyer specialties (grouped)
 // ========================================
 import React, { useState, useMemo, useCallback } from 'react';
 import Select, { MultiValue, GroupBase } from 'react-select';
@@ -80,7 +80,7 @@ const SpecialtySelect: React.FC<SpecialtySelectProps> = React.memo(({
   const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale[currentLocale], [currentLocale]);
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
-      ? (inputValue ? `Aucune spécialité trouvée pour "${inputValue}"` : 'Aucune spécialité disponible')
+      ? (inputValue ? `Aucune spÃ©cialitÃ© trouvÃ©e pour "${inputValue}"` : 'Aucune spÃ©cialitÃ© disponible')
       : (inputValue ? `No specialty found for "${inputValue}"` : 'No specialties available');
   }, [currentLocale]);
 

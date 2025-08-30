@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { X, Image as ImageIcon, Check, AlertCircle, Upload, Camera, FileImage } from 'lucide-react';
 import ImageCropModal from './ImageCropModal';
 import {
@@ -45,21 +45,21 @@ type I18n = { errors: I18nErrors; ui: I18nUI };
 const I18N: Record<Locale, I18n> = {
   fr: {
     errors: {
-      unsupportedFormat: 'Format non supporté. Formats acceptés: JPG, PNG, WEBP, GIF, HEIC, BMP, TIFF, AVIF',
-      fileTooLarge: (sizeMB: number, maxSizeMB: number) => `L'image ne doit pas dépasser ${maxSizeMB}MB (actuelle: ${sizeMB.toFixed(1)}MB)`,
+      unsupportedFormat: 'Format non supportÃ©. Formats acceptÃ©s: JPG, PNG, WEBP, GIF, HEIC, BMP, TIFF, AVIF',
+      fileTooLarge: (sizeMB: number, maxSizeMB: number) => `L'image ne doit pas dÃ©passer ${maxSizeMB}MB (actuelle: ${sizeMB.toFixed(1)}MB)`,
       uploadFailed: (error: string) => `Erreur d'upload: ${error}`,
-      previewFailed: "Erreur lors de la création de l'aperçu",
+      previewFailed: "Erreur lors de la crÃ©ation de l'aperÃ§u",
       deleteFailed: 'Erreur lors de la suppression',
       imageLoadError: 'Erreur de chargement',
-      cameraNotSupported: 'Caméra non supportée sur cet appareil',
-      cameraAccessFailed: "Impossible d'accéder à la caméra",
+      cameraNotSupported: 'CamÃ©ra non supportÃ©e sur cet appareil',
+      cameraAccessFailed: "Impossible d'accÃ©der Ã  la camÃ©ra",
     },
     ui: {
-      dropHere: "Déposez l'image ici",
+      dropHere: "DÃ©posez l'image ici",
       clickOrDrag: 'Cliquez ou glissez une image',
-      formatInfo: (maxSizeMB: number) => `JPG, PNG, WEBP, GIF, HEIC • Max ${maxSizeMB}MB`,
+      formatInfo: (maxSizeMB: number) => `JPG, PNG, WEBP, GIF, HEIC â€¢ Max ${maxSizeMB}MB`,
       uploading: (p: number) => `Upload en cours... ${p}%`,
-      uploadSuccess: 'Image uploadée avec succès !',
+      uploadSuccess: 'Image uploadÃ©e avec succÃ¨s !',
       replaceImage: "Remplacer l'image",
       removeImage: "Supprimer l'image",
       profileImage: 'Photo de profil',
@@ -74,7 +74,7 @@ const I18N: Record<Locale, I18n> = {
   en: {
     errors: {
       unsupportedFormat: 'Unsupported format. Accepted: JPG, PNG, WEBP, GIF, HEIC, BMP, TIFF, AVIF',
-      fileTooLarge: (sizeMB: number, maxSizeMB: number) => `Image must be ≤ ${maxSizeMB}MB (current: ${sizeMB.toFixed(1)}MB)`,
+      fileTooLarge: (sizeMB: number, maxSizeMB: number) => `Image must be â‰¤ ${maxSizeMB}MB (current: ${sizeMB.toFixed(1)}MB)`,
       uploadFailed: (error: string) => `Upload error: ${error}`,
       previewFailed: 'Error creating preview',
       deleteFailed: 'Error deleting image',
@@ -85,7 +85,7 @@ const I18N: Record<Locale, I18n> = {
     ui: {
       dropHere: 'Drop image here',
       clickOrDrag: 'Click or drag an image',
-      formatInfo: (maxSizeMB: number) => `JPG, PNG, WEBP, GIF, HEIC • Max ${maxSizeMB}MB`,
+      formatInfo: (maxSizeMB: number) => `JPG, PNG, WEBP, GIF, HEIC â€¢ Max ${maxSizeMB}MB`,
       uploading: (p: number) => `Uploading... ${p}%`,
       uploadSuccess: 'Image uploaded successfully!',
       replaceImage: 'Replace image',
@@ -105,7 +105,7 @@ const I18N: Record<Locale, I18n> = {
 const generateUniqueId = (): string =>
   Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
 
-// Native dropzone (léger, accessible)
+// Native dropzone (lÃ©ger, accessible)
 interface UseDropzoneOptions {
   onDrop: (files: File[]) => void;
   accept: Record<string, readonly string[]>;
@@ -125,7 +125,7 @@ const useDropzone = (opts: UseDropzoneOptions) => {
     if (opts.disabled) return;
     const files = Array.from(e.dataTransfer.files);
 
-    // validation simple: type image/* OU extension acceptée
+    // validation simple: type image/* OU extension acceptÃ©e
     const acceptedExts = new Set<string>(Object.values(opts.accept).flat().map(String));
     const valid = files.filter(f => {
       const byMime = f.type.startsWith('image/');
@@ -141,7 +141,7 @@ const useDropzone = (opts: UseDropzoneOptions) => {
     if (files.length) opts.onDrop(files);
   };
   const acceptString = useMemo(() => {
-    // pour l'input, concatène le type + extensions
+    // pour l'input, concatÃ¨ne le type + extensions
     const parts = new Set<string>([
       ...Object.keys(opts.accept),
       ...Object.values(opts.accept).flat().map(String)
@@ -157,7 +157,7 @@ const useDropzone = (opts: UseDropzoneOptions) => {
 };
 
 /* =========================
-   Caméra (mobile + desktop)
+   CamÃ©ra (mobile + desktop)
    ========================= */
 interface CameraCapture {
   openCamera: (facingMode?: 'user' | 'environment') => Promise<void>;
@@ -180,12 +180,12 @@ const useCameraCapture = (
       });
     } catch { /* no-op */ }
 
-    // 2) chercher une cam dos / back, ou première dispos
+    // 2) chercher une cam dos / back, ou premiÃ¨re dispos
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videos = devices.filter(d => d.kind === 'videoinput');
       const back = videos.find(d =>
-        /back|rear|environment|arrière|dos/i.test(d.label)
+        /back|rear|environment|arriÃ¨re|dos/i.test(d.label)
       ) || videos[0];
       if (back) {
         return await navigator.mediaDevices.getUserMedia({
@@ -226,8 +226,8 @@ const useCameraCapture = (
       cancelBtn.className = 'flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50';
 
       const switchBtn = document.createElement('button');
-      switchBtn.textContent = '🔄';
-      switchBtn.title = 'Changer de caméra';
+      switchBtn.textContent = 'ðŸ”„';
+      switchBtn.title = 'Changer de camÃ©ra';
       switchBtn.className = 'px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50';
 
       const captureBtn = document.createElement('button');
@@ -274,7 +274,7 @@ const useCameraCapture = (
         }, 'image/jpeg', 0.9);
       };
 
-      // switch caméra
+      // switch camÃ©ra
       let currentFacing: 'user' | 'environment' = facingMode;
       switchBtn.onclick = async () => {
         try {
@@ -423,8 +423,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   /**
    * SUPPRESSION ROBUSTE D'UNE ANCIENNE IMAGE
-   * - On décode le chemin exact de l'objet à partir de l'URL Firebase:
-   *   https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<path encodé>?alt=media&token=...
+   * - On dÃ©code le chemin exact de l'objet Ã  partir de l'URL Firebase:
+   *   https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<path encodÃ©>?alt=media&token=...
    * - Pas d'heuristique sur le fileName. On supprime l'objet exact.
    */
   const deleteFromStorage = useCallback(async (url: string): Promise<void> => {
@@ -437,7 +437,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         return; // pas une URL valide -> on ignore
       }
 
-      // on accepte les hôtes Firebase Storage usuels
+      // on accepte les hÃ´tes Firebase Storage usuels
       const host = parsed.host.toLowerCase();
       if (!/firebasestorage\.googleapis\.com$/.test(host) && !/storage\.googleapis\.com$/.test(host)) {
         return;
@@ -458,7 +458,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   }, []);
 
   const uploadImage = useCallback(async (file: File | Blob): Promise<string> => {
-    console.log('🔄 Starting image upload...', {
+    console.log('ðŸ”„ Starting image upload...', {
       blobSize: file.size,
       isRegistration,
       uploadPath: isRegistration ? 'registration_temp' : uploadPath
@@ -471,7 +471,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     const finalUploadPath = isRegistration ? 'registration_temp' : uploadPath;
     const refObj: StorageReference = storageRef(storage, `${finalUploadPath}/${fileName}`);
 
-    console.log('📁 Upload path:', `${finalUploadPath}/${fileName}`);
+    console.log('ðŸ“ Upload path:', `${finalUploadPath}/${fileName}`);
 
     return new Promise((resolve, reject) => {
       const task = uploadBytesResumable(refObj, processed);
@@ -479,21 +479,21 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         (snap) => {
           const p = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
           setUploadProgress(p);
-          console.log('📈 Upload progress:', p + '%');
+          console.log('ðŸ“ˆ Upload progress:', p + '%');
         },
         (err) => {
-          console.error('❌ Upload error:', err);
+          console.error('âŒ Upload error:', err);
           setUploadProgress(0);
           
-          // Messages d'erreur spécifiques selon le code
+          // Messages d'erreur spÃ©cifiques selon le code
           let userMessage = t.errors.uploadFailed('Upload failed');
           if (err.code === 'storage/unauthorized') {
             userMessage = locale === 'fr' 
-              ? 'Permissions insuffisantes. Réessayez ou contactez le support.'
+              ? 'Permissions insuffisantes. RÃ©essayez ou contactez le support.'
               : 'Insufficient permissions. Try again or contact support.';
           } else if (err.code === 'storage/quota-exceeded') {
             userMessage = locale === 'fr'
-              ? 'Quota de stockage dépassé. Contactez le support.'
+              ? 'Quota de stockage dÃ©passÃ©. Contactez le support.'
               : 'Storage quota exceeded. Contact support.';
           } else if (err.code === 'storage/invalid-format') {
             userMessage = locale === 'fr'
@@ -507,10 +507,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           try {
             const url = await getDownloadURL(task.snapshot.ref);
             setUploadProgress(100);
-            console.log('✅ Upload successful:', url);
+            console.log('âœ… Upload successful:', url);
             resolve(url);
           } catch (e) {
-            console.error('❌ GetDownloadURL error:', e);
+            console.error('âŒ GetDownloadURL error:', e);
             reject(e);
           }
         }
@@ -539,7 +539,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   }, [validateFile, disabled, isUploading, locale]);
 
   const handleCropComplete = useCallback(async (croppedBlob: Blob) => {
-    console.log('🔄 Starting image upload...', {
+    console.log('ðŸ”„ Starting image upload...', {
       blobSize: croppedBlob.size,
       isRegistration,
       uploadPath: isRegistration ? 'registration_temp' : uploadPath
@@ -551,13 +551,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     try {
       if (previewUrl) await deleteFromStorage(previewUrl);
       const url = await uploadImage(croppedBlob);
-      console.log('✅ Upload successful:', url);
+      console.log('âœ… Upload successful:', url);
       setPreviewUrl(url);
       setSuccess(true);
       onImageUploaded(url);
       setTimeout(() => setUploadProgress(0), 1200);
     } catch (e) {
-      console.error('❌ Upload failed:', e);
+      console.error('âŒ Upload failed:', e);
       const msg = e instanceof Error ? e.message : 'Unknown error';
       setError(I18N[locale].errors.uploadFailed(msg));
       setUploadProgress(0);
@@ -852,7 +852,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         </div>
       )}
 
-      {/* Succès */}
+      {/* SuccÃ¨s */}
       {success && !isUploading && (
         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md flex items-center gap-2" role="status" aria-live="polite">
           <Check className="w-4 h-4 text-green-600" />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/layout/Layout';
@@ -34,7 +34,7 @@ const Checkout: React.FC = () => {
     duration: number;
   } | null>(null);
 
-  // Déplacer servicePlans en dehors du composant pour éviter les dépendances de useEffect
+  // DÃ©placer servicePlans en dehors du composant pour Ã©viter les dÃ©pendances de useEffect
   const servicePlans = React.useMemo((): Record<string, ServicePlan[]> => ({
     consultation: [
       {
@@ -43,9 +43,9 @@ const Checkout: React.FC = () => {
         price: 49,
         duration: '30 minutes',
         features: [
-          'Consultation téléphonique de 30 minutes',
-          'Conseils juridiques personnalisés',
-          'Résumé écrit de la consultation',
+          'Consultation tÃ©lÃ©phonique de 30 minutes',
+          'Conseils juridiques personnalisÃ©s',
+          'RÃ©sumÃ© Ã©crit de la consultation',
           'Support par email pendant 7 jours'
         ]
       },
@@ -55,8 +55,8 @@ const Checkout: React.FC = () => {
         price: 89,
         duration: '60 minutes',
         features: [
-          'Consultation téléphonique de 60 minutes',
-          'Analyse détaillée de votre situation',
+          'Consultation tÃ©lÃ©phonique de 60 minutes',
+          'Analyse dÃ©taillÃ©e de votre situation',
           'Rapport juridique complet',
           'Support par email pendant 14 jours',
           'Une consultation de suivi gratuite'
@@ -71,11 +71,11 @@ const Checkout: React.FC = () => {
         price: 99,
         duration: '1 mois',
         features: [
-          'Support juridique illimité par email',
-          '2 consultations téléphoniques incluses',
-          'Révision de documents',
+          'Support juridique illimitÃ© par email',
+          '2 consultations tÃ©lÃ©phoniques incluses',
+          'RÃ©vision de documents',
           'Assistance administrative',
-          'Réponse sous 24h garantie'
+          'RÃ©ponse sous 24h garantie'
         ]
       },
       {
@@ -84,12 +84,12 @@ const Checkout: React.FC = () => {
         price: 999,
         duration: '12 mois',
         features: [
-          'Support juridique illimité',
-          'Consultations téléphoniques illimitées',
-          'Révision de documents illimitée',
+          'Support juridique illimitÃ©',
+          'Consultations tÃ©lÃ©phoniques illimitÃ©es',
+          'RÃ©vision de documents illimitÃ©e',
           'Assistance administrative prioritaire',
-          'Réponse sous 4h garantie',
-          'Avocat dédié',
+          'RÃ©ponse sous 4h garantie',
+          'Avocat dÃ©diÃ©',
           '2 mois gratuits'
         ],
         popular: true
@@ -100,27 +100,27 @@ const Checkout: React.FC = () => {
         id: 'emergency-sos',
         name: 'SOS Juridique',
         price: 149,
-        duration: 'Immédiat',
+        duration: 'ImmÃ©diat',
         features: [
-          'Intervention immédiate (24h/24)',
+          'Intervention immÃ©diate (24h/24)',
           'Consultation d\'urgence de 45 minutes',
           'Conseils juridiques d\'urgence',
-          'Assistance pour démarches urgentes',
-          'Support pendant 48h après l\'intervention'
+          'Assistance pour dÃ©marches urgentes',
+          'Support pendant 48h aprÃ¨s l\'intervention'
         ]
       }
     ]
   }), []);
 
   useEffect(() => {
-    // Charger la demande de réservation depuis sessionStorage
+    // Charger la demande de rÃ©servation depuis sessionStorage
     const savedRequest = sessionStorage.getItem('bookingRequest');
     if (savedRequest) {
       setBookingRequest(JSON.parse(savedRequest));
     }
 
     if (!user) {
-      // Rediriger vers login avec les paramètres actuels
+      // Rediriger vers login avec les paramÃ¨tres actuels
       const currentUrl = window.location.pathname + window.location.search;
       navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
       return;
@@ -132,7 +132,7 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    // Sélectionner le plan populaire par défaut ou le premier
+    // SÃ©lectionner le plan populaire par dÃ©faut ou le premier
     const defaultPlan = plans.find(plan => plan.popular) || plans[0];
     setSelectedPlan(defaultPlan);
   }, [serviceType, user, navigate, servicePlans]);
@@ -149,7 +149,7 @@ const Checkout: React.FC = () => {
       // Nettoyer sessionStorage
       sessionStorage.removeItem('bookingRequest');
       
-      // Rediriger vers la page de succès
+      // Rediriger vers la page de succÃ¨s
       const successParams = new URLSearchParams({
         service: serviceType || '',
         provider: searchParams.get('provider') || '',
@@ -162,7 +162,7 @@ const Checkout: React.FC = () => {
     }
   };
 
-  // Logique unifiée pour prix, durée et nom - utilise soit selectedPlan soit bookingRequest
+  // Logique unifiÃ©e pour prix, durÃ©e et nom - utilise soit selectedPlan soit bookingRequest
   const getServiceInfo = () => {
     if (selectedPlan) {
       return {
@@ -176,20 +176,20 @@ const Checkout: React.FC = () => {
       return {
         price: bookingRequest.price,
         duration: `${bookingRequest.duration} min`,
-        name: bookingRequest.providerType === 'lawyer' ? 'Appel Avocat' : 'Appel Expatrié'
+        name: bookingRequest.providerType === 'lawyer' ? 'Appel Avocat' : 'Appel ExpatriÃ©'
       };
     }
     
-    // Fallback basé sur serviceType
+    // Fallback basÃ© sur serviceType
     return {
       price: serviceType === 'lawyer_call' ? 49 : 19,
       duration: `${serviceType === 'lawyer_call' ? 20 : 30} min`,
-      name: serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'
+      name: serviceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel ExpatriÃ©'
     };
   };
 
   if (isLoading) {
-  return null; // ou un petit skeleton non bloquant si tu préfères
+  return null; // ou un petit skeleton non bloquant si tu prÃ©fÃ¨res
 }
 
 
@@ -200,7 +200,7 @@ const Checkout: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Service non trouvé
+              Service non trouvÃ©
             </h1>
             <Button onClick={() => navigate('/pricing')}>
               Retour aux tarifs
@@ -222,7 +222,7 @@ const Checkout: React.FC = () => {
               Finaliser votre commande
             </h1>
             <p className="text-lg text-gray-600">
-              Choisissez votre plan et procédez au paiement sécurisé
+              Choisissez votre plan et procÃ©dez au paiement sÃ©curisÃ©
             </p>
           </div>
 
@@ -260,7 +260,7 @@ const Checkout: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <span className="text-2xl font-bold text-gray-900">
-                        {plan.price}€
+                        {plan.price}â‚¬
                       </span>
                     </div>
                   </div>
@@ -277,12 +277,12 @@ const Checkout: React.FC = () => {
               ))}
             </div>
 
-            {/* Résumé et paiement */}
+            {/* RÃ©sumÃ© et paiement */}
             <div className="space-y-6">
-              {/* Résumé de la commande */}
+              {/* RÃ©sumÃ© de la commande */}
               <div className="bg-white p-6 rounded-lg shadow-sm border">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Résumé de votre consultation
+                  RÃ©sumÃ© de votre consultation
                 </h2>
                 
                 {bookingRequest && (
@@ -300,7 +300,7 @@ const Checkout: React.FC = () => {
                             ? 'bg-blue-100 text-blue-800' 
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {bookingRequest.providerType === 'lawyer' ? 'Avocat' : 'Expatrié'}
+                          {bookingRequest.providerType === 'lawyer' ? 'Avocat' : 'ExpatriÃ©'}
                         </span>
                       </div>
                     </div>
@@ -323,13 +323,13 @@ const Checkout: React.FC = () => {
                     <span className="font-medium">{serviceInfo.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Durée</span>
+                    <span className="text-gray-600">DurÃ©e</span>
                     <span className="font-medium">{serviceInfo.duration}</span>
                   </div>
                   <div className="border-t pt-3">
                     <div className="flex justify-between text-lg font-semibold">
                       <span>Total</span>
-                      <span>€{serviceInfo.price}</span>
+                      <span>â‚¬{serviceInfo.price}</span>
                     </div>
                   </div>
                 </div>
@@ -345,7 +345,7 @@ const Checkout: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Prénom
+                        PrÃ©nom
                       </label>
                       <input
                         type="text"
@@ -381,10 +381,10 @@ const Checkout: React.FC = () => {
                 </div>
               </div>
 
-              {/* Méthode de paiement */}
+              {/* MÃ©thode de paiement */}
               <div className="bg-white p-6 rounded-lg shadow-sm border">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Méthode de paiement
+                  MÃ©thode de paiement
                 </h2>
                 
                 <div className="space-y-3">
@@ -405,8 +405,8 @@ const Checkout: React.FC = () => {
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg flex items-start">
                   <Shield className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-blue-800">
-                    <p className="font-medium">Paiement 100% sécurisé</p>
-                    <p>Vos données sont protégées par un cryptage SSL</p>
+                    <p className="font-medium">Paiement 100% sÃ©curisÃ©</p>
+                    <p>Vos donnÃ©es sont protÃ©gÃ©es par un cryptage SSL</p>
                   </div>
                 </div>
               </div>
@@ -423,12 +423,12 @@ const Checkout: React.FC = () => {
                       <span className="ml-2">Traitement en cours...</span>
                   </div>
                 ) : (
-                  `Payer €${serviceInfo.price}`
+                  `Payer â‚¬${serviceInfo.price}`
                 )}
               </Button>
               
               <p className="text-xs text-gray-500 text-center">
-                En procédant au paiement, vous acceptez nos conditions générales de vente
+                En procÃ©dant au paiement, vous acceptez nos conditions gÃ©nÃ©rales de vente
               </p>
             </div>
           </div>

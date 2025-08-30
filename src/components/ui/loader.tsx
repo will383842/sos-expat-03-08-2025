@@ -1,4 +1,4 @@
-// src/components/ui/loader.tsx
+﻿// src/components/ui/loader.tsx
 import React from 'react';
 
 export const Loader: React.FC = () => {

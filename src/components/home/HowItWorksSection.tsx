@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Phone, CheckCircle, Clock, LucideIcon } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
@@ -39,24 +39,24 @@ interface Translations {
 const HowItWorksPage: React.FC = () => {
   const { language } = useApp();
 
-  // Traductions complètes pour la page
+  // Traductions complÃ¨tes pour la page
   const translations: Translations = {
     fr: {
-      pageTitle: 'Comment ça marche - Notre processus',
-      pageDescription: 'Découvrez comment obtenir de l\'aide juridique ou d\'expatriation en 3 étapes simples, rapides et sécurisées.',
-      breadcrumb: 'Comment ça marche',
-      heroTitle: 'Comment ça marche ?',
-      heroSubtitle: 'Découvrez comment obtenir de l\'aide juridique ou d\'expatriation en 3 étapes simples, rapides et sécurisées.',
-      sectionTitle: 'Notre processus en 3 étapes',
-      sectionSubtitle: 'Obtenez de l\'aide en 3 étapes simples, rapides et sécurisées.',
-      ctaTitle: 'Prêt à commencer ?',
+      pageTitle: 'Comment Ã§a marche - Notre processus',
+      pageDescription: 'DÃ©couvrez comment obtenir de l\'aide juridique ou d\'expatriation en 3 Ã©tapes simples, rapides et sÃ©curisÃ©es.',
+      breadcrumb: 'Comment Ã§a marche',
+      heroTitle: 'Comment Ã§a marche ?',
+      heroSubtitle: 'DÃ©couvrez comment obtenir de l\'aide juridique ou d\'expatriation en 3 Ã©tapes simples, rapides et sÃ©curisÃ©es.',
+      sectionTitle: 'Notre processus en 3 Ã©tapes',
+      sectionSubtitle: 'Obtenez de l\'aide en 3 Ã©tapes simples, rapides et sÃ©curisÃ©es.',
+      ctaTitle: 'PrÃªt Ã  commencer ?',
       ctaSubtitle: 'Obtenez l\'aide dont vous avez besoin en quelques minutes seulement.',
       ctaButton: 'Commencer maintenant',
       home: 'Accueil',
       steps: {
         choose: {
           title: 'Choisissez votre service',
-          description: 'Sélectionnez le type d\'aide dont vous avez besoin : avocat ou expatrié.'
+          description: 'SÃ©lectionnez le type d\'aide dont vous avez besoin : avocat ou expatriÃ©.'
         },
         connect: {
           title: 'Connectez-vous',
@@ -174,14 +174,14 @@ const HowItWorksPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Section Comment ça marche */}
+        {/* Section Comment Ã§a marche */}
         <section 
           className="py-12 sm:py-16 lg:py-20 bg-white"
           aria-labelledby="how-it-works-section-title"
           role="region"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* En-tête de section */}
+            {/* En-tÃªte de section */}
             <header className="text-center mb-12 sm:mb-16">
               <h2 
                 id="how-it-works-section-title"
@@ -202,7 +202,7 @@ const HowItWorksPage: React.FC = () => {
                 aria-hidden="true"
               />
               
-              {/* Grille des étapes */}
+              {/* Grille des Ã©tapes */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 lg:gap-12 relative z-10">
                 {steps.map((step) => {
                   const Icon = step.icon;
@@ -213,7 +213,7 @@ const HowItWorksPage: React.FC = () => {
                       key={step.number}
                       className="flex flex-col items-center text-center group"
                     >
-                      {/* Icône avec numéro */}
+                      {/* IcÃ´ne avec numÃ©ro */}
                       <div className="relative mb-6 sm:mb-8">
                         <div 
                           className={`
@@ -227,7 +227,7 @@ const HowItWorksPage: React.FC = () => {
                             shadow-sm
                           `}
                           role="img"
-                          aria-label={`Étape ${step.number}: ${stepData.title}`}
+                          aria-label={`Ã‰tape ${step.number}: ${stepData.title}`}
                         >
                           <Icon 
                             className={`w-6 h-6 sm:w-8 sm:h-8 ${step.textColorClass}`}
@@ -235,7 +235,7 @@ const HowItWorksPage: React.FC = () => {
                           />
                         </div>
                         
-                        {/* Badge numéro */}
+                        {/* Badge numÃ©ro */}
                         <div 
                           className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-6 h-6 sm:w-8 sm:h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-sm sm:text-lg font-bold shadow-md"
                           aria-hidden="true"

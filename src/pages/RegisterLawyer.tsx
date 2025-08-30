@@ -1,4 +1,4 @@
-// src/pages/RegisterLawyer.tsx
+﻿// src/pages/RegisterLawyer.tsx
 import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense, useRef } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -35,25 +35,25 @@ const THEME = {
 type Duo = { fr: string; en: string };
 const COUNTRIES: Duo[] = [
   { fr: 'Afghanistan', en: 'Afghanistan' }, { fr: 'Afrique du Sud', en: 'South Africa' },
-  { fr: 'Albanie', en: 'Albania' }, { fr: 'Algérie', en: 'Algeria' }, { fr: 'Allemagne', en: 'Germany' },
+  { fr: 'Albanie', en: 'Albania' }, { fr: 'AlgÃ©rie', en: 'Algeria' }, { fr: 'Allemagne', en: 'Germany' },
   { fr: 'Andorre', en: 'Andorra' }, { fr: 'Angola', en: 'Angola' }, { fr: 'Arabie Saoudite', en: 'Saudi Arabia' },
-  { fr: 'Argentine', en: 'Argentina' }, { fr: 'Arménie', en: 'Armenia' }, { fr: 'Australie', en: 'Australia' },
-  { fr: 'Autriche', en: 'Austria' }, { fr: 'Azerbaïdjan', en: 'Azerbaijan' }, { fr: 'Bahamas', en: 'Bahamas' },
-  { fr: 'Bahreïn', en: 'Bahrain' }, { fr: 'Bangladesh', en: 'Bangladesh' }, { fr: 'Barbade', en: 'Barbados' },
-  { fr: 'Belgique', en: 'Belgium' }, { fr: 'Belize', en: 'Belize' }, { fr: 'Bénin', en: 'Benin' },
-  { fr: 'Bhoutan', en: 'Bhutan' }, { fr: 'Biélorussie', en: 'Belarus' }, { fr: 'Birmanie', en: 'Myanmar' },
-  { fr: 'Bolivie', en: 'Bolivia' }, { fr: 'Bosnie-Herzégovine', en: 'Bosnia and Herzegovina' },
-  { fr: 'Botswana', en: 'Botswana' }, { fr: 'Brésil', en: 'Brazil' }, { fr: 'Brunei', en: 'Brunei' },
+  { fr: 'Argentine', en: 'Argentina' }, { fr: 'ArmÃ©nie', en: 'Armenia' }, { fr: 'Australie', en: 'Australia' },
+  { fr: 'Autriche', en: 'Austria' }, { fr: 'AzerbaÃ¯djan', en: 'Azerbaijan' }, { fr: 'Bahamas', en: 'Bahamas' },
+  { fr: 'BahreÃ¯n', en: 'Bahrain' }, { fr: 'Bangladesh', en: 'Bangladesh' }, { fr: 'Barbade', en: 'Barbados' },
+  { fr: 'Belgique', en: 'Belgium' }, { fr: 'Belize', en: 'Belize' }, { fr: 'BÃ©nin', en: 'Benin' },
+  { fr: 'Bhoutan', en: 'Bhutan' }, { fr: 'BiÃ©lorussie', en: 'Belarus' }, { fr: 'Birmanie', en: 'Myanmar' },
+  { fr: 'Bolivie', en: 'Bolivia' }, { fr: 'Bosnie-HerzÃ©govine', en: 'Bosnia and Herzegovina' },
+  { fr: 'Botswana', en: 'Botswana' }, { fr: 'BrÃ©sil', en: 'Brazil' }, { fr: 'Brunei', en: 'Brunei' },
   { fr: 'Bulgarie', en: 'Bulgaria' }, { fr: 'Burkina Faso', en: 'Burkina Faso' }, { fr: 'Burundi', en: 'Burundi' },
   { fr: 'Cambodge', en: 'Cambodia' }, { fr: 'Cameroun', en: 'Cameroon' }, { fr: 'Canada', en: 'Canada' },
   { fr: 'Cap-Vert', en: 'Cape Verde' }, { fr: 'Chili', en: 'Chile' }, { fr: 'Chine', en: 'China' },
   { fr: 'Chypre', en: 'Cyprus' }, { fr: 'Colombie', en: 'Colombia' }, { fr: 'Comores', en: 'Comoros' },
-  { fr: 'Congo', en: 'Congo' }, { fr: 'Corée du Nord', en: 'North Korea' }, { fr: 'Corée du Sud', en: 'South Korea' },
-  { fr: 'Costa Rica', en: 'Costa Rica' }, { fr: "Côte d'Ivoire", en: 'Ivory Coast' }, { fr: 'Croatie', en: 'Croatia' },
+  { fr: 'Congo', en: 'Congo' }, { fr: 'CorÃ©e du Nord', en: 'North Korea' }, { fr: 'CorÃ©e du Sud', en: 'South Korea' },
+  { fr: 'Costa Rica', en: 'Costa Rica' }, { fr: "CÃ´te d'Ivoire", en: 'Ivory Coast' }, { fr: 'Croatie', en: 'Croatia' },
   { fr: 'Cuba', en: 'Cuba' }, { fr: 'Danemark', en: 'Denmark' }, { fr: 'Djibouti', en: 'Djibouti' },
-  { fr: 'Dominique', en: 'Dominica' }, { fr: 'Égypte', en: 'Egypt' }, { fr: 'Émirats arabes unis', en: 'United Arab Emirates' },
-  { fr: 'Équateur', en: 'Ecuador' }, { fr: 'Érythrée', en: 'Eritrea' }, { fr: 'Espagne', en: 'Spain' },
-  { fr: 'Estonie', en: 'Estonia' }, { fr: 'États-Unis', en: 'United States' }, { fr: 'Éthiopie', en: 'Ethiopia' },
+  { fr: 'Dominique', en: 'Dominica' }, { fr: 'Ã‰gypte', en: 'Egypt' }, { fr: 'Ã‰mirats arabes unis', en: 'United Arab Emirates' },
+  { fr: 'Ã‰quateur', en: 'Ecuador' }, { fr: 'Ã‰rythrÃ©e', en: 'Eritrea' }, { fr: 'Espagne', en: 'Spain' },
+  { fr: 'Estonie', en: 'Estonia' }, { fr: 'Ã‰tats-Unis', en: 'United States' }, { fr: 'Ã‰thiopie', en: 'Ethiopia' },
   { fr: 'Fidji', en: 'Fiji' }, { fr: 'Finlande', en: 'Finland' }, { fr: 'France', en: 'France' },
   { fr: 'Autre', en: 'Other' },
 ];
@@ -64,50 +64,50 @@ const SPECIALTIES: Duo[] = [
   { fr: 'Droit immobilier', en: 'Real Estate Law' },
   { fr: 'Droit des affaires', en: 'Business Law' },
   { fr: 'Droit de la famille', en: 'Family Law' },
-  { fr: 'Droit pénal', en: 'Criminal Law' },
+  { fr: 'Droit pÃ©nal', en: 'Criminal Law' },
   { fr: 'Droit fiscal', en: 'Tax Law' },
   { fr: 'Droit international', en: 'International Law' },
   { fr: 'Droit des contrats', en: 'Contract Law' },
-  { fr: 'Propriété intellectuelle', en: 'Intellectual Property' },
+  { fr: 'PropriÃ©tÃ© intellectuelle', en: 'Intellectual Property' },
   { fr: 'Droit de la consommation', en: 'Consumer Law' },
   { fr: 'Droit bancaire', en: 'Banking Law' },
   { fr: "Droit de l'environnement", en: 'Environmental Law' },
-  { fr: 'Droit médical', en: 'Medical Law' },
-  { fr: 'Droit des sociétés', en: 'Corporate Law' },
+  { fr: 'Droit mÃ©dical', en: 'Medical Law' },
+  { fr: 'Droit des sociÃ©tÃ©s', en: 'Corporate Law' },
   { fr: 'Droit des successions', en: 'Estate Law' },
   { fr: 'Droit administratif', en: 'Administrative Law' },
-  { fr: 'Droit européen', en: 'European Law' },
-  { fr: 'Droit des étrangers', en: 'Immigrant Rights' },
+  { fr: 'Droit europÃ©en', en: 'European Law' },
+  { fr: 'Droit des Ã©trangers', en: 'Immigrant Rights' },
   { fr: 'Autre', en: 'Other' },
 ];
 
 // Country codes (names FR/EN)
 const COUNTRY_CODES = [
-  { code: '+33', flag: '🇫🇷', fr: 'France', en: 'France' },
-  { code: '+1', flag: '🇺🇸', fr: 'USA/Canada', en: 'USA/Canada' },
-  { code: '+44', flag: '🇬🇧', fr: 'Royaume-Uni', en: 'United Kingdom' },
-  { code: '+49', flag: '🇩🇪', fr: 'Allemagne', en: 'Germany' },
-  { code: '+34', flag: '🇪🇸', fr: 'Espagne', en: 'Spain' },
-  { code: '+39', flag: '🇮🇹', fr: 'Italie', en: 'Italy' },
-  { code: '+32', flag: '🇧🇪', fr: 'Belgique', en: 'Belgium' },
-  { code: '+41', flag: '🇨🇭', fr: 'Suisse', en: 'Switzerland' },
-  { code: '+352', flag: '🇱🇺', fr: 'Luxembourg', en: 'Luxembourg' },
-  { code: '+31', flag: '🇳🇱', fr: 'Pays-Bas', en: 'Netherlands' },
-  { code: '+351', flag: '🇵🇹', fr: 'Portugal', en: 'Portugal' },
-  { code: '+30', flag: '🇬🇷', fr: 'Grèce', en: 'Greece' },
-  { code: '+66', flag: '🇹🇭', fr: 'Thaïlande', en: 'Thailand' },
-  { code: '+61', flag: '🇦🇺', fr: 'Australie', en: 'Australia' },
-  { code: '+64', flag: '🇳🇿', fr: 'Nouvelle-Zélande', en: 'New Zealand' },
-  { code: '+81', flag: '🇯🇵', fr: 'Japon', en: 'Japan' },
-  { code: '+82', flag: '🇰🇷', fr: 'Corée du Sud', en: 'South Korea' },
-  { code: '+65', flag: '🇸🇬', fr: 'Singapour', en: 'Singapore' },
-  { code: '+212', flag: '🇲🇦', fr: 'Maroc', en: 'Morocco' },
-  { code: '+216', flag: '🇹🇳', fr: 'Tunisia', en: 'Tunisia' },
-  { code: '+213', flag: '🇩🇿', fr: 'Algérie', en: 'Algeria' },
-  { code: '+971', flag: '🇦🇪', fr: 'Émirats', en: 'UAE' },
-  { code: '+55', flag: '🇧🇷', fr: 'Brésil', en: 'Brazil' },
-  { code: '+52', flag: '🇲🇽', fr: 'Mexique', en: 'Mexico' },
-  { code: '+7', flag: '🇷🇺', fr: 'Russie', en: 'Russia' },
+  { code: '+33', flag: 'ðŸ‡«ðŸ‡·', fr: 'France', en: 'France' },
+  { code: '+1', flag: 'ðŸ‡ºðŸ‡¸', fr: 'USA/Canada', en: 'USA/Canada' },
+  { code: '+44', flag: 'ðŸ‡¬ðŸ‡§', fr: 'Royaume-Uni', en: 'United Kingdom' },
+  { code: '+49', flag: 'ðŸ‡©ðŸ‡ª', fr: 'Allemagne', en: 'Germany' },
+  { code: '+34', flag: 'ðŸ‡ªðŸ‡¸', fr: 'Espagne', en: 'Spain' },
+  { code: '+39', flag: 'ðŸ‡®ðŸ‡¹', fr: 'Italie', en: 'Italy' },
+  { code: '+32', flag: 'ðŸ‡§ðŸ‡ª', fr: 'Belgique', en: 'Belgium' },
+  { code: '+41', flag: 'ðŸ‡¨ðŸ‡­', fr: 'Suisse', en: 'Switzerland' },
+  { code: '+352', flag: 'ðŸ‡±ðŸ‡º', fr: 'Luxembourg', en: 'Luxembourg' },
+  { code: '+31', flag: 'ðŸ‡³ðŸ‡±', fr: 'Pays-Bas', en: 'Netherlands' },
+  { code: '+351', flag: 'ðŸ‡µðŸ‡¹', fr: 'Portugal', en: 'Portugal' },
+  { code: '+30', flag: 'ðŸ‡¬ðŸ‡·', fr: 'GrÃ¨ce', en: 'Greece' },
+  { code: '+66', flag: 'ðŸ‡¹ðŸ‡­', fr: 'ThaÃ¯lande', en: 'Thailand' },
+  { code: '+61', flag: 'ðŸ‡¦ðŸ‡º', fr: 'Australie', en: 'Australia' },
+  { code: '+64', flag: 'ðŸ‡³ðŸ‡¿', fr: 'Nouvelle-ZÃ©lande', en: 'New Zealand' },
+  { code: '+81', flag: 'ðŸ‡¯ðŸ‡µ', fr: 'Japon', en: 'Japan' },
+  { code: '+82', flag: 'ðŸ‡°ðŸ‡·', fr: 'CorÃ©e du Sud', en: 'South Korea' },
+  { code: '+65', flag: 'ðŸ‡¸ðŸ‡¬', fr: 'Singapour', en: 'Singapore' },
+  { code: '+212', flag: 'ðŸ‡²ðŸ‡¦', fr: 'Maroc', en: 'Morocco' },
+  { code: '+216', flag: 'ðŸ‡¹ðŸ‡³', fr: 'Tunisia', en: 'Tunisia' },
+  { code: '+213', flag: 'ðŸ‡©ðŸ‡¿', fr: 'AlgÃ©rie', en: 'Algeria' },
+  { code: '+971', flag: 'ðŸ‡¦ðŸ‡ª', fr: 'Ã‰mirats', en: 'UAE' },
+  { code: '+55', flag: 'ðŸ‡§ðŸ‡·', fr: 'BrÃ©sil', en: 'Brazil' },
+  { code: '+52', flag: 'ðŸ‡²ðŸ‡½', fr: 'Mexique', en: 'Mexico' },
+  { code: '+7', flag: 'ðŸ‡·ðŸ‡º', fr: 'Russie', en: 'Russia' },
 ] as const;
 
 // ===== Types =====
@@ -129,76 +129,76 @@ interface LanguageOption { value: string; label: string }
 // ===== i18n (fun) =====
 const I18N = {
   fr: {
-    metaTitle: 'Inscription Avocat • SOS Expats',
-    metaDesc: 'Rejoignez le réseau SOS Expats : des clients partout, des dossiers malins, et vous aux commandes 🚀.',
+    metaTitle: 'Inscription Avocat â€¢ SOS Expats',
+    metaDesc: 'Rejoignez le rÃ©seau SOS Expats : des clients partout, des dossiers malins, et vous aux commandes ðŸš€.',
     heroTitle: 'Inscription Avocat',
-    heroSubtitle: 'Partagez votre expertise avec des expats du monde entier. On s’occupe du reste 😉',
-    already: 'Déjà inscrit ?', login: 'Se connecter',
+    heroSubtitle: 'Partagez votre expertise avec des expats du monde entier. On sâ€™occupe du reste ðŸ˜‰',
+    already: 'DÃ©jÃ  inscrit ?', login: 'Se connecter',
     personalInfo: 'Informations personnelles',
-    geoInfo: 'Où vous opérez',
+    geoInfo: 'OÃ¹ vous opÃ©rez',
     proInfo: 'Votre pratique',
-    acceptTerms: 'J’accepte les', termsLink: 'CGU Avocats',
-    create: 'Créer mon compte avocat', loading: 'On prépare tout pour vous… ⏳',
-    firstName: 'Prénom', lastName: 'Nom', email: 'Adresse email', password: 'Mot de passe',
-    phone: 'Téléphone', whatsapp: 'Numéro WhatsApp',
+    acceptTerms: 'Jâ€™accepte les', termsLink: 'CGU Avocats',
+    create: 'CrÃ©er mon compte avocat', loading: 'On prÃ©pare tout pour vousâ€¦ â³',
+    firstName: 'PrÃ©nom', lastName: 'Nom', email: 'Adresse email', password: 'Mot de passe',
+    phone: 'TÃ©lÃ©phone', whatsapp: 'NumÃ©ro WhatsApp',
     countryCode: 'Indicatif pays',
-    residenceCountry: 'Pays de résidence', presenceCountry: 'Pays où vous êtes en ce moment',
-    yoe: 'Années d’expérience', gradYear: 'Année de diplôme',
+    residenceCountry: 'Pays de rÃ©sidence', presenceCountry: 'Pays oÃ¹ vous Ãªtes en ce moment',
+    yoe: 'AnnÃ©es dâ€™expÃ©rience', gradYear: 'AnnÃ©e de diplÃ´me',
     bio: 'Description professionnelle', profilePhoto: 'Photo de profil',
-    specialties: 'Spécialités', practiceCountries: 'Pays d’intervention',
-    languages: 'Langues parlées',
+    specialties: 'SpÃ©cialitÃ©s', practiceCountries: 'Pays dâ€™intervention',
+    languages: 'Langues parlÃ©es',
     formations: 'Formations', addFormation: 'Ajouter une formation',
-    addPractice: 'Ajouter un pays d’intervention', addSpecialty: 'Ajouter une spécialité',
-    specifyCountry: 'Précisez votre pays', specifyPractice: 'Précisez le pays', specifySpecialty: 'Précisez la spécialité',
+    addPractice: 'Ajouter un pays dâ€™intervention', addSpecialty: 'Ajouter une spÃ©cialitÃ©',
+    specifyCountry: 'PrÃ©cisez votre pays', specifyPractice: 'PrÃ©cisez le pays', specifySpecialty: 'PrÃ©cisez la spÃ©cialitÃ©',
     help: {
-      minPassword: '6 caractères et c’est parti (aucune contrainte) 💃',
+      minPassword: '6 caractÃ¨res et câ€™est parti (aucune contrainte) ðŸ’ƒ',
       emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'Comment on vous appelle ? 😊',
-      bioHint: 'Racontez en 2–3 phrases comment vous aidez les expats (50 caractères mini).',
+      firstNamePlaceholder: 'Comment on vous appelle ? ðŸ˜Š',
+      bioHint: 'Racontez en 2â€“3 phrases comment vous aidez les expats (50 caractÃ¨res mini).',
     },
     errors: {
-      title: 'Petites retouches avant le grand saut ✨',
-      firstNameRequired: 'On veut bien vous appeler… mais comment ? 😄',
-      lastNameRequired: 'Un petit nom de famille pour faire pro ? 👔',
-      emailRequired: 'On a besoin de votre email pour vous tenir au courant 📬',
-      emailInvalid: 'Cette adresse a l’air louche… Essayez plutôt nom@exemple.com 🧐',
-      emailTaken: 'Oups, cet email est déjà utilisé. Vous avez peut-être déjà un compte ? 🔑',
-      passwordTooShort: 'Juste 6 caractères minimum — easy ! 💪',
-      phoneRequired: 'On vous sonne où ? 📞',
-      whatsappRequired: 'On papote aussi sur WhatsApp ? 💬',
-      needCountry: 'Votre pays de résidence, s’il vous plaît 🌍',
-      needPresence: 'Où êtes-vous actuellement ? ✈️',
-      needPractice: 'Ajoutez au moins un pays d’intervention 🗺️',
-      needLang: 'Choisissez au moins une langue 🗣️',
-      needSpec: 'Une spécialité, et vous brillez ✨',
-      needBio: 'Encore un petit effort : 50 caractères minimum 📝',
-      needPhoto: 'Une photo pro, et c’est 100% plus rassurant 📸',
-      needEducation: 'Ajoutez au moins une formation 🎓',
-      acceptTermsRequired: 'Un petit clic sur les conditions et on y va ✅',
+      title: 'Petites retouches avant le grand saut âœ¨',
+      firstNameRequired: 'On veut bien vous appelerâ€¦ mais comment ? ðŸ˜„',
+      lastNameRequired: 'Un petit nom de famille pour faire pro ? ðŸ‘”',
+      emailRequired: 'On a besoin de votre email pour vous tenir au courant ðŸ“¬',
+      emailInvalid: 'Cette adresse a lâ€™air loucheâ€¦ Essayez plutÃ´t nom@exemple.com ðŸ§',
+      emailTaken: 'Oups, cet email est dÃ©jÃ  utilisÃ©. Vous avez peut-Ãªtre dÃ©jÃ  un compte ? ðŸ”‘',
+      passwordTooShort: 'Juste 6 caractÃ¨res minimum â€” easy ! ðŸ’ª',
+      phoneRequired: 'On vous sonne oÃ¹ ? ðŸ“ž',
+      whatsappRequired: 'On papote aussi sur WhatsApp ? ðŸ’¬',
+      needCountry: 'Votre pays de rÃ©sidence, sâ€™il vous plaÃ®t ðŸŒ',
+      needPresence: 'OÃ¹ Ãªtes-vous actuellement ? âœˆï¸',
+      needPractice: 'Ajoutez au moins un pays dâ€™intervention ðŸ—ºï¸',
+      needLang: 'Choisissez au moins une langue ðŸ—£ï¸',
+      needSpec: 'Une spÃ©cialitÃ©, et vous brillez âœ¨',
+      needBio: 'Encore un petit effort : 50 caractÃ¨res minimum ðŸ“',
+      needPhoto: 'Une photo pro, et câ€™est 100% plus rassurant ðŸ“¸',
+      needEducation: 'Ajoutez au moins une formation ðŸŽ“',
+      acceptTermsRequired: 'Un petit clic sur les conditions et on y va âœ…',
     },
     success: {
-      fieldValid: 'Parfait ! ✨',
-      emailValid: 'Super email ! 👌',
-      pwdOk: 'Mot de passe validé 🔒',
-      allGood: 'Tout est bon, prêt·e à rayonner 🌟',
+      fieldValid: 'Parfait ! âœ¨',
+      emailValid: 'Super email ! ðŸ‘Œ',
+      pwdOk: 'Mot de passe validÃ© ðŸ”’',
+      allGood: 'Tout est bon, prÃªtÂ·e Ã  rayonner ðŸŒŸ',
     },
-    secureNote: 'Données protégées • Validation sous 24h • Support juridique',
-    footerTitle: '⚖️ Rejoignez la communauté SOS Expats',
-    footerText: 'Des avocats vérifiés, des clients engagés — let’s go !',
-    langPlaceholder: 'Sélectionnez les langues',
-    previewTitle: 'Aperçu live du profil',
-    previewToggleOpen: 'Masquer l’aperçu',
-    previewToggleClose: 'Voir l’aperçu',
+    secureNote: 'DonnÃ©es protÃ©gÃ©es â€¢ Validation sous 24h â€¢ Support juridique',
+    footerTitle: 'âš–ï¸ Rejoignez la communautÃ© SOS Expats',
+    footerText: 'Des avocats vÃ©rifiÃ©s, des clients engagÃ©s â€” letâ€™s go !',
+    langPlaceholder: 'SÃ©lectionnez les langues',
+    previewTitle: 'AperÃ§u live du profil',
+    previewToggleOpen: 'Masquer lâ€™aperÃ§u',
+    previewToggleClose: 'Voir lâ€™aperÃ§u',
   },
   en: {
-    metaTitle: 'Lawyer Registration • SOS Expats',
-    metaDesc: 'Join SOS Expats: smart clients, smooth cases, and you in the driver’s seat 🚀.',
+    metaTitle: 'Lawyer Registration â€¢ SOS Expats',
+    metaDesc: 'Join SOS Expats: smart clients, smooth cases, and you in the driverâ€™s seat ðŸš€.',
     heroTitle: 'Lawyer Registration',
-    heroSubtitle: 'Share your expertise with expats worldwide. We handle the boring bits 😉',
+    heroSubtitle: 'Share your expertise with expats worldwide. We handle the boring bits ðŸ˜‰',
     already: 'Already registered?', login: 'Log in',
     personalInfo: 'Personal info', geoInfo: 'Where you operate', proInfo: 'Your practice',
     acceptTerms: 'I accept the', termsLink: 'Lawyers T&Cs',
-    create: 'Create my lawyer account', loading: 'Getting things ready for you… ⏳',
+    create: 'Create my lawyer account', loading: 'Getting things ready for youâ€¦ â³',
     firstName: 'First Name', lastName: 'Last Name', email: 'Email', password: 'Password',
     phone: 'Phone', whatsapp: 'WhatsApp Number',
     countryCode: 'Country code',
@@ -211,40 +211,40 @@ const I18N = {
     addPractice: 'Add a practice country', addSpecialty: 'Add a specialty',
     specifyCountry: 'Specify your country', specifyPractice: 'Specify the country', specifySpecialty: 'Specify the specialty',
     help: {
-      minPassword: '6+ characters and you’re good 💃',
+      minPassword: '6+ characters and youâ€™re good ðŸ’ƒ',
       emailPlaceholder: 'you@example.com',
-      firstNamePlaceholder: 'How should we call you? 😊',
-      bioHint: 'In 2–3 lines, tell expats how you help (min 50 chars).',
+      firstNamePlaceholder: 'How should we call you? ðŸ˜Š',
+      bioHint: 'In 2â€“3 lines, tell expats how you help (min 50 chars).',
     },
     errors: {
-      title: 'Tiny tweaks before we launch ✨',
-      firstNameRequired: 'We’d love to address you… what’s your name? 😄',
-      lastNameRequired: 'A last name keeps it professional 👔',
-      emailRequired: 'We need your email to keep you posted 📬',
-      emailInvalid: 'That email looks off. Try name@example.com 🧐',
-      emailTaken: 'This email is already in use. Maybe you already have an account? 🔑',
-      passwordTooShort: 'At least 6 characters — easy peasy! 💪',
-      phoneRequired: 'Where can we call you? 📞',
-      whatsappRequired: 'WhatsApp number please? 💬',
-      needCountry: 'Your residence country, please 🌍',
-      needPresence: 'Where are you at the moment? ✈️',
-      needPractice: 'Add at least one practice country 🗺️',
-      needLang: 'Pick at least one language 🗣️',
-      needSpec: 'Choose at least one specialty ✨',
-      needBio: 'Push it to 50 characters, you got this 📝',
-      needPhoto: 'A professional photo builds trust 📸',
-      needEducation: 'Add at least one formation 🎓',
-      acceptTermsRequired: 'Tick the box and we’re rolling ✅',
+      title: 'Tiny tweaks before we launch âœ¨',
+      firstNameRequired: 'Weâ€™d love to address youâ€¦ whatâ€™s your name? ðŸ˜„',
+      lastNameRequired: 'A last name keeps it professional ðŸ‘”',
+      emailRequired: 'We need your email to keep you posted ðŸ“¬',
+      emailInvalid: 'That email looks off. Try name@example.com ðŸ§',
+      emailTaken: 'This email is already in use. Maybe you already have an account? ðŸ”‘',
+      passwordTooShort: 'At least 6 characters â€” easy peasy! ðŸ’ª',
+      phoneRequired: 'Where can we call you? ðŸ“ž',
+      whatsappRequired: 'WhatsApp number please? ðŸ’¬',
+      needCountry: 'Your residence country, please ðŸŒ',
+      needPresence: 'Where are you at the moment? âœˆï¸',
+      needPractice: 'Add at least one practice country ðŸ—ºï¸',
+      needLang: 'Pick at least one language ðŸ—£ï¸',
+      needSpec: 'Choose at least one specialty âœ¨',
+      needBio: 'Push it to 50 characters, you got this ðŸ“',
+      needPhoto: 'A professional photo builds trust ðŸ“¸',
+      needEducation: 'Add at least one formation ðŸŽ“',
+      acceptTermsRequired: 'Tick the box and weâ€™re rolling âœ…',
     },
     success: {
-      fieldValid: 'Looks great! ✨',
-      emailValid: 'Nice email! 👌',
-      pwdOk: 'Password good to go 🔒',
-      allGood: 'All set — time to shine 🌟',
+      fieldValid: 'Looks great! âœ¨',
+      emailValid: 'Nice email! ðŸ‘Œ',
+      pwdOk: 'Password good to go ðŸ”’',
+      allGood: 'All set â€” time to shine ðŸŒŸ',
     },
-    secureNote: 'Data protected • 24h validation • Legal support',
-    footerTitle: '⚖️ Join the SOS Expats community',
-    footerText: 'Verified lawyers, great clients — let’s go!',
+    secureNote: 'Data protected â€¢ 24h validation â€¢ Legal support',
+    footerTitle: 'âš–ï¸ Join the SOS Expats community',
+    footerText: 'Verified lawyers, great clients â€” letâ€™s go!',
     langPlaceholder: 'Select languages',
     previewTitle: 'Live profile preview',
     previewToggleOpen: 'Hide preview',
@@ -280,7 +280,7 @@ FieldSuccess.displayName = 'FieldSuccess';
 /* ========= Avatar + Preview ========= */
 const Avatar = ({ src, name }: { src?: string; name: string }) => {
   if (src) return <img src={src} alt={name} className="w-16 h-16 rounded-full object-cover ring-2 ring-indigo-200" />;
-  const initials = name.split(' ').map((p) => p.charAt(0).toUpperCase()).slice(0, 2).join('') || '🙂';
+  const initials = name.split(' ').map((p) => p.charAt(0).toUpperCase()).slice(0, 2).join('') || 'ðŸ™‚';
   return (
     <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center font-bold ring-2 ring-indigo-200">
       {initials}
@@ -304,7 +304,7 @@ const LawyerPreviewCard = ({
         <div>
           <h3 className="text-lg font-extrabold text-gray-900 leading-tight">{fullName || (lang === 'en' ? 'Your Name' : 'Votre nom')}</h3>
           <p className="text-xs text-gray-500">
-            {lang === 'en' ? 'Lawyer' : 'Avocat'} • {progress}% {lang === 'en' ? 'complete' : 'complet'}
+            {lang === 'en' ? 'Lawyer' : 'Avocat'} â€¢ {progress}% {lang === 'en' ? 'complete' : 'complet'}
           </p>
         </div>
       </div>
@@ -319,7 +319,7 @@ const LawyerPreviewCard = ({
         {(currentCountry || presenceCountry) && (
           <div className="flex items-center gap-2 text-gray-700">
             <MapPin className="w-4 h-4 text-indigo-600" />
-            <span className="font-medium">{currentCountry || (lang === 'en' ? 'Residence' : 'Résidence')}</span>
+            <span className="font-medium">{currentCountry || (lang === 'en' ? 'Residence' : 'RÃ©sidence')}</span>
             {presenceCountry && (
               <span className="ml-auto rounded-full px-2 py-0.5 text-xs bg-indigo-50 border border-indigo-200">
                 {presenceCountry}
@@ -329,7 +329,7 @@ const LawyerPreviewCard = ({
         )}
         {typeof yearsOfExperience === 'number' && yearsOfExperience >= 0 && (
           <div className="text-gray-700">
-            {lang === 'en' ? 'Experience:' : 'Expérience :'} <strong>{yearsOfExperience}</strong> {lang === 'en' ? 'years' : 'ans'}
+            {lang === 'en' ? 'Experience:' : 'ExpÃ©rience :'} <strong>{yearsOfExperience}</strong> {lang === 'en' ? 'years' : 'ans'}
           </div>
         )}
       </div>
@@ -374,7 +374,7 @@ const LawyerPreviewCard = ({
         </div>
       )}
 
-      <p className="mt-4 text-xs text-gray-500">{lang === 'en' ? 'This is what clients will see. Make it shine ✨' : 'Ce que les clients verront. Faites briller votre profil ✨'}</p>
+      <p className="mt-4 text-xs text-gray-500">{lang === 'en' ? 'This is what clients will see. Make it shine âœ¨' : 'Ce que les clients verront. Faites briller votre profil âœ¨'}</p>
     </div>
   );
 };
@@ -392,11 +392,11 @@ const computePasswordStrength = (pw: string) => {
   if (/\d/.test(pw)) score += 5;
   if (/[^a-zA-Z0-9]/.test(pw)) score += 5;
   const clamp = Math.min(100, score);
-  let labelFr = 'Excellent 🚀', labelEn = 'Excellent 🚀', color = 'bg-green-500';
-  if (pw.length < 6) { labelFr = 'Trop court 😅'; labelEn = 'Too short 😅'; color = 'bg-red-500'; }
-  else if (clamp < 40) { labelFr = 'Faible 🙂'; labelEn = 'Weak 🙂'; color = 'bg-orange-500'; }
-  else if (clamp < 55) { labelFr = 'Moyen 👍'; labelEn = 'Medium 👍'; color = 'bg-yellow-500'; }
-  else if (clamp < 70) { labelFr = 'Bon 🔥'; labelEn = 'Good 🔥'; color = 'bg-blue-500'; }
+  let labelFr = 'Excellent ðŸš€', labelEn = 'Excellent ðŸš€', color = 'bg-green-500';
+  if (pw.length < 6) { labelFr = 'Trop court ðŸ˜…'; labelEn = 'Too short ðŸ˜…'; color = 'bg-red-500'; }
+  else if (clamp < 40) { labelFr = 'Faible ðŸ™‚'; labelEn = 'Weak ðŸ™‚'; color = 'bg-orange-500'; }
+  else if (clamp < 55) { labelFr = 'Moyen ðŸ‘'; labelEn = 'Medium ðŸ‘'; color = 'bg-yellow-500'; }
+  else if (clamp < 70) { labelFr = 'Bon ðŸ”¥'; labelEn = 'Good ðŸ”¥'; color = 'bg-blue-500'; }
   return { percent: clamp, labelFr, labelEn, color };
 };
 
@@ -438,7 +438,7 @@ SectionHeader.displayName = 'SectionHeader';
 const RegisterLawyer: React.FC = () => {
   const navigate = useNavigate();
 
-  // --- Types sûrs (pas de any) ---
+  // --- Types sÃ»rs (pas de any) ---
   type NavState = Readonly<{ selectedProvider?: Provider }>;
   function isProviderLike(v: unknown): v is Provider {
     if (typeof v !== 'object' || v === null) return false;
@@ -538,7 +538,7 @@ const RegisterLawyer: React.FC = () => {
   // ---- Password strength ----
   const pwdStrength = useMemo(() => computePasswordStrength(form.password), [form.password]);
 
-  // ---- Progress (ne vérifie plus la dispo email) ----
+  // ---- Progress (ne vÃ©rifie plus la dispo email) ----
   const progress = useMemo(() => {
     const fields = [
       !!form.firstName, !!form.lastName,
@@ -578,7 +578,7 @@ const RegisterLawyer: React.FC = () => {
       const { name, value, type, checked } = e.target as HTMLInputElement;
       setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value }));
 
-      // (plus d’appel handleEmailCheck)
+      // (plus dâ€™appel handleEmailCheck)
       if (name === 'currentCountry') {
         const other = lang === 'en' ? 'Other' : 'Autre';
         setShowCustomCountry(value === other);
@@ -592,7 +592,7 @@ const RegisterLawyer: React.FC = () => {
     [fieldErrors, lang]
   );
 
-  // ---- Sélections multi (pays de pratique / spécialités) ----
+  // ---- SÃ©lections multi (pays de pratique / spÃ©cialitÃ©s) ----
   const onPracticeSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const v = e.target.value;
     if (!v) return;
@@ -656,7 +656,7 @@ const RegisterLawyer: React.FC = () => {
     });
   }, []);
 
-  // ---- Validation complète (ne bloque plus sur "email déjà utilisé") ----
+  // ---- Validation complÃ¨te (ne bloque plus sur "email dÃ©jÃ  utilisÃ©") ----
   const validateAll = useCallback(() => {
     const e: Record<string, string> = {};
     if (!form.firstName.trim()) e.firstName = t.errors.firstNameRequired;
@@ -697,18 +697,18 @@ const RegisterLawyer: React.FC = () => {
   const missing = useMemo(() => {
     const langs = (selectedLanguages as LanguageOption[]).length > 0;
     return [
-      { key: 'firstName', ok: !!form.firstName, labelFr: 'Prénom', labelEn: 'First name' },
+      { key: 'firstName', ok: !!form.firstName, labelFr: 'PrÃ©nom', labelEn: 'First name' },
       { key: 'lastName', ok: !!form.lastName, labelFr: 'Nom', labelEn: 'Last name' },
       { key: 'email', ok: EMAIL_REGEX.test(form.email), labelFr: 'Email valide', labelEn: 'Valid email' },
-      { key: 'password', ok: form.password.length >= 6, labelFr: 'Mot de passe (≥ 6 caractères)', labelEn: 'Password (≥ 6 chars)' },
-      { key: 'phone', ok: !!form.phone, labelFr: 'Téléphone', labelEn: 'Phone' },
+      { key: 'password', ok: form.password.length >= 6, labelFr: 'Mot de passe (â‰¥ 6 caractÃ¨res)', labelEn: 'Password (â‰¥ 6 chars)' },
+      { key: 'phone', ok: !!form.phone, labelFr: 'TÃ©lÃ©phone', labelEn: 'Phone' },
       { key: 'whatsappNumber', ok: !!form.whatsappNumber, labelFr: 'WhatsApp', labelEn: 'WhatsApp' },
-      { key: 'currentCountry', ok: !!form.currentCountry, labelFr: 'Pays de résidence', labelEn: 'Residence country' },
-      { key: 'currentPresenceCountry', ok: !!form.currentPresenceCountry, labelFr: 'Pays de présence', labelEn: 'Presence country' },
+      { key: 'currentCountry', ok: !!form.currentCountry, labelFr: 'Pays de rÃ©sidence', labelEn: 'Residence country' },
+      { key: 'currentPresenceCountry', ok: !!form.currentPresenceCountry, labelFr: 'Pays de prÃ©sence', labelEn: 'Presence country' },
       { key: 'practiceCountries', ok: form.practiceCountries.length > 0, labelFr: "Au moins un pays d'intervention", labelEn: 'At least one practice country' },
       { key: 'languages', ok: langs, labelFr: 'Au moins une langue', labelEn: 'At least one language' },
-      { key: 'specialties', ok: form.specialties.length > 0, labelFr: 'Au moins une spécialité', labelEn: 'At least one specialty' },
-      { key: 'bio', ok: form.bio.trim().length >= 50, labelFr: 'Bio (≥ 50 caractères)', labelEn: 'Bio (≥ 50 chars)' },
+      { key: 'specialties', ok: form.specialties.length > 0, labelFr: 'Au moins une spÃ©cialitÃ©', labelEn: 'At least one specialty' },
+      { key: 'bio', ok: form.bio.trim().length >= 50, labelFr: 'Bio (â‰¥ 50 caractÃ¨res)', labelEn: 'Bio (â‰¥ 50 chars)' },
       { key: 'profilePhoto', ok: !!form.profilePhoto, labelFr: 'Photo de profil', labelEn: 'Profile photo' },
       { key: 'educations', ok: form.educations.some((v) => v.trim().length > 0), labelFr: 'Au moins une formation', labelEn: 'At least one education' },
       { key: 'acceptTerms', ok: !!form.acceptTerms, labelFr: 'Accepter les CGU', labelEn: 'Accept T&Cs' },
@@ -787,7 +787,7 @@ const RegisterLawyer: React.FC = () => {
       await register(userData, form.password);
       navigate(redirect, {
         replace: true,
-        state: { message: lang === 'en' ? 'Registration successful! Your profile will be validated within 24h.' : 'Inscription réussie ! Votre profil sera validé sous 24h.', type: 'success' },
+        state: { message: lang === 'en' ? 'Registration successful! Your profile will be validated within 24h.' : 'Inscription rÃ©ussie ! Votre profil sera validÃ© sous 24h.', type: 'success' },
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
@@ -903,7 +903,7 @@ const RegisterLawyer: React.FC = () => {
                 lang={lang}
                 t={t}
                 progress={progress}
-                fullName={`${form.firstName || (lang === 'en' ? 'First' : 'Prénom')} ${form.lastName || (lang === 'en' ? 'Last' : 'Nom')}`.trim()}
+                fullName={`${form.firstName || (lang === 'en' ? 'First' : 'PrÃ©nom')} ${form.lastName || (lang === 'en' ? 'Last' : 'Nom')}`.trim()}
                 photo={form.profilePhoto}
                 currentCountry={form.currentCountry}
                 presenceCountry={form.currentPresenceCountry}
@@ -974,7 +974,7 @@ const RegisterLawyer: React.FC = () => {
                         />
                       </div>
                       <p id="email-help" className="mt-1 text-xs text-gray-500">
-                        {lang === 'en' ? 'We only email you for account & bookings. 🤝' : 'On vous écrit seulement pour le compte & les réservations. 🤝'}
+                        {lang === 'en' ? 'We only email you for account & bookings. ðŸ¤' : 'On vous Ã©crit seulement pour le compte & les rÃ©servations. ðŸ¤'}
                       </p>
                       <FieldError
                         error={fieldErrors.email || (!EMAIL_REGEX.test(form.email) && touched.email ? t.errors.emailInvalid : undefined)}
@@ -1024,7 +1024,7 @@ const RegisterLawyer: React.FC = () => {
                           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div className={`h-full transition-all duration-500 ${pwdStrength.color}`} style={{ width: `${pwdStrength.percent}%` }} />
                           </div>
-                          {capsPassword && <p className="text-xs text-orange-600 mt-1">↥ {lang === 'en' ? 'Caps Lock is ON' : 'Verr. Maj activée'}</p>}
+                          {capsPassword && <p className="text-xs text-orange-600 mt-1">â†¥ {lang === 'en' ? 'Caps Lock is ON' : 'Verr. Maj activÃ©e'}</p>}
                         </div>
                       )}
                       <FieldError error={fieldErrors.password} show={!!(fieldErrors.password && touched.password)} />
@@ -1090,7 +1090,7 @@ const RegisterLawyer: React.FC = () => {
                         <ShieldCheck className="w-3.5 h-3.5 mr-1 text-green-600" />
                         {lang === 'en'
                           ? 'We use your contact only to connect you with clients. No spam.'
-                          : 'Vos coordonnées servent uniquement aux mises en relation. Jamais de spam.'}
+                          : 'Vos coordonnÃ©es servent uniquement aux mises en relation. Jamais de spam.'}
                       </p>
                     </div>
                   </section>
@@ -1108,7 +1108,7 @@ const RegisterLawyer: React.FC = () => {
                           value={form.currentCountry} onChange={onChange} onBlur={() => markTouched('currentCountry')}
                           className={getInputClassName('currentCountry')}
                         >
-                          <option value="">{lang === 'en' ? 'Select your country' : 'Sélectionnez votre pays'}</option>
+                          <option value="">{lang === 'en' ? 'Select your country' : 'SÃ©lectionnez votre pays'}</option>
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
                         {showCustomCountry && (
@@ -1131,7 +1131,7 @@ const RegisterLawyer: React.FC = () => {
                           value={form.currentPresenceCountry} onChange={onChange} onBlur={() => markTouched('currentPresenceCountry')}
                           className={getInputClassName('currentPresenceCountry')}
                         >
-                          <option value="">{lang === 'en' ? 'Select your presence country' : 'Sélectionnez votre pays de présence'}</option>
+                          <option value="">{lang === 'en' ? 'Select your presence country' : 'SÃ©lectionnez votre pays de prÃ©sence'}</option>
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
                         <FieldError error={fieldErrors.currentPresenceCountry} show={!!(fieldErrors.currentPresenceCountry && touched.currentPresenceCountry)} />
@@ -1239,7 +1239,7 @@ const RegisterLawyer: React.FC = () => {
                               value={ed}
                               onChange={(e) => updateEducation(idx, e.target.value)}
                               className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-indigo-600"
-                              placeholder={lang === 'en' ? 'e.g., LLM – NYU, 2018' : 'ex : Master 2 Droit – Paris 1, 2018'}
+                              placeholder={lang === 'en' ? 'e.g., LLM â€“ NYU, 2018' : 'ex : Master 2 Droit â€“ Paris 1, 2018'}
                             />
                             <button type="button" onClick={() => removeEducationField(idx)} className="px-3 py-2 rounded-xl border-2 border-gray-200 hover:bg-gray-50" aria-label="Remove formation">
                               <X className="w-4 h-4" />
@@ -1263,12 +1263,12 @@ const RegisterLawyer: React.FC = () => {
 
                       {(selectedLanguages as LanguageOption[]).length > 0 && (
                         <div className="mb-2 text-xs text-gray-700">
-                          <span className="font-medium">{lang === 'en' ? 'Selected languages' : 'Langues sélectionnées'}:</span>{' '}
+                          <span className="font-medium">{lang === 'en' ? 'Selected languages' : 'Langues sÃ©lectionnÃ©es'}:</span>{' '}
                           {(selectedLanguages as LanguageOption[]).map((l) => l.value.toUpperCase()).join(', ')}
                         </div>
                       )}
 
-                      <Suspense fallback={<div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100 flex items-center px-3 text-gray-500 text-sm">{lang === 'en' ? 'Loading languages…' : 'Chargement des langues…'}</div>}>
+                      <Suspense fallback={<div className="h-11 animate-pulse rounded-xl border border-gray-200 bg-gray-100 flex items-center px-3 text-gray-500 text-sm">{lang === 'en' ? 'Loading languagesâ€¦' : 'Chargement des languesâ€¦'}</div>}>
                         <div className={`${getInputClassName('languages')} p-0`}>
                           <MultiLanguageSelect
                             value={selectedLanguages}
@@ -1278,7 +1278,7 @@ const RegisterLawyer: React.FC = () => {
                               if (v.length > 0) setFieldErrors((prev) => ({ ...prev, languages: '' }));
                             }}
                             locale={lang}
-                            placeholder={lang === 'fr' ? "Rechercher et sélectionner les langues..." : "Search and select languages..."}
+                            placeholder={lang === 'fr' ? "Rechercher et sÃ©lectionner les langues..." : "Search and select languages..."}
                           />
                         </div>
                       </Suspense>
@@ -1306,11 +1306,11 @@ const RegisterLawyer: React.FC = () => {
                           <span className={form.bio.length < 50 ? 'text-orange-600' : 'text-green-600'}>
                             {form.bio.length < 50
                               ? lang === 'en'
-                                ? `Just ${50 - form.bio.length} chars to go — you’ve got this! 💪`
-                                : `Encore ${50 - form.bio.length} caractères — vous y êtes presque ! 💪`
+                                ? `Just ${50 - form.bio.length} chars to go â€” youâ€™ve got this! ðŸ’ª`
+                                : `Encore ${50 - form.bio.length} caractÃ¨res â€” vous y Ãªtes presque ! ðŸ’ª`
                               : lang === 'en'
-                              ? '✓ Nice! Field validated.'
-                              : '✓ Top ! Champ validé.'}
+                              ? 'âœ“ Nice! Field validated.'
+                              : 'âœ“ Top ! Champ validÃ©.'}
                           </span>
                           <span className={form.bio.length > 450 ? 'text-orange-500' : 'text-gray-500'}>
                             {form.bio.length}/500
@@ -1393,7 +1393,7 @@ const RegisterLawyer: React.FC = () => {
                       {/* Checklist claire, dynamique */}
                       {!isLoading && (
                         <div className="mt-5 rounded-2xl border border-white/40 bg-white/70 backdrop-blur p-4">
-                          <h4 className="text-sm font-bold text-gray-800 mb-2">{lang === 'en' ? 'To complete:' : 'À compléter :'}</h4>
+                          <h4 className="text-sm font-bold text-gray-800 mb-2">{lang === 'en' ? 'To complete:' : 'Ã€ complÃ©ter :'}</h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                             {missing.map((m, idx) => (
                               <div key={idx} className={`flex items-center text-sm ${m.ok ? 'text-green-700' : 'text-gray-700'}`}>
@@ -1404,7 +1404,7 @@ const RegisterLawyer: React.FC = () => {
                           </div>
                           <div className="mt-3 text-center">
                             <span className="text-xs text-gray-700 bg-gray-100 rounded-xl px-3 py-1 inline-block">
-                              {lang === 'en' ? `Completion: ${progress}%` : `Complétion : ${progress}%`}
+                              {lang === 'en' ? `Completion: ${progress}%` : `ComplÃ©tion : ${progress}%`}
                             </span>
                           </div>
                         </div>
@@ -1422,16 +1422,16 @@ const RegisterLawyer: React.FC = () => {
                 </div>
                 <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
                   <Link to="/politique-confidentialite" className="hover:text-indigo-700 underline">
-                    🔒 {lang === 'en' ? 'Privacy' : 'Confidentialité'}
+                    ðŸ”’ {lang === 'en' ? 'Privacy' : 'ConfidentialitÃ©'}
                   </Link>
                   <Link to="/cgu-avocats" className="hover:text-indigo-700 underline">
-                    📋 {t.termsLink}
+                    ðŸ“‹ {t.termsLink}
                   </Link>
                   <Link to="/centre-aide" className="hover:text-indigo-700 underline">
-                    💬 {lang === 'en' ? 'Help' : 'Aide'}
+                    ðŸ’¬ {lang === 'en' ? 'Help' : 'Aide'}
                   </Link>
                   <Link to="/contact" className="hover:text-indigo-700 underline">
-                    📧 Contact
+                    ðŸ“§ Contact
                   </Link>
                 </div>
               </footer>

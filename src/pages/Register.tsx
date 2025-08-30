@@ -1,4 +1,4 @@
-// src/pages/Register.tsx
+﻿// src/pages/Register.tsx
 import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Scale, Users, UserCheck, ArrowRight, Star, Shield, Clock, Sparkles, Download } from 'lucide-react';
@@ -83,9 +83,9 @@ function PWAInstallSection({ canInstall, onInstall }: PWAInstallSectionProps) {
     const isDesktop = !isIOS && !isAndroid;
 
     const prefix = 'Votre navigateur ne permet pas l\'installation automatique. ';
-    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari → « Partager » → « Sur l\'écran d\'accueil ». 😊';
-    if (isAndroid) return prefix + 'Sur Android : Chrome → menu ⋮ → « Installer l\'application ». 😊';
-    if (isDesktop) return prefix + 'Sur ordinateur : Chrome/Edge → icône « Installer » dans la barre d\'adresse.';
+    if (isIOS) return prefix + 'Sur iPhone/iPad : Safari â†’ Â« Partager Â» â†’ Â« Sur l\'Ã©cran d\'accueil Â». ðŸ˜Š';
+    if (isAndroid) return prefix + 'Sur Android : Chrome â†’ menu â‹® â†’ Â« Installer l\'application Â». ðŸ˜Š';
+    if (isDesktop) return prefix + 'Sur ordinateur : Chrome/Edge â†’ icÃ´ne Â« Installer Â» dans la barre d\'adresse.';
     return prefix + 'Essayez avec Chrome/Edge (ordinateur) ou Safari/Chrome (mobile).';
   };
 
@@ -120,13 +120,13 @@ function PWAInstallSection({ canInstall, onInstall }: PWAInstallSectionProps) {
               <button
                 onClick={onClick}
                 onTouchStart={() => { 
-                  reveal('L\'app qui change la vie des expats ! 🚀'); 
+                  reveal('L\'app qui change la vie des expats ! ðŸš€'); 
                   scheduleHide(1400); 
                 }}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl overflow-hidden border-4 border-orange-400/50 hover:border-orange-300/70 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-orange-400/40 touch-manipulation shadow-2xl shadow-orange-500/30"
-                aria-label="Télécharger l'application SOS Expats"
+                aria-label="TÃ©lÃ©charger l'application SOS Expats"
               >
-                {/* Nouvelle icône avec image ronde */}
+                {/* Nouvelle icÃ´ne avec image ronde */}
                 <div className="w-full h-full bg-white rounded-2xl flex items-center justify-center p-1">
                   <div className="w-full h-full rounded-2xl overflow-hidden">
                     <svg viewBox="0 0 200 200" className="w-full h-full">
@@ -159,11 +159,11 @@ function PWAInstallSection({ canInstall, onInstall }: PWAInstallSectionProps) {
           </div>
 
           <h3 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent mb-3">
-            📱 Télécharge l&apos;app SOS Expats !
+            ðŸ“± TÃ©lÃ©charge l&apos;app SOS Expats !
           </h3>
           
           <p className="text-purple-200 text-base sm:text-lg leading-relaxed mb-6 max-w-lg mx-auto">
-            L&apos;aide d&apos;urgence dans ta poche ! Accès instantané aux experts, même hors connexion.
+            L&apos;aide d&apos;urgence dans ta poche ! AccÃ¨s instantanÃ© aux experts, mÃªme hors connexion.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -172,12 +172,12 @@ function PWAInstallSection({ canInstall, onInstall }: PWAInstallSectionProps) {
               className="group w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-bold text-lg rounded-2xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-500/40 touch-manipulation shadow-xl shadow-purple-500/30"
             >
               <Download className="w-6 h-6 group-hover:animate-bounce" />
-              <span>{canInstall ? 'Installer maintenant' : 'Télécharger l\'app'}</span>
+              <span>{canInstall ? 'Installer maintenant' : 'TÃ©lÃ©charger l\'app'}</span>
             </button>
             
             <div className="flex items-center gap-2 text-sm text-purple-300">
               <Shield className="w-4 h-4 text-green-400" />
-              <span>100% gratuit & sécurisé</span>
+              <span>100% gratuit & sÃ©curisÃ©</span>
             </div>
           </div>
 
@@ -189,7 +189,7 @@ function PWAInstallSection({ canInstall, onInstall }: PWAInstallSectionProps) {
           >
             <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/95 rotate-45 border-l border-t border-gray-200" />
             <div className="px-4 py-3">
-              <div className="font-bold text-gray-900">L&apos;app qui change tout ! 🚀</div>
+              <div className="font-bold text-gray-900">L&apos;app qui change tout ! ðŸš€</div>
               {hintText && <div className="mt-1 leading-relaxed text-gray-700">{hintText}</div>}
             </div>
           </div>
@@ -199,71 +199,71 @@ function PWAInstallSection({ canInstall, onInstall }: PWAInstallSectionProps) {
   );
 }
 
-/* ============ i18n léger (FR/EN) ============ */
+/* ============ i18n lÃ©ger (FR/EN) ============ */
 const useTranslation = () => {
   const { language } = useApp();
   const lang = (language as 'fr' | 'en') || 'fr';
 
   const dict: Record<string, Record<'fr' | 'en', string>> = {
     'meta.title': {
-      fr: "Inscription - SOS Expats | Choisissez votre profil ✨",
-      en: 'Sign up - SOS Expats | Choose your profile ✨',
+      fr: "Inscription - SOS Expats | Choisissez votre profil âœ¨",
+      en: 'Sign up - SOS Expats | Choose your profile âœ¨',
     },
     'meta.description': {
-      fr: "Rejoignez SOS Expats : choisissez un profil (Client, Avocat, Expatrié) pour profiter d'une aide sympa et efficace, 24/7 et multilingue 🌍.",
-      en: 'Join SOS Expats: choose a profile (Client, Lawyer, Expat) to get friendly and effective help, 24/7 and multilingual 🌍.',
+      fr: "Rejoignez SOS Expats : choisissez un profil (Client, Avocat, ExpatriÃ©) pour profiter d'une aide sympa et efficace, 24/7 et multilingue ðŸŒ.",
+      en: 'Join SOS Expats: choose a profile (Client, Lawyer, Expat) to get friendly and effective help, 24/7 and multilingual ðŸŒ.',
     },
     'og.title': {
-      fr: 'Inscription SOS Expats - Choisissez votre profil 🌴',
-      en: 'SOS Expats Sign up - Choose your profile 🌴',
+      fr: 'Inscription SOS Expats - Choisissez votre profil ðŸŒ´',
+      en: 'SOS Expats Sign up - Choose your profile ðŸŒ´',
     },
     'og.description': {
-      fr: "Plateforme d'aide sympa et efficace pour expatriés & conseils juridiques. Toujours là pour vous, même en vacances 😎.",
-      en: 'Friendly and effective help for expats & legal advisory. Here for you, even on holiday 😎.',
+      fr: "Plateforme d'aide sympa et efficace pour expatriÃ©s & conseils juridiques. Toujours lÃ  pour vous, mÃªme en vacances ðŸ˜Ž.",
+      en: 'Friendly and effective help for expats & legal advisory. Here for you, even on holiday ðŸ˜Ž.',
     },
     'register.title': { 
-      fr: 'Qui êtes-vous ? 🚀', 
-      en: 'Who are you? 🚀' 
+      fr: 'Qui Ãªtes-vous ? ðŸš€', 
+      en: 'Who are you? ðŸš€' 
     },
     'register.subtitle': { 
       fr: 'Rejoignez la famille SOS Expats !', 
       en: 'Join the SOS Expats family!' 
     },
     'register.description': {
-      fr: 'Choisissez votre camp et on vous emmène dans l\'aventure ! 🌟',
-      en: 'Pick your side and we\'ll take you on the adventure! 🌟',
+      fr: 'Choisissez votre camp et on vous emmÃ¨ne dans l\'aventure ! ðŸŒŸ',
+      en: 'Pick your side and we\'ll take you on the adventure! ðŸŒŸ',
     },
     'register.loginPrompt': {
-      fr: 'déjà dans la team ? Connectez-vous !',
+      fr: 'dÃ©jÃ  dans la team ? Connectez-vous !',
       en: 'already on the team? Sign in!',
     },
     'register.bookingMessage': {
-      fr: 'Après ton inscription, on te redirige direct pour finaliser ta résa ! 🎯',
-      en: "After signing up, we'll redirect you to finish your booking! 🎯",
+      fr: 'AprÃ¨s ton inscription, on te redirige direct pour finaliser ta rÃ©sa ! ðŸŽ¯',
+      en: "After signing up, we'll redirect you to finish your booking! ðŸŽ¯",
     },
     'register.needHelp': { 
-      fr: "Un souci ? On est là ! ", 
+      fr: "Un souci ? On est lÃ  ! ", 
       en: 'Need help? We got you! ' 
     },
     'register.contactUs': { 
-      fr: 'Écris-nous 💬', 
-      en: 'Hit us up 💬' 
+      fr: 'Ã‰cris-nous ðŸ’¬', 
+      en: 'Hit us up ðŸ’¬' 
     },
     'register.termsAccept': { 
       fr: 'En t\'inscrivant, tu acceptes nos', 
       en: 'By signing up, you agree to our' 
     },
     'register.termsLink': { 
-      fr: "conditions (promis c'est pas chiant à lire)", 
+      fr: "conditions (promis c'est pas chiant Ã  lire)", 
       en: 'terms (promise they\'re not boring)' 
     },
     'register.secureData': { 
-      fr: 'Tes données sont safe 🔒', 
-      en: 'Your data is safe 🔒' 
+      fr: 'Tes donnÃ©es sont safe ðŸ”’', 
+      en: 'Your data is safe ðŸ”’' 
     },
     'register.freeRegistration': { 
-      fr: 'Inscription 100% gratuite 🎉', 
-      en: '100% free signup 🎉' 
+      fr: 'Inscription 100% gratuite ðŸŽ‰', 
+      en: '100% free signup ðŸŽ‰' 
     },
     'role.client': { 
       fr: 'J\'ai besoin d\'aide', 
@@ -274,76 +274,76 @@ const useTranslation = () => {
       en: 'I\'m a lawyer' 
     },
     'role.expat': { 
-      fr: 'Je suis expatrié(e)', 
+      fr: 'Je suis expatriÃ©(e)', 
       en: 'I\'m an expat' 
     },
     'role.client.desc': {
-      fr: "J'ai des galères d'expat et j'ai besoin de conseils qui marchent vraiment ! 🆘",
-      en: 'I have expat troubles and need advice that actually works! 🆘',
+      fr: "J'ai des galÃ¨res d'expat et j'ai besoin de conseils qui marchent vraiment ! ðŸ†˜",
+      en: 'I have expat troubles and need advice that actually works! ðŸ†˜',
     },
     'role.lawyer.desc': {
-      fr: 'Je connais le droit et je veux aider des expats tout en gagnant ma vie ! 💼',
-      en: 'I know the law and want to help expats while making good money! 💼',
+      fr: 'Je connais le droit et je veux aider des expats tout en gagnant ma vie ! ðŸ’¼',
+      en: 'I know the law and want to help expats while making good money! ðŸ’¼',
     },
     'role.expat.desc': {
-      fr: "J'ai galéré, j'ai appris, et maintenant je veux aider les autres (et me faire un petit extra) ! 🌍",
-      en: 'I\'ve struggled, learned, and now I want to help others (and make some extra cash)! 🌍',
+      fr: "J'ai galÃ©rÃ©, j'ai appris, et maintenant je veux aider les autres (et me faire un petit extra) ! ðŸŒ",
+      en: 'I\'ve struggled, learned, and now I want to help others (and make some extra cash)! ðŸŒ',
     },
     'role.lawyer.cta': {
-      fr: "Booste ton chiffre d'affaires en aidant des expats ! Tu décides quand être en ligne, tu réponds aux appels, tu factures. Simple et efficace ! 💰⚖️",
-      en: "Boost your revenue helping expats! You decide when to go online, answer calls, and bill. Simple and effective! 💰⚖️",
+      fr: "Booste ton chiffre d'affaires en aidant des expats ! Tu dÃ©cides quand Ãªtre en ligne, tu rÃ©ponds aux appels, tu factures. Simple et efficace ! ðŸ’°âš–ï¸",
+      en: "Boost your revenue helping expats! You decide when to go online, answer calls, and bill. Simple and effective! ðŸ’°âš–ï¸",
     },
     'role.expat.cta': {
-      fr: "Du petit extra au gros revenu, c'est TOI qui choisis ! Un clic pour passer en ligne → joignable 24h → payé direct. À toi de voir ton niveau d'implication ! 🎯💸",
-      en: "From small extras to big income, YOU choose! One click to go online → available 24h → paid directly. Up to you how involved you want to be! 🎯💸",
+      fr: "Du petit extra au gros revenu, c'est TOI qui choisis ! Un clic pour passer en ligne â†’ joignable 24h â†’ payÃ© direct. Ã€ toi de voir ton niveau d'implication ! ðŸŽ¯ðŸ’¸",
+      en: "From small extras to big income, YOU choose! One click to go online â†’ available 24h â†’ paid directly. Up to you how involved you want to be! ðŸŽ¯ðŸ’¸",
     },
     'role.client.f1': { 
-      fr: 'Conseils dans ta langue 🗣️', 
-      en: 'Advice in your language 🗣️' 
+      fr: 'Conseils dans ta langue ðŸ—£ï¸', 
+      en: 'Advice in your language ðŸ—£ï¸' 
     },
     'role.client.f2': { 
-      fr: 'Dispo même à 3h du mat 🌙', 
-      en: 'Available even at 3am 🌙' 
+      fr: 'Dispo mÃªme Ã  3h du mat ðŸŒ™', 
+      en: 'Available even at 3am ðŸŒ™' 
     },
     'role.client.f3': { 
-      fr: 'Réponses ultra rapides ⚡', 
-      en: 'Lightning fast answers ⚡' 
+      fr: 'RÃ©ponses ultra rapides âš¡', 
+      en: 'Lightning fast answers âš¡' 
     },
     'role.lawyer.f1': { 
-      fr: 'Clients du monde entier 🌏', 
-      en: 'Clients worldwide 🌏' 
+      fr: 'Clients du monde entier ðŸŒ', 
+      en: 'Clients worldwide ðŸŒ' 
     },
     'role.lawyer.f2': { 
-      fr: 'Travaille dans plusieurs langues 🎯', 
-      en: 'Work in multiple languages 🎯' 
+      fr: 'Travaille dans plusieurs langues ðŸŽ¯', 
+      en: 'Work in multiple languages ðŸŽ¯' 
     },
     'role.lawyer.f3': { 
-      fr: 'Revenus quand tu veux 💵', 
-      en: 'Earn when you want 💵' 
+      fr: 'Revenus quand tu veux ðŸ’µ', 
+      en: 'Earn when you want ðŸ’µ' 
     },
     'role.expat.f1': { 
-      fr: 'Aide concrète sur le terrain 🛠️', 
-      en: 'Real hands-on help 🛠️' 
+      fr: 'Aide concrÃ¨te sur le terrain ðŸ› ï¸', 
+      en: 'Real hands-on help ðŸ› ï¸' 
     },
     'role.expat.f2': { 
-      fr: 'Partage ton vécu 📖', 
-      en: 'Share your experience 📖' 
+      fr: 'Partage ton vÃ©cu ðŸ“–', 
+      en: 'Share your experience ðŸ“–' 
     },
     'role.expat.f3': { 
-      fr: 'Gagne en aidant 🤝💰', 
-      en: 'Earn while helping 🤝💰' 
+      fr: 'Gagne en aidant ðŸ¤ðŸ’°', 
+      en: 'Earn while helping ðŸ¤ðŸ’°' 
     },
     'badge.24_7': { 
-      fr: 'Toujours là pour toi ! ⏰', 
-      en: 'Always here for you! ⏰' 
+      fr: 'Toujours lÃ  pour toi ! â°', 
+      en: 'Always here for you! â°' 
     },
     'badge.multi': { 
-      fr: 'On parle toutes les langues ! 🌍', 
-      en: 'We speak all languages! 🌍' 
+      fr: 'On parle toutes les langues ! ðŸŒ', 
+      en: 'We speak all languages! ðŸŒ' 
     },
     'register.topBadge': {
-      fr: '🎉 Déjà +15K expats dans la team !',
-      en: '🎉 Already +15K expats on the team!'
+      fr: 'ðŸŽ‰ DÃ©jÃ  +15K expats dans la team !',
+      en: 'ðŸŽ‰ Already +15K expats on the team!'
     },
     'register.mainTitle': {
       fr: 'Bienvenue dans l\'aventure',
@@ -400,8 +400,8 @@ const Register: React.FC = () => {
         bgGlow: 'bg-blue-500/20',
         features: [t('role.client.f1'), t('role.client.f2'), t('role.client.f3')],
         cta: '',
-        emoji: '🆘',
-        emojiSecondary: '💡',
+        emoji: 'ðŸ†˜',
+        emojiSecondary: 'ðŸ’¡',
       },
       {
         id: 'lawyer' as const,
@@ -413,8 +413,8 @@ const Register: React.FC = () => {
         bgGlow: 'bg-red-500/20',
         features: [t('role.lawyer.f1'), t('role.lawyer.f2'), t('role.lawyer.f3')],
         cta: t('role.lawyer.cta'),
-        emoji: '⚖️',
-        emojiSecondary: '💰',
+        emoji: 'âš–ï¸',
+        emojiSecondary: 'ðŸ’°',
       },
       {
         id: 'expat' as const,
@@ -426,8 +426,8 @@ const Register: React.FC = () => {
         bgGlow: 'bg-emerald-500/20',
         features: [t('role.expat.f1'), t('role.expat.f2'), t('role.expat.f3')],
         cta: t('role.expat.cta'),
-        emoji: '🌍',
-        emojiSecondary: '✈️',
+        emoji: 'ðŸŒ',
+        emojiSecondary: 'âœˆï¸',
       },
     ],
     [t]
@@ -574,7 +574,7 @@ const Register: React.FC = () => {
               <button
                 onClick={navigateToLogin}
                 className="font-bold text-transparent bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text hover:from-red-300 hover:to-orange-300 underline underline-offset-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-sm touch-manipulation"
-                aria-label={language === 'fr' ? 'Se connecter à votre compte existant' : 'Sign in to your existing account'}
+                aria-label={language === 'fr' ? 'Se connecter Ã  votre compte existant' : 'Sign in to your existing account'}
               >
                 {t('register.loginPrompt')}
               </button>
@@ -735,7 +735,7 @@ const Register: React.FC = () => {
               >
                 {t('register.contactUs')}
               </Link>
-              <span className="text-base sm:text-xl animate-bounce">👋</span>
+              <span className="text-base sm:text-xl animate-bounce">ðŸ‘‹</span>
             </div>
           </aside>
         </div>

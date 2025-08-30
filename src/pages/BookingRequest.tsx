@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useState,
   useEffect,
   useMemo,
@@ -46,13 +46,13 @@ import {
 } from '../services/pricingService';
 
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
-// ✅ Service centralisé
+// âœ… Service centralisÃ©
 import { createBookingRequest } from '../services/booking';
-/** ===== Types complémentaires ===== */
+/** ===== Types complÃ©mentaires ===== */
 type LangKey = keyof typeof I18N;
 type Language = { code: string; name: string };
 
-/** Props attendues par le composant MultiLanguageSelect (fortement typées) */
+/** Props attendues par le composant MultiLanguageSelect (fortement typÃ©es) */
 type MultiLanguageOption = { value: string; label: string };
 type MultiLanguageSelectProps = {
   value: MultiLanguageOption[];
@@ -92,92 +92,92 @@ const DEFAULT_SERVICE_FEES = {
   expat: { eur: 9, usd: 15 },
 } as const;
 
-/** ===== i18n (FR par défaut) ===== */
+/** ===== i18n (FR par dÃ©faut) ===== */
 const I18N = {
   fr: {
-    metaTitle: 'Demande de consultation • SOS Expats',
-    metaDesc: 'Un formulaire fun, fluide et ultra clair pour booker votre appel 🚀',
-    heroTitle: 'Décrivez votre demande',
+    metaTitle: 'Demande de consultation â€¢ SOS Expats',
+    metaDesc: 'Un formulaire fun, fluide et ultra clair pour booker votre appel ðŸš€',
+    heroTitle: 'DÃ©crivez votre demande',
     heroSubtitle:
-      'Quelques infos et on s’occupe du reste — simple, friendly, cool ✨',
+      'Quelques infos et on sâ€™occupe du reste â€” simple, friendly, cool âœ¨',
     progress: 'Progression',
     personal: 'On fait connaissance',
     request: 'Votre demande',
     languages: 'Langues',
     contact: 'Contact',
     cgu: 'CGU Clients',
-    checklistTitle: 'À compléter :',
-    callTiming: 'Appel dans les 5 minutes après paiement',
-    securePay: 'Paiement 100% sécurisé',
+    checklistTitle: 'Ã€ complÃ©ter :',
+    callTiming: 'Appel dans les 5 minutes aprÃ¨s paiement',
+    securePay: 'Paiement 100% sÃ©curisÃ©',
     satisfied:
-      '💯 Satisfait ou remboursé : expert indisponible = remboursement automatique.',
+      'ðŸ’¯ Satisfait ou remboursÃ© : expert indisponible = remboursement automatique.',
     continuePay: 'Continuer vers le paiement',
-    errorsTitle: 'Oups, quelques retouches et c’est parfait ✨',
+    errorsTitle: 'Oups, quelques retouches et câ€™est parfait âœ¨',
     hints: {
-      title: 'Plus votre titre est précis, mieux c’est !',
-      desc: 'Contexte, objectif, délais… donnez-nous de la matière 🔎',
+      title: 'Plus votre titre est prÃ©cis, mieux câ€™est !',
+      desc: 'Contexte, objectif, dÃ©laisâ€¦ donnez-nous de la matiÃ¨re ðŸ”Ž',
       phone:
-        'Aucun spam — jamais. Seulement pour vous connecter à l’expert. 📵',
+        'Aucun spam â€” jamais. Seulement pour vous connecter Ã  lâ€™expert. ðŸ“µ',
       whatsapp:
-        'Optionnel mais pratique pour les mises à jour en temps réel. 💬',
+        'Optionnel mais pratique pour les mises Ã  jour en temps rÃ©el. ðŸ’¬',
     },
     fields: {
-      firstName: 'Prénom',
+      firstName: 'PrÃ©nom',
       lastName: 'Nom',
-      nationality: 'Nationalité',
+      nationality: 'NationalitÃ©',
       currentCountry: "Pays d'intervention",
-      otherCountry: 'Précisez votre pays',
+      otherCountry: 'PrÃ©cisez votre pays',
       title: 'Titre de votre demande',
-      description: 'Description détaillée',
-      phone: 'Téléphone',
-      whatsapp: 'Numéro WhatsApp (optionnel)',
-      accept: 'J’accepte les ',
+      description: 'Description dÃ©taillÃ©e',
+      phone: 'TÃ©lÃ©phone',
+      whatsapp: 'NumÃ©ro WhatsApp (optionnel)',
+      accept: 'Jâ€™accepte les ',
       andConfirm:
         ' et confirme que les informations fournies sont exactes.',
     },
     placeholders: {
-      firstName: 'Votre prénom',
+      firstName: 'Votre prÃ©nom',
       lastName: 'Votre nom',
-      nationality: 'Ex : Française, Américaine…',
-      title: 'Ex : Visa de travail au Canada — quels documents ?',
+      nationality: 'Ex : FranÃ§aise, AmÃ©ricaineâ€¦',
+      title: 'Ex : Visa de travail au Canada â€” quels documents ?',
       description:
-        'Expliquez votre situation : contexte, questions précises, objectifs, délais… (50 caractères min.)',
+        'Expliquez votre situation : contexte, questions prÃ©cises, objectifs, dÃ©laisâ€¦ (50 caractÃ¨res min.)',
       phone: '612 345 678',
       otherCountry: 'Ex : Paraguay',
     },
     validators: {
-      firstName: 'Prénom requis',
+      firstName: 'PrÃ©nom requis',
       lastName: 'Nom requis',
-      title: 'Le titre doit contenir au moins 10 caractères',
-      description: 'La description doit contenir au moins 50 caractères',
-      nationality: 'Nationalité requise',
+      title: 'Le titre doit contenir au moins 10 caractÃ¨res',
+      description: 'La description doit contenir au moins 50 caractÃ¨res',
+      nationality: 'NationalitÃ© requise',
       currentCountry: "Pays d'intervention requis",
-      otherCountry: 'Veuillez préciser votre pays',
-      languages: 'Sélectionnez au moins une langue',
-      phone: 'Numéro de téléphone invalide',
+      otherCountry: 'Veuillez prÃ©ciser votre pays',
+      languages: 'SÃ©lectionnez au moins une langue',
+      phone: 'NumÃ©ro de tÃ©lÃ©phone invalide',
       accept: 'Vous devez accepter les conditions',
       langMismatch: 'Aucune langue en commun avec le prestataire',
     },
     preview: {
-      title: 'Aperçu rapide',
-      hint: 'C’est ce que verra votre expert pour vous aider au mieux.',
+      title: 'AperÃ§u rapide',
+      hint: 'Câ€™est ce que verra votre expert pour vous aider au mieux.',
     },
     labels: {
       compatible: 'Langues compatibles',
       incompatible: 'Langues non compatibles',
       communicationImpossible: 'Communication impossible',
       needShared:
-        'Sélectionnez au moins une langue commune pour continuer.',
+        'SÃ©lectionnez au moins une langue commune pour continuer.',
     },
   },
   en: {
-    metaTitle: 'Consultation Request • SOS Expats',
-    metaDesc: 'A fun, fluid, ultra-clear booking form 🚀',
+    metaTitle: 'Consultation Request â€¢ SOS Expats',
+    metaDesc: 'A fun, fluid, ultra-clear booking form ðŸš€',
     heroTitle: 'Describe your request',
     heroSubtitle:
-      'A few details and we’ll handle the rest — simple, friendly, cool ✨',
+      'A few details and weâ€™ll handle the rest â€” simple, friendly, cool âœ¨',
     progress: 'Progress',
-    personal: 'Let’s get to know you',
+    personal: 'Letâ€™s get to know you',
     request: 'Your request',
     languages: 'Languages',
     contact: 'Contact',
@@ -186,14 +186,14 @@ const I18N = {
     callTiming: 'Call within 5 minutes after payment',
     securePay: '100% secure payment',
     satisfied:
-      '💯 Satisfaction guarantee: if the expert is unavailable, you are automatically refunded.',
+      'ðŸ’¯ Satisfaction guarantee: if the expert is unavailable, you are automatically refunded.',
     continuePay: 'Continue to payment',
-    errorsTitle: 'Tiny tweaks and we’re there ✨',
+    errorsTitle: 'Tiny tweaks and weâ€™re there âœ¨',
     hints: {
       title: 'The clearer your title, the better!',
-      desc: 'Context, goal, timelines… give us material 🔎',
-      phone: 'No spam — ever. Only to connect you to the expert. 📵',
-      whatsapp: 'Optional but handy for real-time updates. 💬',
+      desc: 'Context, goal, timelinesâ€¦ give us material ðŸ”Ž',
+      phone: 'No spam â€” ever. Only to connect you to the expert. ðŸ“µ',
+      whatsapp: 'Optional but handy for real-time updates. ðŸ’¬',
     },
     fields: {
       firstName: 'First name',
@@ -211,10 +211,10 @@ const I18N = {
     placeholders: {
       firstName: 'Your first name',
       lastName: 'Your last name',
-      nationality: 'e.g., French, American…',
-      title: 'e.g., Canada work visa — which documents?',
+      nationality: 'e.g., French, Americanâ€¦',
+      title: 'e.g., Canada work visa â€” which documents?',
       description:
-        'Explain your situation: context, specific questions, goals, timeline… (min. 50 chars)',
+        'Explain your situation: context, specific questions, goals, timelineâ€¦ (min. 50 chars)',
       phone: '612 345 678',
       otherCountry: 'e.g., Paraguay',
     },
@@ -245,33 +245,33 @@ const I18N = {
 } as const;
 
 const countries = [
-  'Afghanistan','Afrique du Sud','Albanie','Algérie','Allemagne','Andorre','Angola',
-  'Antigua-et-Barbuda','Arabie saoudite','Argentine','Arménie','Australie','Autriche',
-  'Azerbaïdjan','Bahamas','Bahreïn','Bangladesh','Barbade','Belgique','Belize','Bénin',
-  'Bhoutan','Biélorussie','Birmanie','Bolivie','Bosnie-Herzégovine','Botswana','Brésil',
+  'Afghanistan','Afrique du Sud','Albanie','AlgÃ©rie','Allemagne','Andorre','Angola',
+  'Antigua-et-Barbuda','Arabie saoudite','Argentine','ArmÃ©nie','Australie','Autriche',
+  'AzerbaÃ¯djan','Bahamas','BahreÃ¯n','Bangladesh','Barbade','Belgique','Belize','BÃ©nin',
+  'Bhoutan','BiÃ©lorussie','Birmanie','Bolivie','Bosnie-HerzÃ©govine','Botswana','BrÃ©sil',
   'Brunei','Bulgarie','Burkina Faso','Burundi','Cambodge','Cameroun','Canada','Cap-Vert',
   'Chili','Chine','Chypre','Colombie','Comores','Congo','Congo (RDC)',
-  'Corée du Nord','Corée du Sud','Costa Rica',"Côte d'Ivoire",'Croatie','Cuba','Danemark',
-  'Djibouti','Dominique','Égypte','Émirats arabes unis','Équateur','Érythrée','Espagne',
-  'Estonie','États-Unis','Éthiopie','Fidji','Finlande','France','Gabon','Gambie',
-  'Géorgie','Ghana','Grèce','Grenade','Guatemala','Guinée','Guinée-Bissau',
-  'Guinée équatoriale','Guyana','Haïti','Honduras','Hongrie','Îles Cook','Îles Marshall',
-  'Îles Salomon','Inde','Indonésie','Irak','Iran','Irlande','Islande','Israël','Italie',
-  'Jamaïque','Japon','Jordanie','Kazakhstan','Kenya','Kirghizistan','Kiribati','Koweït',
+  'CorÃ©e du Nord','CorÃ©e du Sud','Costa Rica',"CÃ´te d'Ivoire",'Croatie','Cuba','Danemark',
+  'Djibouti','Dominique','Ã‰gypte','Ã‰mirats arabes unis','Ã‰quateur','Ã‰rythrÃ©e','Espagne',
+  'Estonie','Ã‰tats-Unis','Ã‰thiopie','Fidji','Finlande','France','Gabon','Gambie',
+  'GÃ©orgie','Ghana','GrÃ¨ce','Grenade','Guatemala','GuinÃ©e','GuinÃ©e-Bissau',
+  'GuinÃ©e Ã©quatoriale','Guyana','HaÃ¯ti','Honduras','Hongrie','ÃŽles Cook','ÃŽles Marshall',
+  'ÃŽles Salomon','Inde','IndonÃ©sie','Irak','Iran','Irlande','Islande','IsraÃ«l','Italie',
+  'JamaÃ¯que','Japon','Jordanie','Kazakhstan','Kenya','Kirghizistan','Kiribati','KoweÃ¯t',
   'Laos','Lesotho','Lettonie','Liban','Liberia','Libye','Liechtenstein','Lituanie',
-  'Luxembourg','Macédoine du Nord','Madagascar','Malaisie','Malawi','Maldives','Mali',
-  'Malte','Maroc','Maurice','Mauritanie','Mexique','Micronésie','Moldavie','Monaco',
-  'Mongolie','Monténégro','Mozambique','Namibie','Nauru','Népal','Nicaragua','Niger',
-  'Nigeria','Norvège','Nouvelle-Zélande','Oman','Ouganda','Ouzbékistan','Pakistan',
-  'Palaos','Palestine','Panama','Papouasie-Nouvelle-Guinée','Paraguay','Pays-Bas','Pérou',
-  'Philippines','Pologne','Portugal','Qatar','République centrafricaine',
-  'République dominicaine','République tchèque','Roumanie','Royaume-Uni','Russie','Rwanda',
-  'Saint-Christophe-et-Niévès','Saint-Marin','Saint-Vincent-et-les-Grenadines','Sainte-Lucie',
-  'Salvador','Samoa','São Tomé-et-Principe','Sénégal','Serbie','Seychelles','Sierra Leone',
-  'Singapour','Slovaquie','Slovénie','Somalie','Soudan','Soudan du Sud','Sri Lanka',
-  'Suède','Suisse','Suriname','Syrie','Tadjikistan','Tanzanie','Tchad','Thaïlande',
-  'Timor oriental','Togo','Tonga','Trinité-et-Tobago','Tunisie','Turkménistan','Turquie',
-  'Tuvalu','Ukraine','Uruguay','Vanuatu','Vatican','Venezuela','Vietnam','Yémen',
+  'Luxembourg','MacÃ©doine du Nord','Madagascar','Malaisie','Malawi','Maldives','Mali',
+  'Malte','Maroc','Maurice','Mauritanie','Mexique','MicronÃ©sie','Moldavie','Monaco',
+  'Mongolie','MontÃ©nÃ©gro','Mozambique','Namibie','Nauru','NÃ©pal','Nicaragua','Niger',
+  'Nigeria','NorvÃ¨ge','Nouvelle-ZÃ©lande','Oman','Ouganda','OuzbÃ©kistan','Pakistan',
+  'Palaos','Palestine','Panama','Papouasie-Nouvelle-GuinÃ©e','Paraguay','Pays-Bas','PÃ©rou',
+  'Philippines','Pologne','Portugal','Qatar','RÃ©publique centrafricaine',
+  'RÃ©publique dominicaine','RÃ©publique tchÃ¨que','Roumanie','Royaume-Uni','Russie','Rwanda',
+  'Saint-Christophe-et-NiÃ©vÃ¨s','Saint-Marin','Saint-Vincent-et-les-Grenadines','Sainte-Lucie',
+  'Salvador','Samoa','SÃ£o TomÃ©-et-Principe','SÃ©nÃ©gal','Serbie','Seychelles','Sierra Leone',
+  'Singapour','Slovaquie','SlovÃ©nie','Somalie','Soudan','Soudan du Sud','Sri Lanka',
+  'SuÃ¨de','Suisse','Suriname','Syrie','Tadjikistan','Tanzanie','Tchad','ThaÃ¯lande',
+  'Timor oriental','Togo','Tonga','TrinitÃ©-et-Tobago','Tunisie','TurkmÃ©nistan','Turquie',
+  'Tuvalu','Ukraine','Uruguay','Vanuatu','Vatican','Venezuela','Vietnam','YÃ©men',
   'Zambie','Zimbabwe',
 ];
 
@@ -365,7 +365,7 @@ const SectionHeader = ({
   </div>
 );
 
-/** Retiré `providerName` (inutilisé) pour éviter no-unused-vars */
+/** RetirÃ© `providerName` (inutilisÃ©) pour Ã©viter no-unused-vars */
 const PreviewCard = ({
   title,
   country,
@@ -392,7 +392,7 @@ const PreviewCard = ({
     <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
       <div className="flex items-center gap-2 text-gray-700">
         <Globe className={`w-4 h-4 ${THEME.icon}`} />
-        <span className="font-medium truncate">{title || '—'}</span>
+        <span className="font-medium truncate">{title || 'â€”'}</span>
       </div>
       {!!country && (
         <div className="flex items-center gap-2 text-gray-700">
@@ -422,10 +422,10 @@ const PreviewCard = ({
 
     <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
       <div className="rounded-lg bg-rose-50 border border-rose-200 p-2">
-        ⏱️ <span className="font-semibold">{duration ?? '—'} min</span>
+        â±ï¸ <span className="font-semibold">{duration ?? 'â€”'} min</span>
       </div>
       <div className="rounded-lg bg-rose-50 border border-rose-200 p-2 text-right">
-        💰 <span className="font-semibold">{priceLabel || '—'}</span>
+        ðŸ’° <span className="font-semibold">{priceLabel || 'â€”'}</span>
       </div>
     </div>
 
@@ -433,21 +433,21 @@ const PreviewCard = ({
   </div>
 );
 
-/** 📞 Codes & pays (utilisé pour déduire le pays par défaut) */
+/** ðŸ“ž Codes & pays (utilisÃ© pour dÃ©duire le pays par dÃ©faut) */
 const countryCodeOptions = [
-  { code: '+33', flag: '🇫🇷', country: 'FR' },
-  { code: '+1', flag: '🇺🇸', country: 'US' },
-  { code: '+44', flag: '🇬🇧', country: 'GB' },
-  { code: '+49', flag: '🇩🇪', country: 'DE' },
-  { code: '+34', flag: '🇪🇸', country: 'ES' },
-  { code: '+39', flag: '🇮🇹', country: 'IT' },
-  { code: '+66', flag: '🇹🇭', country: 'TH' },
-  { code: '+61', flag: '🇦🇺', country: 'AU' },
-  { code: '+81', flag: '🇯🇵', country: 'JP' },
-  { code: '+86', flag: '🇨🇳', country: 'CN' },
+  { code: '+33', flag: 'ðŸ‡«ðŸ‡·', country: 'FR' },
+  { code: '+1', flag: 'ðŸ‡ºðŸ‡¸', country: 'US' },
+  { code: '+44', flag: 'ðŸ‡¬ðŸ‡§', country: 'GB' },
+  { code: '+49', flag: 'ðŸ‡©ðŸ‡ª', country: 'DE' },
+  { code: '+34', flag: 'ðŸ‡ªðŸ‡¸', country: 'ES' },
+  { code: '+39', flag: 'ðŸ‡®ðŸ‡¹', country: 'IT' },
+  { code: '+66', flag: 'ðŸ‡¹ðŸ‡­', country: 'TH' },
+  { code: '+61', flag: 'ðŸ‡¦ðŸ‡º', country: 'AU' },
+  { code: '+81', flag: 'ðŸ‡¯ðŸ‡µ', country: 'JP' },
+  { code: '+86', flag: 'ðŸ‡¨ðŸ‡³', country: 'CN' },
 ];
 
-/** 🔧 util E.164 */
+/** ðŸ”§ util E.164 */
 const toE164 = (raw: string, defaultCountry?: string) => {
   try {
     const p = parsePhoneNumberFromString(raw, defaultCountry as any);
@@ -496,7 +496,7 @@ const BookingRequest: React.FC = () => {
   const [hasLanguageMatchRealTime, setHasLanguageMatchRealTime] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Refs pour scroll ciblé vers erreurs
+  // Refs pour scroll ciblÃ© vers erreurs
   const refFirstName = useRef<HTMLDivElement | null>(null);
   const refLastName = useRef<HTMLDivElement | null>(null);
   const refNationality = useRef<HTMLDivElement | null>(null);
@@ -514,7 +514,7 @@ const BookingRequest: React.FC = () => {
         : 'border-gray-200 hover:border-gray-300 focus:border-red-600'
     }`;
 
-  // Rediriger vers login si non connecté
+  // Rediriger vers login si non connectÃ©
   useEffect(() => {
     if (!authLoading && !user) {
       const currentUrl = `/booking-request/${providerId}`;
@@ -623,7 +623,7 @@ const BookingRequest: React.FC = () => {
     setHasLanguageMatchRealTime(hasMatch);
   }, [languagesSpoken, provider]);
 
-  /** 📞 E.164 live (pour la validation et l’aperçu) */
+  /** ðŸ“ž E.164 live (pour la validation et lâ€™aperÃ§u) */
   const selectedDial = useMemo(
     () => countryCodeOptions.find(c => c.code === formData.phoneCountryCode) || countryCodeOptions[0],
     [formData.phoneCountryCode]
@@ -657,7 +657,7 @@ const BookingRequest: React.FC = () => {
       currentCountry: !!formData.currentCountry.trim(),
       autrePays: formData.currentCountry !== 'Autre' ? true : !!formData.autrePays.trim(),
       langs: languagesSpoken.length > 0,
-      phone: !!phoneE164,                       // ✅ E.164 sinon invalide
+      phone: !!phoneE164,                       // âœ… E.164 sinon invalide
       accept: formData.acceptTerms,
       sharedLang: hasLanguageMatchRealTime,
     }),
@@ -670,7 +670,7 @@ const BookingRequest: React.FC = () => {
     return Math.round((done / flags.length) * 100);
   }, [valid]);
 
-  // Redirection si provider introuvable une fois chargement terminé
+  // Redirection si provider introuvable une fois chargement terminÃ©
   useEffect(() => {
     if (!authLoading && !providerLoading && !provider) navigate('/');
   }, [provider, providerLoading, authLoading, navigate]);
@@ -681,7 +681,7 @@ const BookingRequest: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="flex items-center space-x-3 text-gray-700">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-700"></div>
-            <span>Chargement du prestataire…</span>
+            <span>Chargement du prestataireâ€¦</span>
           </div>
         </div>
       </Layout>
@@ -692,7 +692,7 @@ const BookingRequest: React.FC = () => {
   const isLawyer = provider.type === 'lawyer' || provider.role === 'lawyer';
   const role: ServiceType = isLawyer ? 'lawyer' : 'expat';
 
-  /** Prix affichés (ADMIN si dispo, sinon secours) */
+  /** Prix affichÃ©s (ADMIN si dispo, sinon secours) */
   const eurAdmin = pricing?.[role]?.eur;
   const usdAdmin = pricing?.[role]?.usd;
 
@@ -754,21 +754,21 @@ const BookingRequest: React.FC = () => {
         emailHtml: `
 <h2>Nouvelle demande de consultation</h2>
 <p><strong>Client:</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
-<p><strong>Nationalité:</strong> ${requestData.clientNationality}</p>
+<p><strong>NationalitÃ©:</strong> ${requestData.clientNationality}</p>
 <p><strong>Pays:</strong> ${requestData.clientCurrentCountry}</p>
-<p><strong>Téléphone:</strong> ${requestData.clientPhone}</p>
+<p><strong>TÃ©lÃ©phone:</strong> ${requestData.clientPhone}</p>
 <p><strong>Titre:</strong> ${requestData.title}</p>
 <p><strong>Description:</strong> ${requestData.description}</p>
 <hr>
-<p>Connectez-vous à votre espace prestataire pour répondre.</p>`.trim(),
+<p>Connectez-vous Ã  votre espace prestataire pour rÃ©pondre.</p>`.trim(),
         smsMessage: `SOS Expat: Nouvelle demande de ${requestData.clientFirstName}. Titre: "${requestData.title.substring(0, 30)}...". Consultez votre espace.`,
-        whatsappMessage: `🔔 SOS Expat: Nouvelle demande de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire.`,
+        whatsappMessage: `ðŸ”” SOS Expat: Nouvelle demande de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire.`,
       };
 
       if (requestData.providerEmail?.includes('@')) notificationData.recipientEmail = requestData.providerEmail;
       if (requestData.providerPhone && requestData.providerPhone.length > 5) notificationData.recipientPhone = requestData.providerPhone;
 
-      if (!functions) throw new Error('Firebase Functions non initialisé');
+      if (!functions) throw new Error('Firebase Functions non initialisÃ©');
       const sendNotification = httpsCallable(functions, 'sendEmail');
       const result = await sendNotification(notificationData);
       return { success: true, result: (result as { data?: unknown })?.data };
@@ -863,17 +863,17 @@ const BookingRequest: React.FC = () => {
   const validateForm = () => {
     const e: Record<string, string> = {};
     const global: string[] = [];
-    if (!valid.firstName) { e.firstName = t.validators.firstName; global.push(`– ${t.validators.firstName}`); }
-    if (!valid.lastName) { e.lastName = t.validators.lastName; global.push(`– ${t.validators.lastName}`); }
-    if (!valid.title) { e.title = t.validators.title; global.push(`– ${t.validators.title}`); }
-    if (!valid.description) { e.description = t.validators.description; global.push(`– ${t.validators.description}`); }
-    if (!valid.nationality) { e.nationality = t.validators.nationality; global.push(`– ${t.validators.nationality}`); }
-    if (!valid.currentCountry) { e.currentCountry = t.validators.currentCountry; global.push(`– ${t.validators.currentCountry}`); }
-    if (formData.currentCountry === 'Autre' && !valid.autrePays) { e.autrePays = t.validators.otherCountry; global.push(`– ${t.validators.otherCountry}`); }
-    if (!valid.langs) { e.languages = t.validators.languages; global.push(`– ${t.validators.languages}`); }
-    if (!valid.sharedLang) { global.push(`– ${t.validators.langMismatch}`); }
-    if (!valid.phone) { e.phoneNumber = t.validators.phone; global.push(`– ${t.validators.phone}`); }
-    if (!valid.accept) { global.push(`– ${t.validators.accept}`); }
+    if (!valid.firstName) { e.firstName = t.validators.firstName; global.push(`â€“ ${t.validators.firstName}`); }
+    if (!valid.lastName) { e.lastName = t.validators.lastName; global.push(`â€“ ${t.validators.lastName}`); }
+    if (!valid.title) { e.title = t.validators.title; global.push(`â€“ ${t.validators.title}`); }
+    if (!valid.description) { e.description = t.validators.description; global.push(`â€“ ${t.validators.description}`); }
+    if (!valid.nationality) { e.nationality = t.validators.nationality; global.push(`â€“ ${t.validators.nationality}`); }
+    if (!valid.currentCountry) { e.currentCountry = t.validators.currentCountry; global.push(`â€“ ${t.validators.currentCountry}`); }
+    if (formData.currentCountry === 'Autre' && !valid.autrePays) { e.autrePays = t.validators.otherCountry; global.push(`â€“ ${t.validators.otherCountry}`); }
+    if (!valid.langs) { e.languages = t.validators.languages; global.push(`â€“ ${t.validators.languages}`); }
+    if (!valid.sharedLang) { global.push(`â€“ ${t.validators.langMismatch}`); }
+    if (!valid.phone) { e.phoneNumber = t.validators.phone; global.push(`â€“ ${t.validators.phone}`); }
+    if (!valid.accept) { global.push(`â€“ ${t.validators.accept}`); }
     setFieldErrors(e);
     setFormErrors(global);
     return global.length === 0;
@@ -927,19 +927,19 @@ const { selectedProvider, bookingRequest } = prepareStandardizedData(
   clientWhatsappE164,
 );
 
-// 🔐 UID de l'utilisateur connecté (NE PAS déplacer)
+// ðŸ” UID de l'utilisateur connectÃ© (NE PAS dÃ©placer)
 const uid = user?.uid;
 if (!uid) {
-  setFormError("Session expirée. Reconnectez-vous.");
+  setFormError("Session expirÃ©e. Reconnectez-vous.");
   setIsLoading(false);
   return;
 }
 
 
 
-// ————————————————————————————
-// Création du booking request via le service centralisé
-// ————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// CrÃ©ation du booking request via le service centralisÃ©
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 await createBookingRequest({
   clientId: uid,
   providerId: selectedProvider.id,
@@ -977,9 +977,9 @@ await createBookingRequest({
       // (optionnel) notifier le prestataire
       // void notifyProviderOfRequest(selectedProvider.id, bookingRequest);
 
-      // ————————————————————————————
-      // ServiceData (admin = vérité ; fallback = prix secours + frais défaut)
-      // ————————————————————————————
+      // â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+      // ServiceData (admin = vÃ©ritÃ© ; fallback = prix secours + frais dÃ©faut)
+      // â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
       const selectedCurrency: Currency = detectUserCurrency();
       const roleForPricing: ServiceType = (provider.role || provider.type || 'expat') as ServiceType;
 
@@ -1028,7 +1028,7 @@ await createBookingRequest({
       navigate(`/call-checkout/${providerId}`);
     } catch (err) {
       console.error('Submit error', err);
-      setFormError('Une erreur est survenue. Veuillez réessayer.');
+      setFormError('Une erreur est survenue. Veuillez rÃ©essayer.');
     } finally {
       setIsLoading(false);
     }
@@ -1095,22 +1095,22 @@ await createBookingRequest({
                   onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
                 />
               ) : (
-                <img src="/default-avatar.png" alt="Avatar par défaut" className="w-full h-full object-cover" />
+                <img src="/default-avatar.png" alt="Avatar par dÃ©faut" className="w-full h-full object-cover" />
               )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 truncate">{provider?.name || '—'}</h3>
+                <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 truncate">{provider?.name || 'â€”'}</h3>
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                     isLawyer ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-green-100 text-green-800 border border-green-200'
                   }`}
                 >
-                  {isLawyer ? '⚖️ Avocat' : '🌍 Expatrié aidant'}
+                  {isLawyer ? 'âš–ï¸ Avocat' : 'ðŸŒ ExpatriÃ© aidant'}
                 </span>
               </div>
               <div className="mt-1 text-xs sm:text-sm text-gray-700 flex items-center gap-2">
-                <span className="font-medium">📍</span>
+                <span className="font-medium">ðŸ“</span>
                 <span className="truncate">{provider.country}</span>
               </div>
               {!!provider?.languages?.length && (
@@ -1130,9 +1130,9 @@ await createBookingRequest({
               )}
             </div>
             <div className="text-center sm:text-right bg-white rounded-xl p-3 sm:p-4 border border-gray-200 w-auto min-w-[120px]">
-              <div className="text-2xl sm:text-3xl font-extrabold text-red-600">{`${displayEUR}€ / $${displayUSD}`}</div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-red-600">{`${displayEUR}â‚¬ / $${displayUSD}`}</div>
               <div className="text-sm text-gray-600 mt-1">{displayDuration} min</div>
-              <div className="mt-1 text-xs text-gray-500">💳 {t.securePay}</div>
+              <div className="mt-1 text-xs text-gray-500">ðŸ’³ {t.securePay}</div>
             </div>
           </div>
         </div>
@@ -1149,7 +1149,7 @@ await createBookingRequest({
                     <SectionHeader icon={<MapPin className="w-5 h-5" />} title={t.personal} />
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Prénom */}
+                      {/* PrÃ©nom */}
                       <div ref={refFirstName}>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">
                           {t.fields.firstName} <span className="text-red-500">*</span>
@@ -1161,7 +1161,7 @@ await createBookingRequest({
                           className={`${inputClass('firstName')} ${fieldErrors.firstName ? 'bg-red-50' : ''}`}
                           placeholder={t.placeholders.firstName}
                         />
-                        <FieldSuccess show={valid.firstName}>Parfait ! ✨</FieldSuccess>
+                        <FieldSuccess show={valid.firstName}>Parfait ! âœ¨</FieldSuccess>
                         {fieldErrors.firstName && <p className="mt-1 text-sm text-red-600">{fieldErrors.firstName}</p>}
                       </div>
                       {/* Nom */}
@@ -1176,12 +1176,12 @@ await createBookingRequest({
                           className={`${inputClass('lastName')} ${fieldErrors.lastName ? 'bg-red-50' : ''}`}
                           placeholder={t.placeholders.lastName}
                         />
-                        <FieldSuccess show={valid.lastName}>Parfait ! ✨</FieldSuccess>
+                        <FieldSuccess show={valid.lastName}>Parfait ! âœ¨</FieldSuccess>
                         {fieldErrors.lastName && <p className="mt-1 text-sm text-red-600">{fieldErrors.lastName}</p>}
                       </div>
                     </div>
 
-                    {/* Nationalité */}
+                    {/* NationalitÃ© */}
                     <div className="mt-4" ref={refNationality}>
                       <label className="block text-sm font-semibold text-gray-800 mb-1">
                         {t.fields.nationality} <span className="text-red-500">*</span>
@@ -1207,7 +1207,7 @@ await createBookingRequest({
                         onChange={handleInputChange}
                         className={`${inputClass('currentCountry')} ${fieldErrors.currentCountry ? 'bg-red-50' : ''}`}
                       >
-                        <option value="">-- Sélectionnez un pays --</option>
+                        <option value="">-- SÃ©lectionnez un pays --</option>
                         {countries.map((c) => (
                           <option key={c} value={c}>{c}</option>
                         ))}
@@ -1245,8 +1245,8 @@ await createBookingRequest({
                         className={`${inputClass('title')} ${fieldErrors.title ? 'bg-red-50' : ''}`}
                         placeholder={t.placeholders.title}
                       />
-                      <div className="mt-1 text-xs text-gray-500">💡 {t.hints.title}</div>
-                      <FieldSuccess show={valid.title}>C’est clair 👍</FieldSuccess>
+                      <div className="mt-1 text-xs text-gray-500">ðŸ’¡ {t.hints.title}</div>
+                      <FieldSuccess show={valid.title}>Câ€™est clair ðŸ‘</FieldSuccess>
                       {fieldErrors.title && <p className="mt-1 text-sm text-red-600">{fieldErrors.title}</p>}
                     </div>
 
@@ -1263,8 +1263,8 @@ await createBookingRequest({
                         className={`resize-none ${inputClass('description')} ${fieldErrors.description ? 'bg-red-50' : ''}`}
                         placeholder={t.placeholders.description}
                       />
-                      <div className="mt-1 text-xs text-gray-500">🔎 {t.hints.desc}</div>
-                      <FieldSuccess show={valid.description}>On y voit clair 👀</FieldSuccess>
+                      <div className="mt-1 text-xs text-gray-500">ðŸ”Ž {t.hints.desc}</div>
+                      <FieldSuccess show={valid.description}>On y voit clair ðŸ‘€</FieldSuccess>
                       {fieldErrors.description && <p className="mt-1 text-sm text-red-600">{fieldErrors.description}</p>}
                     </div>
                   </section>
@@ -1274,7 +1274,7 @@ await createBookingRequest({
                     <SectionHeader icon={<LanguagesIcon className="w-5 h-5" />} title={t.languages} />
 
                     <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      🗣️ {lang === 'en' ? 'Spoken languages' : 'Langues parlées'} <span className="text-red-500">*</span>
+                      ðŸ—£ï¸ {lang === 'en' ? 'Spoken languages' : 'Langues parlÃ©es'} <span className="text-red-500">*</span>
                     </label>
 
                     <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
@@ -1297,7 +1297,7 @@ await createBookingRequest({
 
                     {fieldErrors.languages && <p className="mt-2 text-sm text-red-600">{fieldErrors.languages}</p>}
 
-                    {/* Compatibilité */}
+                    {/* CompatibilitÃ© */}
                     {languagesSpoken.length > 0 && (
                       <div className="mt-4 space-y-3">
                         {(() => {
@@ -1311,11 +1311,11 @@ await createBookingRequest({
                                   <div className="flex">
                                     <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
                                     <div className="ml-3">
-                                      <p className="text-green-900 font-semibold mb-2">✅ {t.labels.compatible} :</p>
+                                      <p className="text-green-900 font-semibold mb-2">âœ… {t.labels.compatible} :</p>
                                       <div className="flex flex-wrap gap-2">
                                         {compatible.map((l) => (
                                           <span key={l.code} className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full border border-green-200">
-                                            🌐 {l.name}
+                                            ðŸŒ {l.name}
                                           </span>
                                         ))}
                                       </div>
@@ -1328,11 +1328,11 @@ await createBookingRequest({
                                   <div className="flex">
                                     <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                                     <div className="ml-3">
-                                      <p className="text-red-700 font-semibold mb-2">⚠️ {t.labels.incompatible} :</p>
+                                      <p className="text-red-700 font-semibold mb-2">âš ï¸ {t.labels.incompatible} :</p>
                                       <div className="flex flex-wrap gap-2">
                                         {incompatible.map((l) => (
                                           <span key={l.code} className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full border border-red-200">
-                                            🌐 {l.name}
+                                            ðŸŒ {l.name}
                                           </span>
                                         ))}
                                       </div>
@@ -1351,7 +1351,7 @@ await createBookingRequest({
                         <div className="flex">
                           <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                           <div className="ml-3">
-                            <p className="text-red-700 font-semibold">🚫 {t.labels.communicationImpossible}</p>
+                            <p className="text-red-700 font-semibold">ðŸš« {t.labels.communicationImpossible}</p>
                             <p className="text-red-600 text-sm mt-1">{t.labels.needShared}</p>
                           </div>
                         </div>
@@ -1363,7 +1363,7 @@ await createBookingRequest({
                   <section className="p-5 sm:p-6 border-t border-gray-50" ref={refPhone}>
                     <SectionHeader icon={<Phone className="w-5 h-5" />} title={t.contact} />
 
-                    {/* Numéro */}
+                    {/* NumÃ©ro */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Phone size={16} className="inline mr-1" /> {t.fields.phone} <span className="text-red-500">*</span>
@@ -1398,10 +1398,10 @@ await createBookingRequest({
                       {fieldErrors.phoneNumber && <p className="mt-1 text-sm text-red-600">{fieldErrors.phoneNumber}</p>}
                       {!!phoneE164 && (
                         <div className="mt-1 text-xs text-gray-500">
-                          ➜ International: <span className="font-mono">{phoneE164}</span>
+                          âžœ International: <span className="font-mono">{phoneE164}</span>
                         </div>
                       )}
-                      <div className="mt-2 text-sm text-gray-700">⏱️ <strong>{t.callTiming}</strong></div>
+                      <div className="mt-2 text-sm text-gray-700">â±ï¸ <strong>{t.callTiming}</strong></div>
                     </div>
 
                     {/* WhatsApp */}
@@ -1434,7 +1434,7 @@ await createBookingRequest({
                       </div>
                       {!!whatsappE164 && (
                         <div className="mt-1 text-xs text-gray-500">
-                          ➜ WhatsApp (E.164): <span className="font-mono">{whatsappE164}</span>
+                          âžœ WhatsApp (E.164): <span className="font-mono">{whatsappE164}</span>
                         </div>
                       )}
                       <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
@@ -1487,14 +1487,14 @@ await createBookingRequest({
                     </div>
                   )}
 
-                  {/* Aperçu rapide */}
+                  {/* AperÃ§u rapide */}
                   <div className="px-5 sm:px-6">
                     <button
                       type="button"
                       onClick={() => setShowPreview((v) => !v)}
                       className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50"
                     >
-                      {showPreview ? 'Masquer l’aperçu' : 'Afficher l’aperçu rapide'}
+                      {showPreview ? 'Masquer lâ€™aperÃ§u' : 'Afficher lâ€™aperÃ§u rapide'}
                     </button>
 
                     {showPreview && (
@@ -1504,7 +1504,7 @@ await createBookingRequest({
                           country={formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry}
                           langs={languagesSpoken.map((l) => l.code)}
                           phone={phoneE164 || `${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
-                          priceLabel={`${displayEUR}€ / $${displayUSD}`}
+                          priceLabel={`${displayEUR}â‚¬ / $${displayUSD}`}
                           duration={displayDuration}
                           langPack={t}
                         />
@@ -1544,7 +1544,7 @@ await createBookingRequest({
                         <div className="flex items-center justify-center">
                           <Euro size={20} className="mr-2 sm:mr-3" />
                           <span>
-                            {t.continuePay} ({`${displayEUR}€ / $${displayUSD}`}
+                            {t.continuePay} ({`${displayEUR}â‚¬ / $${displayUSD}`}
                             )
                           </span>
                         </div>
@@ -1554,41 +1554,41 @@ await createBookingRequest({
                     {!Object.values(valid).every(Boolean) && (
                       <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-yellow-800 text-sm font-medium mb-2">
-                          🔍{' '}
+                          ðŸ”{' '}
                           {lang === 'en'
                             ? 'Missing to enable the button:'
-                            : 'Éléments manquants pour activer le bouton :'}
+                            : 'Ã‰lÃ©ments manquants pour activer le bouton :'}
                         </p>
                         <div className="grid grid-cols-1 gap-1 text-xs text-yellow-700">
                           {!valid.firstName && (
-                            <div>• {t.validators.firstName}</div>
+                            <div>â€¢ {t.validators.firstName}</div>
                           )}
                           {!valid.lastName && (
-                            <div>• {t.validators.lastName}</div>
+                            <div>â€¢ {t.validators.lastName}</div>
                           )}
-                          {!valid.title && <div>• {t.validators.title}</div>}
+                          {!valid.title && <div>â€¢ {t.validators.title}</div>}
                           {!valid.description && (
-                            <div>• {t.validators.description}</div>
+                            <div>â€¢ {t.validators.description}</div>
                           )}
-                          {!valid.phone && <div>• {t.validators.phone}</div>}
+                          {!valid.phone && <div>â€¢ {t.validators.phone}</div>}
                           {!valid.nationality && (
-                            <div>• {t.validators.nationality}</div>
+                            <div>â€¢ {t.validators.nationality}</div>
                           )}
                           {!valid.currentCountry && (
-                            <div>• {t.validators.currentCountry}</div>
+                            <div>â€¢ {t.validators.currentCountry}</div>
                           )}
                           {formData.currentCountry === 'Autre' &&
                             !valid.autrePays && (
-                              <div>• {t.validators.otherCountry}</div>
+                              <div>â€¢ {t.validators.otherCountry}</div>
                             )}
                           {!valid.langs && (
-                            <div>• {t.validators.languages}</div>
+                            <div>â€¢ {t.validators.languages}</div>
                           )}
                           {!hasLanguageMatchRealTime && (
-                            <div>• {t.validators.langMismatch}</div>
+                            <div>â€¢ {t.validators.langMismatch}</div>
                           )}
                           {!valid.accept && (
-                            <div>• {t.validators.accept}</div>
+                            <div>â€¢ {t.validators.accept}</div>
                           )}
                         </div>
                         <div className="mt-3">
@@ -1607,7 +1607,7 @@ await createBookingRequest({
 
                     <div className="text-center pt-4">
                       <p className="text-xs text-gray-500">
-                        🔒 {t.securePay} • {t.callTiming}
+                        ðŸ”’ {t.securePay} â€¢ {t.callTiming}
                       </p>
                     </div>
                   </div>

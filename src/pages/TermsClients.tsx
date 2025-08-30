@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileText,
@@ -27,12 +27,12 @@ const TermsClients: React.FC = () => {
     (language as 'fr' | 'en') || 'fr'
   );
 
-  // Reste aligné avec la langue globale si elle change
+  // Reste alignÃ© avec la langue globale si elle change
   useEffect(() => {
     if (language) setSelectedLanguage(language as 'fr' | 'en');
   }, [language]);
 
-  // Récupération du dernier document actif depuis Firestore (type: "terms")
+  // RÃ©cupÃ©ration du dernier document actif depuis Firestore (type: "terms")
   useEffect(() => {
     const fetchTerms = async () => {
       try {
@@ -67,31 +67,31 @@ const TermsClients: React.FC = () => {
   const translations = {
     fr: {
       title: 'CGU Clients',
-      subtitle: "Conditions générales d'utilisation pour les clients",
-      lastUpdated: 'Version 2.2 – Dernière mise à jour : 16 juin 2025',
+      subtitle: "Conditions gÃ©nÃ©rales d'utilisation pour les clients",
+      lastUpdated: 'Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025',
       loading: 'Chargement...',
       languageToggle: 'Changer de langue',
-      keyFeatures: 'Points clés',
+      keyFeatures: 'Points clÃ©s',
       features: [
-        'Paiement sécurisé',
+        'Paiement sÃ©curisÃ©',
         'Remboursement si pas de mise en relation',
-        '3 tentatives d’appel',
-        'Prestataires vérifiés',
+        '3 tentatives dâ€™appel',
+        'Prestataires vÃ©rifiÃ©s',
       ],
       anchorTitle: 'Sommaire',
-      editHint: 'Document éditable depuis la console admin',
-      heroBadge: 'Nouveau — Conditions mises à jour',
+      editHint: 'Document Ã©ditable depuis la console admin',
+      heroBadge: 'Nouveau â€” Conditions mises Ã  jour',
       contactUs: 'Nous contacter',
       contactForm: 'Formulaire de contact',
-      readyToUse: 'Prêt à utiliser SOS Expat ?',
+      readyToUse: 'PrÃªt Ã  utiliser SOS Expat ?',
       readySubtitle:
-        'Réservez un appel avec un avocat ou un aidant en quelques minutes, partout dans le monde.',
-      seeHowItWorks: 'Voir comment ça marche',
+        'RÃ©servez un appel avec un avocat ou un aidant en quelques minutes, partout dans le monde.',
+      seeHowItWorks: 'Voir comment Ã§a marche',
     },
     en: {
       title: 'Client Terms',
       subtitle: 'General terms of use for customers',
-      lastUpdated: 'Version 2.2 – Last updated: 16 June 2025',
+      lastUpdated: 'Version 2.2 â€“ Last updated: 16 June 2025',
       loading: 'Loading...',
       languageToggle: 'Switch language',
       keyFeatures: 'Key features',
@@ -103,7 +103,7 @@ const TermsClients: React.FC = () => {
       ],
       anchorTitle: 'Overview',
       editHint: 'Document editable from the admin console',
-      heroBadge: 'New — Terms updated',
+      heroBadge: 'New â€” Terms updated',
       contactUs: 'Contact us',
       contactForm: 'Contact Form',
       readyToUse: 'Ready to use SOS Expat?',
@@ -119,7 +119,7 @@ const TermsClients: React.FC = () => {
     setSelectedLanguage(newLang);
   };
 
-  // ------- Parser Markdown (aligné avec TermsExpats / TermsLawyers) -------
+  // ------- Parser Markdown (alignÃ© avec TermsExpats / TermsLawyers) -------
   const parseMarkdownContent = (text: string) => {
     const lines = text.split('\n');
     const elements: JSX.Element[] = [];
@@ -130,7 +130,7 @@ const TermsClients: React.FC = () => {
 
       if (line.trim() === '') continue;
 
-      // Séparateur
+      // SÃ©parateur
       if (line.trim() === '---') {
         elements.push(<hr key={currentIndex++} className="my-8 border-t-2 border-gray-200" />);
         continue;
@@ -150,7 +150,7 @@ const TermsClients: React.FC = () => {
         continue;
       }
 
-      // H2 (avec numéro optionnel)
+      // H2 (avec numÃ©ro optionnel)
       if (line.startsWith('## ')) {
         const title = line.substring(3).trim();
         const match = title.match(/^(\d+)\.\s*(.*)$/);
@@ -188,7 +188,7 @@ const TermsClients: React.FC = () => {
         continue;
       }
 
-      // Points numérotés 1.1 / 2.4 / …
+      // Points numÃ©rotÃ©s 1.1 / 2.4 / â€¦
       const numberedMatch = line.match(/^(\d+\.\d+\.?)\s+(.*)$/);
       if (numberedMatch) {
         const number = numberedMatch[1];
@@ -211,7 +211,7 @@ const TermsClients: React.FC = () => {
         continue;
       }
 
-      // Ligne entièrement en gras
+      // Ligne entiÃ¨rement en gras
       if (line.startsWith('**') && line.endsWith('**')) {
         const boldText = line.slice(2, -2);
         elements.push(
@@ -222,7 +222,7 @@ const TermsClients: React.FC = () => {
         continue;
       }
 
-      // Bloc contact spécial
+      // Bloc contact spÃ©cial
       if (
         line.toLowerCase().includes('contact form') ||
         line.toLowerCase().includes('formulaire de contact') ||
@@ -281,197 +281,197 @@ const TermsClients: React.FC = () => {
     return elements;
   };
 
-  // --------- Contenu par défaut (bilingue, selon la langue) ----------
+  // --------- Contenu par dÃ©faut (bilingue, selon la langue) ----------
   const defaultFr = `
-# Conditions Générales – Clients (Global)
+# Conditions GÃ©nÃ©rales â€“ Clients (Global)
 
-**SOS Expat d’Ulixai OÜ** (la « Plateforme », « SOS », « nous »)
+**SOS Expat dâ€™Ulixai OÃœ** (la Â« Plateforme Â», Â« SOS Â», Â« nous Â»)
 
-**Version 2.2 – Dernière mise à jour : 16 juin 2025**
-
----
-
-## 1. Objet et champ d’application
-
-1.1. Les présentes conditions générales (« CGV ») régissent l’utilisation de la Plateforme par toute personne physique ou morale qui crée un compte client et réserve un service via la Plateforme (le « Client »).
-
-1.2. **Rôle d’Ulixai.** SOS Expat est une plateforme de mise en relation : (i) avec des avocats indépendants (« Avocats »), et/ou (ii) avec des expatriés aidants indépendants (« Aidants »). Ulixai n’est pas un cabinet d’avocats, ne fournit aucun conseil juridique, médical, fiscal ou réglementé, et n’est pas partie au contrat de prestation conclu entre le Client et le prestataire (Avocat/Aidant).
-
-1.3. **Acceptation électronique (click-wrap).** En cochant la case d’acceptation et/ou en utilisant la Plateforme, le Client accepte les présentes CGV (signature électronique). SOS peut conserver des preuves techniques (horodatage, identifiants).
-
-1.4. **Modifications.** Nous pouvons mettre à jour les CGV et/ou les tarifs/frais avec effet prospectif par publication sur la Plateforme. La poursuite d’usage vaut acceptation.
+**Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025**
 
 ---
 
-## 2. Comptes, éligibilité et usage
+## 1. Objet et champ dâ€™application
 
-2.1. **Âge et capacité.** Le Client déclare avoir 18 ans révolus et la capacité juridique. Pour les personnes morales, l’utilisateur déclare être habilité à engager la société.
+1.1. Les prÃ©sentes conditions gÃ©nÃ©rales (Â« CGV Â») rÃ©gissent lâ€™utilisation de la Plateforme par toute personne physique ou morale qui crÃ©e un compte client et rÃ©serve un service via la Plateforme (le Â« Client Â»).
 
-2.2. **Exactitude des informations.** Les informations fournies (identité, moyens de contact, pays, objet de la demande) doivent être exactes et à jour.
+1.2. **RÃ´le dâ€™Ulixai.** SOS Expat est une plateforme de mise en relation : (i) avec des avocats indÃ©pendants (Â« Avocats Â»), et/ou (ii) avec des expatriÃ©s aidants indÃ©pendants (Â« Aidants Â»). Ulixai nâ€™est pas un cabinet dâ€™avocats, ne fournit aucun conseil juridique, mÃ©dical, fiscal ou rÃ©glementÃ©, et nâ€™est pas partie au contrat de prestation conclu entre le Client et le prestataire (Avocat/Aidant).
 
-2.3. **Usage conforme.** Le Client s’interdit toute utilisation illicite ou abusive (fraude, contenu illégal, harcèlement, atteinte aux droits de tiers, détournement des flux de paiement, etc.). Aucun usage pour des situations médicales ou vitales d’urgence ; SOS n’est pas un service d’urgence.
+1.3. **Acceptation Ã©lectronique (click-wrap).** En cochant la case dâ€™acceptation et/ou en utilisant la Plateforme, le Client accepte les prÃ©sentes CGV (signature Ã©lectronique). SOS peut conserver des preuves techniques (horodatage, identifiants).
 
-2.4. **Disponibilité.** La Plateforme est fournie « en l’état » : aucune disponibilité ininterrompue n’est garantie (maintenance, incidents, force majeure).
+1.4. **Modifications.** Nous pouvons mettre Ã  jour les CGV et/ou les tarifs/frais avec effet prospectif par publication sur la Plateforme. La poursuite dâ€™usage vaut acceptation.
 
 ---
 
-## 3. Nature des services réservables
+## 2. Comptes, Ã©ligibilitÃ© et usage
 
-3.1. **Appels avec Avocats.** Consultations courtes d’orientation (par ex. 20 minutes). L’Avocat demeure seul responsable de ses conseils et du respect de sa déontologie/lois locales.
+2.1. **Ã‚ge et capacitÃ©.** Le Client dÃ©clare avoir 18 ans rÃ©volus et la capacitÃ© juridique. Pour les personnes morales, lâ€™utilisateur dÃ©clare Ãªtre habilitÃ© Ã  engager la sociÃ©tÃ©.
 
-3.2. **Appels avec Aidants.** Aide non réglementée (orientation pratique, traduction informelle, contacts locaux…). Aucun conseil juridique/médical/réglementé sans licence locale adéquate.
+2.2. **Exactitude des informations.** Les informations fournies (identitÃ©, moyens de contact, pays, objet de la demande) doivent Ãªtre exactes et Ã  jour.
 
-3.3. **Aucune garantie.** Nous ne garantissons ni l’issue, ni la qualité, ni l’adéquation à un besoin particulier, ni la disponibilité des prestataires.
+2.3. **Usage conforme.** Le Client sâ€™interdit toute utilisation illicite ou abusive (fraude, contenu illÃ©gal, harcÃ¨lement, atteinte aux droits de tiers, dÃ©tournement des flux de paiement, etc.). Aucun usage pour des situations mÃ©dicales ou vitales dâ€™urgence ; SOS nâ€™est pas un service dâ€™urgence.
+
+2.4. **DisponibilitÃ©.** La Plateforme est fournie Â« en lâ€™Ã©tat Â» : aucune disponibilitÃ© ininterrompue nâ€™est garantie (maintenance, incidents, force majeure).
+
+---
+
+## 3. Nature des services rÃ©servables
+
+3.1. **Appels avec Avocats.** Consultations courtes dâ€™orientation (par ex. 20 minutes). Lâ€™Avocat demeure seul responsable de ses conseils et du respect de sa dÃ©ontologie/lois locales.
+
+3.2. **Appels avec Aidants.** Aide non rÃ©glementÃ©e (orientation pratique, traduction informelle, contacts locauxâ€¦). Aucun conseil juridique/mÃ©dical/rÃ©glementÃ© sans licence locale adÃ©quate.
+
+3.3. **Aucune garantie.** Nous ne garantissons ni lâ€™issue, ni la qualitÃ©, ni lâ€™adÃ©quation Ã  un besoin particulier, ni la disponibilitÃ© des prestataires.
 
 ---
 
 ## 4. Prix, devises et frais de mise en relation
 
-4.1. **Affichage des prix.** Le prix total affiché au moment de la réservation inclut : (i) la rémunération du prestataire (Avocat/Aidant) fixée selon l’offre présentée, et (ii) les frais de mise en relation dus à SOS (forfait).
+4.1. **Affichage des prix.** Le prix total affichÃ© au moment de la rÃ©servation inclut : (i) la rÃ©munÃ©ration du prestataire (Avocat/Aidant) fixÃ©e selon lâ€™offre prÃ©sentÃ©e, et (ii) les frais de mise en relation dus Ã  SOS (forfait).
 
-4.2. **Frais de mise en relation (forfait).** 19 € (EUR) ou 25 $ (USD) par mise en relation (hors taxes), intégrés dans le prix total. SOS peut modifier ce forfait et/ou publier des barèmes locaux par pays/devise avec effet prospectif.
+4.2. **Frais de mise en relation (forfait).** 19 â‚¬ (EUR) ou 25 $ (USD) par mise en relation (hors taxes), intÃ©grÃ©s dans le prix total. SOS peut modifier ce forfait et/ou publier des barÃ¨mes locaux par pays/devise avec effet prospectif.
 
-4.3. **Devises & conversion.** Les prix peuvent être proposés en plusieurs devises. Des frais/taux de change du prestataire de paiement peuvent s’appliquer.
+4.3. **Devises & conversion.** Les prix peuvent Ãªtre proposÃ©s en plusieurs devises. Des frais/taux de change du prestataire de paiement peuvent sâ€™appliquer.
 
-4.4. **Taxes.** Les prix affichés incluent, le cas échéant, la TVA ou taxes applicables sur les frais de mise en relation. Les Prestataires demeurent responsables de leurs propres obligations fiscales.
-
----
-
-## 5. Réservation, appel et tentatives de contact
-
-5.1. **Définition de « mise en relation ».** Est réputée intervenue : (a) la transmission des coordonnées Client–Prestataire, et/ou (b) l’ouverture par la Plateforme d’un canal d’appel/messagerie/visio, et/ou (c) l’acceptation par le Prestataire d’une demande du Client.
-
-5.2. **Tentatives d’appel.** En cas d’appel immédiat : la Plateforme effectue jusqu’à trois (3) tentatives sur une fenêtre d’environ 15 minutes (sauf indication différente in-app).
-
-5.3. **Indisponibilité du prestataire.** Si aucune mise en relation n’a pu être réalisée après les tentatives, la réservation est annulée et le Client est remboursé intégralement du prix total payé.
-
-5.4. **Non-réponse du Client.** Si la mise en relation a eu lieu (au sens 5.1) mais que le Client n’aboutit pas à un échange effectif (non-réponse, occupation, refus, arrêt prématuré), le paiement demeure dû et non remboursable.
-
-5.5. **Qualité de la communication.** Le Client doit se trouver en zone de couverture suffisante et utiliser un équipement compatible. SOS n’est pas responsable des coupures/réseaux tiers.
+4.4. **Taxes.** Les prix affichÃ©s incluent, le cas Ã©chÃ©ant, la TVA ou taxes applicables sur les frais de mise en relation. Les Prestataires demeurent responsables de leurs propres obligations fiscales.
 
 ---
 
-## 6. Droit de rétractation (consommateurs) & exécution immédiate
+## 5. RÃ©servation, appel et tentatives de contact
 
-6.1. **Information.** Si le Client est consommateur et la loi impérative locale prévoit un droit de rétractation, celui-ci peut s’exercer dans les délais légaux sauf si le Client demande l’exécution immédiate du service.
+5.1. **DÃ©finition de Â« mise en relation Â».** Est rÃ©putÃ©e intervenue : (a) la transmission des coordonnÃ©es Clientâ€“Prestataire, et/ou (b) lâ€™ouverture par la Plateforme dâ€™un canal dâ€™appel/messagerie/visio, et/ou (c) lâ€™acceptation par le Prestataire dâ€™une demande du Client.
 
-6.2. **Renonciation.** En réservant un appel immédiat ou programmé avant l’expiration du délai légal, le Client demande l’exécution immédiate et reconnaît que, une fois la prestation pleinement exécutée, il perd son droit de rétractation. En cas d’exécution partielle avant rétractation, le Client doit payer la partie déjà fournie et les frais de mise en relation, non remboursables.
+5.2. **Tentatives dâ€™appel.** En cas dâ€™appel immÃ©diat : la Plateforme effectue jusquâ€™Ã  trois (3) tentatives sur une fenÃªtre dâ€™environ 15 minutes (sauf indication diffÃ©rente in-app).
 
-6.3. **Formalisme.** La Plateforme recueille l’acceptation explicite de ces points lors de la réservation, lorsque requis.
+5.3. **IndisponibilitÃ© du prestataire.** Si aucune mise en relation nâ€™a pu Ãªtre rÃ©alisÃ©e aprÃ¨s les tentatives, la rÃ©servation est annulÃ©e et le Client est remboursÃ© intÃ©gralement du prix total payÃ©.
+
+5.4. **Non-rÃ©ponse du Client.** Si la mise en relation a eu lieu (au sens 5.1) mais que le Client nâ€™aboutit pas Ã  un Ã©change effectif (non-rÃ©ponse, occupation, refus, arrÃªt prÃ©maturÃ©), le paiement demeure dÃ» et non remboursable.
+
+5.5. **QualitÃ© de la communication.** Le Client doit se trouver en zone de couverture suffisante et utiliser un Ã©quipement compatible. SOS nâ€™est pas responsable des coupures/rÃ©seaux tiers.
 
 ---
 
-## 7. Paiement, sécurité, rétrofacturations
+## 6. Droit de rÃ©tractation (consommateurs) & exÃ©cution immÃ©diate
 
-7.1. **Paiement unique & répartition.** Le Client règle un paiement unique via la Plateforme couvrant (i) la part Prestataire et (ii) les frais de mise en relation. SOS (ou son prestataire de paiement) encaisse, déduit ses frais, puis reverse le solde au Prestataire.
+6.1. **Information.** Si le Client est consommateur et la loi impÃ©rative locale prÃ©voit un droit de rÃ©tractation, celui-ci peut sâ€™exercer dans les dÃ©lais lÃ©gaux sauf si le Client demande lâ€™exÃ©cution immÃ©diate du service.
 
-7.2. **Sécurité.** Les paiements transitent par des prestataires de paiement tiers. Des contrôles KYC/LCB-FT peuvent s’appliquer.
+6.2. **Renonciation.** En rÃ©servant un appel immÃ©diat ou programmÃ© avant lâ€™expiration du dÃ©lai lÃ©gal, le Client demande lâ€™exÃ©cution immÃ©diate et reconnaÃ®t que, une fois la prestation pleinement exÃ©cutÃ©e, il perd son droit de rÃ©tractation. En cas dâ€™exÃ©cution partielle avant rÃ©tractation, le Client doit payer la partie dÃ©jÃ  fournie et les frais de mise en relation, non remboursables.
 
-7.3. **Rétrofacturations/contestation.** En cas de litige de paiement, SOS peut transmettre au prestataire de paiement les données strictement nécessaires et suspendre des services/paiements liés.
+6.3. **Formalisme.** La Plateforme recueille lâ€™acceptation explicite de ces points lors de la rÃ©servation, lorsque requis.
 
-7.4. **Compensation.** Si un remboursement est accordé au Client, la part correspondante est prélevée sur le prestataire concerné ; SOS peut compenser sur ses paiements futurs.
+---
+
+## 7. Paiement, sÃ©curitÃ©, rÃ©trofacturations
+
+7.1. **Paiement unique & rÃ©partition.** Le Client rÃ¨gle un paiement unique via la Plateforme couvrant (i) la part Prestataire et (ii) les frais de mise en relation. SOS (ou son prestataire de paiement) encaisse, dÃ©duit ses frais, puis reverse le solde au Prestataire.
+
+7.2. **SÃ©curitÃ©.** Les paiements transitent par des prestataires de paiement tiers. Des contrÃ´les KYC/LCB-FT peuvent sâ€™appliquer.
+
+7.3. **RÃ©trofacturations/contestation.** En cas de litige de paiement, SOS peut transmettre au prestataire de paiement les donnÃ©es strictement nÃ©cessaires et suspendre des services/paiements liÃ©s.
+
+7.4. **Compensation.** Si un remboursement est accordÃ© au Client, la part correspondante est prÃ©levÃ©e sur le prestataire concernÃ© ; SOS peut compenser sur ses paiements futurs.
 
 ---
 
 ## 8. Annulations et remboursements
 
-8.1. **Général.** Sauf dispositions légales impératives :
-- les frais de mise en relation sont non remboursables dès la mise en relation (5.1) ;
-- la part Prestataire est non remboursable une fois la prestation commencée, sauf geste commercial du Prestataire.
+8.1. **GÃ©nÃ©ral.** Sauf dispositions lÃ©gales impÃ©ratives :
+- les frais de mise en relation sont non remboursables dÃ¨s la mise en relation (5.1) ;
+- la part Prestataire est non remboursable une fois la prestation commencÃ©e, sauf geste commercial du Prestataire.
 
-8.2. **Annulation par le Client avant mise en relation.** Remboursement intégral.
+8.2. **Annulation par le Client avant mise en relation.** Remboursement intÃ©gral.
 
-8.3. **Annulation par le Prestataire.** Remboursement intégral. SOS peut proposer un re-routing vers un autre prestataire disponible.
+8.3. **Annulation par le Prestataire.** Remboursement intÃ©gral. SOS peut proposer un re-routing vers un autre prestataire disponible.
 
-8.4. **Cas techniques imputables à SOS.** Remboursement ou re-crédit à la discrétion de SOS, dans la mesure permise par la loi.
-
----
-
-## 9. Comportements, sécurité et contenus
-
-9.1. **Respect.** Le Client s’engage à un comportement respectueux, à ne pas enregistrer ni diffuser l’échange sans consentement légalement requis, et à ne pas solliciter d’actes illégaux.
-
-9.2. **Contenus fournis.** Les informations transmises doivent être loyales, exactes et licites. Le Client garantit SOS et le Prestataire contre toute réclamation liée à des contenus illégaux qu’il fournirait.
-
-9.3. **Signalement.** Tout abus peut être signalé via le formulaire de contact.
+8.4. **Cas techniques imputables Ã  SOS.** Remboursement ou re-crÃ©dit Ã  la discrÃ©tion de SOS, dans la mesure permise par la loi.
 
 ---
 
-## 10. Données personnelles
+## 9. Comportements, sÃ©curitÃ© et contenus
 
-10.1. **Rôles.** Pour les données strictement nécessaires à la mise en relation, SOS et le Prestataire agissent chacun en responsable de traitement pour leurs finalités propres.
+9.1. **Respect.** Le Client sâ€™engage Ã  un comportement respectueux, Ã  ne pas enregistrer ni diffuser lâ€™Ã©change sans consentement lÃ©galement requis, et Ã  ne pas solliciter dâ€™actes illÃ©gaux.
 
-10.2. **Bases & finalités.** Exécution du contrat (réservation), intérêts légitimes (sécurité, prévention de la fraude, amélioration), compliance (LCB-FT/sanctions) et consentement si requis.
+9.2. **Contenus fournis.** Les informations transmises doivent Ãªtre loyales, exactes et licites. Le Client garantit SOS et le Prestataire contre toute rÃ©clamation liÃ©e Ã  des contenus illÃ©gaux quâ€™il fournirait.
 
-10.3. **Transferts internationaux** possibles avec garanties appropriées.
+9.3. **Signalement.** Tout abus peut Ãªtre signalÃ© via le formulaire de contact.
+
+---
+
+## 10. DonnÃ©es personnelles
+
+10.1. **RÃ´les.** Pour les donnÃ©es strictement nÃ©cessaires Ã  la mise en relation, SOS et le Prestataire agissent chacun en responsable de traitement pour leurs finalitÃ©s propres.
+
+10.2. **Bases & finalitÃ©s.** ExÃ©cution du contrat (rÃ©servation), intÃ©rÃªts lÃ©gitimes (sÃ©curitÃ©, prÃ©vention de la fraude, amÃ©lioration), compliance (LCB-FT/sanctions) et consentement si requis.
+
+10.3. **Transferts internationaux** possibles avec garanties appropriÃ©es.
 
 10.4. **Droits & contact.** Exercice via le formulaire de contact de la Plateforme.
 
-10.5. **Sécurité.** Mesures techniques/organisationnelles raisonnables ; notification des violations requises par la loi.
+10.5. **SÃ©curitÃ©.** Mesures techniques/organisationnelles raisonnables ; notification des violations requises par la loi.
 
 ---
 
-## 11. Propriété intellectuelle
+## 11. PropriÃ©tÃ© intellectuelle
 
-La Plateforme, ses marques, logos, bases de données et contenus sont protégés. Aucun droit n’est cédé au Client. L’usage est strictement limité à un accès personnel conformément aux CGV.
-
----
-
-## 12. Responsabilité
-
-12.1. **Prestataires indépendants.** Le Client reconnaît que les Avocats et Aidants sont indépendants. SOS n’est pas responsable des conseils/services fournis ni de leur résultat.
-
-12.2. **Limitations.** Dans la mesure permise par la loi, la responsabilité de SOS pour un dommage direct prouvé est limitée au prix total payé par le Client pour la réservation concernée. SOS n’est pas responsable des dommages indirects/spéciaux/consécutifs (perte de chance, de profits, d’image, etc.), dans la mesure permise.
-
-12.3. **Aucune garantie.** SOS ne garantit pas la disponibilité continue de la Plateforme ni l’absence d’erreurs.
+La Plateforme, ses marques, logos, bases de donnÃ©es et contenus sont protÃ©gÃ©s. Aucun droit nâ€™est cÃ©dÃ© au Client. Lâ€™usage est strictement limitÃ© Ã  un accÃ¨s personnel conformÃ©ment aux CGV.
 
 ---
 
-## 13. Droit applicable, règlement des litiges et tribunaux compétents
+## 12. ResponsabilitÃ©
 
-13.1. **Droit matériel.** Pour chaque service couvrant un pays donné, la relation SOS–Client est régie par les lois du pays d’intervention sans priver le Client consommateur de ses droits impératifs de résidence. À titre supplétif, le droit estonien régit l’interprétation/validité des CGV et toute question non régie par ce droit local.
+12.1. **Prestataires indÃ©pendants.** Le Client reconnaÃ®t que les Avocats et Aidants sont indÃ©pendants. SOS nâ€™est pas responsable des conseils/services fournis ni de leur rÃ©sultat.
+
+12.2. **Limitations.** Dans la mesure permise par la loi, la responsabilitÃ© de SOS pour un dommage direct prouvÃ© est limitÃ©e au prix total payÃ© par le Client pour la rÃ©servation concernÃ©e. SOS nâ€™est pas responsable des dommages indirects/spÃ©ciaux/consÃ©cutifs (perte de chance, de profits, dâ€™image, etc.), dans la mesure permise.
+
+12.3. **Aucune garantie.** SOS ne garantit pas la disponibilitÃ© continue de la Plateforme ni lâ€™absence dâ€™erreurs.
+
+---
+
+## 13. Droit applicable, rÃ¨glement des litiges et tribunaux compÃ©tents
+
+13.1. **Droit matÃ©riel.** Pour chaque service couvrant un pays donnÃ©, la relation SOSâ€“Client est rÃ©gie par les lois du pays dâ€™intervention sans priver le Client consommateur de ses droits impÃ©ratifs de rÃ©sidence. Ã€ titre supplÃ©tif, le droit estonien rÃ©git lâ€™interprÃ©tation/validitÃ© des CGV et toute question non rÃ©gie par ce droit local.
 
 13.2. **Arbitrage CCI (option consommateur) / obligatoire non-consommateur.**
-- **Client non-consommateur (B2B)** : arbitrage CCI obligatoire, siège : Tallinn (Estonie), langue : français, droit matériel selon 13.1, procédure confidentielle.
-- **Client consommateur** : option de recourir à l’arbitrage CCI (mêmes modalités) ou aux juridictions compétentes en vertu des lois impératives applicables.
+- **Client non-consommateur (B2B)** : arbitrage CCI obligatoire, siÃ¨ge : Tallinn (Estonie), langue : franÃ§ais, droit matÃ©riel selon 13.1, procÃ©dure confidentielle.
+- **Client consommateur** : option de recourir Ã  lâ€™arbitrage CCI (mÃªmes modalitÃ©s) ou aux juridictions compÃ©tentes en vertu des lois impÃ©ratives applicables.
 
-13.3. **Compétence des tribunaux estoniens (Tallinn).** Pour toute demande non arbitrable, l’exécution des sentences ou les mesures urgentes, compétence exclusive des tribunaux d’Estonie (Tallinn), sans préjudice des droits impératifs du consommateur.
+13.3. **CompÃ©tence des tribunaux estoniens (Tallinn).** Pour toute demande non arbitrable, lâ€™exÃ©cution des sentences ou les mesures urgentes, compÃ©tence exclusive des tribunaux dâ€™Estonie (Tallinn), sans prÃ©judice des droits impÃ©ratifs du consommateur.
 
-13.4. **Renonciation aux actions collectives (dans la mesure permise).** Toute action collective/de groupe/représentative est exclue, sauf si la loi impérative du lieu de résidence du consommateur en dispose autrement.
+13.4. **Renonciation aux actions collectives (dans la mesure permise).** Toute action collective/de groupe/reprÃ©sentative est exclue, sauf si la loi impÃ©rative du lieu de rÃ©sidence du consommateur en dispose autrement.
 
 ---
 
-## 14. Résiliation/suspension et divers
+## 14. RÃ©siliation/suspension et divers
 
-14.1. **Suspension.** SOS peut suspendre/fermer le compte en cas de fraude, non-conformité, abus ou risque juridique.
+14.1. **Suspension.** SOS peut suspendre/fermer le compte en cas de fraude, non-conformitÃ©, abus ou risque juridique.
 
-14.2. **Intégralité.** Les CGV constituent l’accord complet entre SOS et le Client pour l’usage de la Plateforme.
+14.2. **IntÃ©gralitÃ©.** Les CGV constituent lâ€™accord complet entre SOS et le Client pour lâ€™usage de la Plateforme.
 
-14.3. **Langues.** Des traductions peuvent être fournies ; le français prévaut pour l’interprétation.
+14.3. **Langues.** Des traductions peuvent Ãªtre fournies ; le franÃ§ais prÃ©vaut pour lâ€™interprÃ©tation.
 
-14.4. **Nullité partielle.** Si une stipulation est nulle/inapplicable, le reste demeure en vigueur ; elle pourra être remplacée par une clause valide d’effet équivalent.
+14.4. **NullitÃ© partielle.** Si une stipulation est nulle/inapplicable, le reste demeure en vigueur ; elle pourra Ãªtre remplacÃ©e par une clause valide dâ€™effet Ã©quivalent.
 
-14.5. **Non-renonciation.** Le fait de ne pas exercer un droit n’emporte pas renonciation.
+14.5. **Non-renonciation.** Le fait de ne pas exercer un droit nâ€™emporte pas renonciation.
 
 ---
 
 ## 15. Contact
 
-**Formulaire de contact (support & demandes légales)** : **http://localhost:5174/contact**
+**Formulaire de contact (support & demandes lÃ©gales)** : **http://localhost:5174/contact**
 `;
 
   const defaultEn = `
-# General Terms – Customers (Global)
+# General Terms â€“ Customers (Global)
 
-**SOS Expat by Ulixai OÜ** (the “Platform”, “SOS”, “we”)
+**SOS Expat by Ulixai OÃœ** (the â€œPlatformâ€, â€œSOSâ€, â€œweâ€)
 
-**Version 2.2 – Last updated: 16 June 2025**
+**Version 2.2 â€“ Last updated: 16 June 2025**
 
 ---
 
 ## 1. Purpose and Scope
 
-These Terms govern the use of the Platform by any person or entity creating a customer account and booking a service (the “Customer”). **SOS Expat is a matchmaking platform** connecting Customers with independent **Lawyers** and independent **Helpers**. Ulixai is **not a law firm** and provides no legal/medical/tax/regulated advice and is **not** a party to the Customer–Provider contract.
+These Terms govern the use of the Platform by any person or entity creating a customer account and booking a service (the â€œCustomerâ€). **SOS Expat is a matchmaking platform** connecting Customers with independent **Lawyers** and independent **Helpers**. Ulixai is **not a law firm** and provides no legal/medical/tax/regulated advice and is **not** a party to the Customerâ€“Provider contract.
 
 ---
 
@@ -480,7 +480,7 @@ These Terms govern the use of the Platform by any person or entity creating a cu
 - **18+ and legal capacity.** Corporate users warrant authority.
 - **Accurate information** must be provided and kept up to date.
 - **No illegal/abusive use**; the Platform is **not** an emergency service.
-- **Availability** is “as is.”
+- **Availability** is â€œas is.â€
 
 ---
 
@@ -492,7 +492,7 @@ Short legal orientation calls with Lawyers (e.g., 20 minutes) and non-regulated 
 
 ## 4. Prices, Currencies and Connection Fee
 
-The **total price** shown includes (i) the Provider’s remuneration and (ii) SOS’s **flat Connection Fee**. **Connection Fee:** **EUR 19** or **USD 25** per Connection (excl. taxes), subject to change and/or local schedules with prospective effect. **FX and payment processor charges** may apply. Taxes included where required on the Connection Fee; Providers are responsible for their own taxes.
+The **total price** shown includes (i) the Providerâ€™s remuneration and (ii) SOSâ€™s **flat Connection Fee**. **Connection Fee:** **EUR 19** or **USD 25** per Connection (excl. taxes), subject to change and/or local schedules with prospective effect. **FX and payment processor charges** may apply. Taxes included where required on the Connection Fee; Providers are responsible for their own taxes.
 
 ---
 
@@ -510,13 +510,13 @@ Where mandatory local law grants a withdrawal right, it may apply unless the Cus
 
 ## 7. Payment, Security, Chargebacks
 
-**Single payment & split:** Customer pays one amount covering the Provider’s share and the Connection Fee. SOS (or its processor) **collects**, **deducts** its Fee, and **remits** the remainder to the Provider. Payments via third-party processors; **AML/KYC** may apply. In case of **chargeback/dispute**, SOS may share strictly necessary data with the processor and suspend related services/payouts. **Set-off:** refunds to Customers are borne by the Provider’s share; SOS may offset against future payouts.
+**Single payment & split:** Customer pays one amount covering the Providerâ€™s share and the Connection Fee. SOS (or its processor) **collects**, **deducts** its Fee, and **remits** the remainder to the Provider. Payments via third-party processors; **AML/KYC** may apply. In case of **chargeback/dispute**, SOS may share strictly necessary data with the processor and suspend related services/payouts. **Set-off:** refunds to Customers are borne by the Providerâ€™s share; SOS may offset against future payouts.
 
 ---
 
 ## 8. Cancellations and Refunds
 
-Unless mandatory law provides otherwise: the **Connection Fee is non-refundable** once a Connection occurs; the Provider’s share is non-refundable once performance starts, save goodwill by the Provider. **Before Connection:** full refund. **Provider cancellation:** full refund. **Platform-fault technical cases:** refund or credit at SOS’s discretion to the extent permitted by law.
+Unless mandatory law provides otherwise: the **Connection Fee is non-refundable** once a Connection occurs; the Providerâ€™s share is non-refundable once performance starts, save goodwill by the Provider. **Before Connection:** full refund. **Provider cancellation:** full refund. **Platform-fault technical cases:** refund or credit at SOSâ€™s discretion to the extent permitted by law.
 
 ---
 
@@ -540,13 +540,13 @@ Platform IP remains with Ulixai; Customer receives a **personal, limited** right
 
 ## 12. Liability
 
-Providers are **independent**; SOS is not liable for their services/results. To the maximum extent permitted, SOS’s **liability cap** for proven direct damage is the **total price paid** for the relevant booking; **no indirect/special/consequential damages**, where permitted.
+Providers are **independent**; SOS is not liable for their services/results. To the maximum extent permitted, SOSâ€™s **liability cap** for proven direct damage is the **total price paid** for the relevant booking; **no indirect/special/consequential damages**, where permitted.
 
 ---
 
 ## 13. Governing Law, Disputes and Courts
 
-**Substantive law:** for each country covered by the service, the laws of the **Country of Intervention** govern the SOS–Customer relationship without prejudice to the Customer’s mandatory consumer rights at residence. **Supplementary:** Estonian law governs interpretation/validity and any matter not governed by local law. **ICC arbitration:** mandatory for **non-consumers** (seat: Tallinn, Estonia; language: French; confidential). **Consumers** may opt-in to ICC arbitration or use courts available under mandatory law. **Estonian courts (Tallinn)** have exclusive jurisdiction for non-arbitrable claims, award enforcement and urgent measures, subject to consumer mandatory rights. **Class/collective actions are waived** to the extent permitted by law.
+**Substantive law:** for each country covered by the service, the laws of the **Country of Intervention** govern the SOSâ€“Customer relationship without prejudice to the Customerâ€™s mandatory consumer rights at residence. **Supplementary:** Estonian law governs interpretation/validity and any matter not governed by local law. **ICC arbitration:** mandatory for **non-consumers** (seat: Tallinn, Estonia; language: French; confidential). **Consumers** may opt-in to ICC arbitration or use courts available under mandatory law. **Estonian courts (Tallinn)** have exclusive jurisdiction for non-arbitrable claims, award enforcement and urgent measures, subject to consumer mandatory rights. **Class/collective actions are waived** to the extent permitted by law.
 
 ---
 
@@ -566,20 +566,20 @@ We may suspend/close accounts for fraud, non-compliance, abuse or legal risk. **
   // Sommaire (UI)
   const anchorMap = useMemo(
     () => [
-      { num: 1, label: selectedLanguage === 'fr' ? 'Objet et champ d’application' : 'Purpose and Scope' },
+      { num: 1, label: selectedLanguage === 'fr' ? 'Objet et champ dâ€™application' : 'Purpose and Scope' },
       { num: 2, label: selectedLanguage === 'fr' ? 'Comptes & usage' : 'Accounts & Use' },
-      { num: 3, label: selectedLanguage === 'fr' ? 'Services réservables' : 'Bookable Services' },
+      { num: 3, label: selectedLanguage === 'fr' ? 'Services rÃ©servables' : 'Bookable Services' },
       { num: 4, label: selectedLanguage === 'fr' ? 'Prix & frais' : 'Prices & Fees' },
-      { num: 5, label: selectedLanguage === 'fr' ? 'Réservation & appels' : 'Booking & Calls' },
-      { num: 6, label: selectedLanguage === 'fr' ? 'Rétractation' : 'Withdrawal Right' },
-      { num: 7, label: selectedLanguage === 'fr' ? 'Paiement & sécurité' : 'Payment & Security' },
+      { num: 5, label: selectedLanguage === 'fr' ? 'RÃ©servation & appels' : 'Booking & Calls' },
+      { num: 6, label: selectedLanguage === 'fr' ? 'RÃ©tractation' : 'Withdrawal Right' },
+      { num: 7, label: selectedLanguage === 'fr' ? 'Paiement & sÃ©curitÃ©' : 'Payment & Security' },
       { num: 8, label: selectedLanguage === 'fr' ? 'Annulations & remboursements' : 'Cancellations & Refunds' },
       { num: 9, label: selectedLanguage === 'fr' ? 'Comportements & contenus' : 'Conduct & Content' },
-      { num: 10, label: selectedLanguage === 'fr' ? 'Données personnelles' : 'Data Protection' },
-      { num: 11, label: selectedLanguage === 'fr' ? 'Propriété intellectuelle' : 'Intellectual Property' },
-      { num: 12, label: selectedLanguage === 'fr' ? 'Responsabilité' : 'Liability' },
+      { num: 10, label: selectedLanguage === 'fr' ? 'DonnÃ©es personnelles' : 'Data Protection' },
+      { num: 11, label: selectedLanguage === 'fr' ? 'PropriÃ©tÃ© intellectuelle' : 'Intellectual Property' },
+      { num: 12, label: selectedLanguage === 'fr' ? 'ResponsabilitÃ©' : 'Liability' },
       { num: 13, label: selectedLanguage === 'fr' ? 'Droit applicable & litiges' : 'Governing Law & Disputes' },
-      { num: 14, label: selectedLanguage === 'fr' ? 'Résiliation & divers' : 'Termination & Misc.' },
+      { num: 14, label: selectedLanguage === 'fr' ? 'RÃ©siliation & divers' : 'Termination & Misc.' },
       { num: 15, label: selectedLanguage === 'fr' ? 'Contact' : 'Contact' },
     ],
     [selectedLanguage]
@@ -605,7 +605,7 @@ We may suspend/close accounts for fraud, non-compliance, abuse or legal risk. **
               <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full pl-5 pr-4 py-2.5 border border-white/20 text-white">
                 <Sparkles className="w-4 h-4 text-yellow-300" />
                 <span className="text-sm font-semibold">{t.heroBadge}</span>
-                <span className="mx-1 text-white/40">•</span>
+                <span className="mx-1 text-white/40">â€¢</span>
                 <span className="text-sm text-white/90">{t.lastUpdated}</span>
               </div>
 
@@ -649,7 +649,7 @@ We may suspend/close accounts for fraud, non-compliance, abuse or legal risk. **
               </h1>
               <p className="text-lg sm:text-2xl text-gray-300 max-w-3xl mx-auto">{t.subtitle}</p>
 
-              {/* Points clés */}
+              {/* Points clÃ©s */}
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-white/90">
                 {[
                   { icon: <CreditCard className="w-6 h-6" />, text: t.features[0], gradient: 'from-green-500 to-emerald-500' },
@@ -775,7 +775,7 @@ We may suspend/close accounts for fraud, non-compliance, abuse or legal risk. **
               >
                 <Shield className="w-5 h-5" />
                 <span>{t.seeHowItWorks}</span>
-                {/* Pas de flèche ici */}
+                {/* Pas de flÃ¨che ici */}
                 <span className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-black/5" />
               </Link>
             </div>

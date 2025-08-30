@@ -1,4 +1,4 @@
-// src/pages/admin/AdminBackups.tsx
+﻿// src/pages/admin/AdminBackups.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   subscribeBackups,
@@ -46,7 +46,7 @@ type Row = {
 // -------------------------
 async function isAdminNow(): Promise<boolean> {
   const auth = getAuth();
-  // Attendre que Firebase connaisse l'état d'auth
+  // Attendre que Firebase connaisse l'Ã©tat d'auth
   await new Promise<void>((res) => {
     const off = auth.onAuthStateChanged(() => {
       off();
@@ -112,14 +112,14 @@ const StatusBadge: React.FC<{ s: BackupStatus }> = ({ s }) => {
     return (
       <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs">
         <CheckCircle size={12} className="mr-1" />
-        Terminé
+        TerminÃ©
       </span>
     );
   if (s === "failed")
     return (
       <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-xs">
         <AlertTriangle size={12} className="mr-1" />
-        Échoué
+        Ã‰chouÃ©
       </span>
     );
   return (
@@ -176,7 +176,7 @@ const AdminBackups: React.FC = () => {
       setIsAdmin(ok);
       if (!ok) {
         console.debug(
-          "Skip getBackupSchedule: rôle 'admin' absent. Utilise le bloc 'Devenir admin'."
+          "Skip getBackupSchedule: rÃ´le 'admin' absent. Utilise le bloc 'Devenir admin'."
         );
         return;
       }
@@ -194,12 +194,12 @@ const AdminBackups: React.FC = () => {
     };
   }, []);
 
-  // ---- Dernier préfixe détectable automatiquement ----
+  // ---- Dernier prÃ©fixe dÃ©tectable automatiquement ----
   const latestPrefix = useMemo(() => {
     const completed = rows.filter((r) => r.status === "completed");
     if (completed.length === 0) return "";
 
-    // 1) si prefix déjà stocké en champ dédié
+    // 1) si prefix dÃ©jÃ  stockÃ© en champ dÃ©diÃ©
     for (const r of completed) {
       if (typeof r.prefix === "string" && r.prefix.includes("/")) {
         return r.prefix;
@@ -211,7 +211,7 @@ const AdminBackups: React.FC = () => {
       const a = r.artifacts || {};
       const anyVal = a.firestore || a.auth || a.functions;
       if (typeof anyVal === "string" && anyVal.includes("/app/")) {
-        // ⚠️ Correction regex: enlever le ^ mal placé
+        // âš ï¸ Correction regex: enlever le ^ mal placÃ©
         const m = anyVal.match(/app\/([^/]+\/[^/]+)/);
         if (m) return m[1];
       }
@@ -225,7 +225,7 @@ const AdminBackups: React.FC = () => {
     setIsAdmin(ok);
     if (!ok) {
       alert(
-        "Ton jeton n'a pas encore le rôle admin. Utilise le bloc 'Devenir admin', puis recharge la page."
+        "Ton jeton n'a pas encore le rÃ´le admin. Utilise le bloc 'Devenir admin', puis recharge la page."
       );
     }
     return ok;
@@ -234,7 +234,7 @@ const AdminBackups: React.FC = () => {
   async function onTest() {
     try {
       await openTestBackupHttp();
-      alert("Requête test envoyée (vérifie le bucket de backup).");
+      alert("RequÃªte test envoyÃ©e (vÃ©rifie le bucket de backup).");
     } catch (e) {
       alert(getErrMsg(e));
     }
@@ -245,7 +245,7 @@ const AdminBackups: React.FC = () => {
     setLoading(true);
     try {
       await startBackup();
-      alert("Sauvegarde lancée.");
+      alert("Sauvegarde lancÃ©e.");
     } catch (e: unknown) {
       alert(getErrMsg(e) || "Erreur sauvegarde");
     } finally {
@@ -258,7 +258,7 @@ const AdminBackups: React.FC = () => {
     setLoading(true);
     try {
       await updateBackupSchedule(cron, timeZone);
-      alert("Planification mise à jour.");
+      alert("Planification mise Ã  jour.");
     } catch (e: unknown) {
       alert(getErrMsg(e) || "Erreur planification");
     } finally {
@@ -273,11 +273,11 @@ const AdminBackups: React.FC = () => {
       alert("Renseigne un prefix AAAA-MM-JJ/HHMMSS");
       return;
     }
-    if (!confirm(`Restaurer depuis ${p} ? Cela peut écraser des données.`)) return;
+    if (!confirm(`Restaurer depuis ${p} ? Cela peut Ã©craser des donnÃ©es.`)) return;
     setRestoring(true);
     try {
       await restoreFromBackup(p, { firestore: true, storage: true, auth: "basic" });
-      alert("Restauration lancée.");
+      alert("Restauration lancÃ©e.");
     } catch (e: unknown) {
       alert(getErrMsg(e) || "Erreur restauration");
     } finally {
@@ -287,11 +287,11 @@ const AdminBackups: React.FC = () => {
 
   async function onDelete(id: string) {
     if (!(await ensureAdminOrExplain())) return;
-    if (!confirm("Supprimer cette sauvegarde ? Les fichiers seront effacés du bucket.")) return;
+    if (!confirm("Supprimer cette sauvegarde ? Les fichiers seront effacÃ©s du bucket.")) return;
     setLoading(true);
     try {
       await deleteBackup(id);
-      alert("Sauvegarde supprimée.");
+      alert("Sauvegarde supprimÃ©e.");
     } catch (e: unknown) {
       alert(getErrMsg(e) || "Erreur suppression");
     } finally {
@@ -311,8 +311,8 @@ const AdminBackups: React.FC = () => {
       const auth = getAuth();
       await auth.currentUser?.getIdToken(true);
       const t = await auth.currentUser?.getIdTokenResult();
-      console.log("Claims:", t?.claims); // on s'attend à { role: "admin", ... }
-      alert("OK: rôle admin accordé. Recharge la page.");
+      console.log("Claims:", t?.claims); // on s'attend Ã  { role: "admin", ... }
+      alert("OK: rÃ´le admin accordÃ©. Recharge la page.");
     } catch (e: unknown) {
       alert(getErrMsg(e) || "Erreur grantAdminIfToken");
     } finally {
@@ -407,7 +407,7 @@ const AdminBackups: React.FC = () => {
           </div>
           {!!latestPrefix && (
             <p className="text-xs text-gray-500 mt-2">
-              Dernier préfixe détecté : <code>{latestPrefix}</code>
+              Dernier prÃ©fixe dÃ©tectÃ© : <code>{latestPrefix}</code>
             </p>
           )}
         </div>
@@ -420,7 +420,7 @@ const AdminBackups: React.FC = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Créée le</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CrÃ©Ã©e le</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Erreur</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>

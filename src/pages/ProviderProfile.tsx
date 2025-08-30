@@ -1,4 +1,4 @@
-// src/pages/ProviderProfile.tsx
+﻿// src/pages/ProviderProfile.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -45,7 +45,7 @@ import SEOHead from '../components/layout/SEOHead';
 import { Review } from '../types';
 import { formatLanguages } from '@/i18n';
 
-// 👉 Pricing admin (source de vérité)
+// ðŸ‘‰ Pricing admin (source de vÃ©ritÃ©)
 import { usePricingConfig } from '../services/pricingService';
 
 /* ===================================================================== */
@@ -72,46 +72,46 @@ const TEXTS = {
     loading: 'Chargement du profil...',
     notFound: 'Ce profil prestataire est introuvable. Redirection en cours...',
     backToExperts: 'Retour aux experts',
-    certifiedLawyer: 'Avocat certifié',
-    expertExpat: 'Expatrié expert',
-    verified: 'Vérifié',
+    certifiedLawyer: 'Avocat certifiÃ©',
+    expertExpat: 'ExpatriÃ© expert',
+    verified: 'VÃ©rifiÃ©',
     online: 'EN LIGNE',
     offline: 'HORS LIGNE',
-    yearsExperience: "ans d'expérience",
+    yearsExperience: "ans d'expÃ©rience",
     yearsAsExpat: "ans d'expatriation",
     reviews: 'avis',
     share: 'Partager :',
     copyLink: 'Copier le lien',
-    successRate: 'Taux de succès',
-    availability: 'Disponibilité',
-    completedCalls: 'Appels réalisés',
-    bookNow: 'RÉSERVER MAINTENANT',
+    successRate: 'Taux de succÃ¨s',
+    availability: 'DisponibilitÃ©',
+    completedCalls: 'Appels rÃ©alisÃ©s',
+    bookNow: 'RÃ‰SERVER MAINTENANT',
     unavailable: 'NON DISPONIBLE',
     availableNow: 'Expert disponible maintenant !',
     currentlyOffline: 'Expert actuellement hors ligne',
-    securePayment: 'Paiement sécurisé • Satisfaction garantie',
-    specialties: 'Spécialités',
-    languages: 'Langues parlées',
+    securePayment: 'Paiement sÃ©curisÃ© â€¢ Satisfaction garantie',
+    specialties: 'SpÃ©cialitÃ©s',
+    languages: 'Langues parlÃ©es',
     educationCertifications: 'Formation et certifications',
-    expatExperience: "Expérience d'expatriation",
+    expatExperience: "ExpÃ©rience d'expatriation",
     customerReviews: 'Avis clients',
     loadingReviews: 'Chargement des avis...',
     stats: 'Statistiques',
     averageRating: 'Note moyenne',
     information: 'Informations',
-    basedIn: 'Basé en',
+    basedIn: 'BasÃ© en',
     speaks: 'Parle',
     onlineNow: 'EN LIGNE MAINTENANT',
-    verifiedExpert: 'Expert vérifié',
-    linkCopied: 'Lien copié !',
+    verifiedExpert: 'Expert vÃ©rifiÃ©',
+    linkCopied: 'Lien copiÃ© !',
     reportReason: 'Veuillez indiquer la raison du signalement :',
-    reportThanks: "Merci pour votre signalement. Notre équipe va l'examiner.",
+    reportThanks: "Merci pour votre signalement. Notre Ã©quipe va l'examiner.",
     close: 'Fermer',
     photoOf: 'Photo de',
-    noSpecialties: 'Aucune spécialité renseignée.',
+    noSpecialties: 'Aucune spÃ©cialitÃ© renseignÃ©e.',
     yearsAbroad: "ans d'expatriation",
     in: 'en',
-    experience: 'Expérience',
+    experience: 'ExpÃ©rience',
     years: 'ans',
     minutes: 'minutes',
     memberSince: 'Inscrit depuis le',
@@ -137,7 +137,7 @@ const TEXTS = {
     unavailable: 'UNAVAILABLE',
     availableNow: 'Expert available now!',
     currentlyOffline: 'Expert currently offline',
-    securePayment: 'Secure payment • Satisfaction guaranteed',
+    securePayment: 'Secure payment â€¢ Satisfaction guaranteed',
     specialties: 'Specialties',
     languages: 'Languages',
     educationCertifications: 'Education & Certifications',
@@ -189,7 +189,7 @@ interface SosProfile {
   experienceDescription?: string | LocalizedText; motivation?: string | LocalizedText; bio?: string | LocalizedText;
   profilePhoto?: string; photoURL?: string; avatar?: string; rating: number; reviewCount: number; yearsOfExperience: number; yearsAsExpat?: number;
   isOnline?: boolean; isActive: boolean; isApproved: boolean; isVerified: boolean; isVisibleOnMap?: boolean;
-  // ❌ Supprimé: price?: number; duration?: number; (plus d'override provider)
+  // âŒ SupprimÃ©: price?: number; duration?: number; (plus d'override provider)
   education?: Education | Education[] | LocalizedText; certifications?: Certification | Certification[] | LocalizedText;
   lawSchool?: string | LocalizedText; graduationYear?: number; responseTime?: string; successRate?: number; totalCalls?: number; successfulCalls?: number;
   totalResponses?: number; totalResponseTime?: number; avgResponseTimeMs?: number; createdAt?: TSLike; updatedAt?: TSLike; lastSeen?: TSLike;
@@ -248,7 +248,7 @@ const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
 
 /* ======= Helpers prix avec Intl.NumberFormat ======= */
 const formatEUR = (value?: number) => {
-  if (typeof value !== 'number') return '—';
+  if (typeof value !== 'number') return 'â€”';
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
@@ -258,7 +258,7 @@ const formatEUR = (value?: number) => {
 };
 
 const formatUSD = (value?: number) => {
-  if (typeof value !== 'number') return '$—';
+  if (typeof value !== 'number') return '$â€”';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -285,7 +285,7 @@ const ProviderProfile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // 👉 Pricing admin (page AdminPricing -> doc "admin_config/pricing")
+  // ðŸ‘‰ Pricing admin (page AdminPricing -> doc "admin_config/pricing")
   const { pricing } = usePricingConfig();
 
   // Reviews
@@ -297,7 +297,7 @@ const ProviderProfile: React.FC = () => {
   // Online status
   const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({ isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0 });
 
-  // ======= Prix depuis Admin uniquement (EUR principal + équivalent USD) =======
+  // ======= Prix depuis Admin uniquement (EUR principal + Ã©quivalent USD) =======
   const serviceTypeForPricing: 'lawyer' | 'expat' | undefined = provider?.type;
   const bookingPrice = useMemo(() => {
     if (!pricing || !serviceTypeForPricing) return null;
@@ -305,7 +305,7 @@ const ProviderProfile: React.FC = () => {
     return {
       eur: cfg.eur.totalAmount,
       usd: cfg.usd.totalAmount,
-      duration: cfg.eur.duration, // durée admin
+      duration: cfg.eur.duration, // durÃ©e admin
     };
   }, [pricing, serviceTypeForPricing]);
 
@@ -491,7 +491,7 @@ const ProviderProfile: React.FC = () => {
               lastName: navData.lastName || '',
               type: navData.type === 'lawyer' ? 'lawyer' : 'expat',
               country: navData.country || '',
-              languages: navData.languages || ['Français'],
+              languages: navData.languages || ['FranÃ§ais'],
               specialties: toArrayFromAny(navData.specialties, preferredLangKey),
               helpTypes: toArrayFromAny(navData.helpTypes, preferredLangKey),
               description: navData.description || navData.bio || '',
@@ -506,7 +506,7 @@ const ProviderProfile: React.FC = () => {
               reviewCount: Number(navData.reviewCount) || 0,
               yearsOfExperience: Number(navData.yearsOfExperience) || 0,
               yearsAsExpat: Number(navData.yearsAsExpat) || 0,
-              // ❌ Plus de prix/durée override provider — uniquement admin
+              // âŒ Plus de prix/durÃ©e override provider â€” uniquement admin
               isOnline: !!navData.isOnline,
               isActive: true,
               isApproved: !!navData.isApproved,
@@ -598,7 +598,7 @@ const ProviderProfile: React.FC = () => {
       const seoUrl = `/${displayType}/${countrySlug}/${langSlug}/${nameSlug}-${provider.id}`;
       if (window.location.pathname !== seoUrl) window.history.replaceState(null, '', seoUrl);
 
-      const pageTitle = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`;
+      const pageTitle = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'ExpatriÃ©' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`;
       document.title = pageTitle;
 
       const updateOrCreateMeta = (property: string, content: string): void => {
@@ -667,7 +667,7 @@ const ProviderProfile: React.FC = () => {
     const nameSlug = provider.slug || safeNormalize(`${provider.firstName}-${provider.lastName}`);
     const seoPath = `/${isLawyer ? 'avocat' : 'expatrie'}/${countrySlug}/${langSlug}/${nameSlug}-${provider.id}`;
     const currentUrl = `${window.location.origin}${seoPath}`;
-    const title = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}`;
+    const title = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'ExpatriÃ©' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}`;
 
     switch (platform) {
       case 'facebook':
@@ -732,7 +732,7 @@ const ProviderProfile: React.FC = () => {
   // Computed
   const isLawyer = provider?.type === 'lawyer';
   const isExpat = provider?.type === 'expat';
-  const languagesList = useMemo<string[]>(() => (provider?.languages?.length ? provider.languages : ['Français']), [provider?.languages]);
+  const languagesList = useMemo<string[]>(() => (provider?.languages?.length ? provider.languages : ['FranÃ§ais']), [provider?.languages]);
   const mainPhoto = (provider?.profilePhoto || provider?.photoURL || provider?.avatar || '/default-avatar.png') as string;
   const descriptionText = useMemo(() => (provider ? pickDescription(provider, preferredLangKey) : ''), [provider, preferredLangKey]);
   const educationText = useMemo(() => {
@@ -767,7 +767,7 @@ const ProviderProfile: React.FC = () => {
       image: { '@type': 'ImageObject', url: mainPhoto, width: IMAGE_SIZES.MODAL_MAX_WIDTH, height: IMAGE_SIZES.MODAL_MAX_HEIGHT },
       description: descriptionText,
       address: { '@type': 'PostalAddress', addressCountry: provider.country },
-      jobTitle: isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Attorney') : (detectedLang === 'fr' ? 'Consultant expatrié' : 'Expat consultant'),
+      jobTitle: isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Attorney') : (detectedLang === 'fr' ? 'Consultant expatriÃ©' : 'Expat consultant'),
       worksFor: { '@type': 'Organization', name: 'SOS Expat & Travelers', url: window.location.origin },
       knowsLanguage: languagesList.map((lang) => ({ '@type': 'Language', name: lang })),
       aggregateRating: { '@type': 'AggregateRating', ratingValue: provider.rating || 0, reviewCount: provider.reviewCount || reviews.length || 0, bestRating: 5, worstRating: 1 },
@@ -782,8 +782,8 @@ const ProviderProfile: React.FC = () => {
         {user && provider && ((user as AuthUser)?.uid ?? (user as AuthUser)?.id) === provider.uid && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-              <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
-              <p className="text-gray-600 text-sm mb-3">Activez/désactivez votre présence sur la carte. (Visible uniquement par vous)</p>
+              <h3 className="text-sm font-semibold mb-2">VisibilitÃ© sur la carte</h3>
+              <p className="text-gray-600 text-sm mb-3">Activez/dÃ©sactivez votre prÃ©sence sur la carte. (Visible uniquement par vous)</p>
             </div>
           </div>
         )}
@@ -808,8 +808,8 @@ const ProviderProfile: React.FC = () => {
   return (
     <Layout>
       <SEOHead
-        title={`${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`}
-        description={`${detectedLang === 'fr' ? 'Consultez' : 'Consult'} ${provider.fullName}, ${isLawyer ? (detectedLang === 'fr' ? 'avocat' : 'lawyer') : (detectedLang === 'fr' ? 'expatrié' : 'expat')} ${detectedLang === 'fr' ? 'francophone' : 'French-speaking'} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}. ${descriptionText.slice(0, 120)}...`}
+        title={`${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'ExpatriÃ©' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`}
+        description={`${detectedLang === 'fr' ? 'Consultez' : 'Consult'} ${provider.fullName}, ${isLawyer ? (detectedLang === 'fr' ? 'avocat' : 'lawyer') : (detectedLang === 'fr' ? 'expatriÃ©' : 'expat')} ${detectedLang === 'fr' ? 'francophone' : 'French-speaking'} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}. ${descriptionText.slice(0, 120)}...`}
         canonicalUrl={`/${isLawyer ? 'avocat' : 'expatrie'}/${safeNormalize(provider.country)}/${safeNormalize(provider.mainLanguage || languagesList[0] || 'francais')}/${safeNormalize(provider.fullName)}-${provider.id}`}
         ogImage={mainPhoto}
         ogType="profile"
@@ -841,7 +841,7 @@ const ProviderProfile: React.FC = () => {
                 className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white/90 hover:text-white hover:bg-white/15 backdrop-blur px-4 py-2 transition-colors min-h-[44px]"
                 aria-label={t('backToExperts')}
               >
-                <span aria-hidden="true">←</span>
+                <span aria-hidden="true">â†</span>
                 <span className="ml-2">{t('backToExperts')}</span>
               </button>
             </nav>
@@ -901,7 +901,7 @@ const ProviderProfile: React.FC = () => {
                           onlineStatus.isOnline ? 'bg-green-500 text-white border-green-300 shadow-lg shadow-green-500/30' : 'bg-red-500 text-white border-red-300'
                         }`}
                       >
-                        {onlineStatus.isOnline ? '🟢 ' + t('online') : '🔴 ' + t('offline')}
+                        {onlineStatus.isOnline ? 'ðŸŸ¢ ' + t('online') : 'ðŸ”´ ' + t('offline')}
                       </span>
                     </div>
 
@@ -959,20 +959,20 @@ const ProviderProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* ✅ Booking card - Prix uniquement depuis Admin (EUR principal + équivalent USD) */}
+              {/* âœ… Booking card - Prix uniquement depuis Admin (EUR principal + Ã©quivalent USD) */}
               <aside className="lg:col-span-1">
                 <div className="group relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-200 transition-all hover:scale-[1.01]">
                   <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-red-500/5 to-orange-500/5 group-hover:from-red-500/10 group-hover:to-orange-500/10 transition-opacity" />
                   <div className="relative z-10">
 
-                    {/* Badge délai d'appel */}
+                    {/* Badge dÃ©lai d'appel */}
                     <div className="text-center mb-6">
                       <div className="inline-flex items-center gap-2 bg-gray-900 text-white rounded-full px-3 py-1 text-xs font-semibold">
                         <Phone size={14} />
                         <span>Appel en ~5 min</span>
                       </div>
 
-                      {/* ✅ Prix uniquement depuis admin_config/pricing */}
+                      {/* âœ… Prix uniquement depuis admin_config/pricing */}
                       <div className="mt-4 text-3xl sm:text-4xl font-black text-gray-900">
                         {bookingPrice ? (
                           <>
@@ -982,12 +982,12 @@ const ProviderProfile: React.FC = () => {
                             <span className="text-gray-600">({formatUSD(bookingPrice.usd)})</span>
                           </>
                         ) : (
-                          '—'
+                          'â€”'
                         )}
                       </div>
 
                       <div className="text-gray-600">
-                        {bookingPrice?.duration ? `${bookingPrice.duration} ${t('minutes')}` : '—'}
+                        {bookingPrice?.duration ? `${bookingPrice.duration} ${t('minutes')}` : 'â€”'}
                       </div>
                     </div>
 
@@ -1007,7 +1007,7 @@ const ProviderProfile: React.FC = () => {
                               : 'bg-red-100 text-red-800 border border-red-300'
                           }`}
                         >
-                          {onlineStatus.isOnline ? '🟢 ' + t('online') : '🔴 ' + t('offline')}
+                          {onlineStatus.isOnline ? 'ðŸŸ¢ ' + t('online') : 'ðŸ”´ ' + t('offline')}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
@@ -1041,9 +1041,9 @@ const ProviderProfile: React.FC = () => {
 
                     <div className="mt-4 text-center text-sm">
                       {onlineStatus.isOnline ? (
-                        <div className="text-green-600 font-medium">✅ {t('availableNow')}</div>
+                        <div className="text-green-600 font-medium">âœ… {t('availableNow')}</div>
                       ) : (
-                        <div className="text-red-600">❌ {t('currentlyOffline')}</div>
+                        <div className="text-red-600">âŒ {t('currentlyOffline')}</div>
                       )}
                     </div>
 
@@ -1153,7 +1153,7 @@ const ProviderProfile: React.FC = () => {
                     <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 p-[1px]">
                       <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 border border-yellow-200/70 text-yellow-700 text-sm font-semibold">
                         <Star className="w-4 h-4" />
-                        <span>{typeof provider.rating === 'number' ? provider.rating.toFixed(1) : '—'}/5</span>
+                        <span>{typeof provider.rating === 'number' ? provider.rating.toFixed(1) : 'â€”'}/5</span>
                         <Award className="w-4 h-4" />
                       </span>
                     </span>

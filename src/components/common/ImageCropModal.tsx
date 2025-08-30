@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { X, Check, ZoomIn, AlertCircle, RotateCw } from 'lucide-react';
 
 
@@ -11,17 +11,17 @@ type Locale = 'fr' | 'en';
 const I18N = {
   fr: {
     title: "Recadrer l'image",
-    hint: "Glissez l'image pour la repositionner. Utilisez les contrôles pour ajuster.",
-    preview: 'Aperçu :',
+    hint: "Glissez l'image pour la repositionner. Utilisez les contrÃ´les pour ajuster.",
+    preview: 'AperÃ§u :',
     finalSize: 'Taille finale :',
-    quality: 'Format optimisé, haute qualité',
+    quality: 'Format optimisÃ©, haute qualitÃ©',
     zoom: 'Zoom',
-    rotate: 'Rotation 90°',
+    rotate: 'Rotation 90Â°',
     cancel: 'Annuler',
     validate: 'Valider',
     processing: 'Traitement...',
-    altToCrop: 'À recadrer',
-    altPreview: 'Aperçu recadrage',
+    altToCrop: 'Ã€ recadrer',
+    altPreview: 'AperÃ§u recadrage',
   },
   en: {
     title: 'Crop image',
@@ -30,7 +30,7 @@ const I18N = {
     finalSize: 'Final size:',
     quality: 'Optimized format, high quality',
     zoom: 'Zoom',
-    rotate: 'Rotate 90°',
+    rotate: 'Rotate 90Â°',
     cancel: 'Cancel',
     validate: 'Apply',
     processing: 'Processing...',
@@ -472,7 +472,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
             <div className="flex-1 text-sm text-gray-600">
               <div className="font-medium text-gray-800 mb-1">{t.finalSize}</div>
               <div className="text-blue-600 font-mono">
-                {outputSize} × {Math.max(1, Math.round(outputSize / (aspectRatio || 1)))} px
+                {outputSize} Ã— {Math.max(1, Math.round(outputSize / (aspectRatio || 1)))} px
               </div>
               <div className="text-xs text-gray-500 mt-1">{t.quality}</div>
             </div>
@@ -513,7 +513,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
               <RotateCw size={16} />
               {t.rotate}
             </button>
-            <span className="text-sm text-gray-600">{rotation}°</span>
+            <span className="text-sm text-gray-600">{rotation}Â°</span>
           </div>
 
           {/* Actions */}

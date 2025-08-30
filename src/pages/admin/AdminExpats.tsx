@@ -1,4 +1,4 @@
-// src/pages/admin/AdminExpats.tsx
+﻿// src/pages/admin/AdminExpats.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   collection,
@@ -57,9 +57,9 @@ const detectLang = (): Lang => {
 };
 const STRINGS: Record<Lang, Record<string, string>> = {
   fr: {
-    title: "Expatriés",
-    subtitle: "Gestion des expatriés (validation, statut, notation, carte)",
-    searchPlaceholder: "Recherche: nom, email, pays, ville…",
+    title: "ExpatriÃ©s",
+    subtitle: "Gestion des expatriÃ©s (validation, statut, notation, carte)",
+    searchPlaceholder: "Recherche: nom, email, pays, villeâ€¦",
     filters: "Filtres",
     columns: "Colonnes",
     showAll: "Tout",
@@ -69,64 +69,64 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     active: "Actifs",
     suspended: "Suspendus",
     pending: "En attente",
-    validated: "Validés",
-    notValidated: "Non validés",
+    validated: "ValidÃ©s",
+    notValidated: "Non validÃ©s",
     status: "Statut",
     validation: "Validation",
     kyc: "KYC",
     all: "Tous",
-    blocked: "Bloqué",
-    period: "Période",
+    blocked: "BloquÃ©",
+    period: "PÃ©riode",
     today: "Aujourd'hui",
     week: "Cette semaine",
     month: "Ce mois",
-    country: "Pays de résidence",
+    country: "Pays de rÃ©sidence",
     originCountry: "Pays d'origine",
     helpDomains: "Domaines d'aide (contient)",
     languages: "Langues (contient)",
-    minRating: "Note ≥",
-    minYears: "Années sur place ≥",
+    minRating: "Note â‰¥",
+    minYears: "AnnÃ©es sur place â‰¥",
     name: "Nom",
     email: "Email",
-    emailVerified: "Email vérifié",
-    phone: "Téléphone",
+    emailVerified: "Email vÃ©rifiÃ©",
+    phone: "TÃ©lÃ©phone",
     city: "Ville",
     rating: "Note",
     reviews: "Avis",
     signup: "Inscription",
-    lastLogin: "Dernière connexion",
-    yearsInCountry: "Ancienneté",
+    lastLogin: "DerniÃ¨re connexion",
+    yearsInCountry: "AnciennetÃ©",
     expatSince: "Expat depuis",
     profile: "Profil",
     map: "Carte",
     accountStatus: "Compte",
     actions: "Actions",
-    hourlyRate: "Tarif (€/h)",
+    hourlyRate: "Tarif (â‚¬/h)",
     visibleOnMap: "Carte",
-    help: "Domaines d’aide",
+    help: "Domaines dâ€™aide",
     langs: "Langues",
     origin: "Origine",
-    expatsCount: "expatriés",
+    expatsCount: "expatriÃ©s",
     perPage: "par page",
-    emptyTitle: "Aucun expatrié",
-    emptyText: "Aucun résultat avec ces filtres.",
+    emptyTitle: "Aucun expatriÃ©",
+    emptyText: "Aucun rÃ©sultat avec ces filtres.",
     clearFilters: "Effacer les filtres",
-    selection: "sélectionné(s)",
+    selection: "sÃ©lectionnÃ©(s)",
     approve: "Approuver",
     reject: "Rejeter",
     activate: "Activer",
     suspend: "Suspendre",
     delete: "Supprimer",
-    confirmBulk: "Confirmer l'action pour {n} expatrié(s) ?",
-    updated: "Mis à jour",
-    loading: "Chargement…",
+    confirmBulk: "Confirmer l'action pour {n} expatriÃ©(s) ?",
+    updated: "Mis Ã  jour",
+    loading: "Chargementâ€¦",
     view: "Voir",
-    edit: "Éditer",
+    edit: "Ã‰diter",
   },
   en: {
     title: "Expats",
     subtitle: "Manage expats (validation, status, rating, map)",
-    searchPlaceholder: "Search: name, email, country, city…",
+    searchPlaceholder: "Search: name, email, country, cityâ€¦",
     filters: "Filters",
     columns: "Columns",
     showAll: "All",
@@ -151,8 +151,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     originCountry: "Origin country",
     helpDomains: "Help domains (contains)",
     languages: "Languages (contains)",
-    minRating: "Rating ≥",
-    minYears: "Years in country ≥",
+    minRating: "Rating â‰¥",
+    minYears: "Years in country â‰¥",
     name: "Name",
     email: "Email",
     emailVerified: "Email verified",
@@ -168,7 +168,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     map: "Map",
     accountStatus: "Account",
     actions: "Actions",
-    hourlyRate: "Hourly rate (€/h)",
+    hourlyRate: "Hourly rate (â‚¬/h)",
     visibleOnMap: "Map",
     help: "Help domains",
     langs: "Languages",
@@ -186,7 +186,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     delete: "Delete",
     confirmBulk: "Confirm action for {n} expat(s)?",
     updated: "Updated",
-    loading: "Loading…",
+    loading: "Loadingâ€¦",
     view: "View",
     edit: "Edit",
   },
@@ -430,8 +430,8 @@ const useColumnLayout = () => {
 
 /* ---------------------- Utils ---------------------- */
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
-const fmtDate = (d?: Date) => (d ? d.toLocaleDateString("fr-FR") : "—");
-const fmtMoney = (n: number) => `${n.toFixed(2)}€`;
+const fmtDate = (d?: Date) => (d ? d.toLocaleDateString("fr-FR") : "â€”");
+const fmtMoney = (n: number) => `${n.toFixed(2)}â‚¬`;
 
 /* ---------------------- Composant principal ---------------------- */
 const AdminExpats: React.FC = () => {
@@ -465,7 +465,7 @@ const AdminExpats: React.FC = () => {
     minYearsInCountry: "all",
   });
 
-  // stats (calculées sur la page)
+  // stats (calculÃ©es sur la page)
   const stats = React.useMemo(() => {
     const avgRating = expats.length ? expats.reduce((s, e) => s + e.rating, 0) / expats.length : 0;
     const active = expats.filter((e) => e.status === "active").length;
@@ -513,7 +513,7 @@ const AdminExpats: React.FC = () => {
 
       if (filters.status !== "all") base.push(where("status", "==", filters.status));
       if (filters.validationStatus !== "all") base.push(where("validationStatus", "==", filters.validationStatus));
-      // Recherche large côté client après fetch (pour rester proche de Lawyers). Ici on garde un orderBy fixe.
+      // Recherche large cÃ´tÃ© client aprÃ¨s fetch (pour rester proche de Lawyers). Ici on garde un orderBy fixe.
       const q = fsQuery(
         collection(db, "users"),
         ...base,
@@ -694,26 +694,26 @@ const AdminExpats: React.FC = () => {
     const rows = expats.map((e) => ({
       ID: e.id,
       Email: e.email,
-      "Email vérifié": e.emailVerified ? "Oui" : "Non",
-      Prénom: e.firstName,
+      "Email vÃ©rifiÃ©": e.emailVerified ? "Oui" : "Non",
+      PrÃ©nom: e.firstName,
       Nom: e.lastName,
-      Téléphone: e.phone || "",
+      TÃ©lÃ©phone: e.phone || "",
       Pays: e.country,
       Ville: e.city || "",
       "Pays d'origine": e.originCountry || "",
       Note: e.rating.toFixed(1),
       Avis: e.reviewsCount,
       "Inscription": fmtDate(e.createdAt),
-      "Dernière connexion": fmtDate(e.lastLoginAt),
-      "Années sur place": e.yearsInCountry,
+      "DerniÃ¨re connexion": fmtDate(e.lastLoginAt),
+      "AnnÃ©es sur place": e.yearsInCountry,
       "Expat depuis": fmtDate(e.expatSince),
       "Domaines d'aide": e.helpDomains.join(", "),
       Langues: e.languages.join(", "),
-      "Tarif €/h": e.hourlyRate ?? "",
+      "Tarif â‚¬/h": e.hourlyRate ?? "",
       Statut: e.status,
       Validation: e.validationStatus,
       "Visible carte": e.isVisibleOnMap ? "Oui" : "Non",
-      "Total gagné": fmtMoney(e.totalEarned),
+      "Total gagnÃ©": fmtMoney(e.totalEarned),
       "Appels": e.callsCount,
     }));
     const headers = Object.keys(rows[0]).join(",");
@@ -774,7 +774,7 @@ const AdminExpats: React.FC = () => {
           </div>
         );
       case "phone":
-        return <div className="text-sm text-gray-900">{e.phone || "—"}</div>;
+        return <div className="text-sm text-gray-900">{e.phone || "â€”"}</div>;
       case "country":
         return (
           <div className="text-sm text-gray-900 flex items-center">
@@ -783,11 +783,11 @@ const AdminExpats: React.FC = () => {
           </div>
         );
       case "city":
-        return <div className="text-sm text-gray-900">{e.city || "—"}</div>;
+        return <div className="text-sm text-gray-900">{e.city || "â€”"}</div>;
       case "origin":
         return (
           <div className="text-sm">
-            <div className="text-gray-900">{e.originCountry || "—"}</div>
+            <div className="text-gray-900">{e.originCountry || "â€”"}</div>
             <div className="text-xs text-gray-500">{t("origin")}</div>
           </div>
         );
@@ -799,7 +799,7 @@ const AdminExpats: React.FC = () => {
           </div>
         );
       case "help":
-        return <div className="text-xs text-gray-800" title={e.helpDomains.join(", ")}>{e.helpDomains.slice(0, 2).join(", ")}{e.helpDomains.length > 2 ? "…" : ""}</div>;
+        return <div className="text-xs text-gray-800" title={e.helpDomains.join(", ")}>{e.helpDomains.slice(0, 2).join(", ")}{e.helpDomains.length > 2 ? "â€¦" : ""}</div>;
       case "rating":
         return (
           <div className="flex items-center text-sm">
@@ -814,11 +814,11 @@ const AdminExpats: React.FC = () => {
       case "lastLogin":
         return <div className="text-sm text-gray-900">{fmtDate(e.lastLoginAt)}</div>;
       case "yearsInCountry":
-        return <div className="text-sm text-blue-700">{e.yearsInCountry > 0 ? `${e.yearsInCountry} an${e.yearsInCountry > 1 ? "s" : ""}` : "—"}</div>;
+        return <div className="text-sm text-blue-700">{e.yearsInCountry > 0 ? `${e.yearsInCountry} an${e.yearsInCountry > 1 ? "s" : ""}` : "â€”"}</div>;
       case "expatSince":
         return <div className="text-sm text-gray-900">{fmtDate(e.expatSince)}</div>;
       case "hourlyRate":
-        return <div className="text-sm text-green-700">{e.hourlyRate ? `${e.hourlyRate}€` : "—"}</div>;
+        return <div className="text-sm text-green-700">{e.hourlyRate ? `${e.hourlyRate}â‚¬` : "â€”"}</div>;
       case "profile":
         return (
           <div className="text-sm">
@@ -826,7 +826,7 @@ const AdminExpats: React.FC = () => {
               {e.profileComplete}% {t("profile").toLowerCase()}
             </div>
             <div className="text-xs text-gray-500">
-              {e.callsCount} calls • {fmtMoney(e.totalEarned)}
+              {e.callsCount} calls â€¢ {fmtMoney(e.totalEarned)}
             </div>
           </div>
         );
@@ -883,8 +883,8 @@ const AdminExpats: React.FC = () => {
     }
   };
 
-  /* ---------------------- Header (drag, resize, visibilité) ---------------------- */
-  // (simplifié mais fidèle à l’esprit de Lawyers : ordre, largeur, visibilité, reset)
+  /* ---------------------- Header (drag, resize, visibilitÃ©) ---------------------- */
+  // (simplifiÃ© mais fidÃ¨le Ã  lâ€™esprit de Lawyers : ordre, largeur, visibilitÃ©, reset)
   const HeaderCell: React.FC<{ col: ColId; label: string }> = ({ col, label }) => {
     const startX = useRef(0);
     const startW = useRef(0);
@@ -973,7 +973,7 @@ const AdminExpats: React.FC = () => {
             </h1>
             <p className="text-gray-600 mt-1">{t("subtitle")}</p>
             <p className="text-gray-500 mt-1">
-              {t("totalExact")}: <span className="font-semibold">{total}</span> • {stats.active} {t("active")} • {stats.pending} {t("pending")} • {stats.validated} {t("validated")}
+              {t("totalExact")}: <span className="font-semibold">{total}</span> â€¢ {stats.active} {t("active")} â€¢ {stats.pending} {t("pending")} â€¢ {stats.validated} {t("validated")}
             </p>
           </div>
 
@@ -1013,7 +1013,7 @@ const AdminExpats: React.FC = () => {
           </div>
         </div>
 
-        {/* Filtres avancés */}
+        {/* Filtres avancÃ©s */}
         {showFilters && (
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex justify-between items-center mb-4">
@@ -1075,7 +1075,7 @@ const AdminExpats: React.FC = () => {
                   value={filters.country === "all" ? "" : filters.country}
                   onChange={(e) => setFilters((f) => ({ ...f, country: e.target.value || "all" }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="FR, ES…"
+                  placeholder="FR, ESâ€¦"
                 />
               </div>
 
@@ -1085,7 +1085,7 @@ const AdminExpats: React.FC = () => {
                   value={filters.originCountry === "all" ? "" : filters.originCountry}
                   onChange={(e) => setFilters((f) => ({ ...f, originCountry: e.target.value || "all" }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="MA, SN…"
+                  placeholder="MA, SNâ€¦"
                 />
               </div>
 
@@ -1095,7 +1095,7 @@ const AdminExpats: React.FC = () => {
                   value={filters.helpDomain}
                   onChange={(e) => setFilters((f) => ({ ...f, helpDomain: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="logement, papiers…"
+                  placeholder="logement, papiersâ€¦"
                 />
               </div>
 
@@ -1105,7 +1105,7 @@ const AdminExpats: React.FC = () => {
                   value={filters.language}
                   onChange={(e) => setFilters((f) => ({ ...f, language: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="fr, en…"
+                  placeholder="fr, enâ€¦"
                 />
               </div>
 
@@ -1251,10 +1251,10 @@ const AdminExpats: React.FC = () => {
           {/* Pagination */}
           <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6 flex items-center justify-between">
             <div className="text-sm text-gray-700">
-              {expats.length} / {t("expatsCount")} • {t("totalExact")}: {total} • {t("rating")}: {stats.avgRating.toFixed(1)}
+              {expats.length} / {t("expatsCount")} â€¢ {t("totalExact")}: {total} â€¢ {t("rating")}: {stats.avgRating.toFixed(1)}
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" onClick={() => void loadPage("init")}><span className="mr-1">↻</span> Refresh</Button>
+              <Button variant="outline" onClick={() => void loadPage("init")}><span className="mr-1">â†»</span> Refresh</Button>
               <Button variant="outline" disabled={!cursor} onClick={() => void loadPage("init")}>
                 <ChevronLeft className="w-4 h-4 mr-1" /> Prev
               </Button>
@@ -1274,11 +1274,11 @@ const AdminExpats: React.FC = () => {
                 {drawerExpat.phone ? <div><strong>{t("phone")}:</strong> {drawerExpat.phone}</div> : null}
                 <div><strong>{t("country")}:</strong> {drawerExpat.city ? `${drawerExpat.city}, ` : ""}{drawerExpat.country}</div>
                 {drawerExpat.originCountry ? <div><strong>{t("origin")}:</strong> {drawerExpat.originCountry}</div> : null}
-                <div><strong>{t("langs")}:</strong> {drawerExpat.languages.join(", ") || "—"}</div>
-                <div><strong>{t("help")}:</strong> {drawerExpat.helpDomains.join(", ") || "—"}</div>
-                <div><strong>{t("yearsInCountry")}:</strong> {drawerExpat.yearsInCountry || "—"}</div>
+                <div><strong>{t("langs")}:</strong> {drawerExpat.languages.join(", ") || "â€”"}</div>
+                <div><strong>{t("help")}:</strong> {drawerExpat.helpDomains.join(", ") || "â€”"}</div>
+                <div><strong>{t("yearsInCountry")}:</strong> {drawerExpat.yearsInCountry || "â€”"}</div>
                 <div><strong>{t("expatSince")}:</strong> {fmtDate(drawerExpat.expatSince)}</div>
-                <div><strong>{t("hourlyRate")}:</strong> {drawerExpat.hourlyRate ?? "—"}</div>
+                <div><strong>{t("hourlyRate")}:</strong> {drawerExpat.hourlyRate ?? "â€”"}</div>
               </div>
               <div className="flex items-center justify-end space-x-2">
                 <Button variant="outline" onClick={() => setDrawerExpat(null)}>Close</Button>

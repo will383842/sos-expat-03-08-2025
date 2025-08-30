@@ -1,4 +1,4 @@
-// src/emails/admin/AdminEmails/CampaignsPage.tsx
+﻿// src/emails/admin/AdminEmails/CampaignsPage.tsx
 import React, { useEffect, useState } from "react";
 import { Campaign } from "../../types/emailTypes";
 import { format } from "date-fns";
@@ -9,7 +9,7 @@ import { httpsCallable } from "firebase/functions";
 const getAllCampaigns = httpsCallable<undefined, Campaign[]>(
   functions,
   "admin_getAllCampaigns"
-); // ⚠️ À créer côté Firebase Functions
+); // âš ï¸ Ã€ crÃ©er cÃ´tÃ© Firebase Functions
 
 const CampaignsPage: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -18,7 +18,7 @@ const CampaignsPage: React.FC = () => {
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
-        const { data: campaigns } = await getAllCampaigns(); // ✅ typé directement
+        const { data: campaigns } = await getAllCampaigns(); // âœ… typÃ© directement
         setCampaigns(campaigns ?? []);
       } catch (error) {
         console.error("Erreur lors du chargement des campagnes :", error);
@@ -32,12 +32,12 @@ const CampaignsPage: React.FC = () => {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Campagnes programmées</h2>
+      <h2 className="text-xl font-semibold mb-4">Campagnes programmÃ©es</h2>
 
       {loading ? (
         <p>Chargement des campagnes...</p>
       ) : campaigns.length === 0 ? (
-        <p>Aucune campagne programmée pour le moment.</p>
+        <p>Aucune campagne programmÃ©e pour le moment.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full table-auto border">

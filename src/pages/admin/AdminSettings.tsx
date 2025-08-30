@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, 
@@ -119,10 +119,10 @@ const AdminSettings: React.FC = () => {
         )
       );
       
-      alert(`Pays ${!isActive ? 'activé' : 'désactivé'} avec succès`);
+      alert(`Pays ${!isActive ? 'activÃ©' : 'dÃ©sactivÃ©'} avec succÃ¨s`);
     } catch (error) {
       console.error('Error updating country:', error);
-      alert('Erreur lors de la mise à jour du pays');
+      alert('Erreur lors de la mise Ã  jour du pays');
     } finally {
       setIsLoading(false);
     }
@@ -138,10 +138,10 @@ const AdminSettings: React.FC = () => {
       });
       
       setShowMapSettingsModal(false);
-      alert('Paramètres de la carte mis à jour avec succès');
+      alert('ParamÃ¨tres de la carte mis Ã  jour avec succÃ¨s');
     } catch (error) {
       console.error('Error saving map settings:', error);
-      alert('Erreur lors de la sauvegarde des paramètres de la carte');
+      alert('Erreur lors de la sauvegarde des paramÃ¨tres de la carte');
     } finally {
       setIsLoading(false);
     }
@@ -163,7 +163,7 @@ const AdminSettings: React.FC = () => {
         createdBy: currentUser?.id
       });
       
-      setBackupStatus('Sauvegarde terminée avec succès');
+      setBackupStatus('Sauvegarde terminÃ©e avec succÃ¨s');
       setTimeout(() => setBackupStatus(''), 3000);
     } catch (error) {
       console.error('Error creating backup:', error);
@@ -182,7 +182,7 @@ const AdminSettings: React.FC = () => {
         { name: 'Connexion Firebase', status: 'running' },
         { name: 'API Stripe', status: 'running' },
         { name: 'Service Twilio', status: 'running' },
-        { name: 'Génération PDF', status: 'running' },
+        { name: 'GÃ©nÃ©ration PDF', status: 'running' },
         { name: 'Upload fichiers', status: 'running' }
       ];
       
@@ -224,7 +224,7 @@ const AdminSettings: React.FC = () => {
         prev.filter(refund => refund.id !== refundId)
       );
       
-      alert(`Remboursement ${action === 'approve' ? 'approuvé' : 'rejeté'} avec succès`);
+      alert(`Remboursement ${action === 'approve' ? 'approuvÃ©' : 'rejetÃ©'} avec succÃ¨s`);
     } catch (error) {
       console.error('Error processing refund:', error);
       alert('Erreur lors du traitement du remboursement');
@@ -239,11 +239,11 @@ const AdminSettings: React.FC = () => {
       
       // This would typically require Firebase Admin SDK
       // For now, we'll show instructions
-      alert('Pour créer les index automatiquement, exécutez la commande suivante dans votre terminal :\n\nfirebase deploy --only firestore:indexes');
+      alert('Pour crÃ©er les index automatiquement, exÃ©cutez la commande suivante dans votre terminal :\n\nfirebase deploy --only firestore:indexes');
       
     } catch (error) {
       console.error('Error creating indexes:', error);
-      alert('Erreur lors de la création des index');
+      alert('Erreur lors de la crÃ©ation des index');
     } finally {
       setIsLoading(false);
     }
@@ -276,7 +276,7 @@ const AdminSettings: React.FC = () => {
     <AdminLayout>
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Paramètres de la plateforme</h1>
+          <h1 className="text-2xl font-bold text-gray-900">ParamÃ¨tres de la plateforme</h1>
         </div>
 
         {/* Settings Cards */}
@@ -289,7 +289,7 @@ const AdminSettings: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900">Pays disponibles</h3>
               </div>
             </div>
-            <p className="text-gray-600 mb-4">Gérer la disponibilité de la plateforme par pays</p>
+            <p className="text-gray-600 mb-4">GÃ©rer la disponibilitÃ© de la plateforme par pays</p>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {countries.map((country) => (
                 <div key={country.id} className="flex items-center justify-between">
@@ -344,7 +344,7 @@ const AdminSettings: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900">Mode test</h3>
               </div>
             </div>
-            <p className="text-gray-600 mb-4">Tester les fonctionnalités critiques</p>
+            <p className="text-gray-600 mb-4">Tester les fonctionnalitÃ©s critiques</p>
             <Button
               onClick={() => navigate('/test-production')}
               variant="outline"
@@ -368,7 +368,7 @@ const AdminSettings: React.FC = () => {
                 </span>
               )}
             </div>
-            <p className="text-gray-600 mb-4">Gérer les demandes de remboursement</p>
+            <p className="text-gray-600 mb-4">GÃ©rer les demandes de remboursement</p>
             <Button
               onClick={() => setShowRefundModal(true)}
               variant="outline"
@@ -403,7 +403,7 @@ const AdminSettings: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">
                 <Map className="w-6 h-6 text-purple-600 mr-3" />
-                <h3 className="text-lg font-semibold text-gray-900">Paramètres de la carte</h3>
+                <h3 className="text-lg font-semibold text-gray-900">ParamÃ¨tres de la carte</h3>
               </div>
             </div>
             <p className="text-gray-600 mb-4">Configuration de l'affichage de la carte mondiale</p>
@@ -425,7 +425,7 @@ const AdminSettings: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900">Index Firebase</h3>
               </div>
             </div>
-            <p className="text-gray-600 mb-4">Créer tous les index nécessaires</p>
+            <p className="text-gray-600 mb-4">CrÃ©er tous les index nÃ©cessaires</p>
             <Button
               onClick={handleCreateIndexes}
               variant="outline"
@@ -433,7 +433,7 @@ const AdminSettings: React.FC = () => {
               disabled={isLoading}
             >
               <Upload className="w-4 h-4 mr-2" />
-              Créer les index
+              CrÃ©er les index
             </Button>
           </div>
         </div>
@@ -449,7 +449,7 @@ const AdminSettings: React.FC = () => {
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
             <p className="text-sm text-blue-800">
-              Ces tests vérifient le bon fonctionnement des services critiques de la plateforme.
+              Ces tests vÃ©rifient le bon fonctionnement des services critiques de la plateforme.
             </p>
           </div>
 
@@ -495,7 +495,7 @@ const AdminSettings: React.FC = () => {
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h4 className="font-medium text-gray-900">{refund.clientName}</h4>
-                    <p className="text-sm text-gray-500">Montant: {refund.amount}€</p>
+                    <p className="text-sm text-gray-500">Montant: {refund.amount}â‚¬</p>
                     <p className="text-sm text-gray-500">Date: {formatDate(refund.createdAt)}</p>
                   </div>
                   <div className="flex space-x-2">
@@ -533,7 +533,7 @@ const AdminSettings: React.FC = () => {
       <Modal
         isOpen={showMapSettingsModal}
         onClose={() => setShowMapSettingsModal(false)}
-        title="Paramètres de la carte"
+        title="ParamÃ¨tres de la carte"
         size="medium"
       >
         <div className="space-y-4">
@@ -583,7 +583,7 @@ const AdminSettings: React.FC = () => {
               className="bg-blue-600 hover:bg-blue-700"
               loading={isLoading}
             >
-              Enregistrer les paramètres
+              Enregistrer les paramÃ¨tres
             </Button>
           </div>
         </div>
@@ -602,11 +602,11 @@ const AdminSettings: React.FC = () => {
               <CheckCircle className="h-5 w-5 text-green-400" />
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-green-800">
-                  PWA configurée
+                  PWA configurÃ©e
                 </h3>
                 <div className="mt-2 text-sm text-green-700">
                   <p>
-                    L'application est déjà configurée comme PWA installable.
+                    L'application est dÃ©jÃ  configurÃ©e comme PWA installable.
                     Les utilisateurs peuvent l'installer depuis leur navigateur.
                   </p>
                 </div>
@@ -617,19 +617,19 @@ const AdminSettings: React.FC = () => {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600">Manifest:</span>
-              <span className="font-medium text-green-600">✓ Configuré</span>
+              <span className="font-medium text-green-600">âœ“ ConfigurÃ©</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Service Worker:</span>
-              <span className="font-medium text-green-600">✓ Actif</span>
+              <span className="font-medium text-green-600">âœ“ Actif</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Icônes:</span>
-              <span className="font-medium text-green-600">✓ Disponibles</span>
+              <span className="text-gray-600">IcÃ´nes:</span>
+              <span className="font-medium text-green-600">âœ“ Disponibles</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Mode hors ligne:</span>
-              <span className="font-medium text-green-600">✓ Supporté</span>
+              <span className="font-medium text-green-600">âœ“ SupportÃ©</span>
             </div>
           </div>
         </div>

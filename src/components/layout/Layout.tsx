@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+﻿import React, { ReactNode } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,7 +36,7 @@ const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 antialiased">
-      {/* Skip link pour accessibilité */}
+      {/* Skip link pour accessibilitÃ© */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -57,13 +57,13 @@ const Layout: React.FC<LayoutProps> = ({
 
       {showFooter && <Footer />}
 
-      {/* Bandeau PWA global — bas-droite, laissé à gauche du bouton “remonter en haut” */}
+      {/* Bandeau PWA global â€” bas-droite, laissÃ© Ã  gauche du bouton â€œremonter en hautâ€ */}
       <InstallBanner
         offsetRightPx={88}                        // laisse la place au bouton scroll-to-top
-        bottomPx={24}                             // aligné avec bottom-6
+        bottomPx={24}                             // alignÃ© avec bottom-6
         zIndexClass="z-50"
         gradientClass="from-violet-600 to-fuchsia-600"
-        closeForDays={30}                         // persistance après fermeture
+        closeForDays={30}                         // persistance aprÃ¨s fermeture
       />
     </div>
   );

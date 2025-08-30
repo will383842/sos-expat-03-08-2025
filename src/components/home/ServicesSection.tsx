@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Scale, Users, Clock, Shield, CheckCircle, Phone, Globe } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -13,16 +13,16 @@ const ServicesSection: React.FC = () => {
 
   const serviceDescriptions = {
     lawyer_call: {
-      fr: 'Consultation juridique urgente par téléphone avec un avocat certifié',
+      fr: 'Consultation juridique urgente par tÃ©lÃ©phone avec un avocat certifiÃ©',
       en: 'Emergency legal consultation by phone with a certified lawyer'
     },
     expat_call: {
-      fr: 'Conseil pratique d\'un expatrié francophone qui connaît le pays',
+      fr: 'Conseil pratique d\'un expatriÃ© francophone qui connaÃ®t le pays',
       en: 'Practical advice from a French-speaking expat who knows the country'
     }
   };
 
-  // ✅ SUPPRESSION de handleServiceSelect - utiliser liens directs
+  // âœ… SUPPRESSION de handleServiceSelect - utiliser liens directs
   const features = [
     {
       icon: Phone,
@@ -33,16 +33,16 @@ const ServicesSection: React.FC = () => {
     },
     {
       icon: Shield,
-      title: language === 'fr' ? 'Experts vérifiés' : 'Verified experts',
+      title: language === 'fr' ? 'Experts vÃ©rifiÃ©s' : 'Verified experts',
       description: language === 'fr'
-        ? 'Tous nos experts sont vérifiés manuellement par notre équipe.'
+        ? 'Tous nos experts sont vÃ©rifiÃ©s manuellement par notre Ã©quipe.'
         : 'All our experts are manually verified by our team.'
     },
     {
       icon: CheckCircle,
       title: language === 'fr' ? 'Satisfaction garantie' : 'Satisfaction guaranteed',
       description: language === 'fr'
-        ? 'Remboursement automatique si l\'expert ne répond pas.'
+        ? 'Remboursement automatique si l\'expert ne rÃ©pond pas.'
         : 'Automatic refund if the expert doesn\'t answer.'
     },
     {
@@ -66,7 +66,7 @@ const ServicesSection: React.FC = () => {
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             {language === 'fr'
-              ? 'Choisissez le service qui correspond à vos besoins et connectez-vous immédiatement avec un expert.'
+              ? 'Choisissez le service qui correspond Ã  vos besoins et connectez-vous immÃ©diatement avec un expert.'
               : 'Choose the service that fits your needs and connect immediately with an expert.'
             }
           </p>
@@ -91,7 +91,7 @@ const ServicesSection: React.FC = () => {
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">
                     {isLawyer 
                       ? (language === 'fr' ? 'Appel Avocat' : 'Lawyer Call')
-                      : (language === 'fr' ? 'Appel Expatrié' : 'Expat Call')
+                      : (language === 'fr' ? 'Appel ExpatriÃ©' : 'Expat Call')
                     }
                   </h3>
                   
@@ -101,7 +101,7 @@ const ServicesSection: React.FC = () => {
                   
                   <div className="flex items-center justify-between w-full mb-6">
                     <div className={`text-3xl font-bold ${isLawyer ? 'text-red-600' : 'text-blue-600'}`}>
-                      €{service.price}
+                      â‚¬{service.price}
                     </div>
                     <div className="flex items-center text-gray-500">
                       <Clock size={20} className="mr-2" />
@@ -121,7 +121,7 @@ const ServicesSection: React.FC = () => {
           })}
         </div>
 
-        {/* ✅ Features modernisées */}
+        {/* âœ… Features modernisÃ©es */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
           {features.map((feature, index) => (
             <div key={index} className="bg-white rounded-2xl p-6 text-center hover:shadow-lg hover:-translate-y-1 transition-all border border-slate-100">

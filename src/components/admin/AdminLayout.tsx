@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
+﻿import React, { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
 import type { ErrorInfo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Shield, LogOut, Menu, X, Home, AlertTriangle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -34,7 +34,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [updateSuccess, setUpdateSuccess] = useState<boolean | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Détection mobile/desktop avec JavaScript - PAS CSS !
+  // DÃ©tection mobile/desktop avec JavaScript - PAS CSS !
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -45,7 +45,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Sauvegarder la préférence de largeur de sidebar dans localStorage
+  // Sauvegarder la prÃ©fÃ©rence de largeur de sidebar dans localStorage
   useEffect(() => {
     const saved = localStorage.getItem('admin-sidebar-open');
     if (saved !== null) {
@@ -61,7 +61,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       logError({
         origin: 'frontend',
-        error: `Erreur de déconnexion admin: ${errorMessage}`,
+        error: `Erreur de dÃ©connexion admin: ${errorMessage}`,
         context: { component: 'AdminLayout', userId: user?.id },
       });
     }
@@ -69,7 +69,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const handleUpdateProfiles = useCallback(async () => {
     const ok = window.confirm(
-      'Êtes-vous sûr de vouloir mettre à jour tous les profils existants avec les nouveaux champs ?'
+      'ÃŠtes-vous sÃ»r de vouloir mettre Ã  jour tous les profils existants avec les nouveaux champs ?'
     );
     if (!ok) return;
 
@@ -80,7 +80,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
       const { updateExistingProfiles } = await import('../../utils/firestore');
       if (typeof updateExistingProfiles !== 'function') {
-        throw new Error('Fonction de mise à jour non disponible');
+        throw new Error('Fonction de mise Ã  jour non disponible');
       }
       const success = await updateExistingProfiles();
       setUpdateSuccess(success);
@@ -89,7 +89,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       logError({
         origin: 'frontend',
-        error: `Erreur mise à jour profils: ${errorMessage}`,
+        error: `Erreur mise Ã  jour profils: ${errorMessage}`,
         context: { component: 'AdminLayout', userId: user?.id },
       });
       setUpdateSuccess(false);
@@ -102,7 +102,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const toggleSidebar = useCallback(() => {
     const newState = !isSidebarOpen;
     setIsSidebarOpen(newState);
-    // Sauvegarder la préférence
+    // Sauvegarder la prÃ©fÃ©rence
     localStorage.setItem('admin-sidebar-open', JSON.stringify(newState));
   }, [isSidebarOpen]);
 
@@ -121,9 +121,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="bg-white p-8 rounded-lg shadow-md text-center">
           <Shield className="h-16 w-16 text-red-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Accès refusé</h1>
-          <p className="text-gray-600 mb-4">Vous devez être administrateur pour accéder à cette page.</p>
-          <Button onClick={() => navigate('/')}>Retour à l&apos;accueil</Button>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">AccÃ¨s refusÃ©</h1>
+          <p className="text-gray-600 mb-4">Vous devez Ãªtre administrateur pour accÃ©der Ã  cette page.</p>
+          <Button onClick={() => navigate('/')}>Retour Ã  l&apos;accueil</Button>
         </div>
       </div>
     );
@@ -140,11 +140,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </h1>
           <p className="text-gray-600 mb-4">
             {accountStatus === 'banned'
-              ? 'Votre compte a été suspendu. Contactez le support.'
+              ? 'Votre compte a Ã©tÃ© suspendu. Contactez le support.'
               : 'Votre compte est en cours de validation.'}
           </p>
           <Button onClick={handleLogout} variant="secondary">
-            Se déconnecter
+            Se dÃ©connecter
           </Button>
         </div>
       </div>
@@ -203,7 +203,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         size={16}
                         className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
                       />
-                      Mettre à jour les profils
+                      Mettre Ã  jour les profils
                     </Button>
 
                     {updateSuccess !== null && (
@@ -214,8 +214,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         role="alert"
                       >
                         {updateSuccess
-                          ? 'Profils mis à jour avec succès'
-                          : 'Erreur lors de la mise à jour des profils'}
+                          ? 'Profils mis Ã  jour avec succÃ¨s'
+                          : 'Erreur lors de la mise Ã  jour des profils'}
                       </div>
                     )}
                   </div>
@@ -228,7 +228,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   className="flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white"
                 >
                   <LogOut className="h-5 w-5 mr-3" />
-                  <span>Déconnexion</span>
+                  <span>DÃ©connexion</span>
                 </button>
               </div>
             </div>
@@ -249,8 +249,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 className={`absolute top-4 z-10 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-full shadow-lg transition-all duration-300 ${
                   isSidebarOpen ? 'right-4' : 'right-2'
                 }`}
-                aria-label={isSidebarOpen ? 'Réduire la sidebar' : 'Étendre la sidebar'}
-                title={isSidebarOpen ? 'Réduire la sidebar' : 'Étendre la sidebar'}
+                aria-label={isSidebarOpen ? 'RÃ©duire la sidebar' : 'Ã‰tendre la sidebar'}
+                title={isSidebarOpen ? 'RÃ©duire la sidebar' : 'Ã‰tendre la sidebar'}
               >
                 {isSidebarOpen ? (
                   <ChevronLeft className="h-4 w-4" />
@@ -287,7 +287,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             size={14}
                             className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
                           />
-                          Mettre à jour les profils
+                          Mettre Ã  jour les profils
                         </Button>
 
                         {updateSuccess !== null && (
@@ -298,8 +298,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             role="alert"
                           >
                             {updateSuccess
-                              ? 'Profils mis à jour avec succès'
-                              : 'Erreur lors de la mise à jour des profils'}
+                              ? 'Profils mis Ã  jour avec succÃ¨s'
+                              : 'Erreur lors de la mise Ã  jour des profils'}
                           </div>
                         )}
                       </div>
@@ -313,10 +313,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     className={`flex items-center w-full px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white ${
                       !isSidebarOpen ? 'justify-center' : ''
                     }`}
-                    title={!isSidebarOpen ? 'Déconnexion' : ''}
+                    title={!isSidebarOpen ? 'DÃ©connexion' : ''}
                   >
                     <LogOut className="h-5 w-5 flex-shrink-0" />
-                    {isSidebarOpen && <span className="ml-3">Déconnexion</span>}
+                    {isSidebarOpen && <span className="ml-3">DÃ©connexion</span>}
                   </button>
                 </div>
               </div>
@@ -341,7 +341,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <Link
                   to="/"
                   className="text-gray-500 hover:text-gray-700 p-1 -m-1 rounded-md"
-                  aria-label="Retour à l'accueil"
+                  aria-label="Retour Ã  l'accueil"
                 >
                   <Home className="h-5 w-5" />
                 </Link>

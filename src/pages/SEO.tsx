@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   TrendingUp, 
@@ -14,7 +14,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-// Types TypeScript simplifiés
+// Types TypeScript simplifiÃ©s
 interface SEOMetric {
   id: string;
   label: string;
@@ -61,7 +61,7 @@ interface OptimizedPage {
 
 type TabType = 'keywords' | 'pages' | 'content' | 'technical' | 'analytics';
 
-// Service SEO simulé
+// Service SEO simulÃ©
 const SEOService = {
   getMetrics: async (): Promise<SEOMetric[]> => {
     // Simulation d'une API
@@ -139,7 +139,7 @@ const SEO: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  // Chargement des données
+  // Chargement des donnÃ©es
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -206,7 +206,7 @@ const SEO: React.FC = () => {
     </button>
   );
 
-  // Composant métrique
+  // Composant mÃ©trique
   const MetricCard: React.FC<{ metric: SEOMetric }> = ({ metric }) => (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-2">
@@ -228,13 +228,13 @@ const SEO: React.FC = () => {
     </div>
   );
 
-  // États de chargement et d'erreur
+  // Ã‰tats de chargement et d'erreur
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Chargement des données SEO...</p>
+          <p className="text-gray-600 mt-4">Chargement des donnÃ©es SEO...</p>
         </div>
       </div>
     );
@@ -251,7 +251,7 @@ const SEO: React.FC = () => {
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            Réessayer
+            RÃ©essayer
           </button>
         </div>
       </div>
@@ -273,7 +273,7 @@ const SEO: React.FC = () => {
               Optimisation SEO
             </h1>
             <p className="text-xl text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-              Tableau de bord complet pour optimiser votre visibilité en ligne
+              Tableau de bord complet pour optimiser votre visibilitÃ© en ligne
             </p>
             
             {/* Actions */}
@@ -288,12 +288,12 @@ const SEO: React.FC = () => {
               </button>
               
               <div className="text-sm text-indigo-200">
-                Dernière mise à jour: {lastRefresh.toLocaleTimeString('fr-FR')}
+                DerniÃ¨re mise Ã  jour: {lastRefresh.toLocaleTimeString('fr-FR')}
               </div>
             </div>
           </div>
 
-          {/* Métriques */}
+          {/* MÃ©triques */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {metrics.map((metric) => (
               <MetricCard key={metric.id} metric={metric} />
@@ -308,7 +308,7 @@ const SEO: React.FC = () => {
           <div className="flex flex-wrap gap-3">
             <TabButton 
               id="keywords" 
-              label="Mots-clés" 
+              label="Mots-clÃ©s" 
               icon={<Target className="w-4 h-4" />}
               isActive={activeTab === 'keywords'}
             />
@@ -344,11 +344,11 @@ const SEO: React.FC = () => {
       <main className="py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          {/* Onglet Mots-clés */}
+          {/* Onglet Mots-clÃ©s */}
           {activeTab === 'keywords' && (
             <div className="space-y-8">
               <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold text-gray-900">Groupes de Mots-clés</h2>
+                <h2 className="text-3xl font-bold text-gray-900">Groupes de Mots-clÃ©s</h2>
                 <div className="text-sm text-gray-500">
                   {keywordGroups.reduce((acc, group) => acc + group.totalVolume, 0).toLocaleString()} 
                   {' '}recherches mensuelles
@@ -412,7 +412,7 @@ const SEO: React.FC = () => {
           {/* Onglet Pages */}
           {activeTab === 'pages' && (
             <div className="space-y-8">
-              <h2 className="text-3xl font-bold text-gray-900">Pages Optimisées</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Pages OptimisÃ©es</h2>
               
               <div className="grid grid-cols-1 gap-6">
                 {optimizedPages.map((page) => (
@@ -431,7 +431,7 @@ const SEO: React.FC = () => {
                               {page.traffic.change > 0 ? '+' : ''}{page.traffic.change}%
                             </span>
                             <span className="text-sm text-blue-600 font-semibold">
-                              {page.keywords.count} mots-clés
+                              {page.keywords.count} mots-clÃ©s
                             </span>
                             <span className={`text-xs px-2 py-1 rounded-full ${
                               page.performance.coreWebVitals === 'good' 
@@ -446,7 +446,7 @@ const SEO: React.FC = () => {
                         </div>
                         <p className="text-gray-600 mb-2">{page.description}</p>
                         <div className="text-xs text-gray-500">
-                          Dernière mise à jour: {new Date(page.lastUpdated).toLocaleDateString('fr-FR')}
+                          DerniÃ¨re mise Ã  jour: {new Date(page.lastUpdated).toLocaleDateString('fr-FR')}
                         </div>
                       </div>
                       <div className="mt-4 lg:mt-0 lg:ml-6">
@@ -463,8 +463,8 @@ const SEO: React.FC = () => {
           {activeTab === 'content' && (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Stratégie de Contenu</h3>
-              <p className="text-gray-500">Cette section sera développée prochainement.</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">StratÃ©gie de Contenu</h3>
+              <p className="text-gray-500">Cette section sera dÃ©veloppÃ©e prochainement.</p>
             </div>
           )}
 
@@ -472,15 +472,15 @@ const SEO: React.FC = () => {
             <div className="text-center py-12">
               <Zap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Optimisations Techniques</h3>
-              <p className="text-gray-500">Cette section sera développée prochainement.</p>
+              <p className="text-gray-500">Cette section sera dÃ©veloppÃ©e prochainement.</p>
             </div>
           )}
 
           {activeTab === 'analytics' && (
             <div className="text-center py-12">
               <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Avancées</h3>
-              <p className="text-gray-500">Cette section sera développée prochainement.</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics AvancÃ©es</h3>
+              <p className="text-gray-500">Cette section sera dÃ©veloppÃ©e prochainement.</p>
             </div>
           )}
 

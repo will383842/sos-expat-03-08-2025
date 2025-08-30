@@ -38,11 +38,13 @@ const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 // 🔧 FIX CRITIQUE: Configuration d'optimisation CPU SEULEMENT
 const CPU_OPTIMIZED_CONFIG = {
-    memory: "256MiB", // Un peu plus de mémoire pour les templates complets
-    timeoutSeconds: 120, // Plus de temps pour tous les templates
-    maxInstances: 2, // Limite stricte pour cette fonction d'initialisation
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    timeoutSeconds: 120,
+    maxInstances: 3,
     minInstances: 0,
-    concurrency: 1 // Une seule exécution à la fois
+    concurrency: 1,
 };
 // ⚠️ TOUS LES TEMPLATES ORIGINAUX GARDÉS (pas de suppression fonctionnelle)
 const defaultTemplates = [

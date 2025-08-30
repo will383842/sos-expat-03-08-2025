@@ -1,4 +1,4 @@
-// src/components/ui/tabs.tsx
+﻿// src/components/ui/tabs.tsx
 import * as React from 'react';
 
 type TabProps = {

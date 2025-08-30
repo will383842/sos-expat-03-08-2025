@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Star, MapPin, Phone, ChevronLeft, ChevronRight, Globe, Search, ArrowDown, ArrowUp, ChevronDown, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, onSnapshot, limit, where, orderBy } from 'firebase/firestore';
@@ -72,68 +72,68 @@ const IMAGE_SIZES = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
 
 // Extended country and language options
 const COUNTRY_OPTIONS = [
-  'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne', 'Andorre', 'Angola',
-  'Arabie Saoudite', 'Argentine', 'Arménie', 'Australie', 'Autriche', 'Azerbaïdjan',
-  'Bahamas', 'Bahreïn', 'Bangladesh', 'Barbade', 'Belgique', 'Belize', 'Bénin',
-  'Bhoutan', 'Biélorussie', 'Birmanie', 'Bolivie', 'Bosnie-Herzégovine', 'Botswana',
-  'Brésil', 'Brunei', 'Bulgarie', 'Burkina Faso', 'Burundi', 'Cambodge', 'Cameroun',
+  'Afghanistan', 'Afrique du Sud', 'Albanie', 'AlgÃ©rie', 'Allemagne', 'Andorre', 'Angola',
+  'Arabie Saoudite', 'Argentine', 'ArmÃ©nie', 'Australie', 'Autriche', 'AzerbaÃ¯djan',
+  'Bahamas', 'BahreÃ¯n', 'Bangladesh', 'Barbade', 'Belgique', 'Belize', 'BÃ©nin',
+  'Bhoutan', 'BiÃ©lorussie', 'Birmanie', 'Bolivie', 'Bosnie-HerzÃ©govine', 'Botswana',
+  'BrÃ©sil', 'Brunei', 'Bulgarie', 'Burkina Faso', 'Burundi', 'Cambodge', 'Cameroun',
   'Canada', 'Cap-Vert', 'Chili', 'Chine', 'Chypre', 'Colombie', 'Comores',
-  'Congo', 'Corée du Nord', 'Corée du Sud', 'Costa Rica', 'Côte d\'Ivoire', 'Croatie', 'Cuba',
-  'Danemark', 'Djibouti', 'Dominique', 'Égypte', 'Émirats arabes unis', 'Équateur', 'Érythrée',
-  'Espagne', 'Estonie', 'États-Unis', 'Éthiopie', 'Fidji', 'Finlande', 'France',
-  'Gabon', 'Gambie', 'Géorgie', 'Ghana', 'Grèce', 'Grenade', 'Guatemala', 'Guinée',
-  'Guinée-Bissau', 'Guinée équatoriale', 'Guyana', 'Haïti', 'Honduras', 'Hongrie',
-  'Îles Cook', 'Îles Marshall', 'Îles Salomon', 'Inde', 'Indonésie', 'Irak', 'Iran',
-  'Irlande', 'Islande', 'Israël', 'Italie', 'Jamaïque', 'Japon', 'Jordanie',
-  'Kazakhstan', 'Kenya', 'Kirghizistan', 'Kiribati', 'Koweït', 'Laos', 'Lesotho',
+  'Congo', 'CorÃ©e du Nord', 'CorÃ©e du Sud', 'Costa Rica', 'CÃ´te d\'Ivoire', 'Croatie', 'Cuba',
+  'Danemark', 'Djibouti', 'Dominique', 'Ã‰gypte', 'Ã‰mirats arabes unis', 'Ã‰quateur', 'Ã‰rythrÃ©e',
+  'Espagne', 'Estonie', 'Ã‰tats-Unis', 'Ã‰thiopie', 'Fidji', 'Finlande', 'France',
+  'Gabon', 'Gambie', 'GÃ©orgie', 'Ghana', 'GrÃ¨ce', 'Grenade', 'Guatemala', 'GuinÃ©e',
+  'GuinÃ©e-Bissau', 'GuinÃ©e Ã©quatoriale', 'Guyana', 'HaÃ¯ti', 'Honduras', 'Hongrie',
+  'ÃŽles Cook', 'ÃŽles Marshall', 'ÃŽles Salomon', 'Inde', 'IndonÃ©sie', 'Irak', 'Iran',
+  'Irlande', 'Islande', 'IsraÃ«l', 'Italie', 'JamaÃ¯que', 'Japon', 'Jordanie',
+  'Kazakhstan', 'Kenya', 'Kirghizistan', 'Kiribati', 'KoweÃ¯t', 'Laos', 'Lesotho',
   'Lettonie', 'Liban', 'Liberia', 'Libye', 'Liechtenstein', 'Lituanie', 'Luxembourg',
-  'Macédoine du Nord', 'Madagascar', 'Malaisie', 'Malawi', 'Maldives', 'Mali', 'Malte',
-  'Maroc', 'Maurice', 'Mauritanie', 'Mexique', 'Micronésie', 'Moldavie', 'Monaco',
-  'Mongolie', 'Monténégro', 'Mozambique', 'Namibie', 'Nauru', 'Népal', 'Nicaragua',
-  'Niger', 'Nigeria', 'Niue', 'Norvège', 'Nouvelle-Zélande', 'Oman', 'Ouganda',
-  'Ouzbékistan', 'Pakistan', 'Palaos', 'Palestine', 'Panama', 'Papouasie-Nouvelle-Guinée',
-  'Paraguay', 'Pays-Bas', 'Pérou', 'Philippines', 'Pologne', 'Portugal', 'Qatar',
-  'République centrafricaine', 'République démocratique du Congo', 'République dominicaine',
-  'République tchèque', 'Roumanie', 'Royaume-Uni', 'Russie', 'Rwanda', 'Saint-Kitts-et-Nevis',
+  'MacÃ©doine du Nord', 'Madagascar', 'Malaisie', 'Malawi', 'Maldives', 'Mali', 'Malte',
+  'Maroc', 'Maurice', 'Mauritanie', 'Mexique', 'MicronÃ©sie', 'Moldavie', 'Monaco',
+  'Mongolie', 'MontÃ©nÃ©gro', 'Mozambique', 'Namibie', 'Nauru', 'NÃ©pal', 'Nicaragua',
+  'Niger', 'Nigeria', 'Niue', 'NorvÃ¨ge', 'Nouvelle-ZÃ©lande', 'Oman', 'Ouganda',
+  'OuzbÃ©kistan', 'Pakistan', 'Palaos', 'Palestine', 'Panama', 'Papouasie-Nouvelle-GuinÃ©e',
+  'Paraguay', 'Pays-Bas', 'PÃ©rou', 'Philippines', 'Pologne', 'Portugal', 'Qatar',
+  'RÃ©publique centrafricaine', 'RÃ©publique dÃ©mocratique du Congo', 'RÃ©publique dominicaine',
+  'RÃ©publique tchÃ¨que', 'Roumanie', 'Royaume-Uni', 'Russie', 'Rwanda', 'Saint-Kitts-et-Nevis',
   'Saint-Marin', 'Saint-Vincent-et-les-Grenadines', 'Sainte-Lucie', 'Salvador', 'Samoa',
-  'São Tomé-et-Principe', 'Sénégal', 'Serbie', 'Seychelles', 'Sierra Leone', 'Singapour',
-  'Slovaquie', 'Slovénie', 'Somalie', 'Soudan', 'Soudan du Sud', 'Sri Lanka', 'Suède',
-  'Suisse', 'Suriname', 'Syrie', 'Tadjikistan', 'Tanzanie', 'Tchad', 'Thaïlande',
-  'Timor oriental', 'Togo', 'Tonga', 'Trinité-et-Tobago', 'Tunisie', 'Turkménistan',
+  'SÃ£o TomÃ©-et-Principe', 'SÃ©nÃ©gal', 'Serbie', 'Seychelles', 'Sierra Leone', 'Singapour',
+  'Slovaquie', 'SlovÃ©nie', 'Somalie', 'Soudan', 'Soudan du Sud', 'Sri Lanka', 'SuÃ¨de',
+  'Suisse', 'Suriname', 'Syrie', 'Tadjikistan', 'Tanzanie', 'Tchad', 'ThaÃ¯lande',
+  'Timor oriental', 'Togo', 'Tonga', 'TrinitÃ©-et-Tobago', 'Tunisie', 'TurkmÃ©nistan',
   'Turquie', 'Tuvalu', 'Ukraine', 'Uruguay', 'Vanuatu', 'Vatican', 'Venezuela',
-  'Vietnam', 'Yémen', 'Zambie', 'Zimbabwe'
+  'Vietnam', 'YÃ©men', 'Zambie', 'Zimbabwe'
 ];
 
 const LANGUAGE_OPTIONS = [
-  'Afrikaans', 'Albanais', 'Allemand', 'Amharique', 'Anglais', 'Arabe', 'Arménien',
-  'Azéri', 'Basque', 'Bengali', 'Biélorusse', 'Birman', 'Bosniaque', 'Bulgare',
-  'Catalan', 'Chinois', 'Coréen', 'Croate', 'Danois', 'Espagnol', 'Estonien',
-  'Finnois', 'Français', 'Géorgien', 'Grec', 'Gujarati', 'Hébreu', 'Hindi',
-  'Hongrois', 'Indonésien', 'Irlandais', 'Islandais', 'Italien', 'Japonais',
+  'Afrikaans', 'Albanais', 'Allemand', 'Amharique', 'Anglais', 'Arabe', 'ArmÃ©nien',
+  'AzÃ©ri', 'Basque', 'Bengali', 'BiÃ©lorusse', 'Birman', 'Bosniaque', 'Bulgare',
+  'Catalan', 'Chinois', 'CorÃ©en', 'Croate', 'Danois', 'Espagnol', 'Estonien',
+  'Finnois', 'FranÃ§ais', 'GÃ©orgien', 'Grec', 'Gujarati', 'HÃ©breu', 'Hindi',
+  'Hongrois', 'IndonÃ©sien', 'Irlandais', 'Islandais', 'Italien', 'Japonais',
   'Kannada', 'Kazakh', 'Khmer', 'Kirghize', 'Letton', 'Lituanien', 'Luxembourgeois',
-  'Macédonien', 'Malais', 'Malayalam', 'Maltais', 'Marathi', 'Mongol', 'Néerlandais',
-  'Népalais', 'Norvégien', 'Ourdou', 'Ouzbek', 'Pachto', 'Persan', 'Polonais',
+  'MacÃ©donien', 'Malais', 'Malayalam', 'Maltais', 'Marathi', 'Mongol', 'NÃ©erlandais',
+  'NÃ©palais', 'NorvÃ©gien', 'Ourdou', 'Ouzbek', 'Pachto', 'Persan', 'Polonais',
   'Portugais', 'Punjabi', 'Roumain', 'Russe', 'Serbe', 'Singhalais', 'Slovaque',
-  'Slovène', 'Suédois', 'Swahili', 'Tadjik', 'Tamoul', 'Tchèque', 'Telugu',
-  'Thaï', 'Tibétain', 'Turc', 'Turkmen', 'Ukrainien', 'Vietnamien', 'Gallois'
+  'SlovÃ¨ne', 'SuÃ©dois', 'Swahili', 'Tadjik', 'Tamoul', 'TchÃ¨que', 'Telugu',
+  'ThaÃ¯', 'TibÃ©tain', 'Turc', 'Turkmen', 'Ukrainien', 'Vietnamien', 'Gallois'
 ];
 
 // Language mapping function
 const getLanguageLabel = (lang: string): string => {
   const languageMap: { [key: string]: string } = {
-    'Français': 'Français', 'French': 'Français',
+    'FranÃ§ais': 'FranÃ§ais', 'French': 'FranÃ§ais',
     'Anglais': 'Anglais', 'English': 'Anglais',
-    'Espagnol': 'Espagnol', 'Spanish': 'Espagnol', 'Español': 'Espagnol',
+    'Espagnol': 'Espagnol', 'Spanish': 'Espagnol', 'EspaÃ±ol': 'Espagnol',
     'Allemand': 'Allemand', 'German': 'Allemand', 'Deutsch': 'Allemand',
     'Italien': 'Italien', 'Italian': 'Italien', 'Italiano': 'Italien',
-    'Portugais': 'Portugais', 'Portuguese': 'Portugais', 'Português': 'Portugais',
-    'Russe': 'Russe', 'Russian': 'Russe', 'Русский': 'Russe',
-    'Chinois': 'Chinois', 'Chinese': 'Chinois', '中文': 'Chinois',
-    'Japonais': 'Japonais', 'Japanese': 'Japonais', '日本語': 'Japonais',
-    'Coréen': 'Coréen', 'Korean': 'Coréen', '한국어': 'Coréen',
-    'Arabe': 'Arabe', 'Arabic': 'Arabe', 'العربية': 'Arabe',
-    'Hindi': 'Hindi', 'हिन्दी': 'Hindi',
-    'Thaï': 'Thaï', 'Thai': 'Thaï', 'ไทย': 'Thaï'
+    'Portugais': 'Portugais', 'Portuguese': 'Portugais', 'PortuguÃªs': 'Portugais',
+    'Russe': 'Russe', 'Russian': 'Russe', 'Ð ÑƒÑÑÐºÐ¸Ð¹': 'Russe',
+    'Chinois': 'Chinois', 'Chinese': 'Chinois', 'ä¸­æ–‡': 'Chinois',
+    'Japonais': 'Japonais', 'Japanese': 'Japonais', 'æ—¥æœ¬èªž': 'Japonais',
+    'CorÃ©en': 'CorÃ©en', 'Korean': 'CorÃ©en', 'í•œêµ­ì–´': 'CorÃ©en',
+    'Arabe': 'Arabe', 'Arabic': 'Arabe', 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©': 'Arabe',
+    'Hindi': 'Hindi', 'à¤¹à¤¿à¤¨à¥à¤¦à¥€': 'Hindi',
+    'ThaÃ¯': 'ThaÃ¯', 'Thai': 'ThaÃ¯', 'à¹„à¸—à¸¢': 'ThaÃ¯'
   };
   return languageMap[lang] || lang;
 };
@@ -258,7 +258,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
       // Safe array extraction
       const languages = Array.isArray(data.languages) && data.languages.length > 0 
         ? data.languages.filter((lang: unknown) => typeof lang === 'string' && lang.trim().length > 0)
-        : [language === 'fr' ? 'Français' : 'English'];
+        : [language === 'fr' ? 'FranÃ§ais' : 'English'];
         
       const specialties = Array.isArray(data.specialties) 
         ? data.specialties.filter((spec: unknown) => typeof spec === 'string' && spec.trim().length > 0)
@@ -294,8 +294,8 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         avatar: String(data.profilePhoto || data.photoURL || data.avatar || DEFAULT_AVATAR),
         description: String(data.bio || data.description || 
           (typeRaw === 'lawyer' 
-            ? `Expert juridique en ${country} avec ${Number(data.yearsOfExperience) || 0} ans d'expérience`
-            : `Expert expatriation en ${country} avec ${Number(data.yearsAsExpat) || 0} ans d'expérience`
+            ? `Expert juridique en ${country} avec ${Number(data.yearsOfExperience) || 0} ans d'expÃ©rience`
+            : `Expert expatriation en ${country} avec ${Number(data.yearsAsExpat) || 0} ans d'expÃ©rience`
           )),
         price: Math.max(1, Number(data.price) || (typeRaw === 'lawyer' ? 49 : 19)),
         duration: Math.max(1, Number(data.duration) || (typeRaw === 'lawyer' ? 20 : 30)),
@@ -361,7 +361,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           setIsLoading(false);
           
           if (validProviders.length === 0 && !error) {
-            setError('Aucun prestataire trouvé');
+            setError('Aucun prestataire trouvÃ©');
           }
         }, 
         (firebaseError) => {
@@ -424,7 +424,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           ...provider.languages,
           ...provider.specialties,
           ...(provider.certifications || []),
-          provider.type === 'lawyer' ? 'avocat juriste juridique droit' : 'expatrié expat immigration visa',
+          provider.type === 'lawyer' ? 'avocat juriste juridique droit' : 'expatriÃ© expat immigration visa',
         ].join(' ').toLowerCase();
         
         // Multi-term search with relevance
@@ -688,12 +688,12 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
     return (
       <div 
         role="img" 
-        aria-label={`Note ${rating.toFixed(1)} sur 5 basée sur ${reviewCount} avis`}
+        aria-label={`Note ${rating.toFixed(1)} sur 5 basÃ©e sur ${reviewCount} avis`}
         className="flex items-center gap-1"
       >
         {stars}
         <span className="sr-only">
-          {rating.toFixed(1)} étoiles sur 5, {reviewCount} avis
+          {rating.toFixed(1)} Ã©toiles sur 5, {reviewCount} avis
         </span>
       </div>
     );
@@ -795,7 +795,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           <div className="relative aspect-[3/4] overflow-hidden">
             <img
               src={provider.avatar}
-              alt={`${provider.name} - ${provider.type === 'lawyer' ? 'Avocat' : 'Expatrié'}`}
+              alt={`${provider.name} - ${provider.type === 'lawyer' ? 'Avocat' : 'ExpatriÃ©'}`}
               className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
               itemProp="image"
               loading={priority === 'high' ? 'eager' : 'lazy'}
@@ -816,7 +816,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                   ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30' 
                   : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/30'
               }`}>
-                {provider.type === 'lawyer' ? '⚖️ Avocat' : '🌍 Expatrié'}
+                {provider.type === 'lawyer' ? 'âš–ï¸ Avocat' : 'ðŸŒ ExpatriÃ©'}
               </div>
             </div>
             
@@ -842,9 +842,9 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 {provider.name}
               </h3>
               <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>{provider.yearsOfExperience} ans d'expérience</span>
+                <span>{provider.yearsOfExperience} ans d'expÃ©rience</span>
                 <div className="flex items-center gap-1">
-                  <span className="text-yellow-500">★</span>
+                  <span className="text-yellow-500">â˜…</span>
                   <span className="font-medium">({provider.reviewCount})</span>
                 </div>
               </div>
@@ -854,9 +854,9 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm">🗣️</span>
+                    <span className="text-sm">ðŸ—£ï¸</span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-700">Langues parlées</span>
+                  <span className="text-sm font-semibold text-gray-700">Langues parlÃ©es</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {provider.languages.slice(0, isCarousel ? 2 : 3).map((lang, index) => (
@@ -883,7 +883,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                   <span className="text-sm font-semibold text-gray-700">Pays d'intervention</span>
                 </div>
                 <div className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-green-50 to-green-100 text-green-700 text-sm font-medium rounded-full border border-green-200/50">
-                  🌍 {provider.country}
+                  ðŸŒ {provider.country}
                 </div>
               </div>
 
@@ -891,9 +891,9 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm">📋</span>
+                      <span className="text-sm">ðŸ“‹</span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-700">Présentation</span>
+                    <span className="text-sm font-semibold text-gray-700">PrÃ©sentation</span>
                   </div>
                   <p className="text-sm text-gray-600 leading-relaxed" itemProp="description">
                     {truncatedDescription}
@@ -907,7 +907,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                       className="text-sm text-red-600 hover:text-red-700 font-medium mt-1 hover:underline transition-colors inline-flex items-center gap-1"
                     >
                       Lire la suite
-                      <span className="text-xs">→</span>
+                      <span className="text-xs">â†’</span>
                     </button>
                   )}
                 </div>
@@ -928,7 +928,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                     : 'bg-gray-600 hover:bg-gray-700 shadow-gray-500/30 cursor-not-allowed'
                 } hover:shadow-2xl`}
               >
-                <span className="text-xl">👤</span>
+                <span className="text-xl">ðŸ‘¤</span>
                 <span>Voir le profil</span>
               </button>
             </div>
@@ -1040,7 +1040,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           
           <div className="flex items-center justify-between mb-4" itemProp="offers" itemScope itemType="http://schema.org/Offer">
             <div className="text-2xl font-bold text-blue-600" itemProp="price">
-              {provider.price}€
+              {provider.price}â‚¬
               <span itemProp="priceCurrency" className="sr-only">EUR</span>
             </div>
             <div className="text-sm text-gray-500">{provider.duration} min</div>
@@ -1106,7 +1106,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 >
                   <option value="all">Tous</option>
                   <option value="lawyer">Avocats</option>
-                  <option value="expat">Expatriés</option>
+                  <option value="expat">ExpatriÃ©s</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" aria-hidden="true" />
               </div>
@@ -1197,13 +1197,13 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 onClick={resetFilters}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors text-sm font-medium h-10"
               >
-                Réinitialiser
+                RÃ©initialiser
               </button>
             </div>
           </div>
 
           <div className="mt-4 text-center text-xs text-gray-500">
-            {filteredProviders.filter(p => p.isOnline).length} en ligne • {filteredProviders.length} au total
+            {filteredProviders.filter(p => p.isOnline).length} en ligne â€¢ {filteredProviders.length} au total
           </div>
         </div>
       );
@@ -1256,7 +1256,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           </div>
         </div>
 
-        <div className="advanced-filters grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" role="toolbar" aria-label="Filtres avancés">
+        <div className="advanced-filters grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" role="toolbar" aria-label="Filtres avancÃ©s">
           <div className="search-container relative">
             <Search size={20} aria-hidden="true" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -1318,11 +1318,11 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
             >
               <option value="rating">Trier par note</option>
               <option value="price">Trier par prix</option>
-              <option value="experience">Trier par expérience</option>
+              <option value="experience">Trier par expÃ©rience</option>
             </select>
             <button
               onClick={toggleSortOrder}
-              aria-label={`Ordre de tri: ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`}
+              aria-label={`Ordre de tri: ${sortOrder === 'asc' ? 'croissant' : 'dÃ©croissant'}`}
               className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
               {sortOrder === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
@@ -1332,9 +1332,9 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           <button
             onClick={resetFilters}
             className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
-            aria-label="Réinitialiser tous les filtres"
+            aria-label="RÃ©initialiser tous les filtres"
           >
-            Réinitialiser
+            RÃ©initialiser
           </button>
         </div>
       </div>
@@ -1361,7 +1361,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                   onClick={loadProviders}
                   className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors"
                 >
-                  Réessayer
+                  RÃ©essayer
                 </button>
               </div>
             </div>
@@ -1430,16 +1430,16 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                   <Search className="w-8 h-8 text-gray-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Aucun expert trouvé
+                  Aucun expert trouvÃ©
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  Aucun expert ne correspond à vos critères de recherche actuels.
+                  Aucun expert ne correspond Ã  vos critÃ¨res de recherche actuels.
                 </p>
                 <button
                   onClick={resetFilters}
                   className="px-6 py-3 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold rounded-xl transition-colors"
                 >
-                  Réinitialiser les filtres
+                  RÃ©initialiser les filtres
                 </button>
               </div>
             </div>
@@ -1468,7 +1468,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 onClick={loadProviders}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
               >
-                Réessayer
+                RÃ©essayer
               </button>
             </div>
           )}
@@ -1476,7 +1476,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           <div className="results-summary mb-4" aria-live="polite">
             {!isLoading && (
               <p className="text-sm text-gray-600">
-                {filteredProviders.length} prestataire{filteredProviders.length > 1 ? 's' : ''} trouvé{filteredProviders.length > 1 ? 's' : ''}
+                {filteredProviders.length} prestataire{filteredProviders.length > 1 ? 's' : ''} trouvÃ©{filteredProviders.length > 1 ? 's' : ''}
                 {activeFilter !== 'all' && ` de type ${activeFilter === 'lawyer' ? 'avocat' : 'expert'}`}
                 {selectedCountry !== 'all' && ` en ${selectedCountry}`}
                 {onlineOnly && ' en ligne'}
@@ -1506,16 +1506,16 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                     <Search className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Aucun prestataire trouvé
+                    Aucun prestataire trouvÃ©
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    Aucun prestataire ne correspond à vos critères de recherche.
+                    Aucun prestataire ne correspond Ã  vos critÃ¨res de recherche.
                   </p>
                   <button 
                     onClick={resetFilters}
                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
                   >
-                    Réinitialiser les filtres
+                    RÃ©initialiser les filtres
                   </button>
                 </div>
               </div>
@@ -1531,7 +1531,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
             >
               <div className="flex items-center text-sm text-gray-500">
                 <span>
-                  Affichage {((currentPage - 1) * itemsPerPage) + 1} à {Math.min(currentPage * itemsPerPage, filteredProviders.length)} sur {filteredProviders.length} prestataires
+                  Affichage {((currentPage - 1) * itemsPerPage) + 1} Ã  {Math.min(currentPage * itemsPerPage, filteredProviders.length)} sur {filteredProviders.length} prestataires
                 </span>
               </div>
               
@@ -1539,7 +1539,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                 <button
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  aria-label="Page précédente"
+                  aria-label="Page prÃ©cÃ©dente"
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft size={20} />
@@ -1647,7 +1647,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
           <div role="alert" aria-live="polite" className="text-center py-8">
             <p className="text-red-600 mb-4">{error}</p>
             <button onClick={loadProviders} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
-              Réessayer
+              RÃ©essayer
             </button>
           </div>
         )}
@@ -1686,9 +1686,9 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
             ) : (
               <div className="flex items-center justify-center w-full py-12">
                 <div className="text-center">
-                  <p className="text-gray-600 mb-4">Aucun prestataire trouvé</p>
+                  <p className="text-gray-600 mb-4">Aucun prestataire trouvÃ©</p>
                   <button onClick={resetFilters} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-                    Réinitialiser les filtres
+                    RÃ©initialiser les filtres
                   </button>
                 </div>
               </div>
@@ -1699,7 +1699,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
             <>
               <button
                 onClick={handlePrev}
-                aria-label="Voir les prestataires précédents"
+                aria-label="Voir les prestataires prÃ©cÃ©dents"
                 className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white shadow-lg rounded-full p-2 hover:bg-gray-50 transition-colors z-10"
               >
                 <ChevronLeft size={24} />
@@ -1721,7 +1721,7 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
                     key={i}
                     role="tab"
                     aria-selected={currentIndex === i}
-                    aria-label={`Aller à la page ${i + 1} du carrousel`}
+                    aria-label={`Aller Ã  la page ${i + 1} du carrousel`}
                     onClick={() => setCurrentIndex(i)}
                     className={`w-2 h-2 rounded-full transition-colors ${
                       currentIndex === i ? 'bg-blue-600' : 'bg-gray-300'

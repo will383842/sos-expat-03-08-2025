@@ -1,7 +1,7 @@
-// src/emails/admin/AdminEmails/SendToContact.tsx
+﻿// src/emails/admin/AdminEmails/SendToContact.tsx
 
 import React, { useState } from 'react';
-import { sendContactReply } from '../../../api/sendContactReply.ts'; // <-- adapter si nécessaire
+import { sendContactReply } from '../../../api/sendContactReply.ts'; // <-- adapter si nÃ©cessaire
 
 const SendToContact: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -25,9 +25,9 @@ const SendToContact: React.FC = () => {
         error: result.error || '',
       });
 
-      setStatus(result.success ? '✅ Message envoyé avec succès' : `❌ Erreur : ${result.error}`);
+      setStatus(result.success ? 'âœ… Message envoyÃ© avec succÃ¨s' : `âŒ Erreur : ${result.error}`);
     } catch (e: any) {
-      setStatus(`❌ Erreur Firestore : ${e.message}`);
+      setStatus(`âŒ Erreur Firestore : ${e.message}`);
     }
 
     setLoading(false);
@@ -35,7 +35,7 @@ const SendToContact: React.FC = () => {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">✉️ Répondre à un contact</h2>
+      <h2 className="text-xl font-semibold mb-4">âœ‰ï¸ RÃ©pondre Ã  un contact</h2>
       <div className="grid grid-cols-1 gap-4">
         <input
           placeholder="Email du contact"
@@ -44,25 +44,25 @@ const SendToContact: React.FC = () => {
           className="input"
         />
         <input
-          placeholder="Prénom"
+          placeholder="PrÃ©nom"
           value={firstName}
           onChange={e => setFirstName(e.target.value)}
           className="input"
         />
         <textarea
-          placeholder="Message reçu"
+          placeholder="Message reÃ§u"
           value={userMessage}
           onChange={e => setUserMessage(e.target.value)}
           className="textarea"
         />
         <textarea
-          placeholder="Votre réponse"
+          placeholder="Votre rÃ©ponse"
           value={adminReply}
           onChange={e => setAdminReply(e.target.value)}
           className="textarea"
         />
         <button onClick={handleSend} className="btn btn-primary" disabled={loading}>
-          {loading ? 'Envoi en cours...' : 'Envoyer la réponse'}
+          {loading ? 'Envoi en cours...' : 'Envoyer la rÃ©ponse'}
         </button>
         {status && <p className="text-sm mt-2">{status}</p>}
       </div>

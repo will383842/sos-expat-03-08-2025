@@ -1,39 +1,39 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle, Users, MessageSquare } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 
 const HowItWorksPage: React.FC = () => {
-  // Utilisation du contexte App pour récupérer la langue
+  // Utilisation du contexte App pour rÃ©cupÃ©rer la langue
   const { language } = useApp();
   
   const pageData = {
     fr: {
-      title: 'Comment ça marche',
-      subtitle: 'La recette secrète pour ne plus jamais galérer à l\'étranger',
-      description: 'Découvrez comment obtenir de l\'aide juridique ou d\'expatriation en 3 étapes simples, rapides et sécurisées.',
+      title: 'Comment Ã§a marche',
+      subtitle: 'La recette secrÃ¨te pour ne plus jamais galÃ©rer Ã  l\'Ã©tranger',
+      description: 'DÃ©couvrez comment obtenir de l\'aide juridique ou d\'expatriation en 3 Ã©tapes simples, rapides et sÃ©curisÃ©es.',
 
-      stepsTitle: '3 étapes pour arrêter de stresser',
+      stepsTitle: '3 Ã©tapes pour arrÃªter de stresser',
       step1Title: 'Choisissez votre sauveur',
-      step1Desc: 'Parcourez les profils de nos experts et trouvez votre match parfait (comme sur Tinder, mais pour les galères administratives !)',
-      step2Title: 'Réservez un appel téléphonique',
-      step2Desc: 'Réservez un créneau qui vous convient et décrivez votre situation.',
+      step1Desc: 'Parcourez les profils de nos experts et trouvez votre match parfait (comme sur Tinder, mais pour les galÃ¨res administratives !)',
+      step2Title: 'RÃ©servez un appel tÃ©lÃ©phonique',
+      step2Desc: 'RÃ©servez un crÃ©neau qui vous convient et dÃ©crivez votre situation.',
       step3Title: 'Recevez la solution miracle',
-      step3Desc: 'Obtenez des conseils sur-mesure qui vont transformer votre calvaire en promenade de santé. Promis !',
+      step3Desc: 'Obtenez des conseils sur-mesure qui vont transformer votre calvaire en promenade de santÃ©. Promis !',
       
       whyUsTitle: 'Pourquoi choisir SOS Expats ?',
-      whyUsSubtitle: 'Parce qu\'on a vécu les mêmes galères que vous !',
+      whyUsSubtitle: 'Parce qu\'on a vÃ©cu les mÃªmes galÃ¨res que vous !',
       
-      verifiedTitle: 'Experts vérifiés',
-      verifiedDesc: 'Tous nos experts sont certifiés et ont survécu aux mêmes épreuves que vous. Ils connaissent la musique !',
+      verifiedTitle: 'Experts vÃ©rifiÃ©s',
+      verifiedDesc: 'Tous nos experts sont certifiÃ©s et ont survÃ©cu aux mÃªmes Ã©preuves que vous. Ils connaissent la musique !',
       
-      fastTitle: 'Réponse ultra-rapide',
-      fastDesc: 'Plus rapide qu\'un delivery de sushi ! Souvent une réponse le jour même, parfois en quelques minutes.',
+      fastTitle: 'RÃ©ponse ultra-rapide',
+      fastDesc: 'Plus rapide qu\'un delivery de sushi ! Souvent une rÃ©ponse le jour mÃªme, parfois en quelques minutes.',
       
-      ctaTitle: 'Prêt à arrêter de galérer ?',
-      ctaSubtitle: 'Rejoignez la communauté des expats heureux !',
-      ctaDesc: 'Plus de 25 000 expatriés nous font confiance pour leurs galères du quotidien. Et vous, qu\'attendez-vous ?',
+      ctaTitle: 'PrÃªt Ã  arrÃªter de galÃ©rer ?',
+      ctaSubtitle: 'Rejoignez la communautÃ© des expats heureux !',
+      ctaDesc: 'Plus de 25 000 expatriÃ©s nous font confiance pour leurs galÃ¨res du quotidien. Et vous, qu\'attendez-vous ?',
       ctaButton: 'Je veux mes tarifs !'
     },
     en: {
@@ -67,7 +67,7 @@ const HowItWorksPage: React.FC = () => {
 
   const data = pageData[language as keyof typeof pageData] || pageData.fr;
 
-  // Définir le titre de la page
+  // DÃ©finir le titre de la page
   React.useEffect(() => {
     document.title = data.title + ' - SOS Expats';
   }, [data.title]);
@@ -94,7 +94,7 @@ const HowItWorksPage: React.FC = () => {
               </span>
               <br />
               <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
-                ça marche
+                Ã§a marche
               </span>
             </h1>
             
@@ -104,7 +104,7 @@ const HowItWorksPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Section des étapes avec tailles corrigées */}
+        {/* Section des Ã©tapes avec tailles corrigÃ©es */}
         <section className="py-28 bg-gradient-to-b from-gray-950 to-gray-900 relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute top-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-red-400/10 to-orange-400/10 rounded-full blur-2xl" />
@@ -120,9 +120,9 @@ const HowItWorksPage: React.FC = () => {
               </h2>
             </div>
 
-            {/* Grille corrigée avec tailles harmonieuses */}
+            {/* Grille corrigÃ©e avec tailles harmonieuses */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
-              {/* Étape 1 */}
+              {/* Ã‰tape 1 */}
               <div className="group relative">
                 <div className="relative p-10 rounded-3xl bg-white shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-4 border border-gray-100 h-[450px] flex flex-col">
                   <div className="absolute -top-6 -right-6 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full w-16 h-16 flex items-center justify-center font-black text-2xl shadow-lg">
@@ -149,7 +149,7 @@ const HowItWorksPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Étape 2 */}
+              {/* Ã‰tape 2 */}
               <div className="group relative">
                 <div className="relative p-10 rounded-3xl bg-white shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-4 border border-gray-100 h-[450px] flex flex-col">
                   <div className="absolute -top-6 -right-6 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-full w-16 h-16 flex items-center justify-center font-black text-2xl shadow-lg">
@@ -170,13 +170,13 @@ const HowItWorksPage: React.FC = () => {
                   <div className="text-center">
                     <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-100 to-teal-100 text-green-700 px-4 py-2 rounded-full text-sm font-bold">
                       <MessageSquare className="w-4 h-4" />
-                      Soyez rappelé dans moins de 5 minutes !
+                      Soyez rappelÃ© dans moins de 5 minutes !
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Étape 3 */}
+              {/* Ã‰tape 3 */}
               <div className="group relative">
                 <div className="relative p-10 rounded-3xl bg-white shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-4 border border-gray-100 h-[450px] flex flex-col">
                   <div className="absolute -top-6 -right-6 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full w-16 h-16 flex items-center justify-center font-black text-2xl shadow-lg">
@@ -236,7 +236,7 @@ const HowItWorksPage: React.FC = () => {
                   <div className="mt-8 text-center">
                     <div className="inline-flex items-center gap-2 bg-green-200 text-green-800 px-4 py-2 rounded-full text-sm font-bold">
                       <CheckCircle className="w-4 h-4" />
-                      100% vérifiés
+                      100% vÃ©rifiÃ©s
                     </div>
                   </div>
                 </div>
@@ -257,7 +257,7 @@ const HowItWorksPage: React.FC = () => {
                   <div className="mt-8 text-center">
                     <div className="inline-flex items-center gap-2 bg-blue-200 text-blue-800 px-4 py-2 rounded-full text-sm font-bold">
                       <MessageSquare className="w-4 h-4" />
-                      Réponse express
+                      RÃ©ponse express
                     </div>
                   </div>
                 </div>

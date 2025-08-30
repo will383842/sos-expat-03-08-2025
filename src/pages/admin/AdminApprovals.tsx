@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Eye, CheckCircle, XCircle, AlertCircle, Loader2, Edit, Shield, Users, 
@@ -96,13 +96,13 @@ const AdminApprovals: React.FC = () => {
     fakeProfiles: 0
   });
 
-  // Fonction pour afficher des notifications toast améliorées
+  // Fonction pour afficher des notifications toast amÃ©liorÃ©es
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
     const icons = {
-      success: '✅',
-      error: '❌',
-      warning: '⚠️',
-      info: 'ℹ️'
+      success: 'âœ…',
+      error: 'âŒ',
+      warning: 'âš ï¸',
+      info: 'â„¹ï¸'
     };
     
     const colors = {
@@ -112,7 +112,7 @@ const AdminApprovals: React.FC = () => {
       info: 'bg-blue-100 border-blue-500 text-blue-800'
     };
 
-    // Créer et afficher une notification toast
+    // CrÃ©er et afficher une notification toast
     const notification = document.createElement('div');
     notification.className = `fixed top-4 right-4 p-4 rounded-lg border-l-4 shadow-lg z-50 ${colors[type]} max-w-md`;
     notification.innerHTML = `
@@ -124,7 +124,7 @@ const AdminApprovals: React.FC = () => {
     
     document.body.appendChild(notification);
     
-    // Animation d'entrée
+    // Animation d'entrÃ©e
     notification.style.transform = 'translateX(100%)';
     notification.style.transition = 'transform 0.3s ease-in-out';
     
@@ -132,7 +132,7 @@ const AdminApprovals: React.FC = () => {
       notification.style.transform = 'translateX(0)';
     }, 100);
     
-    // Suppression automatique après 5 secondes
+    // Suppression automatique aprÃ¨s 5 secondes
     setTimeout(() => {
       notification.style.transform = 'translateX(100%)';
       setTimeout(() => {
@@ -143,7 +143,7 @@ const AdminApprovals: React.FC = () => {
     }, 5000);
   };
 
-  // Fonction pour envoyer une notification à l'utilisateur
+  // Fonction pour envoyer une notification Ã  l'utilisateur
   const sendUserNotification = async (notificationData: NotificationData) => {
     try {
       await addDoc(collection(db, 'notifications'), {
@@ -155,7 +155,7 @@ const AdminApprovals: React.FC = () => {
     }
   };
 
-  // Calcul du score de complétude du profil
+  // Calcul du score de complÃ©tude du profil
   const calculateCompletionScore = (user: User): number => {
     const fields = [
       'fullName', 'email', 'phone', 'country', 'language', 
@@ -181,8 +181,8 @@ const AdminApprovals: React.FC = () => {
       try {
         querySnapshot = await getDocs(q);
       } catch (firestoreError) {
-        console.error('🔥 Erreur Firestore :', firestoreError);
-        setError("Erreur Firestore : accès interdit ou collection inexistante.");
+        console.error('ðŸ”¥ Erreur Firestore :', firestoreError);
+        setError("Erreur Firestore : accÃ¨s interdit ou collection inexistante.");
         return;
       }
 
@@ -262,14 +262,14 @@ const AdminApprovals: React.FC = () => {
 
     } catch (error) {
       console.error('Error loading users:', error);
-      setError('Erreur lors du chargement des utilisateurs. Veuillez réessayer.');
+      setError('Erreur lors du chargement des utilisateurs. Veuillez rÃ©essayer.');
       showNotification('Erreur lors du chargement', 'error');
     } finally {
       setIsLoading(false);
     }
   }, [sortBy]);
 
-  // Filtrage et recherche en temps réel
+  // Filtrage et recherche en temps rÃ©el
   useEffect(() => {
     let filtered = [...users];
 
@@ -312,7 +312,7 @@ const AdminApprovals: React.FC = () => {
     }
 
     if (currentUser.role !== 'admin') {
-      showNotification('Accès non autorisé', 'error');
+      showNotification('AccÃ¨s non autorisÃ©', 'error');
       navigate('/');
       return;
     }
@@ -368,7 +368,7 @@ const AdminApprovals: React.FC = () => {
       
       await updateDoc(userRef, approvalData);
 
-      // Mettre à jour le profil SOS
+      // Mettre Ã  jour le profil SOS
       try {
         const sosProfileRef = doc(db, 'sos_profiles', userId);
         const sosProfileDoc = await getDoc(sosProfileRef);
@@ -379,13 +379,13 @@ const AdminApprovals: React.FC = () => {
         console.warn('SOS profile not found for this user:', err);
       }
 
-      // Envoyer une notification à l'utilisateur
+      // Envoyer une notification Ã  l'utilisateur
       const user = users.find(u => u.id === userId);
       if (user) {
         await sendUserNotification({
           type: 'approval',
-          title: '🎉 Profil approuvé !',
-          message: `Félicitations ${user.fullName} ! Votre profil SOS Expat a été approuvé. Vous pouvez maintenant recevoir des demandes de clients.`,
+          title: 'ðŸŽ‰ Profil approuvÃ© !',
+          message: `FÃ©licitations ${user.fullName} ! Votre profil SOS Expat a Ã©tÃ© approuvÃ©. Vous pouvez maintenant recevoir des demandes de clients.`,
           userId: userId,
           adminId: currentUser?.uid || '',
           createdAt: Timestamp.now(),
@@ -394,9 +394,9 @@ const AdminApprovals: React.FC = () => {
       }
 
       setUsers(prev => prev.filter(user => user.id !== userId));
-      showNotification('Utilisateur approuvé avec succès. Une notification a été envoyée.', 'success');
+      showNotification('Utilisateur approuvÃ© avec succÃ¨s. Une notification a Ã©tÃ© envoyÃ©e.', 'success');
       
-      // Rafraîchir les stats
+      // RafraÃ®chir les stats
       await fetchUsers(activeTab);
     } catch (error) {
       console.error('Approval error:', error);
@@ -411,20 +411,20 @@ const AdminApprovals: React.FC = () => {
         isRejected: true,
         rejectedAt: Timestamp.now(),
         rejectedBy: currentUser?.uid,
-        rejectionReason: reason || 'Non spécifiée',
+        rejectionReason: reason || 'Non spÃ©cifiÃ©e',
         verificationStatus: 'rejected'
       };
       
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, rejectionData);
 
-      // Envoyer une notification à l'utilisateur
+      // Envoyer une notification Ã  l'utilisateur
       const user = users.find(u => u.id === userId);
       if (user) {
         await sendUserNotification({
           type: 'rejection',
-          title: '❌ Profil rejeté',
-          message: `Bonjour ${user.fullName}, votre profil SOS Expat a été rejeté. Raison: ${reason || 'Non spécifiée'}. Vous pouvez modifier votre profil et soumettre une nouvelle demande.`,
+          title: 'âŒ Profil rejetÃ©',
+          message: `Bonjour ${user.fullName}, votre profil SOS Expat a Ã©tÃ© rejetÃ©. Raison: ${reason || 'Non spÃ©cifiÃ©e'}. Vous pouvez modifier votre profil et soumettre une nouvelle demande.`,
           userId: userId,
           adminId: currentUser?.uid || '',
           createdAt: Timestamp.now(),
@@ -433,9 +433,9 @@ const AdminApprovals: React.FC = () => {
       }
 
       setUsers(prev => prev.filter(user => user.id !== userId));
-      showNotification('Utilisateur rejeté. Une notification a été envoyée.', 'success');
+      showNotification('Utilisateur rejetÃ©. Une notification a Ã©tÃ© envoyÃ©e.', 'success');
       
-      // Rafraîchir les stats
+      // RafraÃ®chir les stats
       await fetchUsers(activeTab);
     } catch (error) {
       console.error('Rejection error:', error);
@@ -457,13 +457,13 @@ const AdminApprovals: React.FC = () => {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, fakeData);
 
-      // Envoyer une notification à l'utilisateur
+      // Envoyer une notification Ã  l'utilisateur
       const user = users.find(u => u.id === userId);
       if (user) {
         await sendUserNotification({
           type: 'fake_profile',
-          title: '🚫 Profil suspendu',
-          message: `Votre profil a été marqué comme suspicieux et temporairement suspendu. Contactez notre support pour plus d'informations.`,
+          title: 'ðŸš« Profil suspendu',
+          message: `Votre profil a Ã©tÃ© marquÃ© comme suspicieux et temporairement suspendu. Contactez notre support pour plus d'informations.`,
           userId: userId,
           adminId: currentUser?.uid || '',
           createdAt: Timestamp.now(),
@@ -472,7 +472,7 @@ const AdminApprovals: React.FC = () => {
       }
 
       setUsers(prev => prev.filter(user => user.id !== userId));
-      showNotification('Profil marqué comme faux et notification envoyée', 'warning');
+      showNotification('Profil marquÃ© comme faux et notification envoyÃ©e', 'warning');
       
       await fetchUsers(activeTab);
     } catch (error) {
@@ -504,7 +504,7 @@ const AdminApprovals: React.FC = () => {
             await handleApprove(userId);
             break;
           case 'reject':
-            await handleReject(userId, 'Action groupée');
+            await handleReject(userId, 'Action groupÃ©e');
             break;
           case 'fake':
             await handleMarkAsFake(userId);
@@ -523,7 +523,7 @@ const AdminApprovals: React.FC = () => {
     }
     
     setSelectedUsers(new Set());
-    showNotification(`${successCount}/${userIds.length} utilisateurs traités avec succès`, 'success');
+    showNotification(`${successCount}/${userIds.length} utilisateurs traitÃ©s avec succÃ¨s`, 'success');
   };
 
   const openUserModal = useCallback(async (user: User) => {
@@ -588,7 +588,7 @@ const AdminApprovals: React.FC = () => {
       ));
       setSelectedUser({ ...selectedUser, ...editForm });
       setShowEditModal(false);
-      showNotification('Profil mis à jour avec succès', 'success');
+      showNotification('Profil mis Ã  jour avec succÃ¨s', 'success');
     } catch (error) {
       console.error('Edit error:', error);
       showNotification('Erreur lors de la modification', 'error');
@@ -623,15 +623,15 @@ const AdminApprovals: React.FC = () => {
 
   const getStatusBadge = (user: User) => {
     if (user.isFakeProfile) {
-      return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">🚫 Faux profil</span>;
+      return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">ðŸš« Faux profil</span>;
     }
     if (user.isApproved) {
-      return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">✅ Approuvé</span>;
+      return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">âœ… ApprouvÃ©</span>;
     }
     if (user.rejectedAt) {
-      return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">❌ Rejeté</span>;
+      return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">âŒ RejetÃ©</span>;
     }
-    return <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">⏳ En attente</span>;
+    return <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">â³ En attente</span>;
   };
 
   const closeUserModal = useCallback(() => {
@@ -654,12 +654,12 @@ const AdminApprovals: React.FC = () => {
     <ErrorBoundary>
       <AdminLayout>
         <div className="p-6 max-w-7xl mx-auto">
-          {/* En-tête avec statistiques */}
+          {/* En-tÃªte avec statistiques */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Gestion des utilisateurs</h1>
-                <p className="text-gray-600 mt-2">Gérez les demandes d'approbation et les profils utilisateurs</p>
+                <p className="text-gray-600 mt-2">GÃ©rez les demandes d'approbation et les profils utilisateurs</p>
               </div>
               
               <div className="flex flex-wrap gap-3">
@@ -675,7 +675,7 @@ const AdminApprovals: React.FC = () => {
                     onClick={() => setShowBulkActionsModal(true)}
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    Actions groupées ({selectedUsers.size})
+                    Actions groupÃ©es ({selectedUsers.size})
                   </Button>
                 )}
               </div>
@@ -698,7 +698,7 @@ const AdminApprovals: React.FC = () => {
                   <UserCheck className="text-green-600 mr-3" size={24} />
                   <div>
                     <p className="text-2xl font-bold text-green-800">{stats.approved}</p>
-                    <p className="text-sm text-green-600">Approuvés</p>
+                    <p className="text-sm text-green-600">ApprouvÃ©s</p>
                   </div>
                 </div>
               </div>
@@ -708,7 +708,7 @@ const AdminApprovals: React.FC = () => {
                   <UserX className="text-red-600 mr-3" size={24} />
                   <div>
                     <p className="text-2xl font-bold text-red-800">{stats.rejected}</p>
-                    <p className="text-sm text-red-600">Rejetés</p>
+                    <p className="text-sm text-red-600">RejetÃ©s</p>
                   </div>
                 </div>
               </div>
@@ -730,8 +730,8 @@ const AdminApprovals: React.FC = () => {
             <nav className="-mb-px flex space-x-8 overflow-x-auto">
               {[
                 { key: 'pending', label: 'En attente', icon: Clock, count: stats.pending },
-                { key: 'approved', label: 'Approuvés', icon: CheckCircle, count: stats.approved },
-                { key: 'rejected', label: 'Rejetés', icon: XCircle, count: stats.rejected },
+                { key: 'approved', label: 'ApprouvÃ©s', icon: CheckCircle, count: stats.approved },
+                { key: 'rejected', label: 'RejetÃ©s', icon: XCircle, count: stats.rejected },
                 { key: 'fake-profiles', label: 'Faux profils', icon: Shield, count: stats.fakeProfiles }
               ].map(tab => (
                 <button
@@ -762,7 +762,7 @@ const AdminApprovals: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <input
                     type="text"
-                    placeholder="Rechercher par nom, email, spécialisation..."
+                    placeholder="Rechercher par nom, email, spÃ©cialisation..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -780,7 +780,7 @@ const AdminApprovals: React.FC = () => {
                   <option value="all">Tous les profils</option>
                   <option value="real">Vrais profils</option>
                   <option value="fake">Faux profils</option>
-                  <option value="complete">Profils complets (≥70%)</option>
+                  <option value="complete">Profils complets (â‰¥70%)</option>
                   <option value="incomplete">Profils incomplets (&lt;70%)</option>
                 </select>
 
@@ -789,15 +789,15 @@ const AdminApprovals: React.FC = () => {
                   onChange={(e) => setSortBy(e.target.value as SortType)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="newest">Plus récents</option>
+                  <option value="newest">Plus rÃ©cents</option>
                   <option value="oldest">Plus anciens</option>
                   <option value="name">Par nom</option>
-                  <option value="completion">Par complétude</option>
+                  <option value="completion">Par complÃ©tude</option>
                 </select>
               </div>
             </div>
 
-            {/* Sélection multiple */}
+            {/* SÃ©lection multiple */}
             {activeTab === 'pending' && filteredUsers.length > 0 && (
               <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
                 <label className="flex items-center">
@@ -808,7 +808,7 @@ const AdminApprovals: React.FC = () => {
                     className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <span className="text-sm text-gray-700">
-                    Sélectionner tout ({selectedUsers.size}/{filteredUsers.length})
+                    SÃ©lectionner tout ({selectedUsers.size}/{filteredUsers.length})
                   </span>
                 </label>
               </div>
@@ -832,9 +832,9 @@ const AdminApprovals: React.FC = () => {
           {filteredUsers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun utilisateur trouvé</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun utilisateur trouvÃ©</h3>
               <p className="text-gray-500">
-                {searchTerm ? 'Aucun résultat pour votre recherche.' : 'Aucun utilisateur dans cette catégorie.'}
+                {searchTerm ? 'Aucun rÃ©sultat pour votre recherche.' : 'Aucun utilisateur dans cette catÃ©gorie.'}
               </p>
             </div>
           ) : (
@@ -856,7 +856,7 @@ const AdminApprovals: React.FC = () => {
                       <div className="flex items-start justify-between gap-4">
                         {/* Informations utilisateur */}
                         <div className="flex items-start gap-4 flex-1 min-w-0">
-                          {/* Checkbox de sélection */}
+                          {/* Checkbox de sÃ©lection */}
                           {activeTab === 'pending' && (
                             <input
                               type="checkbox"
@@ -881,7 +881,7 @@ const AdminApprovals: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Détails */}
+                          {/* DÃ©tails */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-lg font-semibold text-gray-900 truncate">
@@ -913,10 +913,10 @@ const AdminApprovals: React.FC = () => {
                               )}
                             </div>
 
-                            {/* Barre de progression de complétude */}
+                            {/* Barre de progression de complÃ©tude */}
                             <div className="mb-3">
                               <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                                <span>Complétude du profil</span>
+                                <span>ComplÃ©tude du profil</span>
                                 <span>{completionScore}%</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-2">
@@ -930,12 +930,12 @@ const AdminApprovals: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Métadonnées */}
+                            {/* MÃ©tadonnÃ©es */}
                             <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                               <div className="flex items-center gap-1">
                                 <Calendar size={12} />
                                 <span>
-                                  Créé le {user.createdAt ? 
+                                  CrÃ©Ã© le {user.createdAt ? 
                                     new Date(user.createdAt.toDate ? user.createdAt.toDate() : user.createdAt).toLocaleDateString() 
                                     : 'N/A'
                                   }
@@ -945,7 +945,7 @@ const AdminApprovals: React.FC = () => {
                                 <div className="flex items-center gap-1">
                                   <CheckCircle size={12} />
                                   <span>
-                                    Approuvé le {new Date(user.approvedAt.toDate ? user.approvedAt.toDate() : user.approvedAt).toLocaleDateString()}
+                                    ApprouvÃ© le {new Date(user.approvedAt.toDate ? user.approvedAt.toDate() : user.approvedAt).toLocaleDateString()}
                                   </span>
                                 </div>
                               )}
@@ -953,7 +953,7 @@ const AdminApprovals: React.FC = () => {
                                 <div className="flex items-center gap-1">
                                   <XCircle size={12} />
                                   <span>
-                                    Rejeté le {new Date(user.rejectedAt.toDate ? user.rejectedAt.toDate() : user.rejectedAt).toLocaleDateString()}
+                                    RejetÃ© le {new Date(user.rejectedAt.toDate ? user.rejectedAt.toDate() : user.rejectedAt).toLocaleDateString()}
                                   </span>
                                 </div>
                               )}
@@ -969,7 +969,7 @@ const AdminApprovals: React.FC = () => {
                             className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm px-3 py-2"
                           >
                             <Eye size={14} className="mr-1" />
-                            Détails
+                            DÃ©tails
                           </Button>
 
                           {activeTab === 'pending' && (
@@ -1021,15 +1021,15 @@ const AdminApprovals: React.FC = () => {
           )}
         </div>
 
-        {/* Modal des détails utilisateur */}
+        {/* Modal des dÃ©tails utilisateur */}
         <Modal 
           isOpen={showUserModal} 
           onClose={closeUserModal} 
-          title="Détails de l'utilisateur"
+          title="DÃ©tails de l'utilisateur"
         >
           {selectedUser && (
             <div className="space-y-6 max-h-[80vh] overflow-y-auto">
-              {/* En-tête avec photo */}
+              {/* En-tÃªte avec photo */}
               <div className="text-center border-b border-gray-200 pb-6">
                 {selectedUser.profileImage ? (
                   <img 
@@ -1074,12 +1074,12 @@ const AdminApprovals: React.FC = () => {
                       <p className="text-gray-900 bg-gray-50 p-2 rounded">{selectedUser.language}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Rôle</label>
+                      <label className="block text-sm font-medium text-gray-700">RÃ´le</label>
                       <p className="text-gray-900 bg-gray-50 p-2 rounded">{selectedUser.role}</p>
                     </div>
                     {selectedUser.phone && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Téléphone</label>
+                        <label className="block text-sm font-medium text-gray-700">TÃ©lÃ©phone</label>
                         <p className="text-gray-900 bg-gray-50 p-2 rounded">{selectedUser.phone}</p>
                       </div>
                     )}
@@ -1097,13 +1097,13 @@ const AdminApprovals: React.FC = () => {
                   <div className="space-y-3">
                     {selectedUser.specialization && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Spécialisation</label>
+                        <label className="block text-sm font-medium text-gray-700">SpÃ©cialisation</label>
                         <p className="text-gray-900 bg-gray-50 p-3 rounded">{selectedUser.specialization}</p>
                       </div>
                     )}
                     {selectedUser.experience && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Expérience</label>
+                        <label className="block text-sm font-medium text-gray-700">ExpÃ©rience</label>
                         <p className="text-gray-900 bg-gray-50 p-3 rounded">{selectedUser.experience}</p>
                       </div>
                     )}
@@ -1133,16 +1133,16 @@ const AdminApprovals: React.FC = () => {
                 </div>
               )}
 
-              {/* Métadonnées système */}
+              {/* MÃ©tadonnÃ©es systÃ¨me */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <Clock className="mr-2" size={20} />
-                  Informations système
+                  Informations systÃ¨me
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div className="space-y-2">
                     <div>
-                      <span className="font-medium text-gray-700">Date de création:</span>
+                      <span className="font-medium text-gray-700">Date de crÃ©ation:</span>
                       <p className="text-gray-600">
                         {selectedUser.createdAt ? 
                           new Date(selectedUser.createdAt.toDate ? selectedUser.createdAt.toDate() : selectedUser.createdAt).toLocaleString() 
@@ -1151,7 +1151,7 @@ const AdminApprovals: React.FC = () => {
                       </p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-700">Complétude du profil:</span>
+                      <span className="font-medium text-gray-700">ComplÃ©tude du profil:</span>
                       <p className="text-gray-600">{selectedUser.completionScore || 0}%</p>
                     </div>
                   </div>
@@ -1202,7 +1202,7 @@ const AdminApprovals: React.FC = () => {
           )}
         </Modal>
 
-        {/* Modal d'édition */}
+        {/* Modal d'Ã©dition */}
         <Modal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
@@ -1229,7 +1229,7 @@ const AdminApprovals: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">TÃ©lÃ©phone</label>
                 <input
                   type="text"
                   value={editForm.phone || ''}
@@ -1249,7 +1249,7 @@ const AdminApprovals: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Spécialisation</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SpÃ©cialisation</label>
               <input
                 type="text"
                 value={editForm.specialization || ''}
@@ -1265,7 +1265,7 @@ const AdminApprovals: React.FC = () => {
                 onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={4}
-                placeholder="Décrivez votre expérience et vos compétences..."
+                placeholder="DÃ©crivez votre expÃ©rience et vos compÃ©tences..."
               />
             </div>
 
@@ -1301,7 +1301,7 @@ const AdminApprovals: React.FC = () => {
                 </p>
                 <p className="text-sm text-yellow-700">
                   {pendingAction.action === 'approve' 
-                    ? 'L\'utilisateur recevra une notification et pourra commencer à recevoir des demandes.'
+                    ? 'L\'utilisateur recevra une notification et pourra commencer Ã  recevoir des demandes.'
                     : 'L\'utilisateur recevra une notification expliquant le rejet.'
                   }
                 </p>
@@ -1318,7 +1318,7 @@ const AdminApprovals: React.FC = () => {
                   onChange={(e) => setRejectionReason(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
-                  placeholder="Expliquez pourquoi ce profil est rejeté..."
+                  placeholder="Expliquez pourquoi ce profil est rejetÃ©..."
                 />
               </div>
             )}
@@ -1350,15 +1350,15 @@ const AdminApprovals: React.FC = () => {
           </div>
         </Modal>
 
-        {/* Modal d'actions groupées */}
+        {/* Modal d'actions groupÃ©es */}
         <Modal
           isOpen={showBulkActionsModal}
           onClose={() => setShowBulkActionsModal(false)}
-          title={`Actions groupées (${selectedUsers.size} utilisateur${selectedUsers.size > 1 ? 's' : ''} sélectionné${selectedUsers.size > 1 ? 's' : ''})`}
+          title={`Actions groupÃ©es (${selectedUsers.size} utilisateur${selectedUsers.size > 1 ? 's' : ''} sÃ©lectionnÃ©${selectedUsers.size > 1 ? 's' : ''})`}
         >
           <div className="space-y-4">
             <p className="text-gray-600">
-              Choisissez une action à appliquer aux utilisateurs sélectionnés:
+              Choisissez une action Ã  appliquer aux utilisateurs sÃ©lectionnÃ©s:
             </p>
             
             <div className="space-y-3">
@@ -1367,7 +1367,7 @@ const AdminApprovals: React.FC = () => {
                 className="w-full bg-green-600 hover:bg-green-700 text-white justify-start"
               >
                 <CheckCircle className="mr-2" size={16} />
-                Approuver tous les utilisateurs sélectionnés
+                Approuver tous les utilisateurs sÃ©lectionnÃ©s
               </Button>
               
               <Button
@@ -1375,7 +1375,7 @@ const AdminApprovals: React.FC = () => {
                 className="w-full bg-red-600 hover:bg-red-700 text-white justify-start"
               >
                 <XCircle className="mr-2" size={16} />
-                Rejeter tous les utilisateurs sélectionnés
+                Rejeter tous les utilisateurs sÃ©lectionnÃ©s
               </Button>
               
               <Button

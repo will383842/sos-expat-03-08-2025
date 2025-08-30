@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import {
   collection,
   query,
@@ -17,8 +17,8 @@ import autoTable from 'jspdf-autotable';
 
 const exportSinglePDF = (invoice: any) => {
   console.log('Export PDF:', invoice);
-  // TODO: Implémenter l'export PDF réel
-  alert('Fonctionnalité d\'export PDF à implémenter');
+  // TODO: ImplÃ©menter l'export PDF rÃ©el
+  alert('FonctionnalitÃ© d\'export PDF Ã  implÃ©menter');
 };
 
 interface InvoiceRecord {
@@ -112,7 +112,7 @@ export default function UserInvoices() {
       setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       setHasMore(snapshot.size === PAGE_SIZE);
     } catch (err) {
-      console.error('Erreur chargement supplémentaire:', err);
+      console.error('Erreur chargement supplÃ©mentaire:', err);
       setError('Impossible de charger plus de factures.');
     } finally {
       setLoadingMore(false);
@@ -125,7 +125,7 @@ export default function UserInvoices() {
 
     const tableData = invoices.map((invoice) => [
       invoice.id,
-      invoice.amount.toFixed(2) + ' €',
+      invoice.amount.toFixed(2) + ' â‚¬',
       invoice.status,
       new Date(invoice.createdAt.seconds * 1000).toLocaleDateString(),
     ]);
@@ -158,7 +158,7 @@ export default function UserInvoices() {
         {invoices.map((invoice) => (
           <li key={invoice.id} className="border p-4 rounded-md shadow-sm">
             <p>
-              <strong>Montant :</strong> {invoice.amount.toFixed(2)} €
+              <strong>Montant :</strong> {invoice.amount.toFixed(2)} â‚¬
             </p>
             <p>
               <strong>Statut :</strong> {invoice.status}
@@ -174,7 +174,7 @@ export default function UserInvoices() {
     rel="noopener noreferrer"
     className="text-blue-600 underline"
   >
-    Télécharger la facture
+    TÃ©lÃ©charger la facture
   </a>
 
   <button

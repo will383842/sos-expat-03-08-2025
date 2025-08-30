@@ -1,4 +1,4 @@
-// src/components/checkout/CurrencySelector.tsx
+﻿// src/components/checkout/CurrencySelector.tsx
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Euro } from 'lucide-react';
 import { detectUserCurrency, getServicePricing } from '../../services/pricingService';
@@ -52,7 +52,7 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
 
   const handleCurrencySelect = (currency: 'eur' | 'usd') => {
     onCurrencyChange(currency);
-    // Sauvegarder la préférence
+    // Sauvegarder la prÃ©fÃ©rence
     localStorage.setItem('preferredCurrency', currency);
   };
 
@@ -77,7 +77,7 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
             <div className="flex items-center space-x-2">
               <Euro className={`w-5 h-5 ${selectedCurrency === 'eur' ? 'text-blue-600' : 'text-gray-600'}`} />
               <span className={`font-medium text-sm ${selectedCurrency === 'eur' ? 'text-blue-900' : 'text-gray-900'}`}>
-                EUR (€)
+                EUR (â‚¬)
               </span>
             </div>
             {selectedCurrency === 'eur' && (
@@ -87,10 +87,10 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
           
           <div className="space-y-1">
             <div className={`text-lg font-bold ${selectedCurrency === 'eur' ? 'text-blue-900' : 'text-gray-900'}`}>
-              {prices.eur.total.toFixed(2)}€
+              {prices.eur.total.toFixed(2)}â‚¬
             </div>
             <div className="text-xs text-gray-500">
-              Frais: {prices.eur.fee.toFixed(2)}€
+              Frais: {prices.eur.fee.toFixed(2)}â‚¬
             </div>
           </div>
         </button>
@@ -130,11 +130,11 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
         </button>
       </div>
 
-      {/* Info complémentaire */}
+      {/* Info complÃ©mentaire */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-xs text-gray-600">
-          💡 La devise est détectée automatiquement selon votre localisation. 
-          Vous pouvez la modifier à tout moment.
+          ðŸ’¡ La devise est dÃ©tectÃ©e automatiquement selon votre localisation. 
+          Vous pouvez la modifier Ã  tout moment.
         </p>
       </div>
     </div>

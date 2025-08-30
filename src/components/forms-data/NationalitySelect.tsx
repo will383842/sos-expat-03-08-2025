@@ -1,12 +1,12 @@
-// ========================================
-// NationalitySelect.tsx — Multi-select of nationalities
+﻿// ========================================
+// NationalitySelect.tsx â€” Multi-select of nationalities
 // ========================================
 import React, { useState, useMemo, useCallback } from 'react';
 import Select, { MultiValue } from 'react-select';
 import { nationalitiesData } from '@/data';
 import { Locale, getDetectedBrowserLanguage, normalize, getLocalizedLabel, makeAdaptiveStyles, SharedOption } from './shared';
 
-// Interface étendue avec la propriété isShared manquante
+// Interface Ã©tendue avec la propriÃ©tÃ© isShared manquante
 export interface NationalityOption extends SharedOption {
   isShared?: boolean;
 }
@@ -39,7 +39,7 @@ const NationalitySelect: React.FC<NationalitySelectProps> = React.memo(({
     if (!inputValue) return nationalitiesData.filter(n => !n.disabled);
     const q = normalize(inputValue);
     return nationalitiesData.filter(n => !n.disabled && (
-      // Correction: utiliser la bonne propriété selon la langue actuelle
+      // Correction: utiliser la bonne propriÃ©tÃ© selon la langue actuelle
       normalize(getLocalizedLabel(n, currentLocale, n.code)).includes(q) ||
       normalize(n.code).includes(q)
     ));
@@ -48,7 +48,7 @@ const NationalitySelect: React.FC<NationalitySelectProps> = React.memo(({
   const options = useMemo<NationalityOption[]>(() => {
     return filtered.map(n => ({
       value: n.code,
-      // Correction: utiliser la bonne propriété selon la langue actuelle
+      // Correction: utiliser la bonne propriÃ©tÃ© selon la langue actuelle
       label: getLocalizedLabel(n, currentLocale, n.code),
       isShared: highlightShared && providerLanguages.includes(n.code),
     }));
@@ -64,17 +64,17 @@ const NationalitySelect: React.FC<NationalitySelectProps> = React.memo(({
     return input;
   }, []);
 
-  // Correction: enlever le paramètre générique qui n'est pas attendu
+  // Correction: enlever le paramÃ¨tre gÃ©nÃ©rique qui n'est pas attendu
   const styles = useMemo(() => makeAdaptiveStyles(!!highlightShared), [highlightShared]);
   
-  // Fonction utilitaire pour le placeholder par défaut
+  // Fonction utilitaire pour le placeholder par dÃ©faut
   const defaultPlaceholder = useMemo(() => {
-    return currentLocale === 'fr' ? 'Sélectionner des nationalités' : 'Select nationalities';
+    return currentLocale === 'fr' ? 'SÃ©lectionner des nationalitÃ©s' : 'Select nationalities';
   }, [currentLocale]);
 
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
-      ? (inputValue ? `Aucune nationalité trouvée pour "${inputValue}"` : 'Aucune nationalité disponible')
+      ? (inputValue ? `Aucune nationalitÃ© trouvÃ©e pour "${inputValue}"` : 'Aucune nationalitÃ© disponible')
       : (inputValue ? `No nationality found for "${inputValue}"` : 'No nationalities available');
   }, [currentLocale]);
 

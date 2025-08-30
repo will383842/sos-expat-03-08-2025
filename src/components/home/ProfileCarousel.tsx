@@ -1,4 +1,4 @@
-// src/components/home/ProfileCarousel.tsx - VERSION CORRIGÉE
+﻿// src/components/home/ProfileCarousel.tsx - VERSION CORRIGÃ‰E
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
@@ -19,7 +19,7 @@ interface ProfileCarouselProps {
   pageSize?: number;
 }
 
-// Configuration optimisée
+// Configuration optimisÃ©e
 const MAX_VISIBLE = 20;
 const ROTATE_INTERVAL_MS = 30000;
 const ROTATE_COUNT = 8;
@@ -48,7 +48,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
   // Navigation avec URL SEO
   const handleProfileClick = useCallback((provider: Provider) => {
-    console.log('🔗 Navigation vers le profil de:', provider.name);
+    console.log('ðŸ”— Navigation vers le profil de:', provider.name);
 
     const typeSlug = provider.type === 'lawyer' ? 'avocat' : 'expatrie';
     const countrySlug = (provider.country || 'monde')
@@ -67,7 +67,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     try {
       sessionStorage.setItem('selectedProvider', JSON.stringify(provider));
     } catch (error) {
-      console.warn('⚠️ Erreur sessionStorage:', error);
+      console.warn('âš ï¸ Erreur sessionStorage:', error);
     }
 
     navigate(seoUrl, {
@@ -78,36 +78,36 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     });
   }, [navigate]);
 
-  // Algorithme de sélection intelligente pour la rotation
+  // Algorithme de sÃ©lection intelligente pour la rotation
   const selectVisibleProviders = useCallback((allProviders: Provider[]): Provider[] => {
     if (allProviders.length === 0) return [];
 
-    // Séparer en ligne et hors ligne
+    // SÃ©parer en ligne et hors ligne
     const online = allProviders.filter(p => p.isOnline);
     const offline = allProviders.filter(p => !p.isOnline);
 
-    // Mélanger chaque groupe
+    // MÃ©langer chaque groupe
     const shuffledOnline = online.sort(() => Math.random() - 0.5);
     const shuffledOffline = offline.sort(() => Math.random() - 0.5);
 
     // Prioriser les profils en ligne
     const prioritized = [...shuffledOnline, ...shuffledOffline];
 
-    // Éviter les profils récemment affichés
+    // Ã‰viter les profils rÃ©cemment affichÃ©s
     const notRecent = prioritized.filter(p => !recentlyShown.current.has(p.id));
 
     let selected = notRecent.slice(0, MAX_VISIBLE);
 
-    // Si pas assez, compléter avec tous les profils
+    // Si pas assez, complÃ©ter avec tous les profils
     if (selected.length < MAX_VISIBLE) {
       const remaining = prioritized.filter(p => !selected.includes(p));
       selected = [...selected, ...remaining].slice(0, MAX_VISIBLE);
     }
 
-    // Mémoriser les profils affichés
+    // MÃ©moriser les profils affichÃ©s
     selected.forEach(p => recentlyShown.current.add(p.id));
 
-    // Nettoyer le cache de récence
+    // Nettoyer le cache de rÃ©cence
     if (recentlyShown.current.size > 40) {
       const oldEntries = Array.from(recentlyShown.current).slice(0, 20);
       oldEntries.forEach(id => recentlyShown.current.delete(id));
@@ -122,7 +122,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       setIsLoading(true);
       setError(null);
 
-      // Charger depuis Firebase avec la requête finale
+      // Charger depuis Firebase avec la requÃªte finale
       const sosProfilesQuery = query(
         collection(db, 'sos_profiles'),
         where('isVisible', '==', true),
@@ -138,7 +138,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
         return;
       }
 
-      // Transformer les données
+      // Transformer les donnÃ©es
       const transformedProviders: Provider[] = [];
 
       for (const docSnap of snapshot.docs) {
@@ -153,14 +153,14 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
 
           const type = (data.type === 'lawyer' || data.type === 'expat') ? data.type : 'expat';
 
-          // ✅ Fallback pays
+          // âœ… Fallback pays
           const country: string =
             data.currentPresenceCountry ||
             data.country ||
             data.currentCountry ||
             'Monde';
 
-          // Gérer l'avatar
+          // GÃ©rer l'avatar
           let avatar: string = data.profilePhoto || data.photoURL || data.avatar || '';
           if (avatar && avatar.startsWith('user_uploads/')) {
             try {
@@ -173,13 +173,13 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             avatar = DEFAULT_AVATAR;
           }
 
-          // ✅ Bloc provider corrigé
+          // âœ… Bloc provider corrigÃ©
           const provider: Provider = {
             id: docId,
             name: fullName,
             type,
             country,
-            languages: Array.isArray(data.languages) ? data.languages : ['Français'],
+            languages: Array.isArray(data.languages) ? data.languages : ['FranÃ§ais'],
             specialties: Array.isArray(data.specialties) ? data.specialties : [],
             rating: typeof data.rating === 'number' && data.rating >= 0 && data.rating <= 5 ? data.rating : 4.5,
             reviewCount: typeof data.reviewCount === 'number' && data.reviewCount >= 0 ? data.reviewCount : 0,
@@ -193,7 +193,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             price: typeof data.price === 'number' ? data.price : (type === 'lawyer' ? 49 : 19),
             duration: typeof data.duration === 'number' ? data.duration : (type === 'lawyer' ? 20 : 30),
             isApproved: data.isApproved === true,
-            // Champs ajoutés
+            // Champs ajoutÃ©s
             isVisible: true,
             isBanned: false,
             role: type,
@@ -201,9 +201,9 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
             isVerified: data.isVerified === true
           };
 
-          // Vérifications de base
+          // VÃ©rifications de base
           const hasValidData = provider.name.trim() !== '' && provider.country.trim() !== '';
-          const isVisible = data.isVisible !== false; // true par défaut
+          const isVisible = data.isVisible !== false; // true par dÃ©faut
           const notBanned = data.isBanned !== true;
 
           // Validation selon le type
@@ -221,18 +221,18 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           }
 
         } catch (error) {
-          console.error('❌ Erreur transformation document:', docSnap.id, error);
+          console.error('âŒ Erreur transformation document:', docSnap.id, error);
         }
       }
 
       setOnlineProviders(transformedProviders.slice(0, pageSize));
 
-      // Sélection initiale intelligente
+      // SÃ©lection initiale intelligente
       const initialVisible = selectVisibleProviders(transformedProviders);
       setVisibleProviders(initialVisible);
 
     } catch (err) {
-      console.error('❌ Erreur lors du chargement ProfileCarousel:', err);
+      console.error('âŒ Erreur lors du chargement ProfileCarousel:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(`Erreur de chargement: ${errorMessage}`);
 
@@ -271,7 +271,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     shuffledNew.forEach(p => recentlyShown.current.add(p.id));
   }, [onlineProviders, visibleProviders]);
 
-  // Mise à jour du statut en ligne en temps réel
+  // Mise Ã  jour du statut en ligne en temps rÃ©el
   const updateProviderOnlineStatus = useCallback((providerId: string, isOnline: boolean) => {
     setOnlineProviders(prevProviders =>
       prevProviders.map(provider =>
@@ -290,7 +290,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     );
   }, []);
 
-  // Configuration de l'écoute en temps réel
+  // Configuration de l'Ã©coute en temps rÃ©el
   const setupRealtimeListeners = useCallback(() => {
     if (!isUserConnected || visibleProviders.length === 0) {
       return () => {};
@@ -317,7 +317,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           });
         },
         (error) => {
-          console.error(`❌ Erreur listener pour ${provider.id}:`, error);
+          console.error(`âŒ Erreur listener pour ${provider.id}:`, error);
         }
       );
 
@@ -359,7 +359,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return cleanup;
   }, [setupRealtimeListeners, visibleProviders.length]);
 
-  // Stats calculées
+  // Stats calculÃ©es
   const stats = useMemo(() => ({
     total: onlineProviders.length,
     online: onlineProviders.filter(p => p.isOnline).length,
@@ -367,7 +367,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     experts: onlineProviders.filter(p => p.type === 'expat').length
   }), [onlineProviders]);
 
-  // Gestion des états
+  // Gestion des Ã©tats
   if (isLoading) {
     return (
       <div className={`flex justify-center items-center py-8 ${className}`}>
@@ -385,7 +385,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
           onClick={loadInitialProviders}
           className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
         >
-          Réessayer
+          RÃ©essayer
         </button>
       </div>
     );
@@ -398,12 +398,12 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
     return (
       <div className={`text-center py-8 ${className}`}>
         <div className="max-w-md mx-auto">
-          <div className="text-6xl mb-4">🔍</div>
+          <div className="text-6xl mb-4">ðŸ”</div>
           <h3 className="text-lg font-semibold text-gray-800 mb-2">
             Aucun expert disponible
           </h3>
           <p className="text-gray-600 text-sm mb-4">
-            Aucun profil n'a été trouvé dans la base de données Firebase.
+            Aucun profil n'a Ã©tÃ© trouvÃ© dans la base de donnÃ©es Firebase.
           </p>
         </div>
       </div>
@@ -437,7 +437,7 @@ const ProfileCarousel: React.FC<ProfileCarouselProps> = ({
       {onlineProviders.length > MAX_VISIBLE && (
         <div className="flex justify-center mb-4">
           <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-            Rotation automatique • {displayProviders.filter(p => p.isOnline).length}/{displayProviders.length} en ligne
+            Rotation automatique â€¢ {displayProviders.filter(p => p.isOnline).length}/{displayProviders.length} en ligne
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-// src/pages/admin/AdminPricing.tsx
+﻿// src/pages/admin/AdminPricing.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, 
@@ -16,7 +16,7 @@ import { PricingManagement } from '../../components/admin/PricingManagement';
 import { FinancialAnalytics } from '../../components/admin/FinancialAnalytics';
 import PricingMigrationPanel from '../../components/admin/PricingMigrationPanel';
 
-// Types pour les données réelles
+// Types pour les donnÃ©es rÃ©elles
 interface FinancialStats {
   monthlyRevenue: number;
   totalCommissions: number;
@@ -47,16 +47,16 @@ const AdminPricing: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['pricing']));
   const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'analytics' | 'maintenance'>('overview');
   
-  // États pour les données réelles
+  // Ã‰tats pour les donnÃ©es rÃ©elles
   const [financialStats, setFinancialStats] = useState<FinancialStats | null>(null);
   const [lastModifications, setLastModifications] = useState<LastModifications | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fonctions pour récupérer les données mockées temporairement
+  // Fonctions pour rÃ©cupÃ©rer les donnÃ©es mockÃ©es temporairement
   const fetchFinancialStats = async (): Promise<FinancialStats> => {
-    // Données mockées temporaires
+    // DonnÃ©es mockÃ©es temporaires
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({
@@ -76,7 +76,7 @@ const AdminPricing: React.FC = () => {
   };
 
   const fetchLastModifications = async (): Promise<LastModifications> => {
-    // Données mockées temporaires
+    // DonnÃ©es mockÃ©es temporaires
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({
@@ -89,7 +89,7 @@ const AdminPricing: React.FC = () => {
   };
 
   const fetchSystemStatus = async (): Promise<SystemStatus> => {
-    // Données mockées temporaires
+    // DonnÃ©es mockÃ©es temporaires
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({
@@ -102,7 +102,7 @@ const AdminPricing: React.FC = () => {
     });
   };
 
-  // Chargement initial des données
+  // Chargement initial des donnÃ©es
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -184,7 +184,7 @@ const AdminPricing: React.FC = () => {
     setExpandedSections(newExpanded);
   };
 
-  // Génération dynamique des statistiques
+  // GÃ©nÃ©ration dynamique des statistiques
   const generateQuickStats = () => {
     if (!financialStats) return [];
 
@@ -306,12 +306,12 @@ const AdminPricing: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {systemStatus?.api === 'online' ? 'Système Opérationnel' : 'Problème Système'}
+                    {systemStatus?.api === 'online' ? 'SystÃ¨me OpÃ©rationnel' : 'ProblÃ¨me SystÃ¨me'}
                   </h3>
                   <p className="text-gray-600 mt-1">
                     {systemStatus?.api === 'online' 
-                      ? `Tous les services fonctionnent normalement. Dernière vérification: ${formatRelativeTime(systemStatus.lastCheck)}.`
-                      : 'Des problèmes ont été détectés. Contactez le support technique.'
+                      ? `Tous les services fonctionnent normalement. DerniÃ¨re vÃ©rification: ${formatRelativeTime(systemStatus.lastCheck)}.`
+                      : 'Des problÃ¨mes ont Ã©tÃ© dÃ©tectÃ©s. Contactez le support technique.'
                     }
                   </p>
                   <div className="flex items-center space-x-4 mt-3">
@@ -327,7 +327,7 @@ const AdminPricing: React.FC = () => {
                         ? 'bg-blue-100 text-blue-800' 
                         : 'bg-orange-100 text-orange-800'
                     }`}>
-                      Base de données: {systemStatus?.database === 'optimal' ? 'Optimale' : 'Problème'}
+                      Base de donnÃ©es: {systemStatus?.database === 'optimal' ? 'Optimale' : 'ProblÃ¨me'}
                     </span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       systemStatus?.cache === 'active' 
@@ -371,10 +371,10 @@ const AdminPricing: React.FC = () => {
                   </div>
                   <div>
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                      Gestion Financière
+                      Gestion FinanciÃ¨re
                     </h1>
                     <p className="text-gray-600 mt-1 text-sm">
-                      Pilotage centralisé de votre système de pricing et analytics
+                      Pilotage centralisÃ© de votre systÃ¨me de pricing et analytics
                     </p>
                   </div>
                 </div>
@@ -385,7 +385,7 @@ const AdminPricing: React.FC = () => {
                 <div className="text-sm text-gray-500">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <span className="font-medium">Dernière modification :</span>
+                    <span className="font-medium">DerniÃ¨re modification :</span>
                   </div>
                   <div className="mt-1 space-y-1">
                     <div className="text-xs text-gray-600">

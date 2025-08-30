@@ -1,6 +1,6 @@
-// =============================================================================
+﻿// =============================================================================
 // FICHIER: src/pages/RegisterClient.tsx
-// Version: sans check d’unicité email + libellés plus fun 😄
+// Version: sans check dâ€™unicitÃ© email + libellÃ©s plus fun ðŸ˜„
 // =============================================================================
 
 import React, {
@@ -93,7 +93,7 @@ function isProviderLike(v: unknown): v is Provider {
 }
 
 // ==========================
-// i18n typé
+// i18n typÃ©
 // ==========================
 type I18nShape = {
   meta: {
@@ -174,37 +174,37 @@ type LangKey = 'fr' | 'en';
 const i18nConfig: Record<LangKey, I18nShape> = {
   fr: {
     meta: {
-      title: 'Inscription Client - SOS Expats | Rejoignez la team 💙',
+      title: 'Inscription Client - SOS Expats | Rejoignez la team ðŸ’™',
       description:
-        "Créez votre compte client en 60 secondes chrono et accédez à notre réseau d'aidants ultra bienveillants. Support 24/7, multilingue.",
+        "CrÃ©ez votre compte client en 60 secondes chrono et accÃ©dez Ã  notre rÃ©seau d'aidants ultra bienveillants. Support 24/7, multilingue.",
       keywords:
-        'inscription client, expatriation, aide, expats, 24/7, multilingue, communauté',
+        'inscription client, expatriation, aide, expats, 24/7, multilingue, communautÃ©',
     },
     ui: {
-      heroTitle: "Inscription éclair ⚡️ (moins d’1 minute)",
+      heroTitle: "Inscription Ã©clair âš¡ï¸ (moins dâ€™1 minute)",
       badge247: 'Disponible 24/7',
       badgeMulti: 'Multilingue',
       title: 'Inscription Client',
-      subtitle: "Un petit compte et vous voilà connecté(e) à nos experts ✨",
-      alreadyRegistered: 'Déjà parmi nous ?',
+      subtitle: "Un petit compte et vous voilÃ  connectÃ©(e) Ã  nos experts âœ¨",
+      alreadyRegistered: 'DÃ©jÃ  parmi nous ?',
       login: 'Se connecter',
       personalInfo: 'Vos infos perso',
-      acceptTerms: 'J’ai lu et j’accepte les',
-      termsLink: 'conditions générales clients',
-      createAccount: 'Je crée mon compte ✨',
+      acceptTerms: 'Jâ€™ai lu et jâ€™accepte les',
+      termsLink: 'conditions gÃ©nÃ©rales clients',
+      createAccount: 'Je crÃ©e mon compte âœ¨',
       required: 'obligatoire',
-      loading: 'On prépare votre espace magique… ✨',
-      progressHint: 'Plus que quelques cases et c’est bon ! ⭐',
-      passwordStrength: 'Solidité du mot de passe',
+      loading: 'On prÃ©pare votre espace magiqueâ€¦ âœ¨',
+      progressHint: 'Plus que quelques cases et câ€™est bon ! â­',
+      passwordStrength: 'SoliditÃ© du mot de passe',
       progressLabel: 'Progression',
-      loadingLanguages: 'On charge les langues…',
+      loadingLanguages: 'On charge les languesâ€¦',
       ariaShowPassword: 'Afficher le mot de passe',
       ariaHidePassword: 'Masquer le mot de passe',
       footerBanner:
-        "🌟 Bienvenue ! En vous inscrivant, vous rejoignez une communauté d’entraide ultra réactive — prêts à vous filer un coup de main !",
+        "ðŸŒŸ Bienvenue ! En vous inscrivant, vous rejoignez une communautÃ© dâ€™entraide ultra rÃ©active â€” prÃªts Ã  vous filer un coup de main !",
     },
     fields: {
-      firstName: 'Votre prénom',
+      firstName: 'Votre prÃ©nom',
       email: 'Votre email',
       password: 'Votre mot de passe',
       languagesSpoken: 'Langues que vous parlez',
@@ -212,80 +212,80 @@ const i18nConfig: Record<LangKey, I18nShape> = {
     actions: {
       addLanguage: 'Ajouter une langue',
       remove: 'Supprimer',
-      specifyLanguage: 'Quelle langue avez-vous en tête ?',
+      specifyLanguage: 'Quelle langue avez-vous en tÃªte ?',
       add: 'Ajouter',
     },
     help: {
-      minPassword: '6 caractères minimum (et c’est tout ✔️)',
+      minPassword: '6 caractÃ¨res minimum (et câ€™est tout âœ”ï¸)',
       emailPlaceholder: 'votre@email.com',
-      firstNamePlaceholder: 'On vous appelle comment ? 😊',
-      firstNameHint: 'Un petit prénom sympa et on démarre ! ✨',
+      firstNamePlaceholder: 'On vous appelle comment ? ðŸ˜Š',
+      firstNameHint: 'Un petit prÃ©nom sympa et on dÃ©marre ! âœ¨',
       emailHint:
-        "On vous écrit seulement pour votre compte et les mises en relation. Promis, pas de spam 🤝",
+        "On vous Ã©crit seulement pour votre compte et les mises en relation. Promis, pas de spam ðŸ¤",
       passwordTip:
-        'Astuce : plus c’est long, mieux c’est — 6+ caractères suffisent ici 💪',
-      dataSecure: 'Vos données sont chiffrées et bien au chaud',
+        'Astuce : plus câ€™est long, mieux câ€™est â€” 6+ caractÃ¨res suffisent ici ðŸ’ª',
+      dataSecure: 'Vos donnÃ©es sont chiffrÃ©es et bien au chaud',
     },
     errors: {
       title: 'Oups, quelques retouches :',
-      firstNameRequired: 'On aimerait connaître votre prénom ! 😊',
-      firstNameTooShort: '2 caractères minimum pour un prénom qui claque ✨',
-      emailRequired: 'Votre email nous permet de vous contacter 📧',
-      emailInvalid: 'Hmm… cet email semble étrange. Essayez nom@exemple.com 🤔',
+      firstNameRequired: 'On aimerait connaÃ®tre votre prÃ©nom ! ðŸ˜Š',
+      firstNameTooShort: '2 caractÃ¨res minimum pour un prÃ©nom qui claque âœ¨',
+      emailRequired: 'Votre email nous permet de vous contacter ðŸ“§',
+      emailInvalid: 'Hmmâ€¦ cet email semble Ã©trange. Essayez nom@exemple.com ðŸ¤”',
       passwordRequired:
-        'Un mot de passe est nécessaire pour sécuriser votre compte 🔐',
-      passwordTooShort: '6 caractères minimum et c’est gagné 😉',
+        'Un mot de passe est nÃ©cessaire pour sÃ©curiser votre compte ðŸ”',
+      passwordTooShort: '6 caractÃ¨res minimum et câ€™est gagnÃ© ðŸ˜‰',
       languagesRequired:
-        'Dites-nous quelles langues vous parlez, ça nous aide 🌍',
-      termsRequired: 'Un p’tit clic sur les conditions pour finaliser ✅',
+        'Dites-nous quelles langues vous parlez, Ã§a nous aide ðŸŒ',
+      termsRequired: 'Un pâ€™tit clic sur les conditions pour finaliser âœ…',
       registrationError:
-        'Petit souci technique. On réessaie dans un instant 🔧',
+        'Petit souci technique. On rÃ©essaie dans un instant ðŸ”§',
       emailAlreadyExists:
-        'Cette adresse est déjà utilisée. Essayez la connexion 🔄',
+        'Cette adresse est dÃ©jÃ  utilisÃ©e. Essayez la connexion ðŸ”„',
       networkError:
-        'Problème de connexion. Vérifiez votre wifi et réessayons 📶',
+        'ProblÃ¨me de connexion. VÃ©rifiez votre wifi et rÃ©essayons ðŸ“¶',
       tooManyRequests:
-        'Trop de tentatives. Une mini pause et on repart ⏰',
+        'Trop de tentatives. Une mini pause et on repart â°',
     },
     success: {
-      fieldValid: 'Parfait ! ✨',
-      emailValid: 'Email au top ! 👌',
-      passwordValid: 'Mot de passe validé ! 🔒',
-      allFieldsValid: 'Tout est bon ! Prêt(e) à décoller 🚀',
+      fieldValid: 'Parfait ! âœ¨',
+      emailValid: 'Email au top ! ðŸ‘Œ',
+      passwordValid: 'Mot de passe validÃ© ! ðŸ”’',
+      allFieldsValid: 'Tout est bon ! PrÃªt(e) Ã  dÃ©coller ðŸš€',
     },
     termsHref: '/cgu-clients',
     jsonLdName: 'Inscription Client',
   },
   en: {
     meta: {
-      title: 'Client Sign-up - SOS Expats | Join the crew 💙',
+      title: 'Client Sign-up - SOS Expats | Join the crew ðŸ’™',
       description:
         'Create your client account in under 60 seconds and tap into a super helpful network. 24/7, multilingual support.',
       keywords:
         'client registration, expat, help, 24/7, multilingual, community',
     },
     ui: {
-      heroTitle: 'Speedy sign-up ⚡️ (under 1 minute)',
+      heroTitle: 'Speedy sign-up âš¡ï¸ (under 1 minute)',
       badge247: 'Available 24/7',
       badgeMulti: 'Multilingual',
       title: 'Client Registration',
-      subtitle: 'One quick account and you’re in with the experts ✨',
+      subtitle: 'One quick account and youâ€™re in with the experts âœ¨',
       alreadyRegistered: 'Already with us?',
       login: 'Log in',
       personalInfo: 'Your personal info',
       acceptTerms: 'I have read and accept the',
       termsLink: 'client terms & conditions',
-      createAccount: 'Create my account ✨',
+      createAccount: 'Create my account âœ¨',
       required: 'required',
-      loading: 'Setting things up for you… ✨',
-      progressHint: 'Just a few bits left — you got this! ⭐',
+      loading: 'Setting things up for youâ€¦ âœ¨',
+      progressHint: 'Just a few bits left â€” you got this! â­',
       passwordStrength: 'Password strength',
       progressLabel: 'Progress',
-      loadingLanguages: 'Fetching languages…',
+      loadingLanguages: 'Fetching languagesâ€¦',
       ariaShowPassword: 'Show password',
       ariaHidePassword: 'Hide password',
       footerBanner:
-        '🌟 Welcome aboard! By signing up, you join a caring, quick-to-help community — ready when you are!',
+        'ðŸŒŸ Welcome aboard! By signing up, you join a caring, quick-to-help community â€” ready when you are!',
     },
     fields: {
       firstName: 'Your first name',
@@ -300,38 +300,38 @@ const i18nConfig: Record<LangKey, I18nShape> = {
       add: 'Add',
     },
     help: {
-      minPassword: '6 characters minimum (yep, that’s it ✔️)',
+      minPassword: '6 characters minimum (yep, thatâ€™s it âœ”ï¸)',
       emailPlaceholder: 'you@example.com',
-      firstNamePlaceholder: "What should we call you? 😊",
-      firstNameHint: 'Drop your friendly first name and we’re off ✨',
+      firstNamePlaceholder: "What should we call you? ðŸ˜Š",
+      firstNameHint: 'Drop your friendly first name and weâ€™re off âœ¨',
       emailHint:
-        'We’ll only email you about your account & connections. No spam 🤝',
+        'Weâ€™ll only email you about your account & connections. No spam ðŸ¤',
       passwordTip:
-        'Pro tip: longer is stronger — 6+ chars is enough here 💪',
+        'Pro tip: longer is stronger â€” 6+ chars is enough here ðŸ’ª',
       dataSecure: 'Your data is encrypted and cozy',
     },
     errors: {
       title: 'Whoops, a few tweaks:',
-      firstNameRequired: 'We’d love to know your first name! 😊',
-      firstNameTooShort: 'At least 2 characters so your name can shine ✨',
-      emailRequired: 'We need your email to reach you 📧',
-      emailInvalid: 'Hmm… that email looks off. Try name@example.com 🤔',
-      passwordRequired: 'A password is needed to secure your account 🔐',
-      passwordTooShort: 'Minimum 6 characters and you’re good 😉',
+      firstNameRequired: 'Weâ€™d love to know your first name! ðŸ˜Š',
+      firstNameTooShort: 'At least 2 characters so your name can shine âœ¨',
+      emailRequired: 'We need your email to reach you ðŸ“§',
+      emailInvalid: 'Hmmâ€¦ that email looks off. Try name@example.com ðŸ¤”',
+      passwordRequired: 'A password is needed to secure your account ðŸ”',
+      passwordTooShort: 'Minimum 6 characters and youâ€™re good ðŸ˜‰',
       languagesRequired:
-        'Tell us the languages you speak — super helpful 🌍',
-      termsRequired: 'One quick click on the terms to finish ✅',
+        'Tell us the languages you speak â€” super helpful ðŸŒ',
+      termsRequired: 'One quick click on the terms to finish âœ…',
       registrationError:
-        'Tiny technical hiccup. Please try again in a moment 🔧',
-      emailAlreadyExists: 'This email is already in use. Try logging in 🔄',
-      networkError: 'Connection issue. Check your wifi and we’ll retry 📶',
-      tooManyRequests: 'Too many attempts. Take a short break and try again ⏰',
+        'Tiny technical hiccup. Please try again in a moment ðŸ”§',
+      emailAlreadyExists: 'This email is already in use. Try logging in ðŸ”„',
+      networkError: 'Connection issue. Check your wifi and weâ€™ll retry ðŸ“¶',
+      tooManyRequests: 'Too many attempts. Take a short break and try again â°',
     },
     success: {
-      fieldValid: 'Perfect! ✨',
-      emailValid: 'Great email! 👌',
-      passwordValid: 'Password looks good! 🔒',
-      allFieldsValid: 'All set! Ready for take-off 🚀',
+      fieldValid: 'Perfect! âœ¨',
+      emailValid: 'Great email! ðŸ‘Œ',
+      passwordValid: 'Password looks good! ðŸ”’',
+      allFieldsValid: 'All set! Ready for take-off ðŸš€',
     },
     termsHref: '/terms-conditions-clients',
     jsonLdName: 'Client Registration',
@@ -362,20 +362,20 @@ const calculatePasswordStrength = (
   if (/[0-9]/.test(password)) score += 5;
   if (/[^a-zA-Z0-9]/.test(password)) score += 5;
   if (password.length < 6) {
-    label = 'Trop court 😅';
+    label = 'Trop court ðŸ˜…';
     color = 'bg-red-500';
     score = Math.min(score, 25);
   } else if (score < 40) {
-    label = 'Faible 🙂';
+    label = 'Faible ðŸ™‚';
     color = 'bg-orange-500';
   } else if (score < 55) {
-    label = 'Moyen 👍';
+    label = 'Moyen ðŸ‘';
     color = 'bg-yellow-500';
   } else if (score < 70) {
-    label = 'Bon 🔥';
+    label = 'Bon ðŸ”¥';
     color = 'bg-blue-500';
   } else {
-    label = 'Excellent 🚀';
+    label = 'Excellent ðŸš€';
     color = 'bg-green-500';
   }
   return { score: Math.min(100, score), label, color };
@@ -475,7 +475,7 @@ const RegisterClient: React.FC = () => {
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect') || '/dashboard';
 
-  // Conserver le provider si on arrive depuis "Réservez maintenant"
+  // Conserver le provider si on arrive depuis "RÃ©servez maintenant"
   useEffect(() => {
     const rawState: unknown = location.state;
     const state = (rawState ?? null) as NavState | null;
@@ -498,7 +498,7 @@ const RegisterClient: React.FC = () => {
     typeof language === 'string' && language.toLowerCase().startsWith('en') ? 'en' : 'fr';
   const t = i18nConfig[langKey];
 
-  // État initial
+  // Ã‰tat initial
   const initialFormData: FormData = useMemo(
     () => ({
       firstName: '',
@@ -510,7 +510,7 @@ const RegisterClient: React.FC = () => {
     []
   );
 
-  // États
+  // Ã‰tats
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [selectedLanguages, setSelectedLanguages] =
     useState<MultiValue<{ value: string; label: string }>>([]);
@@ -612,7 +612,7 @@ const RegisterClient: React.FC = () => {
   }, []);
 
   // ==========================
-  // Validation champs (sans vérification d'unicité email)
+  // Validation champs (sans vÃ©rification d'unicitÃ© email)
   // ==========================
   const validateField = useCallback(
     (fieldName: string, value: string | string[] | boolean) => {
@@ -640,7 +640,7 @@ const RegisterClient: React.FC = () => {
             errors.email = t.errors.emailInvalid;
             validation.email = false;
           } else {
-            validation.email = true; // ✅ Plus d'unicité ici
+            validation.email = true; // âœ… Plus d'unicitÃ© ici
           }
           break;
 
@@ -787,7 +787,7 @@ const RegisterClient: React.FC = () => {
         case 'auth/email-already-in-use':
           return t.errors.emailAlreadyExists;
         case 'sos/email-linked-to-google':
-          return 'Cet email est lié à un compte Google. Utilisez “Se connecter avec Google”.';
+          return 'Cet email est liÃ© Ã  un compte Google. Utilisez â€œSe connecter avec Googleâ€.';
         case 'auth/network-request-failed':
           return t.errors.networkError;
         case 'auth/too-many-requests':
@@ -932,11 +932,11 @@ const RegisterClient: React.FC = () => {
                       {errorCount > 0 && !error && !fieldErrors.general && (
                         <div className="mt-2 text-sm text-red-700">
                           <ul className="list-none space-y-1">
-                            {fieldErrors.firstName && <li>• {fieldErrors.firstName}</li>}
-                            {fieldErrors.email && <li>• {fieldErrors.email}</li>}
-                            {fieldErrors.password && <li>• {fieldErrors.password}</li>}
-                            {fieldErrors.languagesSpoken && <li>• {fieldErrors.languagesSpoken}</li>}
-                            {fieldErrors.terms && <li>• {fieldErrors.terms}</li>}
+                            {fieldErrors.firstName && <li>â€¢ {fieldErrors.firstName}</li>}
+                            {fieldErrors.email && <li>â€¢ {fieldErrors.email}</li>}
+                            {fieldErrors.password && <li>â€¢ {fieldErrors.password}</li>}
+                            {fieldErrors.languagesSpoken && <li>â€¢ {fieldErrors.languagesSpoken}</li>}
+                            {fieldErrors.terms && <li>â€¢ {fieldErrors.terms}</li>}
                           </ul>
                         </div>
                       )}
@@ -949,7 +949,7 @@ const RegisterClient: React.FC = () => {
                 <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-blue-800 flex items-center gap-1">
-                      🎯 {t.ui.progressLabel}
+                      ðŸŽ¯ {t.ui.progressLabel}
                     </span>
                     <span className="text-sm text-blue-700 font-bold">
                       {Object.values(fieldValidation).filter(Boolean).length}/5
@@ -982,7 +982,7 @@ const RegisterClient: React.FC = () => {
                 </h3>
 
                 <div className="space-y-6">
-                  {/* Prénom */}
+                  {/* PrÃ©nom */}
                   <div>
                     <label htmlFor="firstName" className="mb-1 block text-sm font-semibold text-gray-800">
                       {t.fields.firstName} <span className="text-red-500">*</span>
@@ -1081,7 +1081,7 @@ const RegisterClient: React.FC = () => {
                     />
                   </div>
 
-                  {/* Langues parlées */}
+                  {/* Langues parlÃ©es */}
                   <div>
                     <label className="mb-1 block text-sm font-semibold text-gray-800">
                       {t.fields.languagesSpoken} <span className="text-red-500">*</span>
@@ -1101,8 +1101,8 @@ const RegisterClient: React.FC = () => {
                           locale={langKey}
                           placeholder={
                             langKey === 'fr'
-                              ? 'Rechercher et sélectionner les langues…'
-                              : 'Search and select languages…'
+                              ? 'Rechercher et sÃ©lectionner les languesâ€¦'
+                              : 'Search and select languagesâ€¦'
                           }
                         />
                       </div>
@@ -1143,7 +1143,7 @@ const RegisterClient: React.FC = () => {
 
                     <div className="mt-3 flex items-center gap-2 text-xs text-gray-700 bg-blue-50 rounded-lg px-2 py-1 border border-blue-200">
                       <ShieldCheck className="h-4 w-4 text-blue-600" />
-                      <span>🔒 SSL • {t.help.dataSecure}</span>
+                      <span>ðŸ”’ SSL â€¢ {t.help.dataSecure}</span>
                     </div>
                   </div>
                 </div>
@@ -1245,7 +1245,7 @@ const RegisterClient: React.FC = () => {
               <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-700 opacity-60 blur-sm" />
               <div className="relative flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-md border border-white/15 shadow-lg hover:shadow-blue-500/20 transition-shadow">
                 <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-500 text-white text-sm shadow">
-                  ✨
+                  âœ¨
                 </div>
                 <p className="text-[13px] sm:text-sm text-white/95">{t.ui.footerBanner}</p>
               </div>

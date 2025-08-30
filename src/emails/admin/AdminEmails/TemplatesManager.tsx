@@ -1,4 +1,4 @@
-// TemplatesManager.tsx
+﻿// TemplatesManager.tsx
 import React from 'react';
 import {
   bookingConfirmation,
@@ -10,34 +10,34 @@ import {
 
 const templates = [
   {
-    name: '📅 Confirmation de RDV',
+    name: 'ðŸ“… Confirmation de RDV',
     render: bookingConfirmation,
     exampleData: {
       firstName: 'Alice',
-      date: '01/08/2025 à 14h30',
+      date: '01/08/2025 Ã  14h30',
       providerName: 'Me Jean Dupont',
-      serviceTitle: 'Visa étudiant',
+      serviceTitle: 'Visa Ã©tudiant',
     },
   },
   {
-    name: '📨 Réponse message contact',
+    name: 'ðŸ“¨ RÃ©ponse message contact',
     render: contactReply,
     exampleData: {
       firstName: 'Alice',
-      userMessage: 'Bonjour, j’ai besoin d’aide pour mon dossier.',
-      adminReply: 'Merci pour votre message. Voici comment procéder...',
+      userMessage: 'Bonjour, jâ€™ai besoin dâ€™aide pour mon dossier.',
+      adminReply: 'Merci pour votre message. Voici comment procÃ©der...',
     },
   },
   {
-    name: '📰 Newsletter',
+    name: 'ðŸ“° Newsletter',
     render: newsletter,
     exampleData: {
-      greeting: 'Bonjour à tous 👋',
-      content: 'Voici les nouveautés du mois de juillet.',
+      greeting: 'Bonjour Ã  tous ðŸ‘‹',
+      content: 'Voici les nouveautÃ©s du mois de juillet.',
     },
   },
   {
-    name: '🏷️ Code promo',
+    name: 'ðŸ·ï¸ Code promo',
     render: promoCode,
     exampleData: {
       firstName: 'Alice',
@@ -47,7 +47,7 @@ const templates = [
     },
   },
   {
-    name: '⏰ Rappel prestataire en ligne',
+    name: 'â° Rappel prestataire en ligne',
     render: reminderOnline,
     exampleData: {
       firstName: 'Alice',
@@ -59,9 +59,9 @@ const templates = [
 const TemplatesManager: React.FC = () => {
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">🧱 Aperçu des templates disponibles</h2>
+      <h2 className="text-xl font-semibold mb-4">ðŸ§± AperÃ§u des templates disponibles</h2>
       <p className="text-gray-600 mb-6">
-        Voici un aperçu en temps réel de tous les templates d'emails intégrés.
+        Voici un aperÃ§u en temps rÃ©el de tous les templates d'emails intÃ©grÃ©s.
       </p>
 
       <div className="space-y-8">

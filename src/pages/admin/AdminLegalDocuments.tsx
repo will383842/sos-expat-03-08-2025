@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FileText, 
@@ -34,15 +34,15 @@ interface LegalDocument {
 }
 
 const documentTypes = [
-  { value: 'terms', label: 'Conditions Générales' },
-  { value: 'privacy', label: 'Politique de Confidentialité' },
+  { value: 'terms', label: 'Conditions GÃ©nÃ©rales' },
+  { value: 'privacy', label: 'Politique de ConfidentialitÃ©' },
   { value: 'cookies', label: 'Politique des Cookies' },
   { value: 'refund', label: 'Politique de Remboursement' },
-  { value: 'legal', label: 'Mentions Légales' },
+  { value: 'legal', label: 'Mentions LÃ©gales' },
   { value: 'faq', label: 'FAQ' },
   { value: 'help', label: 'Centre d\'aide' },
   { value: 'consumers', label: 'Information Consommateurs' },
-  { value: 'seo', label: 'Référencement' },
+  { value: 'seo', label: 'RÃ©fÃ©rencement' },
   { value: 'other', label: 'Autre' }
 ];
 
@@ -222,7 +222,7 @@ const AdminLegalDocuments: React.FC = () => {
       setSelectedDocument(null);
       
       // Show success message
-      alert(isCreating ? 'Document créé avec succès' : 'Document mis à jour avec succès');
+      alert(isCreating ? 'Document crÃ©Ã© avec succÃ¨s' : 'Document mis Ã  jour avec succÃ¨s');
       
     } catch (error) {
       console.error('Error saving document:', error);
@@ -249,7 +249,7 @@ const AdminLegalDocuments: React.FC = () => {
       setSelectedDocument(null);
       
       // Show success message
-      alert('Document supprimé avec succès');
+      alert('Document supprimÃ© avec succÃ¨s');
       
     } catch (error) {
       console.error('Error deleting document:', error);
@@ -276,10 +276,10 @@ const AdminLegalDocuments: React.FC = () => {
 
   return (
     <AdminLayout>
-      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des documents légaux. Veuillez réessayer.</div>}>
+      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des documents lÃ©gaux. Veuillez rÃ©essayer.</div>}>
         <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-900">Gestion des documents légaux</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Gestion des documents lÃ©gaux</h1>
             <Button
               onClick={handleCreateDocument}
               className="bg-red-600 hover:bg-red-700"
@@ -311,7 +311,7 @@ const AdminLegalDocuments: React.FC = () => {
                       Statut
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dernière mise à jour
+                      DerniÃ¨re mise Ã  jour
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -343,7 +343,7 @@ const AdminLegalDocuments: React.FC = () => {
                           {getDocumentTypeName(document.type)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {document.language === 'fr' ? '🇫🇷 Français' : '🇬🇧 English'}
+                          {document.language === 'fr' ? 'ðŸ‡«ðŸ‡· FranÃ§ais' : 'ðŸ‡¬ðŸ‡§ English'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {document.version}
@@ -369,14 +369,14 @@ const AdminLegalDocuments: React.FC = () => {
                             <button
                               onClick={() => handlePreviewDocument(document)}
                               className="text-blue-600 hover:text-blue-800"
-                              title="Prévisualiser"
+                              title="PrÃ©visualiser"
                             >
                               <Eye size={18} />
                             </button>
                             <button
                               onClick={() => handleEditDocument(document)}
                               className="text-green-600 hover:text-green-800"
-                              title="Éditer"
+                              title="Ã‰diter"
                             >
                               <Edit size={18} />
                             </button>
@@ -394,7 +394,7 @@ const AdminLegalDocuments: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                        Aucun document trouvé
+                        Aucun document trouvÃ©
                       </td>
                     </tr>
                   )}
@@ -408,7 +408,7 @@ const AdminLegalDocuments: React.FC = () => {
         <Modal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
-          title={isCreating ? "Créer un document légal" : "Modifier un document légal"}
+          title={isCreating ? "CrÃ©er un document lÃ©gal" : "Modifier un document lÃ©gal"}
           size="large"
         >
           <div className="space-y-4">
@@ -422,7 +422,7 @@ const AdminLegalDocuments: React.FC = () => {
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="ex: Conditions Générales d'Utilisation"
+                placeholder="ex: Conditions GÃ©nÃ©rales d'Utilisation"
               />
             </div>
 
@@ -453,7 +453,7 @@ const AdminLegalDocuments: React.FC = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as 'fr' | 'en' }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
-                  <option value="fr">Français</option>
+                  <option value="fr">FranÃ§ais</option>
                   <option value="en">English</option>
                 </select>
               </div>
@@ -499,7 +499,7 @@ const AdminLegalDocuments: React.FC = () => {
                 className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
               />
               <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
-                Document actif (publié sur le site)
+                Document actif (publiÃ© sur le site)
               </label>
             </div>
 
@@ -517,7 +517,7 @@ const AdminLegalDocuments: React.FC = () => {
                 loading={isActionLoading}
               >
                 <Save size={16} className="mr-2" />
-                {isCreating ? 'Créer le document' : 'Enregistrer les modifications'}
+                {isCreating ? 'CrÃ©er le document' : 'Enregistrer les modifications'}
               </Button>
             </div>
           </div>
@@ -527,7 +527,7 @@ const AdminLegalDocuments: React.FC = () => {
         <Modal
           isOpen={showPreviewModal}
           onClose={() => setShowPreviewModal(false)}
-          title="Prévisualisation du document"
+          title="PrÃ©visualisation du document"
           size="large"
         >
           {selectedDocument && (
@@ -597,11 +597,11 @@ const AdminLegalDocuments: React.FC = () => {
                   <AlertTriangle className="h-5 w-5 text-red-400" />
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-red-800">
-                      Attention : Cette action est irréversible
+                      Attention : Cette action est irrÃ©versible
                     </h3>
                     <div className="mt-2 text-sm text-red-700">
                       <p>
-                        Vous êtes sur le point de supprimer définitivement le document :
+                        Vous Ãªtes sur le point de supprimer dÃ©finitivement le document :
                         <br />
                         <strong>{selectedDocument.title}</strong>
                       </p>

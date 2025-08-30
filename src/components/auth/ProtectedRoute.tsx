@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+﻿import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,7 +9,7 @@ import { checkUserRole, isUserBanned } from '../../utils/auth';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string | string[];
-  fallbackPath?: string; // Peut être surchargé par l'appelant
+  fallbackPath?: string; // Peut Ãªtre surchargÃ© par l'appelant
   showError?: boolean;
 }
 
@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [error, setError] = useState<string | null>(null);
 
-  // ⚠️ Fallback robuste : admin → /admin/login, sinon → /login
+  // âš ï¸ Fallback robuste : admin â†’ /admin/login, sinon â†’ /login
   const computedFallbackPath = useMemo(() => {
     if (fallbackPath) return fallbackPath;
 

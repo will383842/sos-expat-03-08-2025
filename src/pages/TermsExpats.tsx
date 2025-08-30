@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -20,9 +20,9 @@ import { db } from '../config/firebase';
 
 /**
  * Important :
- * - Logique métier conservée (Firestore, parsing, sélection langue via useApp).
+ * - Logique mÃ©tier conservÃ©e (Firestore, parsing, sÃ©lection langue via useApp).
  * - Design refondu pour matcher Home (gradients, cards, badges, CTA), mobile-first.
- * - 100% éditable depuis l'admin (collection `legal_documents`).
+ * - 100% Ã©ditable depuis l'admin (collection `legal_documents`).
  * - Aucun `any`.
  */
 
@@ -73,49 +73,49 @@ const TermsExpats: React.FC = () => {
 
   const translations = {
     fr: {
-      title: 'CGU Expatriés Aidants',
-      subtitle: "Conditions générales d'utilisation pour les expatriés aidants",
-      lastUpdated: 'Version 2.2 – Dernière mise à jour : 16 juin 2025',
+      title: 'CGU ExpatriÃ©s Aidants',
+      subtitle: "Conditions gÃ©nÃ©rales d'utilisation pour les expatriÃ©s aidants",
+      lastUpdated: 'Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025',
       loading: 'Chargement...',
-      joinNetwork: 'Rejoindre le réseau',
-      trustedByHelpers: 'Déjà 1K+ expatriés aidants nous font confiance',
-      keyFeatures: 'Points clés',
+      joinNetwork: 'Rejoindre le rÃ©seau',
+      trustedByHelpers: 'DÃ©jÃ  1K+ expatriÃ©s aidants nous font confiance',
+      keyFeatures: 'Points clÃ©s',
       features: [
         'Paiement garanti sous 7 jours',
         'Support technique 24/7',
-        'Interface mobile optimisée',
-        'Utilisateurs vérifiés',
+        'Interface mobile optimisÃ©e',
+        'Utilisateurs vÃ©rifiÃ©s',
       ],
       languageToggle: 'Changer de langue',
       sections: {
-        definitions: 'Définitions',
+        definitions: 'DÃ©finitions',
         scope: 'Objet, champ et acceptation',
-        status: "Statut de l'Expatrié Aidant – Conformité et responsabilités",
-        account: 'Compte, vérifications et sécurité',
-        rules: 'Règles d’usage – Qualité, interdits, non-contournement',
-        relationship: 'Relation Aidant–Utilisateur (hors Plateforme)',
+        status: "Statut de l'ExpatriÃ© Aidant â€“ ConformitÃ© et responsabilitÃ©s",
+        account: 'Compte, vÃ©rifications et sÃ©curitÃ©',
+        rules: 'RÃ¨gles dâ€™usage â€“ QualitÃ©, interdits, non-contournement',
+        relationship: 'Relation Aidantâ€“Utilisateur (hors Plateforme)',
         fees: 'Frais, paiement unique et taxes',
-        data: 'Données personnelles (cadre global)',
-        ip: 'Propriété intellectuelle',
-        liability: 'Garanties, responsabilité et indemnisation',
-        law: 'Droit applicable – Arbitrage – Juridiction estonienne',
+        data: 'DonnÃ©es personnelles (cadre global)',
+        ip: 'PropriÃ©tÃ© intellectuelle',
+        liability: 'Garanties, responsabilitÃ© et indemnisation',
+        law: 'Droit applicable â€“ Arbitrage â€“ Juridiction estonienne',
         misc: 'Divers',
         contact: 'Contact',
       },
-      readyToJoin: 'Prêt à rejoindre SOS Expat ?',
-      readySubtitle: 'Aidez des expatriés et développez votre activité de conseil.',
+      readyToJoin: 'PrÃªt Ã  rejoindre SOS Expat ?',
+      readySubtitle: 'Aidez des expatriÃ©s et dÃ©veloppez votre activitÃ© de conseil.',
       startNow: 'Commencer maintenant',
       contactUs: 'Nous contacter',
       anchorTitle: 'Sommaire',
-      editHint: 'Document éditable depuis la console admin',
+      editHint: 'Document Ã©ditable depuis la console admin',
       ctaHero: 'Voir les experts',
-      heroBadge: 'Nouveau — Conditions mises à jour',
+      heroBadge: 'Nouveau â€” Conditions mises Ã  jour',
       contactForm: 'Formulaire de contact',
     },
     en: {
       title: 'Expat Helper Terms',
       subtitle: 'Terms of Use for expatriate helpers',
-      lastUpdated: 'Version 2.2 – Last updated: 16 June 2025',
+      lastUpdated: 'Version 2.2 â€“ Last updated: 16 June 2025',
       loading: 'Loading...',
       joinNetwork: 'Join the network',
       trustedByHelpers: 'Already 1K+ expat helpers trust us',
@@ -130,15 +130,15 @@ const TermsExpats: React.FC = () => {
       sections: {
         definitions: 'Definitions',
         scope: 'Purpose, Scope and Acceptance',
-        status: 'Helper Status – Compliance and Responsibilities',
+        status: 'Helper Status â€“ Compliance and Responsibilities',
         account: 'Account, Checks and Security',
-        rules: 'Use Rules – Quality, Prohibited Conduct, No Circumvention',
-        relationship: 'Helper–User Relationship (Off-Platform)',
+        rules: 'Use Rules â€“ Quality, Prohibited Conduct, No Circumvention',
+        relationship: 'Helperâ€“User Relationship (Off-Platform)',
         fees: 'Fees, Single Payment and Taxes',
         data: 'Data Protection (Global Framework)',
         ip: 'Intellectual Property',
         liability: 'Warranties, Liability and Indemnity',
-        law: 'Governing Law – ICC Arbitration – Estonian Courts',
+        law: 'Governing Law â€“ ICC Arbitration â€“ Estonian Courts',
         misc: 'Miscellaneous',
         contact: 'Contact',
       },
@@ -149,7 +149,7 @@ const TermsExpats: React.FC = () => {
       anchorTitle: 'Overview',
       editHint: 'Document editable from the admin console',
       ctaHero: 'See experts',
-      heroBadge: 'New — Terms updated',
+      heroBadge: 'New â€” Terms updated',
       contactForm: 'Contact Form',
     },
   };
@@ -160,7 +160,7 @@ const TermsExpats: React.FC = () => {
     setSelectedLanguage(newLang);
   };
 
-  // Parser Markdown (logique d’origine conservée)
+  // Parser Markdown (logique dâ€™origine conservÃ©e)
   const parseMarkdownContent = (text: string) => {
     const lines = text.split('\n');
     const elements: JSX.Element[] = [];
@@ -230,7 +230,7 @@ const TermsExpats: React.FC = () => {
         continue;
       }
 
-      // 2.1 / 3.2 …
+      // 2.1 / 3.2 â€¦
       const numberedMatch = line.match(/^(\d+\.\d+\.?)\s+(.*)$/);
       if (numberedMatch) {
         const number = numberedMatch[1];
@@ -254,7 +254,7 @@ const TermsExpats: React.FC = () => {
         continue;
       }
 
-      // Ligne entièrement en gras
+      // Ligne entiÃ¨rement en gras
       if (line.startsWith('**') && line.endsWith('**')) {
         const boldText = line.slice(2, -2);
         elements.push(
@@ -321,175 +321,175 @@ const TermsExpats: React.FC = () => {
     return elements;
   };
 
-  // Contenu par défaut FR (une seule paire de ** pour éviter le parsing foireux)
+  // Contenu par dÃ©faut FR (une seule paire de ** pour Ã©viter le parsing foireux)
   const defaultFr = `
-# Conditions Générales d'Utilisation – Expatriés Aidants (Global)
+# Conditions GÃ©nÃ©rales d'Utilisation â€“ ExpatriÃ©s Aidants (Global)
 
-**SOS Expat d'Ulixai OÜ** (la « **Plateforme** », « **SOS** », « **nous** »)
+**SOS Expat d'Ulixai OÃœ** (la Â« **Plateforme** Â», Â« **SOS** Â», Â« **nous** Â»)
 
-**Version 2.2 – Dernière mise à jour : 16 juin 2025**
+**Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025**
 
 ---
 
-## 1. Définitions
+## 1. DÃ©finitions
 
-**Expatrié Aidant** (« **Aidant** ») : toute personne inscrite sur la Plateforme pour proposer, à titre indépendant, des services d'assistance non juridiques et non médicaux à des Utilisateurs (orientation, démarches pratiques, accompagnement, traduction informelle, mise en relation locale, etc.).
+**ExpatriÃ© Aidant** (Â« **Aidant** Â») : toute personne inscrite sur la Plateforme pour proposer, Ã  titre indÃ©pendant, des services d'assistance non juridiques et non mÃ©dicaux Ã  des Utilisateurs (orientation, dÃ©marches pratiques, accompagnement, traduction informelle, mise en relation locale, etc.).
 
 **Utilisateur** : toute personne utilisant la Plateforme pour contacter un Aidant.
 
-**Mise en relation** : l'introduction technique/opérationnelle réalisée par la Plateforme entre un Utilisateur et un Aidant (transmission de coordonnées et/ou ouverture d'un canal de communication et/ou acceptation par l'Aidant d'une demande émise via la Plateforme).
+**Mise en relation** : l'introduction technique/opÃ©rationnelle rÃ©alisÃ©e par la Plateforme entre un Utilisateur et un Aidant (transmission de coordonnÃ©es et/ou ouverture d'un canal de communication et/ou acceptation par l'Aidant d'une demande Ã©mise via la Plateforme).
 
-**Pays d'Intervention** : la juridiction principalement visée par la demande de l'Utilisateur au moment de la Mise en relation ; à défaut, le pays de résidence de l'Utilisateur à la date de la demande.
+**Pays d'Intervention** : la juridiction principalement visÃ©e par la demande de l'Utilisateur au moment de la Mise en relation ; Ã  dÃ©faut, le pays de rÃ©sidence de l'Utilisateur Ã  la date de la demande.
 
-**Frais de Mise en relation** : frais fixes dus à SOS par Mise en relation (art. 7) : **19 €** si paiement en **EUR** ou **25 $ USD** si paiement en **USD**, susceptibles d'évolution et/ou de **barèmes locaux** par pays/devise, avec effet prospectif.
+**Frais de Mise en relation** : frais fixes dus Ã  SOS par Mise en relation (art. 7) : **19 â‚¬** si paiement en **EUR** ou **25 $ USD** si paiement en **USD**, susceptibles d'Ã©volution et/ou de **barÃ¨mes locaux** par pays/devise, avec effet prospectif.
 
-**Prestataire(s) de paiement** : services tiers traitant les encaissements et la répartition des fonds.
+**Prestataire(s) de paiement** : services tiers traitant les encaissements et la rÃ©partition des fonds.
 
 ---
 
 ## 2. Objet, champ et acceptation
 
-2.1. Les présentes CGU régissent l'accès et l'utilisation de la Plateforme par les Aidants.
+2.1. Les prÃ©sentes CGU rÃ©gissent l'accÃ¨s et l'utilisation de la Plateforme par les Aidants.
 
-2.2. **Ulixai agit exclusivement comme intermédiaire technique de Mise en relation.** Ulixai n'est pas employeur, mandataire ou partenaire des Aidants, ne fournit aucun conseil juridique, médical, fiscal, comptable ou réglementé, et n'est pas partie aux contrats entre Aidants et Utilisateurs.
+2.2. **Ulixai agit exclusivement comme intermÃ©diaire technique de Mise en relation.** Ulixai n'est pas employeur, mandataire ou partenaire des Aidants, ne fournit aucun conseil juridique, mÃ©dical, fiscal, comptable ou rÃ©glementÃ©, et n'est pas partie aux contrats entre Aidants et Utilisateurs.
 
-2.3. **Acceptation électronique (click-wrap).** L'inscription et/ou l'usage de la Plateforme valent acceptation des CGU, signature électronique et consentement contractuel. SOS peut conserver des preuves techniques (horodatage, identifiants).
+2.3. **Acceptation Ã©lectronique (click-wrap).** L'inscription et/ou l'usage de la Plateforme valent acceptation des CGU, signature Ã©lectronique et consentement contractuel. SOS peut conserver des preuves techniques (horodatage, identifiants).
 
-2.4. **Modifications.** SOS peut mettre à jour les CGU et/ou les barèmes de frais (par pays/devise) avec **effet prospectif** par publication sur la Plateforme. L'usage continu vaut acceptation.
+2.4. **Modifications.** SOS peut mettre Ã  jour les CGU et/ou les barÃ¨mes de frais (par pays/devise) avec **effet prospectif** par publication sur la Plateforme. L'usage continu vaut acceptation.
 
-2.5. **Capacité professionnelle (B2B).** L'Aidant déclare agir **exclusivement à des fins professionnelles** ; les régimes de protection des consommateurs ne s'appliquent pas à la relation Ulixai–Aidant.
-
----
-
-## 3. Statut de l'Aidant – Conformité, autorisations et responsabilités
-
-3.1. **Indépendance.** L'Aidant agit en **professionnel indépendant** ; aucun lien d'emploi, mandat, agence, partenariat ou coentreprise n'est créé avec Ulixai.
-
-3.2. **Autorisation de travail & statut d'immigration.** L'Aidant est **seul responsable** d'obtenir et de maintenir **toutes autorisations** requises dans chaque Pays d'Intervention (visa, permis de travail, enregistrement d'activité/auto-entreprise, assurances, licences locales, etc.). Ulixai **ne vérifie pas** ces autorisations et **n'assume aucune responsabilité** à ce titre.
-
-3.3. **Services non réglementés.** L'Aidant s'engage à **ne pas fournir de services réglementés** (ex. conseil juridique, médical, financier, d'expert-comptable, d'agent immobilier, etc.) **sans** détenir les **autorisations/licences** nécessaires **et** sans se conformer pleinement aux lois locales. À défaut, il s'abstient de tels services et redirige l'Utilisateur vers un professionnel dûment habilité (ex. avocat inscrit).
-
-3.4. **Conformité générale.** L'Aidant respecte les lois/règlements applicables (consommation, e-commerce, publicité/démarchage, concurrence loyale, LCB-FT/KYC le cas échéant, fiscalité, protection des données, sanctions/export, sécurité des personnes).
-
-3.5. **Assurances.** L'Aidant déclare disposer des assurances nécessaires (responsabilité civile pro, le cas échéant) couvrant ses activités et territoires d'intervention.
-
-3.6. **Confidentialité.** L'Aidant protège les informations des Utilisateurs et s'abstient de les divulguer, sauf obligation légale ou consentement.
+2.5. **CapacitÃ© professionnelle (B2B).** L'Aidant dÃ©clare agir **exclusivement Ã  des fins professionnelles** ; les rÃ©gimes de protection des consommateurs ne s'appliquent pas Ã  la relation Ulixaiâ€“Aidant.
 
 ---
 
-## 4. Compte, vérifications et sécurité
+## 3. Statut de l'Aidant â€“ ConformitÃ©, autorisations et responsabilitÃ©s
 
-4.1. **Inscription.** Un (1) compte par Aidant ; informations exactes, complètes et à jour (identité, moyens de contact, description des services, zones d'intervention, etc.).
+3.1. **IndÃ©pendance.** L'Aidant agit en **professionnel indÃ©pendant** ; aucun lien d'emploi, mandat, agence, partenariat ou coentreprise n'est crÃ©Ã© avec Ulixai.
 
-4.2. **Vérifications.** Ulixai peut procéder à des contrôles raisonnables (identité, cohérence du profil, screenings sanctions/KYC via Prestataires) et refuser/suspendre/retirer l'accès pour motif de sécurité, conformité ou qualité de service.
+3.2. **Autorisation de travail & statut d'immigration.** L'Aidant est **seul responsable** d'obtenir et de maintenir **toutes autorisations** requises dans chaque Pays d'Intervention (visa, permis de travail, enregistrement d'activitÃ©/auto-entreprise, assurances, licences locales, etc.). Ulixai **ne vÃ©rifie pas** ces autorisations et **n'assume aucune responsabilitÃ©** Ã  ce titre.
 
-4.3. **Sécurité des accès.** L'Aidant protège ses identifiants. Toute activité via le compte est réputée effectuée par lui.
+3.3. **Services non rÃ©glementÃ©s.** L'Aidant s'engage Ã  **ne pas fournir de services rÃ©glementÃ©s** (ex. conseil juridique, mÃ©dical, financier, d'expert-comptable, d'agent immobilier, etc.) **sans** dÃ©tenir les **autorisations/licences** nÃ©cessaires **et** sans se conformer pleinement aux lois locales. Ã€ dÃ©faut, il s'abstient de tels services et redirige l'Utilisateur vers un professionnel dÃ»ment habilitÃ© (ex. avocat inscrit).
 
----
+3.4. **ConformitÃ© gÃ©nÃ©rale.** L'Aidant respecte les lois/rÃ¨glements applicables (consommation, e-commerce, publicitÃ©/dÃ©marchage, concurrence loyale, LCB-FT/KYC le cas Ã©chÃ©ant, fiscalitÃ©, protection des donnÃ©es, sanctions/export, sÃ©curitÃ© des personnes).
 
-## 5. Règles d'usage – Qualité, interdits, non-contournement
+3.5. **Assurances.** L'Aidant dÃ©clare disposer des assurances nÃ©cessaires (responsabilitÃ© civile pro, le cas Ã©chÃ©ant) couvrant ses activitÃ©s et territoires d'intervention.
 
-5.1. **Qualité & description fidèle.** L'Aidant décrit ses services de façon exacte, sans promesse de résultat. Il ne présente **aucune fausse qualité** (ex. profession réglementée non détenue).
-
-5.2. **Interdits.** Contenus illicites, discriminatoires ou trompeurs ; pratiques déloyales ; collecte ou usage abusif de données ; contournement/ingénierie inverse de la Plateforme ; collusion/boycott visant à nuire ; violations sanctions/export ; toute activité illégale.
-
-5.3. **Non-contournement.** Chaque **nouvelle Mise en relation** avec un **nouvel Utilisateur** via la Plateforme donne lieu aux **Frais de Mise en relation** (art. 7). Il est **interdit** d'éviter ces frais en contournant la Plateforme pour une nouvelle introduction.
-
-5.4. **Disponibilité.** La Plateforme est fournie **« en l'état »** ; aucune disponibilité ininterrompue n'est garantie (maintenance, incidents, force majeure). L'accès peut être restreint si la loi l'exige.
+3.6. **ConfidentialitÃ©.** L'Aidant protÃ¨ge les informations des Utilisateurs et s'abstient de les divulguer, sauf obligation lÃ©gale ou consentement.
 
 ---
 
-## 6. Relation Aidant–Utilisateur (hors Plateforme)
+## 4. Compte, vÃ©rifications et sÃ©curitÃ©
 
-6.1. Après la Mise en relation, l'Aidant et l'Utilisateur peuvent contractualiser **hors Plateforme**. Les **honoraires** et modalités sont fixés librement par eux, dans le respect des lois locales.
+4.1. **Inscription.** Un (1) compte par Aidant ; informations exactes, complÃ¨tes et Ã  jour (identitÃ©, moyens de contact, description des services, zones d'intervention, etc.).
 
-6.2. L'Aidant remet des **conditions/confirmations de service** conformes au droit local, gère sa **facturation** et ses **obligations fiscales**.
+4.2. **VÃ©rifications.** Ulixai peut procÃ©der Ã  des contrÃ´les raisonnables (identitÃ©, cohÃ©rence du profil, screenings sanctions/KYC via Prestataires) et refuser/suspendre/retirer l'accÃ¨s pour motif de sÃ©curitÃ©, conformitÃ© ou qualitÃ© de service.
 
-6.3. Ulixai **n'est pas responsable** de la qualité, de l'exactitude ou du résultat des services de l'Aidant, ni des engagements pris entre l'Aidant et l'Utilisateur.
+4.3. **SÃ©curitÃ© des accÃ¨s.** L'Aidant protÃ¨ge ses identifiants. Toute activitÃ© via le compte est rÃ©putÃ©e effectuÃ©e par lui.
+
+---
+
+## 5. RÃ¨gles d'usage â€“ QualitÃ©, interdits, non-contournement
+
+5.1. **QualitÃ© & description fidÃ¨le.** L'Aidant dÃ©crit ses services de faÃ§on exacte, sans promesse de rÃ©sultat. Il ne prÃ©sente **aucune fausse qualitÃ©** (ex. profession rÃ©glementÃ©e non dÃ©tenue).
+
+5.2. **Interdits.** Contenus illicites, discriminatoires ou trompeurs ; pratiques dÃ©loyales ; collecte ou usage abusif de donnÃ©es ; contournement/ingÃ©nierie inverse de la Plateforme ; collusion/boycott visant Ã  nuire ; violations sanctions/export ; toute activitÃ© illÃ©gale.
+
+5.3. **Non-contournement.** Chaque **nouvelle Mise en relation** avec un **nouvel Utilisateur** via la Plateforme donne lieu aux **Frais de Mise en relation** (art. 7). Il est **interdit** d'Ã©viter ces frais en contournant la Plateforme pour une nouvelle introduction.
+
+5.4. **DisponibilitÃ©.** La Plateforme est fournie **Â« en l'Ã©tat Â»** ; aucune disponibilitÃ© ininterrompue n'est garantie (maintenance, incidents, force majeure). L'accÃ¨s peut Ãªtre restreint si la loi l'exige.
+
+---
+
+## 6. Relation Aidantâ€“Utilisateur (hors Plateforme)
+
+6.1. AprÃ¨s la Mise en relation, l'Aidant et l'Utilisateur peuvent contractualiser **hors Plateforme**. Les **honoraires** et modalitÃ©s sont fixÃ©s librement par eux, dans le respect des lois locales.
+
+6.2. L'Aidant remet des **conditions/confirmations de service** conformes au droit local, gÃ¨re sa **facturation** et ses **obligations fiscales**.
+
+6.3. Ulixai **n'est pas responsable** de la qualitÃ©, de l'exactitude ou du rÃ©sultat des services de l'Aidant, ni des engagements pris entre l'Aidant et l'Utilisateur.
 
 ---
 
 ## 7. Frais, paiement unique et taxes
 
-7.1. **Frais de Mise en relation (forfait).** **19 € (EUR)** **ou** **25 $ (USD)** **par Mise en relation**, hors taxes et hors frais du Prestataire de paiement. Ulixai peut modifier ces montants et/ou publier des **barèmes locaux** par pays/devise, avec effet prospectif.
+7.1. **Frais de Mise en relation (forfait).** **19 â‚¬ (EUR)** **ou** **25 $ (USD)** **par Mise en relation**, hors taxes et hors frais du Prestataire de paiement. Ulixai peut modifier ces montants et/ou publier des **barÃ¨mes locaux** par pays/devise, avec effet prospectif.
 
-7.2. **Paiement unique & répartition.** L'Utilisateur effectue **un paiement unique** via la Plateforme couvrant (i) la **rémunération de l'Aidant** (telle que convenue) et (ii) les **Frais de Mise en relation** d'Ulixai. Ulixai (ou son Prestataire) encaisse, **déduit** ses frais, puis **reverse** le solde à l'Aidant. L'Aidant **autorise** ces déductions et répartitions.
+7.2. **Paiement unique & rÃ©partition.** L'Utilisateur effectue **un paiement unique** via la Plateforme couvrant (i) la **rÃ©munÃ©ration de l'Aidant** (telle que convenue) et (ii) les **Frais de Mise en relation** d'Ulixai. Ulixai (ou son Prestataire) encaisse, **dÃ©duit** ses frais, puis **reverse** le solde Ã  l'Aidant. L'Aidant **autorise** ces dÃ©ductions et rÃ©partitions.
 
-7.3. **Exigibilité & non-remboursement.** Les Frais de Mise en relation sont **dus dès** la Mise en relation et sont **non remboursables** (sauf geste commercial discrétionnaire d'Ulixai en cas d'échec exclusivement imputable à la Plateforme et **dans la mesure permise par la loi**).
+7.3. **ExigibilitÃ© & non-remboursement.** Les Frais de Mise en relation sont **dus dÃ¨s** la Mise en relation et sont **non remboursables** (sauf geste commercial discrÃ©tionnaire d'Ulixai en cas d'Ã©chec exclusivement imputable Ã  la Plateforme et **dans la mesure permise par la loi**).
 
-7.4. **Remboursements Utilisateur.** Si un remboursement est accordé à l'Utilisateur, il est **imputé sur la part de l'Aidant** : Ulixai peut **retenir/compenser** le montant correspondant sur les versements futurs de l'Aidant ou en demander le remboursement si aucun versement n'est à venir. **Aucun remboursement** des Frais de Mise en relation n'est dû, sauf décision discrétionnaire d'Ulixai.
+7.4. **Remboursements Utilisateur.** Si un remboursement est accordÃ© Ã  l'Utilisateur, il est **imputÃ© sur la part de l'Aidant** : Ulixai peut **retenir/compenser** le montant correspondant sur les versements futurs de l'Aidant ou en demander le remboursement si aucun versement n'est Ã  venir. **Aucun remboursement** des Frais de Mise en relation n'est dÃ», sauf dÃ©cision discrÃ©tionnaire d'Ulixai.
 
-7.5. **Devises & conversion.** Plusieurs devises peuvent être proposées ; des taux/frais de conversion du Prestataire peuvent s'appliquer.
+7.5. **Devises & conversion.** Plusieurs devises peuvent Ãªtre proposÃ©es ; des taux/frais de conversion du Prestataire peuvent s'appliquer.
 
-7.6. **Taxes.** L'Aidant demeure responsable de **toutes taxes** applicables (TVA, impôt sur le revenu, sécurité sociale, etc.). Ulixai collecte/reverse, lorsque requis, la TVA/équivalent local sur les Frais de Mise en relation.
+7.6. **Taxes.** L'Aidant demeure responsable de **toutes taxes** applicables (TVA, impÃ´t sur le revenu, sÃ©curitÃ© sociale, etc.). Ulixai collecte/reverse, lorsque requis, la TVA/Ã©quivalent local sur les Frais de Mise en relation.
 
-7.7. **Compensation.** Ulixai peut compenser toute somme due par l'Aidant avec toute somme payable à l'Aidant.
+7.7. **Compensation.** Ulixai peut compenser toute somme due par l'Aidant avec toute somme payable Ã  l'Aidant.
 
 ---
 
-## 8. Données personnelles (cadre global)
+## 8. DonnÃ©es personnelles (cadre global)
 
-8.1. **Rôles.** Pour les données d'Utilisateurs reçues aux fins de Mise en relation, **Ulixai et l'Aidant** agissent **chacun** en **responsable de traitement** pour leurs propres finalités.
+8.1. **RÃ´les.** Pour les donnÃ©es d'Utilisateurs reÃ§ues aux fins de Mise en relation, **Ulixai et l'Aidant** agissent **chacun** en **responsable de traitement** pour leurs propres finalitÃ©s.
 
-8.2. **Bases & finalités.** Exécution du contrat (Mise en relation), intérêts légitimes (sécurité, prévention de la fraude, amélioration), conformité légale (LCB-FT, sanctions), et consentement lorsque requis.
+8.2. **Bases & finalitÃ©s.** ExÃ©cution du contrat (Mise en relation), intÃ©rÃªts lÃ©gitimes (sÃ©curitÃ©, prÃ©vention de la fraude, amÃ©lioration), conformitÃ© lÃ©gale (LCB-FT, sanctions), et consentement lorsque requis.
 
-8.3. **Transferts internationaux** avec **garanties appropriées** lorsque requis.
+8.3. **Transferts internationaux** avec **garanties appropriÃ©es** lorsque requis.
 
 8.4. **Droits & contact.** Exercice via le **formulaire de contact** de la Plateforme.
 
-8.5. **Sécurité.** Mesures techniques/organisationnelles raisonnables ; notification des violations selon les lois applicables.
+8.5. **SÃ©curitÃ©.** Mesures techniques/organisationnelles raisonnables ; notification des violations selon les lois applicables.
 
-8.6. L'Aidant traite les données conformément au droit du **Pays d'Intervention**.
-
----
-
-## 9. Propriété intellectuelle
-
-La Plateforme, ses marques, logos, bases de données et contenus sont protégés. Aucun droit n'est cédé à l'Aidant, hormis un droit **personnel, non exclusif, non transférable** d'accès pendant la durée des CGU. Les contenus fournis par l'Aidant font l'objet d'une **licence mondiale, non exclusive** au profit d'Ulixai pour l'hébergement et l'affichage dans la Plateforme.
+8.6. L'Aidant traite les donnÃ©es conformÃ©ment au droit du **Pays d'Intervention**.
 
 ---
 
-## 10. Garanties, responsabilité et indemnisation
+## 9. PropriÃ©tÃ© intellectuelle
 
-10.1. **Aucune garantie** quant aux résultats/qualité/volume d'affaires ; la Plateforme est fournie **« en l'état »**.
-
-10.2. **Limitation de responsabilité** : dans la mesure permise, la responsabilité totale d'Ulixai envers l'Aidant est limitée aux **dommages directs** et **ne peut excéder** le total des **Frais de Mise en relation** perçus par Ulixai au titre de la **transaction** à l'origine de la réclamation.
-
-10.3. **Exclusions** : aucun dommage indirect/consécutif/spécial/punitif (perte de profits, d'opportunités, de clientèle, atteinte à la réputation, coûts de remplacement, etc.).
-
-10.4. **Indemnisation** : l'Aidant **indemnise et garantit** Ulixai (ainsi que ses affiliés, dirigeants, employés, agents) contre toute réclamation, perte, dommage, pénalité et frais (dont honoraires d'avocat) liés à (i) son manquement aux CGU/lois, (ii) ses contenus, (iii) ses services/omissions, (iv) l'absence d'autorisations de travail/immigration/licences.
-
-10.5. **Aucune représentation.** Rien n'emporte mandat, emploi, partenariat ou coentreprise entre Ulixai et l'Aidant.
-
-10.6. **Survie.** Les art. 5, 7, 8, 9, 10, 11 et 12 survivent à la résiliation.
+La Plateforme, ses marques, logos, bases de donnÃ©es et contenus sont protÃ©gÃ©s. Aucun droit n'est cÃ©dÃ© Ã  l'Aidant, hormis un droit **personnel, non exclusif, non transfÃ©rable** d'accÃ¨s pendant la durÃ©e des CGU. Les contenus fournis par l'Aidant font l'objet d'une **licence mondiale, non exclusive** au profit d'Ulixai pour l'hÃ©bergement et l'affichage dans la Plateforme.
 
 ---
 
-## 11. Droit applicable – Arbitrage – Juridiction estonienne – Actions collectives
+## 10. Garanties, responsabilitÃ© et indemnisation
 
-11.1. **Droit matériel** : pour chaque Mise en relation, la relation **Ulixai–Aidant** est régie par les **lois du Pays d'Intervention**, sous réserve des règles d'ordre public locales et des normes internationales impératives. **À titre supplétif et pour l'interprétation/validité des présentes CGU ainsi que pour toute question non régie par le droit du Pays d'Intervention, le droit estonien s'applique.**
+10.1. **Aucune garantie** quant aux rÃ©sultats/qualitÃ©/volume d'affaires ; la Plateforme est fournie **Â« en l'Ã©tat Â»**.
 
-11.2. **Arbitrage CCI obligatoire** : tout litige Ulixai/Aidant est résolu **définitivement** selon le Règlement d'Arbitrage de la **CCI**. **Siège : Tallinn (Estonie)**. **Langue : français.** Le tribunal applique le **droit matériel** défini à l'art. 11.1. Procédure **confidentielle**.
+10.2. **Limitation de responsabilitÃ©** : dans la mesure permise, la responsabilitÃ© totale d'Ulixai envers l'Aidant est limitÃ©e aux **dommages directs** et **ne peut excÃ©der** le total des **Frais de Mise en relation** perÃ§us par Ulixai au titre de la **transaction** Ã  l'origine de la rÃ©clamation.
 
-11.3. **Renonciation aux actions collectives** : dans la mesure permise, toute action **collective/de groupe/représentative** est exclue ; réclamations **individuelles uniquement**.
+10.3. **Exclusions** : aucun dommage indirect/consÃ©cutif/spÃ©cial/punitif (perte de profits, d'opportunitÃ©s, de clientÃ¨le, atteinte Ã  la rÃ©putation, coÃ»ts de remplacement, etc.).
 
-11.4. **Compétence exclusive des tribunaux d'Estonie** : pour toute demande **non arbitrable**, l'**exécution** des sentences ou les **mesures urgentes**, les tribunaux estoniens (compétents à Tallinn) ont compétence **exclusive**. L'Aidant renonce à toute objection de forum/non-convenance.
+10.4. **Indemnisation** : l'Aidant **indemnise et garantit** Ulixai (ainsi que ses affiliÃ©s, dirigeants, employÃ©s, agents) contre toute rÃ©clamation, perte, dommage, pÃ©nalitÃ© et frais (dont honoraires d'avocat) liÃ©s Ã  (i) son manquement aux CGU/lois, (ii) ses contenus, (iii) ses services/omissions, (iv) l'absence d'autorisations de travail/immigration/licences.
+
+10.5. **Aucune reprÃ©sentation.** Rien n'emporte mandat, emploi, partenariat ou coentreprise entre Ulixai et l'Aidant.
+
+10.6. **Survie.** Les art. 5, 7, 8, 9, 10, 11 et 12 survivent Ã  la rÃ©siliation.
+
+---
+
+## 11. Droit applicable â€“ Arbitrage â€“ Juridiction estonienne â€“ Actions collectives
+
+11.1. **Droit matÃ©riel** : pour chaque Mise en relation, la relation **Ulixaiâ€“Aidant** est rÃ©gie par les **lois du Pays d'Intervention**, sous rÃ©serve des rÃ¨gles d'ordre public locales et des normes internationales impÃ©ratives. **Ã€ titre supplÃ©tif et pour l'interprÃ©tation/validitÃ© des prÃ©sentes CGU ainsi que pour toute question non rÃ©gie par le droit du Pays d'Intervention, le droit estonien s'applique.**
+
+11.2. **Arbitrage CCI obligatoire** : tout litige Ulixai/Aidant est rÃ©solu **dÃ©finitivement** selon le RÃ¨glement d'Arbitrage de la **CCI**. **SiÃ¨ge : Tallinn (Estonie)**. **Langue : franÃ§ais.** Le tribunal applique le **droit matÃ©riel** dÃ©fini Ã  l'art. 11.1. ProcÃ©dure **confidentielle**.
+
+11.3. **Renonciation aux actions collectives** : dans la mesure permise, toute action **collective/de groupe/reprÃ©sentative** est exclue ; rÃ©clamations **individuelles uniquement**.
+
+11.4. **CompÃ©tence exclusive des tribunaux d'Estonie** : pour toute demande **non arbitrable**, l'**exÃ©cution** des sentences ou les **mesures urgentes**, les tribunaux estoniens (compÃ©tents Ã  Tallinn) ont compÃ©tence **exclusive**. L'Aidant renonce Ã  toute objection de forum/non-convenance.
 
 ---
 
 ## 12. Divers
 
-12.1. **Cession.** Ulixai peut céder les CGU à une entité de son groupe ou à un successeur ; l'Aidant ne peut céder sans accord écrit d'Ulixai.
+12.1. **Cession.** Ulixai peut cÃ©der les CGU Ã  une entitÃ© de son groupe ou Ã  un successeur ; l'Aidant ne peut cÃ©der sans accord Ã©crit d'Ulixai.
 
-12.2. **Intégralité.** Les CGU constituent l'accord complet et remplacent tout accord antérieur relatif au même objet.
+12.2. **IntÃ©gralitÃ©.** Les CGU constituent l'accord complet et remplacent tout accord antÃ©rieur relatif au mÃªme objet.
 
 12.3. **Notifications.** Par publication sur la Plateforme, notification in-app ou via le **formulaire de contact**.
 
-12.4. **Interprétation.** Les intitulés sont indicatifs. Aucune règle **contra proferentem**.
+12.4. **InterprÃ©tation.** Les intitulÃ©s sont indicatifs. Aucune rÃ¨gle **contra proferentem**.
 
-12.5. **Langues.** Des traductions peuvent être fournies ; **le français prévaut** pour l'interprétation.
+12.5. **Langues.** Des traductions peuvent Ãªtre fournies ; **le franÃ§ais prÃ©vaut** pour l'interprÃ©tation.
 
-12.6. **Nullité partielle.** Si une stipulation est nulle/inapplicable, le reste demeure en vigueur ; remplaçable par une stipulation valide d'effet équivalent lorsque possible.
+12.6. **NullitÃ© partielle.** Si une stipulation est nulle/inapplicable, le reste demeure en vigueur ; remplaÃ§able par une stipulation valide d'effet Ã©quivalent lorsque possible.
 
 12.7. **Non-renonciation.** L'absence d'exercice d'un droit n'emporte pas renonciation.
 
@@ -497,16 +497,16 @@ La Plateforme, ses marques, logos, bases de données et contenus sont protégés
 
 ## 13. Contact
 
-Pour toute question ou demande légale, contactez-nous :
+Pour toute question ou demande lÃ©gale, contactez-nous :
 `;
 
-  // Contenu par défaut EN (une seule paire de **)
+  // Contenu par dÃ©faut EN (une seule paire de **)
   const defaultEn = `
-# Terms of Use – Expatriate Helpers (Global)
+# Terms of Use â€“ Expatriate Helpers (Global)
 
-**SOS Expat by Ulixai OÜ** (the "**Platform**", "**SOS**", "**we**")
+**SOS Expat by Ulixai OÃœ** (the "**Platform**", "**SOS**", "**we**")
 
-**Version 2.2 – Last updated: 16 June 2025**
+**Version 2.2 â€“ Last updated: 16 June 2025**
 
 ---
 
@@ -528,15 +528,15 @@ Pour toute question ou demande légale, contactez-nous :
 
 ## 2. Purpose, Scope and Acceptance
 
-Ulixai acts **solely as a technical intermediary** and is neither an employer, agent nor partner of Helpers; Ulixai provides no legal, medical, tax, accounting or other regulated advice and is not a party to Helper–User contracts.
+Ulixai acts **solely as a technical intermediary** and is neither an employer, agent nor partner of Helpers; Ulixai provides no legal, medical, tax, accounting or other regulated advice and is not a party to Helperâ€“User contracts.
 
 **Click-wrap acceptance** constitutes electronic signature and consent. SOS may update these Terms and/or fee schedules with **prospective effect** upon posting.
 
-**Professional capacity (B2B)**: the Helper acts exclusively for professional purposes; consumer protection regimes do not apply to the Ulixai–Helper relationship.
+**Professional capacity (B2B)**: the Helper acts exclusively for professional purposes; consumer protection regimes do not apply to the Ulixaiâ€“Helper relationship.
 
 ---
 
-## 3. Helper Status – Compliance, Authorizations and Responsibilities
+## 3. Helper Status â€“ Compliance, Authorizations and Responsibilities
 
 **Independence.** The Helper acts as an independent professional.
 
@@ -558,7 +558,7 @@ One account per Helper; accurate, complete and up-to-date profile. Ulixai may co
 
 ---
 
-## 5. Use Rules – Quality, Prohibited Conduct, No Circumvention
+## 5. Use Rules â€“ Quality, Prohibited Conduct, No Circumvention
 
 Accurate description; no false professional status; no promises of outcome.
 
@@ -570,7 +570,7 @@ Accurate description; no false professional status; no promises of outcome.
 
 ---
 
-## 6. Helper–User Relationship (Off-Platform)
+## 6. Helperâ€“User Relationship (Off-Platform)
 
 After Connection, parties may contract **off-Platform**. The Helper provides local service confirmations/terms, invoices, and handles taxes. Ulixai is **not responsible** for the Helper's services or commitments.
 
@@ -624,11 +624,11 @@ No warranty for outcomes/quality/volume; Platform **"as is."**
 
 ---
 
-## 11. Governing Law – ICC Arbitration – Estonian Courts – Class Actions
+## 11. Governing Law â€“ ICC Arbitration â€“ Estonian Courts â€“ Class Actions
 
-**Substantive law:** for each Connection, the **laws of the Country of Intervention** govern the Ulixai–Helper relationship, subject to mandatory local rules and peremptory international norms.
+**Substantive law:** for each Connection, the **laws of the Country of Intervention** govern the Ulixaiâ€“Helper relationship, subject to mandatory local rules and peremptory international norms.
 
-**Mandatory ICC arbitration** for any Ulixai–Helper dispute. **Seat: Tallinn (Estonia). Language: French.** Tribunal applies the **substantive law** defined above. Proceedings are **confidential**.
+**Mandatory ICC arbitration** for any Ulixaiâ€“Helper dispute. **Seat: Tallinn (Estonia). Language: French.** Tribunal applies the **substantive law** defined above. Proceedings are **confidential**.
 
 **Class/collective actions are waived** to the extent permitted by law.
 
@@ -702,7 +702,7 @@ For any questions or legal requests, contact us:
               <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full pl-5 pr-4 py-2.5 border border-white/20 text-white">
                 <Sparkles className="w-4 h-4 text-yellow-300" />
                 <span className="text-sm font-semibold">{t.heroBadge}</span>
-                <span className="mx-1 text-white/40">•</span>
+                <span className="mx-1 text-white/40">â€¢</span>
                 <span className="text-sm text-white/90">{t.lastUpdated}</span>
               </div>
 
@@ -747,7 +747,7 @@ For any questions or legal requests, contact us:
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
                   <Users className="w-4 h-4" /> <span>{t.trustedByHelpers}</span>
                 </span>
-                {/* Avis retirés sur demande */}
+                {/* Avis retirÃ©s sur demande */}
               </div>
 
               <div className="mt-8 flex items-center justify-center gap-4">
@@ -771,7 +771,7 @@ For any questions or legal requests, contact us:
           </div>
         </section>
 
-        {/* Bandeau points clés */}
+        {/* Bandeau points clÃ©s */}
         <section className="py-10 bg-gray-950">
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -858,7 +858,7 @@ For any questions or legal requests, contact us:
 
             <div className="mb-8 flex flex-wrap items-center justify-center gap-3 text-white/90">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
-                <Shield className="w-4 h-4" /> Sécurisé
+                <Shield className="w-4 h-4" /> SÃ©curisÃ©
               </span>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
                 <Clock className="w-4 h-4" /> <span>Moins de 5&nbsp;minutes</span>
@@ -874,7 +874,7 @@ For any questions or legal requests, contact us:
                 className="group relative overflow-hidden bg-white text-red-600 hover:text-red-700 px-10 py-5 rounded-3xl font-black text-lg transition-all duration-300 hover:scale-110 hover:shadow-2xl flex items-center gap-3"
               >
                 <span>{t.startNow}</span>
-                {/* Flèche retirée sur demande */}
+                {/* FlÃ¨che retirÃ©e sur demande */}
                 <span className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-black/5" />
               </Link>
 
@@ -888,7 +888,7 @@ For any questions or legal requests, contact us:
               </a>
             </div>
 
-            {/* Ligne avis retirée */}
+            {/* Ligne avis retirÃ©e */}
           </div>
         </section>
       </main>

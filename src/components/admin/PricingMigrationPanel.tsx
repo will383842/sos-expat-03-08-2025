@@ -1,5 +1,5 @@
-// src/components/admin/PricingMigrationPanel.tsx
-// Interface admin pour gérer la migration du système de pricing
+﻿// src/components/admin/PricingMigrationPanel.tsx
+// Interface admin pour gÃ©rer la migration du systÃ¨me de pricing
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -33,7 +33,7 @@ export const PricingMigrationPanel: React.FC = () => {
   const [isRunningMigration, setIsRunningMigration] = useState(false);
   const [isRunningCleanup, setIsRunningCleanup] = useState(false);
 
-  // Exécuter le diagnostic au chargement
+  // ExÃ©cuter le diagnostic au chargement
   useEffect(() => {
     handleDiagnostic();
   }, []);
@@ -47,8 +47,8 @@ export const PricingMigrationPanel: React.FC = () => {
       console.error('Erreur diagnostic:', error);
       setDiagnostic({
         status: 'error',
-        issues: ['❌ Impossible d\'exécuter le diagnostic'],
-        recommendations: ['Vérifiez la connectivité et les permissions']
+        issues: ['âŒ Impossible d\'exÃ©cuter le diagnostic'],
+        recommendations: ['VÃ©rifiez la connectivitÃ© et les permissions']
       });
     } finally {
       setIsRunningDiagnostic(false);
@@ -56,7 +56,7 @@ export const PricingMigrationPanel: React.FC = () => {
   };
 
   const handleMigration = async () => {
-    if (!confirm('⚠️ Voulez-vous vraiment exécuter la migration du système de pricing ? Cette action va modifier la configuration.')) {
+    if (!confirm('âš ï¸ Voulez-vous vraiment exÃ©cuter la migration du systÃ¨me de pricing ? Cette action va modifier la configuration.')) {
       return;
     }
 
@@ -65,21 +65,21 @@ export const PricingMigrationPanel: React.FC = () => {
       const result = await migratePricingSystem();
       setMigrationResult(result);
       
-      // Reexécuter le diagnostic après migration
+      // ReexÃ©cuter le diagnostic aprÃ¨s migration
       setTimeout(() => {
         handleDiagnostic();
       }, 1000);
 
       if (result.success) {
-        alert('✅ Migration terminée avec succès !');
+        alert('âœ… Migration terminÃ©e avec succÃ¨s !');
       } else {
-        alert('❌ Échec de la migration. Consultez les détails ci-dessous.');
+        alert('âŒ Ã‰chec de la migration. Consultez les dÃ©tails ci-dessous.');
       }
     } catch (error) {
       console.error('Erreur migration:', error);
       setMigrationResult({
         success: false,
-        message: '❌ Erreur inattendue lors de la migration',
+        message: 'âŒ Erreur inattendue lors de la migration',
         details: [],
         errors: [error instanceof Error ? error.message : String(error)]
       });
@@ -89,7 +89,7 @@ export const PricingMigrationPanel: React.FC = () => {
   };
 
   const handleQuickCleanup = async () => {
-    if (!confirm('🧹 Voulez-vous nettoyer rapidement le système de pricing (cache + validation) ?')) {
+    if (!confirm('ðŸ§¹ Voulez-vous nettoyer rapidement le systÃ¨me de pricing (cache + validation) ?')) {
       return;
     }
 
@@ -97,14 +97,14 @@ export const PricingMigrationPanel: React.FC = () => {
     try {
       const success = await quickCleanupPricing();
       if (success) {
-        alert('✅ Nettoyage rapide terminé !');
-        handleDiagnostic(); // Reexécuter le diagnostic
+        alert('âœ… Nettoyage rapide terminÃ© !');
+        handleDiagnostic(); // ReexÃ©cuter le diagnostic
       } else {
-        alert('❌ Erreur lors du nettoyage rapide');
+        alert('âŒ Erreur lors du nettoyage rapide');
       }
     } catch (error) {
       console.error('Erreur nettoyage:', error);
-      alert('❌ Erreur lors du nettoyage rapide');
+      alert('âŒ Erreur lors du nettoyage rapide');
     } finally {
       setIsRunningCleanup(false);
     }
@@ -135,10 +135,10 @@ export const PricingMigrationPanel: React.FC = () => {
         <div>
           <h3 className="text-xl font-bold text-gray-900 flex items-center">
             <Shield className="w-6 h-6 mr-2 text-blue-600" />
-            🔧 Migration & Maintenance du Système de Pricing
+            ðŸ”§ Migration & Maintenance du SystÃ¨me de Pricing
           </h3>
           <p className="text-gray-600 mt-1">
-            Diagnostiquez et réparez les problèmes de configuration des prix
+            Diagnostiquez et rÃ©parez les problÃ¨mes de configuration des prix
           </p>
         </div>
         
@@ -160,15 +160,15 @@ export const PricingMigrationPanel: React.FC = () => {
           <div className="flex items-center mb-3">
             {getStatusIcon(diagnostic.status)}
             <h4 className="ml-2 font-semibold">
-              État du système: {diagnostic.status === 'healthy' ? '✅ Sain' : 
-                               diagnostic.status === 'warning' ? '⚠️ Attention' : 
-                               '❌ Problème'}
+              Ã‰tat du systÃ¨me: {diagnostic.status === 'healthy' ? 'âœ… Sain' : 
+                               diagnostic.status === 'warning' ? 'âš ï¸ Attention' : 
+                               'âŒ ProblÃ¨me'}
             </h4>
           </div>
 
           {diagnostic.issues.length > 0 && (
             <div className="mb-3">
-              <h5 className="font-medium mb-2">Problèmes détectés:</h5>
+              <h5 className="font-medium mb-2">ProblÃ¨mes dÃ©tectÃ©s:</h5>
               <ul className="space-y-1">
                 {diagnostic.issues.map((issue, index) => (
                   <li key={index} className="text-sm flex items-start">
@@ -198,14 +198,14 @@ export const PricingMigrationPanel: React.FC = () => {
 
       {/* Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Migration complète */}
+        {/* Migration complÃ¨te */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center mb-3">
             <Play className="w-5 h-5 text-green-600 mr-2" />
-            <h4 className="font-semibold text-gray-900">Migration Complète</h4>
+            <h4 className="font-semibold text-gray-900">Migration ComplÃ¨te</h4>
           </div>
           <p className="text-gray-600 text-sm mb-4">
-            Exécute une migration complète du système de pricing. 
+            ExÃ©cute une migration complÃ¨te du systÃ¨me de pricing. 
             Nettoie les anciennes configurations et valide les nouvelles.
           </p>
           <Button
@@ -214,7 +214,7 @@ export const PricingMigrationPanel: React.FC = () => {
             className="w-full bg-green-600 hover:bg-green-700"
           >
             <Play size={16} className="mr-2" />
-            Exécuter la migration
+            ExÃ©cuter la migration
           </Button>
         </div>
 
@@ -226,7 +226,7 @@ export const PricingMigrationPanel: React.FC = () => {
           </div>
           <p className="text-gray-600 text-sm mb-4">
             Nettoie les caches et valide la configuration existante. 
-            Action plus légère que la migration complète.
+            Action plus lÃ©gÃ¨re que la migration complÃ¨te.
           </p>
           <Button
             onClick={handleQuickCleanup}
@@ -239,7 +239,7 @@ export const PricingMigrationPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Résultat de migration */}
+      {/* RÃ©sultat de migration */}
       {migrationResult && (
         <div className={`rounded-lg border p-4 ${
           migrationResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
@@ -259,7 +259,7 @@ export const PricingMigrationPanel: React.FC = () => {
 
           {migrationResult.details.length > 0 && (
             <div className="mb-3">
-              <h5 className="font-medium mb-2">Détails:</h5>
+              <h5 className="font-medium mb-2">DÃ©tails:</h5>
               <ul className="space-y-1">
                 {migrationResult.details.map((detail, index) => (
                   <li key={index} className="text-sm flex items-start">
@@ -291,17 +291,17 @@ export const PricingMigrationPanel: React.FC = () => {
       <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
         <div className="flex items-center mb-3">
           <FileText className="w-5 h-5 text-blue-600 mr-2" />
-          <h4 className="font-semibold text-blue-900">📚 Documentation</h4>
+          <h4 className="font-semibold text-blue-900">ðŸ“š Documentation</h4>
         </div>
         <div className="text-blue-800 text-sm space-y-2">
           <p>
-            <strong>Système unifié:</strong> Tous les prix sont maintenant gérés dans <code>admin_config/pricing</code>
+            <strong>SystÃ¨me unifiÃ©:</strong> Tous les prix sont maintenant gÃ©rÃ©s dans <code>admin_config/pricing</code>
           </p>
           <p>
-            <strong>Structure:</strong> 4 configurations (lawyer/expat × eur/usd) avec calcul automatique des montants
+            <strong>Structure:</strong> 4 configurations (lawyer/expat Ã— eur/usd) avec calcul automatique des montants
           </p>
           <p>
-            <strong>Cache:</strong> Les prix sont mis en cache côté client (5 min) pour optimiser les performances
+            <strong>Cache:</strong> Les prix sont mis en cache cÃ´tÃ© client (5 min) pour optimiser les performances
           </p>
           <p>
             <strong>Migration:</strong> Supprime automatiquement les anciennes configurations dans <code>admin_settings</code>
@@ -312,30 +312,30 @@ export const PricingMigrationPanel: React.FC = () => {
       {/* Informations techniques */}
       <details className="bg-gray-50 rounded-lg border border-gray-200">
         <summary className="p-4 cursor-pointer font-medium text-gray-900 hover:bg-gray-100">
-          🔍 Informations techniques détaillées
+          ðŸ” Informations techniques dÃ©taillÃ©es
         </summary>
         <div className="px-4 pb-4 text-sm text-gray-700 space-y-3">
           <div>
             <h5 className="font-medium text-gray-900 mb-1">Documents Firestore:</h5>
             <ul className="space-y-1 ml-4">
-              <li>• <code>admin_config/pricing</code> - Configuration principale (NOUVEAU)</li>
-              <li>• <code>admin_settings/main</code> - Paramètres généraux (sans commission)</li>
+              <li>â€¢ <code>admin_config/pricing</code> - Configuration principale (NOUVEAU)</li>
+              <li>â€¢ <code>admin_settings/main</code> - ParamÃ¨tres gÃ©nÃ©raux (sans commission)</li>
             </ul>
           </div>
           <div>
             <h5 className="font-medium text-gray-900 mb-1">Services et caches:</h5>
             <ul className="space-y-1 ml-4">
-              <li>• <code>pricingService.ts</code> - Service frontend avec cache 5 min</li>
-              <li>• <code>PricingManagement.tsx</code> - Interface de gestion admin</li>
-              <li>• <code>CurrencySelector.tsx</code> - Sélecteur de devise dynamique</li>
+              <li>â€¢ <code>pricingService.ts</code> - Service frontend avec cache 5 min</li>
+              <li>â€¢ <code>PricingManagement.tsx</code> - Interface de gestion admin</li>
+              <li>â€¢ <code>CurrencySelector.tsx</code> - SÃ©lecteur de devise dynamique</li>
             </ul>
           </div>
           <div>
             <h5 className="font-medium text-gray-900 mb-1">Calculs automatiques:</h5>
             <ul className="space-y-1 ml-4">
-              <li>• <code>providerAmount = totalAmount - connectionFeeAmount</code></li>
-              <li>• Validation automatique de la cohérence des montants</li>
-              <li>• Support multi-devises (EUR/USD) avec détection automatique</li>
+              <li>â€¢ <code>providerAmount = totalAmount - connectionFeeAmount</code></li>
+              <li>â€¢ Validation automatique de la cohÃ©rence des montants</li>
+              <li>â€¢ Support multi-devises (EUR/USD) avec dÃ©tection automatique</li>
             </ul>
           </div>
         </div>

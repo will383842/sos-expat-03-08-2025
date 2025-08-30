@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy, startAfter, limit, QueryDocumentSnapshot, DocumentData, Timestamp, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import AdminLayout from '../../components/admin/AdminLayout';
@@ -106,7 +106,7 @@ const AdminInvoices = () => {
   return (
     <AdminLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Factures générées</h1>
+        <h1 className="text-2xl font-bold mb-4">Factures gÃ©nÃ©rÃ©es</h1>
 
         <div className="mb-4">
           <label className="mr-2 font-medium">Filtrer par mois :</label>
@@ -141,20 +141,20 @@ const AdminInvoices = () => {
               {invoices.map(inv => (
                 <tr key={inv.id} className="border-t">
                   <td className="p-2">{inv.callId}</td>
-                  <td className="p-2">{inv.clientData?.name || '—'}</td>
-                  <td className="p-2">{inv.providerData?.name || '—'}</td>
+                  <td className="p-2">{inv.clientData?.name || 'â€”'}</td>
+                  <td className="p-2">{inv.providerData?.name || 'â€”'}</td>
                   <td className="p-2">{inv.financialData?.totalAmount} {inv.financialData?.currency}</td>
                   <td className="p-2">{inv.metadata.generatedAt?.toDate().toLocaleDateString()}</td>
                   <td className="p-2">{inv.metadata.status}</td>
                   <td className="p-2 flex flex-col gap-1">
                     <div>
                       <a href={inv.invoices.platform.url} target="_blank" rel="noreferrer" title="Facture plateforme">
-                        📄 Plateforme — {inv.invoices.platform.fileName || inv.invoices.platform.number} ({inv.invoices.platform.fileSize || '?'} ko)
+                        ðŸ“„ Plateforme â€” {inv.invoices.platform.fileName || inv.invoices.platform.number} ({inv.invoices.platform.fileSize || '?'} ko)
                       </a>
                     </div>
                     <div>
                       <a href={inv.invoices.provider.url} target="_blank" rel="noreferrer" title="Facture prestataire">
-                        👤 Prestataire — {inv.invoices.provider.fileName || inv.invoices.provider.number} ({inv.invoices.provider.fileSize || '?'} ko)
+                        ðŸ‘¤ Prestataire â€” {inv.invoices.provider.fileName || inv.invoices.provider.number} ({inv.invoices.provider.fileSize || '?'} ko)
                       </a>
                     </div>
                   </td>

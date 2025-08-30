@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Star, MapPin, ArrowLeft, ArrowRight, Quote, CheckCircle, TrendingUp, Users } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
@@ -6,30 +6,30 @@ const TestimonialsSection: React.FC = () => {
   const { language } = useApp();
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // ✅ GARDER les données test comme demandé
+  // âœ… GARDER les donnÃ©es test comme demandÃ©
   const testimonials = [
     {
       id: 1,
       name: 'Marie D.',
-      location: language === 'fr' ? 'Expatriée en Thaïlande' : 'Expat in Thailand',
+      location: language === 'fr' ? 'ExpatriÃ©e en ThaÃ¯lande' : 'Expat in Thailand',
       rating: 5,
       avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
       comment: language === 'fr'
-        ? 'Service exceptionnel ! J\'ai pu parler à un avocat français depuis Bangkok en moins de 2 minutes. Très professionnel et rassurant dans ma situation d\'urgence.'
+        ? 'Service exceptionnel ! J\'ai pu parler Ã  un avocat franÃ§ais depuis Bangkok en moins de 2 minutes. TrÃ¨s professionnel et rassurant dans ma situation d\'urgence.'
         : 'Exceptional service! I was able to speak to a French lawyer from Bangkok in less than 2 minutes. Very professional and reassuring in my emergency situation.',
-      impact: '5000€ économisés',
+      impact: '5000â‚¬ Ã©conomisÃ©s',
       verified: true,
       date: '2024-03-15',
-      expertType: 'Avocat spécialisé'
+      expertType: 'Avocat spÃ©cialisÃ©'
     },
     {
       id: 2,
       name: 'Jean L.',
-      location: language === 'fr' ? 'Expatrié en Espagne' : 'Expat in Spain',
+      location: language === 'fr' ? 'ExpatriÃ© en Espagne' : 'Expat in Spain',
       rating: 5,
       avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
       comment: language === 'fr'
-        ? 'Grâce à SOS Expats, j\'ai pu résoudre mon problème administratif en Espagne. L\'expatrié m\'a donné des conseils précieux basés sur son expérience personnelle. Je recommande vivement ce service à tous les français à l\'étranger !'
+        ? 'GrÃ¢ce Ã  SOS Expats, j\'ai pu rÃ©soudre mon problÃ¨me administratif en Espagne. L\'expatriÃ© m\'a donnÃ© des conseils prÃ©cieux basÃ©s sur son expÃ©rience personnelle. Je recommande vivement ce service Ã  tous les franÃ§ais Ã  l\'Ã©tranger !'
         : 'Thanks to SOS Expats, I was able to solve my administrative problem in Spain. The expat gave me valuable advice based on his personal experience. I highly recommend this service to all French people abroad!',
       impact: 'Visa obtenu en 3 jours',
       verified: true,
@@ -39,16 +39,16 @@ const TestimonialsSection: React.FC = () => {
     {
       id: 3,
       name: 'Sophie M.',
-      location: language === 'fr' ? 'Expatriée au Canada' : 'Expat in Canada',
+      location: language === 'fr' ? 'ExpatriÃ©e au Canada' : 'Expat in Canada',
       rating: 5,
       avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
       comment: language === 'fr'
-        ? 'Interface très intuitive et service client réactif. L\'avocat était compétent et m\'a aidé à comprendre mes droits concernant mon contrat de travail au Canada. Je recommande vivement pour tous les expatriés.'
+        ? 'Interface trÃ¨s intuitive et service client rÃ©actif. L\'avocat Ã©tait compÃ©tent et m\'a aidÃ© Ã  comprendre mes droits concernant mon contrat de travail au Canada. Je recommande vivement pour tous les expatriÃ©s.'
         : 'Very intuitive interface and responsive customer service. The lawyer was competent and helped me understand my rights regarding my employment contract in Canada. I highly recommend for all expats.',
-      impact: 'Urgence résolue en 20min',
+      impact: 'Urgence rÃ©solue en 20min',
       verified: true,
       date: '2024-03-08',
-      expertType: 'Médecin urgentiste'
+      expertType: 'MÃ©decin urgentiste'
     }
   ];
 
@@ -69,7 +69,7 @@ const TestimonialsSection: React.FC = () => {
           </h2>
           <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
             {language === 'fr'
-              ? 'Découvrez les expériences de nos utilisateurs partout dans le monde.'
+              ? 'DÃ©couvrez les expÃ©riences de nos utilisateurs partout dans le monde.'
               : 'Discover the experiences of our users worldwide.'
             }
           </p>
@@ -78,7 +78,7 @@ const TestimonialsSection: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {testimonials.map((testimonial) => (
             <div key={testimonial.id} className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-lg hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all hover:-translate-y-2 group">
-              {/* Header avec rating et vérification */}
+              {/* Header avec rating et vÃ©rification */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex gap-1">
                   {[...Array(5)].map((_, i) => (
@@ -88,12 +88,12 @@ const TestimonialsSection: React.FC = () => {
                 {testimonial.verified && (
                   <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-medium border border-blue-200">
                     <CheckCircle className="h-3 w-3" />
-                    Vérifié
+                    VÃ©rifiÃ©
                   </div>
                 )}
               </div>
               
-              {/* Contenu du témoignage */}
+              {/* Contenu du tÃ©moignage */}
               <p className="text-slate-700 mb-4 leading-relaxed text-sm sm:text-base line-clamp-4">
                 "{testimonial.comment}"
               </p>

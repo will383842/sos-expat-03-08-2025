@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Star, MapPin, Calendar, ThumbsUp, Flag } from 'lucide-react';
 
 type FirestoreTimestampLike = { toDate: () => Date };
@@ -136,7 +136,7 @@ const Reviews: React.FC<ReviewsProps> = ({
   if (reviews.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">Aucun avis pour le moment. Soyez le premier à donner votre avis !</p>
+        <p className="text-gray-500">Aucun avis pour le moment. Soyez le premier Ã  donner votre avis !</p>
       </div>
     );
   }
@@ -172,7 +172,7 @@ const Reviews: React.FC<ReviewsProps> = ({
                   (review.serviceType === 'lawyer_call' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800')
                 }
               >
-                {review.serviceType === 'lawyer_call' ? 'Avocat' : 'Expatrié'}
+                {review.serviceType === 'lawyer_call' ? 'Avocat' : 'ExpatriÃ©'}
               </span>
             )}
           </div>

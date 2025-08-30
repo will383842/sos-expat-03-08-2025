@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+﻿import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Tag,
@@ -144,7 +144,7 @@ const AdminPromoCodes: React.FC = () => {
 
   /* ===================== Effects ===================== */
 
-  // Reset pagination au changement de page déclenché manuellement
+  // Reset pagination au changement de page dÃ©clenchÃ© manuellement
   useEffect(() => {
     if (!currentUser || currentUser.role !== "admin") {
       navigate("/admin/login");
@@ -153,7 +153,7 @@ const AdminPromoCodes: React.FC = () => {
     void loadCoupons();
   }, [currentUser, navigate, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Charger stats au mount et après actions
+  // Charger stats au mount et aprÃ¨s actions
   useEffect(() => {
     if (!currentUser || currentUser.role !== "admin") return;
     void loadStats();
@@ -419,7 +419,7 @@ const AdminPromoCodes: React.FC = () => {
 
       const code = formData.code.toUpperCase();
 
-      // Unicité si création
+      // UnicitÃ© si crÃ©ation
       if (!selectedCoupon) {
         const q = query(
           collection(db, "coupons"),
@@ -428,12 +428,12 @@ const AdminPromoCodes: React.FC = () => {
         );
         const snap = await getDocs(q);
         if (!snap.empty) {
-          alert("Ce code promo existe déjà");
+          alert("Ce code promo existe dÃ©jÃ ");
           return;
         }
       }
 
-      // Données à persister (timestamps serveur pour Firestore)
+      // DonnÃ©es Ã  persister (timestamps serveur pour Firestore)
       const couponDataForFirestore = {
         code,
         type: formData.type,
@@ -452,7 +452,7 @@ const AdminPromoCodes: React.FC = () => {
       if (selectedCoupon) {
         await updateDoc(doc(db, "coupons", selectedCoupon.id), couponDataForFirestore);
 
-        // État local avec objets Date
+        // Ã‰tat local avec objets Date
         setCoupons((prev) =>
           prev.map((c) =>
             c.id === selectedCoupon.id
@@ -510,8 +510,8 @@ const AdminPromoCodes: React.FC = () => {
 
       alert(
         selectedCoupon
-          ? "Code promo mis à jour avec succès"
-          : "Code promo créé avec succès"
+          ? "Code promo mis Ã  jour avec succÃ¨s"
+          : "Code promo crÃ©Ã© avec succÃ¨s"
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
@@ -536,7 +536,7 @@ const AdminPromoCodes: React.FC = () => {
       setShowDeleteModal(false);
       setSelectedCoupon(null);
       void loadStats();
-      alert("Code promo supprimé avec succès");
+      alert("Code promo supprimÃ© avec succÃ¨s");
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
       console.error("Error deleting coupon:", error);
@@ -565,7 +565,7 @@ const AdminPromoCodes: React.FC = () => {
           )
         );
         void loadStats();
-        alert(`Code promo ${!isActive ? "activé" : "désactivé"} avec succès`);
+        alert(`Code promo ${!isActive ? "activÃ©" : "dÃ©sactivÃ©"} avec succÃ¨s`);
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
         console.error("Error toggling coupon status:", error);
@@ -599,7 +599,7 @@ const AdminPromoCodes: React.FC = () => {
   }, []);
 
   const formatAmount = (amount: number, type: "fixed" | "percentage"): string =>
-    type === "fixed" ? `${amount.toFixed(2)}€` : `${amount}%`;
+    type === "fixed" ? `${amount.toFixed(2)}â‚¬` : `${amount}%`;
 
   const getStatusBadge = (active: boolean) =>
     active ? (
@@ -634,7 +634,7 @@ const AdminPromoCodes: React.FC = () => {
         fallback={
           <div className="p-8 text-center">
             Une erreur est survenue lors du chargement des codes promo. Veuillez
-            réessayer.
+            rÃ©essayer.
           </div>
         }
       >
@@ -718,10 +718,10 @@ const AdminPromoCodes: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">
-                    Économies totales
+                    Ã‰conomies totales
                   </p>
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {stats.totalSavings.toFixed(2)}€
+                    {stats.totalSavings.toFixed(2)}â‚¬
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -741,10 +741,10 @@ const AdminPromoCodes: React.FC = () => {
                       Code
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Réduction
+                      RÃ©duction
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Validité
+                      ValiditÃ©
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Utilisations
@@ -799,7 +799,7 @@ const AdminPromoCodes: React.FC = () => {
                           </div>
                           {coupon.min_order_amount > 0 && (
                             <div className="text-xs text-gray-500">
-                              Min: {coupon.min_order_amount}€
+                              Min: {coupon.min_order_amount}â‚¬
                             </div>
                           )}
                         </td>
@@ -828,7 +828,7 @@ const AdminPromoCodes: React.FC = () => {
                             )}
                             {coupon.services.includes("expat_call") && (
                               <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                                Expatrié
+                                ExpatriÃ©
                               </span>
                             )}
                           </div>
@@ -838,7 +838,7 @@ const AdminPromoCodes: React.FC = () => {
                           {isExpired(coupon.valid_until) && (
                             <span className="mt-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center w-fit">
                               <Calendar size={12} className="mr-1" />
-                              Expiré
+                              ExpirÃ©
                             </span>
                           )}
                         </td>
@@ -867,7 +867,7 @@ const AdminPromoCodes: React.FC = () => {
                                   ? "text-red-600 hover:text-red-800"
                                   : "text-green-600 hover:text-green-800"
                               }`}
-                              title={coupon.active ? "Désactiver" : "Activer"}
+                              title={coupon.active ? "DÃ©sactiver" : "Activer"}
                               disabled={isActionLoading}
                             >
                               {coupon.active ? (
@@ -891,7 +891,7 @@ const AdminPromoCodes: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                        Aucun code promo trouvé
+                        Aucun code promo trouvÃ©
                       </td>
                     </tr>
                   )}
@@ -942,7 +942,7 @@ const AdminPromoCodes: React.FC = () => {
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="ex: WELCOME10"
-                disabled={showEditModal} // code inchangé en édition
+                disabled={showEditModal} // code inchangÃ© en Ã©dition
               />
             </div>
 
@@ -952,7 +952,7 @@ const AdminPromoCodes: React.FC = () => {
                   htmlFor="type"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Type de réduction *
+                  Type de rÃ©duction *
                 </label>
                 <select
                   id="type"
@@ -965,7 +965,7 @@ const AdminPromoCodes: React.FC = () => {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
-                  <option value="fixed">Montant fixe (€)</option>
+                  <option value="fixed">Montant fixe (â‚¬)</option>
                   <option value="percentage">Pourcentage (%)</option>
                 </select>
               </div>
@@ -975,7 +975,7 @@ const AdminPromoCodes: React.FC = () => {
                   htmlFor="amount"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Montant de la réduction *
+                  Montant de la rÃ©duction *
                 </label>
                 <input
                   id="amount"
@@ -1001,7 +1001,7 @@ const AdminPromoCodes: React.FC = () => {
                 htmlFor="min_order_amount"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Montant minimum de commande (€)
+                Montant minimum de commande (â‚¬)
               </label>
               <input
                 id="min_order_amount"
@@ -1029,7 +1029,7 @@ const AdminPromoCodes: React.FC = () => {
                   htmlFor="valid_from"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Valide à partir du *
+                  Valide Ã  partir du *
                 </label>
                 <input
                   id="valid_from"
@@ -1184,7 +1184,7 @@ const AdminPromoCodes: React.FC = () => {
                     className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                   />
                   <label htmlFor="expat_call" className="ml-2 block text-sm text-gray-700">
-                    Appel Expatrié
+                    Appel ExpatriÃ©
                   </label>
                 </div>
               </div>
@@ -1241,7 +1241,7 @@ const AdminPromoCodes: React.FC = () => {
                 loading={isActionLoading}
               >
                 <Save size={16} className="mr-2" />
-                {showAddModal ? "Créer le code promo" : "Enregistrer les modifications"}
+                {showAddModal ? "CrÃ©er le code promo" : "Enregistrer les modifications"}
               </Button>
             </div>
           </div>
@@ -1261,11 +1261,11 @@ const AdminPromoCodes: React.FC = () => {
                   <AlertTriangle className="h-5 w-5 text-red-400" />
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-red-800">
-                      Attention : Cette action est irréversible
+                      Attention : Cette action est irrÃ©versible
                     </h3>
                     <div className="mt-2 text-sm text-red-700">
                       <p>
-                        Vous êtes sur le point de supprimer définitivement le
+                        Vous Ãªtes sur le point de supprimer dÃ©finitivement le
                         code promo :
                         <br />
                         <strong>{selectedCoupon.code}</strong>
@@ -1309,7 +1309,7 @@ const AdminPromoCodes: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-blue-900">{selectedCoupon.code}</h3>
                     <p className="text-sm text-blue-700">
-                      {formatAmount(selectedCoupon.amount, selectedCoupon.type)} •{" "}
+                      {formatAmount(selectedCoupon.amount, selectedCoupon.type)} â€¢{" "}
                       {selectedCoupon.description ?? ""}
                     </p>
                   </div>
@@ -1339,7 +1339,7 @@ const AdminPromoCodes: React.FC = () => {
                           Montant
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Réduction
+                          RÃ©duction
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Date
@@ -1361,10 +1361,10 @@ const AdminPromoCodes: React.FC = () => {
                             {usage.orderId}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {usage.order_amount.toFixed(2)}€
+                            {usage.order_amount.toFixed(2)}â‚¬
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                            -{usage.discount_amount.toFixed(2)}€
+                            -{usage.discount_amount.toFixed(2)}â‚¬
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(usage.used_at)}
@@ -1377,7 +1377,7 @@ const AdminPromoCodes: React.FC = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
-                    Aucune utilisation trouvée pour ce code promo
+                    Aucune utilisation trouvÃ©e pour ce code promo
                   </p>
                 </div>
               )}

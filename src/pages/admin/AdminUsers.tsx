@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   User,
   Search,
@@ -111,7 +111,7 @@ const USERS_PER_PAGE = 20;
 const AdminUsers: React.FC = () => {
   const navigate = useNavigate();
 
-  // `useAuth` n’expose pas de types ici : on contraint juste ce qu’on utilise
+  // `useAuth` nâ€™expose pas de types ici : on contraint juste ce quâ€™on utilise
   const { user: rawCurrentUser } = useAuth() as { user?: MinimalCurrentUser | null };
   const currentUser: MinimalCurrentUser | null | undefined = rawCurrentUser;
 
@@ -133,7 +133,7 @@ const AdminUsers: React.FC = () => {
   const [countries, setCountries] = useState<string[]>([]);
 
   useEffect(() => {
-    // Vérification d’accès admin
+    // VÃ©rification dâ€™accÃ¨s admin
     if (!currentUser || currentUser.role !== 'admin') {
       navigate('/admin/login');
       return;
@@ -143,7 +143,7 @@ const AdminUsers: React.FC = () => {
       try {
         setLoading(true);
 
-        // Construction sûre des contraintes de requête (sans `any`)
+        // Construction sÃ»re des contraintes de requÃªte (sans `any`)
         const queryConstraints: QueryConstraint[] = [];
 
         if (selectedRole !== 'all') {
@@ -175,7 +175,7 @@ const AdminUsers: React.FC = () => {
 
         const uniqueCountries = Array.from(
           new Set(
-            usersData.map((u) => u.country ?? u.currentCountry ?? 'Non spécifié')
+            usersData.map((u) => u.country ?? u.currentCountry ?? 'Non spÃ©cifiÃ©')
           )
         )
           .filter((c): c is string => Boolean(c))
@@ -341,7 +341,7 @@ const AdminUsers: React.FC = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-alert
-      alert("Erreur lors de la réactivation de l'utilisateur");
+      alert("Erreur lors de la rÃ©activation de l'utilisateur");
       logError({
         origin: 'frontend',
         error: `Error unbanning user: ${message}`,
@@ -429,7 +429,7 @@ const AdminUsers: React.FC = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-alert
-      alert('Erreur lors de la modification de la visibilité');
+      alert('Erreur lors de la modification de la visibilitÃ©');
       logError({
         origin: 'frontend',
         error: `Error toggling visibility: ${message}`,
@@ -561,17 +561,17 @@ const AdminUsers: React.FC = () => {
               }}
               className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
             >
-              <option value="createdAt-desc">Date d'inscription (récent)</option>
+              <option value="createdAt-desc">Date d'inscription (rÃ©cent)</option>
               <option value="createdAt-asc">Date d'inscription (ancien)</option>
-              <option value="lastLoginAt-desc">Dernière connexion (récent)</option>
-              <option value="lastLoginAt-asc">Dernière connexion (ancien)</option>
+              <option value="lastLoginAt-desc">DerniÃ¨re connexion (rÃ©cent)</option>
+              <option value="lastLoginAt-asc">DerniÃ¨re connexion (ancien)</option>
               <option value="fullName-asc">Nom (A-Z)</option>
               <option value="fullName-desc">Nom (Z-A)</option>
             </select>
           </div>
         </div>
 
-        {/* Filtres par rôle */}
+        {/* Filtres par rÃ´le */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button
             onClick={() => setSelectedRole('all')}
@@ -607,7 +607,7 @@ const AdminUsers: React.FC = () => {
             }`}
           >
             <UserCheck size={16} />
-            <span>Expatriés ({userCounts.expat})</span>
+            <span>ExpatriÃ©s ({userCounts.expat})</span>
           </button>
           <button
             onClick={() => setSelectedRole('admin')}
@@ -632,7 +632,7 @@ const AdminUsers: React.FC = () => {
                     Utilisateur
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rôle
+                    RÃ´le
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Statut
@@ -685,7 +685,7 @@ const AdminUsers: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{u.role}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">{u.status ?? (u.isBanned ? 'Banni' : u.isOnline ? 'En ligne' : 'Hors ligne')}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{u.country ?? u.currentCountry ?? '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{u.country ?? u.currentCountry ?? 'â€”'}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">{formatDate(u.createdAt)}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         <div className="flex flex-wrap gap-2">
@@ -708,7 +708,7 @@ const AdminUsers: React.FC = () => {
                           </Button>
                           {u.isBanned ? (
                             <Button size="small" onClick={() => void handleUnbanUser(u.id)}>
-                              Réactiver
+                              RÃ©activer
                             </Button>
                           ) : (
                             <Button
@@ -727,7 +727,7 @@ const AdminUsers: React.FC = () => {
                           >
                             Supprimer
                           </Button>
-                          {/* Exemples d’actions directes */}
+                          {/* Exemples dâ€™actions directes */}
                           <Button
                             size="small"
                             variant="outline"
@@ -749,7 +749,7 @@ const AdminUsers: React.FC = () => {
                                 variant="outline"
                                 onClick={() => void handleToggleFeatured(u.id, Boolean(u.featured))}
                               >
-                                {u.featured ? 'Retirer “à la une”' : 'Mettre “à la une”'}
+                                {u.featured ? 'Retirer â€œÃ  la uneâ€' : 'Mettre â€œÃ  la uneâ€'}
                               </Button>
                             </>
                           )}
@@ -760,7 +760,7 @@ const AdminUsers: React.FC = () => {
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                      Aucun utilisateur trouvé
+                      Aucun utilisateur trouvÃ©
                     </td>
                   </tr>
                 )}
@@ -778,11 +778,11 @@ const AdminUsers: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal de détails utilisateur */}
+      {/* Modal de dÃ©tails utilisateur */}
       <Modal
         isOpen={showUserModal}
         onClose={() => setShowUserModal(false)}
-        title="Détails de l'utilisateur"
+        title="DÃ©tails de l'utilisateur"
         size="large"
       >
         {selectedUser && (
@@ -813,7 +813,7 @@ const AdminUsers: React.FC = () => {
                     {selectedUser.role === 'lawyer'
                       ? 'Avocat'
                       : selectedUser.role === 'expat'
-                      ? 'Expatrié'
+                      ? 'ExpatriÃ©'
                       : selectedUser.role === 'admin'
                       ? 'Admin'
                       : 'Client'}
@@ -844,14 +844,14 @@ const AdminUsers: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Phone className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">
-                      {selectedUser.phoneCountryCode} {selectedUser.phone || 'Non renseigné'}
+                      {selectedUser.phoneCountryCode} {selectedUser.phone || 'Non renseignÃ©'}
                     </span>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <MapPin className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">
-                      {selectedUser.country || selectedUser.currentCountry || 'Non renseigné'}
+                      {selectedUser.country || selectedUser.currentCountry || 'Non renseignÃ©'}
                     </span>
                   </div>
 
@@ -863,17 +863,17 @@ const AdminUsers: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Clock className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-900">
-                      Dernière connexion le {formatDate(selectedUser.lastLoginAt)}
+                      DerniÃ¨re connexion le {formatDate(selectedUser.lastLoginAt)}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Paramètres du compte</h4>
+                <h4 className="text-sm font-medium text-gray-500 mb-2">ParamÃ¨tres du compte</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-700">Email vérifié</span>
+                    <span className="text-gray-700">Email vÃ©rifiÃ©</span>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         selectedUser.emailVerified || selectedUser.isVerifiedEmail
@@ -886,7 +886,7 @@ const AdminUsers: React.FC = () => {
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-700">Compte approuvé</span>
+                    <span className="text-gray-700">Compte approuvÃ©</span>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         selectedUser.isApproved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -939,7 +939,7 @@ const AdminUsers: React.FC = () => {
             {selectedUser.isBanned && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-red-800 mb-2">Raison du bannissement</h4>
-                <p className="text-red-700">{selectedUser.banReason || 'Aucune raison spécifiée'}</p>
+                <p className="text-red-700">{selectedUser.banReason || 'Aucune raison spÃ©cifiÃ©e'}</p>
               </div>
             )}
 
@@ -976,16 +976,16 @@ const AdminUsers: React.FC = () => {
               <div className="flex">
                 <AlertTriangle className="h-5 w-5 text-red-400" />
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">Attention : Cette action est irréversible</h3>
+                  <h3 className="text-sm font-medium text-red-800">Attention : Cette action est irrÃ©versible</h3>
                   <div className="mt-2 text-sm text-red-700">
                     <p>
-                      Vous êtes sur le point de supprimer définitivement l'utilisateur :
+                      Vous Ãªtes sur le point de supprimer dÃ©finitivement l'utilisateur :
                       <br />
                       <strong>
                         {selectedUser.firstName} {selectedUser.lastName}
                       </strong>
                     </p>
-                    <p className="mt-1">Toutes les données associées seront également supprimées.</p>
+                    <p className="mt-1">Toutes les donnÃ©es associÃ©es seront Ã©galement supprimÃ©es.</p>
                   </div>
                 </div>
               </div>
@@ -1019,7 +1019,7 @@ const AdminUsers: React.FC = () => {
                   <h3 className="text-sm font-medium text-orange-800">Bannissement d'utilisateur</h3>
                   <div className="mt-2 text-sm text-orange-700">
                     <p>
-                      Vous êtes sur le point de bannir l'utilisateur :
+                      Vous Ãªtes sur le point de bannir l'utilisateur :
                       <br />
                       <strong>
                         {selectedUser.firstName} {selectedUser.lastName}

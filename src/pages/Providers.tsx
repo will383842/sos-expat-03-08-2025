@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Star, MapPin, Phone, Clock } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -53,7 +53,7 @@ const getCountryCoordinates = (country: string): { lat: number; lng: number } | 
     'hong-kong': { lat: 22.3193, lng: 114.1694 },
     'emirats-arabes-unis': { lat: 23.4241, lng: 53.8478 },
     'etats-unis': { lat: 37.0902, lng: -95.7129 },
-    'thaïlande': { lat: 15.8700, lng: 100.9925 },
+    'thaÃ¯lande': { lat: 15.8700, lng: 100.9925 },
     'vietnam': { lat: 14.0583, lng: 108.2772 },
     'coree-du-sud': { lat: 35.9078, lng: 127.7669 },
     'chine': { lat: 35.8617, lng: 104.1954 },
@@ -99,31 +99,31 @@ const Providers: React.FC = () => {
   // Memoized translations
   const translations = useMemo(() => ({
     fr: {
-      title: 'Nos Experts Vérifiés',
-      subtitle: 'Trouvez l\'expert qui vous aidera à résoudre votre problème rapidement',
+      title: 'Nos Experts VÃ©rifiÃ©s',
+      subtitle: 'Trouvez l\'expert qui vous aidera Ã  rÃ©soudre votre problÃ¨me rapidement',
       experts: 'Experts',
       averageRating: 'Note moyenne',
       countries: 'Pays',
       searchPlaceholder: 'Rechercher un expert...',
       allTypes: 'Tous les types',
       lawyers: 'Avocats',
-      expats: 'Expatriés',
+      expats: 'ExpatriÃ©s',
       allCountries: 'Tous les pays',
-      bestRated: 'Mieux notés',
+      bestRated: 'Mieux notÃ©s',
       priceAscending: 'Prix croissant',
-      mostExperienced: 'Plus expérimentés',
+      mostExperienced: 'Plus expÃ©rimentÃ©s',
       onlineOnly: 'En ligne uniquement',
-      expertsFound: 'expert(s) trouvé(s)',
+      expertsFound: 'expert(s) trouvÃ©(s)',
       lawyer: 'Avocat',
-      expat: 'Expatrié',
+      expat: 'ExpatriÃ©',
       online: 'En ligne',
       offline: 'Hors ligne',
       years: 'ans',
       reviews: 'avis',
       callNow: 'Appeler maintenant',
       viewProfile: 'Hors ligne - Voir profil',
-      noExperts: 'Aucun expert trouvé pour ces critères',
-      resetFilters: 'Réinitialiser les filtres',
+      noExperts: 'Aucun expert trouvÃ© pour ces critÃ¨res',
+      resetFilters: 'RÃ©initialiser les filtres',
       loadingExperts: 'Chargement des experts...',
       errorLoading: 'Erreur lors du chargement des experts'
     },
@@ -160,7 +160,7 @@ const Providers: React.FC = () => {
 
   const t = translations[language as keyof typeof translations] || translations.fr;
 
-  // Data transformation helper - MODIFIÉ selon les instructions
+  // Data transformation helper - MODIFIÃ‰ selon les instructions
   const transformFirestoreData = useCallback((doc: QueryDocumentSnapshot<DocumentData>): Provider | null => {
     try {
       const data = doc.data();
@@ -203,7 +203,7 @@ const Providers: React.FC = () => {
       }
     } catch (error) {
       console.error("Erreur lors du chargement des prestataires:", error);
-      setError('Erreur lors du chargement des experts. Veuillez réessayer.');
+      setError('Erreur lors du chargement des experts. Veuillez rÃ©essayer.');
       setProviders([]);
     } finally {
       setIsLoading(false);
@@ -261,7 +261,7 @@ const Providers: React.FC = () => {
     });
   }, [providers, searchTerm, selectedType, selectedCountry, onlineOnly, sortBy]);
 
-  // 🔧 CORRECTION PRINCIPALE - Handle provider selection avec les bons noms de propriétés
+  // ðŸ”§ CORRECTION PRINCIPALE - Handle provider selection avec les bons noms de propriÃ©tÃ©s
   const handleCallProvider = useCallback((provider: Provider) => {
     const slug = createSlug(provider.name);
     const mainLanguage = provider.languages.length > 0 ? createSlug(provider.languages[0]) : 'francais';
@@ -270,8 +270,8 @@ const Providers: React.FC = () => {
     
     const seoUrl = `/${role}/${countrySlug}/${mainLanguage}/${slug}-${provider.id}`;
     
-    // ✅ CORRECTION : Utilisation des noms de propriétés attendus par CallCheckoutWrapper
-    const selectedProvider = normalizeProvider(provider); // ← AJOUT de normalizeProvider
+    // âœ… CORRECTION : Utilisation des noms de propriÃ©tÃ©s attendus par CallCheckoutWrapper
+    const selectedProvider = normalizeProvider(provider); // â† AJOUT de normalizeProvider
 
     const serviceData = {
       providerId: selectedProvider.id,
@@ -284,13 +284,13 @@ const Providers: React.FC = () => {
       providerAmount: Math.round(selectedProvider.price * 0.80 * 100) / 100
     };
 
-    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider)); // ← AJOUT
-    sessionStorage.setItem('serviceData', JSON.stringify(serviceData)); // ← AJOUT
+    sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider)); // â† AJOUT
+    sessionStorage.setItem('serviceData', JSON.stringify(serviceData)); // â† AJOUT
     
     navigate(seoUrl, { 
       state: { 
-        selectedProvider: selectedProvider, // ✅ Utilise "selectedProvider" au lieu de "providerData"
-        serviceData: serviceData            // ✅ Utilise "serviceData" au lieu de "booking" ou autre
+        selectedProvider: selectedProvider, // âœ… Utilise "selectedProvider" au lieu de "providerData"
+        serviceData: serviceData            // âœ… Utilise "serviceData" au lieu de "booking" ou autre
       } 
     });
     
@@ -350,7 +350,7 @@ const Providers: React.FC = () => {
               onClick={loadProviders}
               className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
             >
-              Réessayer
+              RÃ©essayer
             </button>
           </div>
         </div>
@@ -499,7 +499,7 @@ const Providers: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-900">€{provider.price}</div>
+                      <div className="text-2xl font-bold text-gray-900">â‚¬{provider.price}</div>
                       <div className="text-xs text-gray-500">
                         {CONFIG.CONSULTATION_DURATION[provider.type]}
                       </div>

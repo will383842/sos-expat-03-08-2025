@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+﻿import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Phone, CheckCircle, FileText, Scale, Users, Star } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -73,10 +73,10 @@ const PaymentSuccess: React.FC = () => {
     [paidServiceType, providerRole]
   );
 
-  // ✅ CORRECTION - Récupérer les données depuis les sources correctes
+  // âœ… CORRECTION - RÃ©cupÃ©rer les donnÃ©es depuis les sources correctes
   const getProviderFromStorage = useCallback((): ProviderInfo | null => {
     try {
-      // ✅ Essayer d'abord selectedProvider (nom correct)
+      // âœ… Essayer d'abord selectedProvider (nom correct)
       const savedProvider = sessionStorage.getItem('selectedProvider');
       if (savedProvider) {
         const providerData = JSON.parse(savedProvider);
@@ -90,7 +90,7 @@ const PaymentSuccess: React.FC = () => {
         };
       }
       
-      // ✅ Essayer ensuite bookingRequest
+      // âœ… Essayer ensuite bookingRequest
       const savedRequest = sessionStorage.getItem('bookingRequest');
       if (savedRequest) {
         const requestData = JSON.parse(savedRequest);
@@ -104,7 +104,7 @@ const PaymentSuccess: React.FC = () => {
         };
       }
 
-      // ✅ Fallback - ancien format pour compatibilité
+      // âœ… Fallback - ancien format pour compatibilitÃ©
       const legacyProvider = sessionStorage.getItem('providerData');
       if (legacyProvider) {
         const providerData = JSON.parse(legacyProvider);
@@ -125,7 +125,7 @@ const PaymentSuccess: React.FC = () => {
 
   // Initialize service data
   const initializeServiceData = useCallback(() => {
-    // ✅ Prioriser les paramètres URL (plus fiables)
+    // âœ… Prioriser les paramÃ¨tres URL (plus fiables)
     const urlAmount = searchParams.get('amount');
     const urlServiceType = searchParams.get('serviceType') || searchParams.get('service');
     const urlDuration = searchParams.get('duration');
@@ -142,7 +142,7 @@ const PaymentSuccess: React.FC = () => {
       setProviderAmount(urlProviderAmount ? parseFloat(urlProviderAmount) : 0);
       setProviderRole(urlProviderRole || '');
       setTimeRemaining((urlDuration ? parseInt(urlDuration) : 0) * 60);
-      console.log('✅ Données récupérées depuis URL params:', {
+      console.log('âœ… DonnÃ©es rÃ©cupÃ©rÃ©es depuis URL params:', {
         amount: parseFloat(urlAmount),
         serviceType: urlServiceType,
         duration: urlDuration
@@ -150,7 +150,7 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
     
-    // ✅ Essayer de récupérer depuis storage avec les bons noms
+    // âœ… Essayer de rÃ©cupÃ©rer depuis storage avec les bons noms
     const providerInfo = getProviderFromStorage();
     if (providerInfo) {
       const price = providerInfo.price || (providerInfo.type === 'lawyer' ? 49 : 19);
@@ -165,7 +165,7 @@ const PaymentSuccess: React.FC = () => {
       setPlatformFee(commission);
       setProviderAmount(price - commission);
       
-      console.log('✅ Données récupérées depuis storage:', {
+      console.log('âœ… DonnÃ©es rÃ©cupÃ©rÃ©es depuis storage:', {
         provider: providerInfo.name,
         price,
         duration,
@@ -174,7 +174,7 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
     
-    // ✅ Fallback vers les défauts
+    // âœ… Fallback vers les dÃ©fauts
     const fallbackProvider = PROVIDER_DEFAULTS[providerId as keyof typeof PROVIDER_DEFAULTS];
     if (fallbackProvider) {
       const commission = fallbackProvider.role === 'lawyer' ? COMMISSION_RATES.lawyer : COMMISSION_RATES.expat;
@@ -187,7 +187,7 @@ const PaymentSuccess: React.FC = () => {
       setPlatformFee(commission);
       setProviderAmount(fallbackProvider.price - commission);
       
-      console.log('✅ Données récupérées depuis fallback:', fallbackProvider);
+      console.log('âœ… DonnÃ©es rÃ©cupÃ©rÃ©es depuis fallback:', fallbackProvider);
     }
   }, [searchParams, providerId, getProviderFromStorage]);
 
@@ -288,8 +288,8 @@ const PaymentSuccess: React.FC = () => {
     const invoiceData = `
 FACTURE SOS-${Date.now()}
 Date: ${new Date().toLocaleDateString()}
-Service: ${paidServiceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel Expatrié'}
-Montant: ${paidAmount}€
+Service: ${paidServiceType === 'lawyer_call' ? 'Appel Avocat' : 'Appel ExpatriÃ©'}
+Montant: ${paidAmount}â‚¬
     `;
     
     const blob = new Blob([invoiceData], { type: 'text/plain' });
@@ -321,28 +321,28 @@ Montant: ${paidAmount}€
 
   // Text translations
   const t = useMemo(() => ({
-    serviceNotFound: language === 'fr' ? 'Service non trouvé' : 'Service not found',
-    backToHome: language === 'fr' ? 'Retour à l\'accueil' : 'Back to home',
-    callFailed: language === 'fr' ? 'Appel non établi' : 'Call failed',
-    paymentSuccessful: language === 'fr' ? 'Paiement réussi !' : 'Payment successful!',
-    autoRefund: language === 'fr' ? 'Vous serez automatiquement remboursé' : 'You will be automatically refunded',
+    serviceNotFound: language === 'fr' ? 'Service non trouvÃ©' : 'Service not found',
+    backToHome: language === 'fr' ? 'Retour Ã  l\'accueil' : 'Back to home',
+    callFailed: language === 'fr' ? 'Appel non Ã©tabli' : 'Call failed',
+    paymentSuccessful: language === 'fr' ? 'Paiement rÃ©ussi !' : 'Payment successful!',
+    autoRefund: language === 'fr' ? 'Vous serez automatiquement remboursÃ©' : 'You will be automatically refunded',
     connecting: language === 'fr' ? 'Votre appel est en cours de connexion...' : 'Your call is being connected...',
     connectingTitle: language === 'fr' ? 'Connexion en cours...' : 'Connecting...',
     contactingExpert: language === 'fr' ? 'Nous contactons votre expert. Veuillez patienter.' : 'We are contacting your expert. Please wait.',
     callInProgress: language === 'fr' ? 'Appel en cours' : 'Call in progress',
     timeRemaining: language === 'fr' ? 'Temps restant' : 'Time remaining',
-    callCompleted: language === 'fr' ? 'Appel terminé' : 'Call completed',
-    thankYou: language === 'fr' ? 'Merci d\'avoir utilisé nos services !' : 'Thank you for using our services!',
-    expertNoAnswer: language === 'fr' ? 'L\'expert n\'a pas répondu après 3 tentatives. Vous serez automatiquement remboursé.' : 'The expert did not answer after 3 attempts. You will be automatically refunded.',
+    callCompleted: language === 'fr' ? 'Appel terminÃ©' : 'Call completed',
+    thankYou: language === 'fr' ? 'Merci d\'avoir utilisÃ© nos services !' : 'Thank you for using our services!',
+    expertNoAnswer: language === 'fr' ? 'L\'expert n\'a pas rÃ©pondu aprÃ¨s 3 tentatives. Vous serez automatiquement remboursÃ©.' : 'The expert did not answer after 3 attempts. You will be automatically refunded.',
     chooseAnother: language === 'fr' ? 'Choisir un autre expert' : 'Choose another expert',
-    serviceDetails: language === 'fr' ? 'Détails du service' : 'Service details',
+    serviceDetails: language === 'fr' ? 'DÃ©tails du service' : 'Service details',
     service: language === 'fr' ? 'Service' : 'Service',
-    duration: language === 'fr' ? 'Durée' : 'Duration',
+    duration: language === 'fr' ? 'DurÃ©e' : 'Duration',
     price: language === 'fr' ? 'Prix' : 'Price',
     date: language === 'fr' ? 'Date' : 'Date',
     lawyerCall: language === 'fr' ? 'Appel Avocat' : 'Lawyer Call',
-    expatCall: language === 'fr' ? 'Appel Expatrié' : 'Expat Call',
-    generatingInvoices: language === 'fr' ? 'Génération des factures...' : 'Generating invoices...',
+    expatCall: language === 'fr' ? 'Appel ExpatriÃ©' : 'Expat Call',
+    generatingInvoices: language === 'fr' ? 'GÃ©nÃ©ration des factures...' : 'Generating invoices...',
     viewInvoices: language === 'fr' ? 'Voir les factures' : 'View invoices',
     leaveReview: language === 'fr' ? 'Laisser un avis' : 'Leave a review',
     goToDashboard: language === 'fr' ? 'Aller au tableau de bord' : 'Go to dashboard',
@@ -450,7 +450,7 @@ Montant: ${paidAmount}€
   const serviceDetailRows = [
     { label: t.service, value: isLawyer ? t.lawyerCall : t.expatCall },
     { label: t.duration, value: `${paidDuration || (isLawyer ? '20' : '30')} min` },
-    { label: t.price, value: `€${paidAmount || (isLawyer ? '49' : '19')}`, bold: true },
+    { label: t.price, value: `â‚¬${paidAmount || (isLawyer ? '49' : '19')}`, bold: true },
     { label: t.date, value: new Date().toLocaleDateString() }
   ];
 
@@ -532,7 +532,7 @@ Montant: ${paidAmount}€
         isOpen={showReviewModal}
         onClose={() => setShowReviewModal(false)}
         providerId={providerId}
-        providerName={isLawyer ? 'Avocat' : 'Expatrié'}
+        providerName={isLawyer ? 'Avocat' : 'ExpatriÃ©'}
         callId={callId}
         serviceType={isLawyer ? 'lawyer_call' : 'expat_call'}
       />

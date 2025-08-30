@@ -1,4 +1,4 @@
-// SendToAll.tsx
+﻿// SendToAll.tsx
 import React, { useState } from "react";
 import { functions } from "@/config/firebase";
 import { httpsCallable } from "firebase/functions";
@@ -8,32 +8,32 @@ import { getErrorMessage } from "../../../utils/errors";
 const getRecipients = httpsCallable<
   Record<string, never>,
   string[]
->(functions, "admin_getRecipients"); // à implémenter côté Functions
+>(functions, "admin_getRecipients"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const sendEmail = httpsCallable<
   { to: string; subject: string; html: string },
   { success: boolean }
->(functions, "admin_sendEmail"); // à implémenter côté Functions
+>(functions, "admin_sendEmail"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const logEmail = httpsCallable<
   { type: string; count: number },
   { logged: boolean }
->(functions, "admin_logEmail"); // à implémenter côté Functions
+>(functions, "admin_logEmail"); // Ã  implÃ©menter cÃ´tÃ© Functions
 
 const SendToAll: React.FC = () => {
-  const [greeting, setGreeting] = useState("Bonjour à tous,");
+  const [greeting, setGreeting] = useState("Bonjour Ã  tous,");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState("");
 
   const handleSend = async () => {
     setStatus("Chargement des destinataires...");
     try {
-      // ✅ destructuration directe
+      // âœ… destructuration directe
       const { data: emails = [] } = await getRecipients({});
       const filteredEmails = emails.filter((email) => email !== "");
 
       if (filteredEmails.length === 0) {
-        setStatus("❌ Aucun destinataire trouvé");
+        setStatus("âŒ Aucun destinataire trouvÃ©");
         return;
       }
 
@@ -42,23 +42,23 @@ const SendToAll: React.FC = () => {
 
         await sendEmail({
           to: email,
-          subject: "Message de l’équipe SOS",
+          subject: "Message de lâ€™Ã©quipe SOS",
           html,
         });
       }
 
-      // ✅ log global du batch
+      // âœ… log global du batch
       await logEmail({ type: "newsletter", count: filteredEmails.length });
 
-      setStatus(`Email envoyé à ${filteredEmails.length} utilisateurs ✅`);
+      setStatus(`Email envoyÃ© Ã  ${filteredEmails.length} utilisateurs âœ…`);
     } catch (err) {
-      setStatus("Erreur ❌ " + getErrorMessage(err));
+      setStatus("Erreur âŒ " + getErrorMessage(err));
     }
   };
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">📢 Envoi global à tous</h2>
+      <h2 className="text-xl font-semibold mb-4">ðŸ“¢ Envoi global Ã  tous</h2>
       <div className="grid gap-4">
         <input
           value={greeting}
@@ -73,7 +73,7 @@ const SendToAll: React.FC = () => {
           className="textarea"
         />
         <button onClick={handleSend} className="btn btn-primary">
-          Envoyer à tous
+          Envoyer Ã  tous
         </button>
         {status && <p className="text-sm mt-2">{status}</p>}
       </div>

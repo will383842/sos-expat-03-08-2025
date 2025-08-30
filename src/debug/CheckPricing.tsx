@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 
@@ -41,7 +41,7 @@ export default function CheckPricing() {
           lastCheck: new Date().toLocaleTimeString(),
           cacheStatus: `Load: ${loadTime}ms`
         });
-        setError("❌ admin_config/pricing document introuvable");
+        setError("âŒ admin_config/pricing document introuvable");
         return;
       }
 
@@ -67,7 +67,7 @@ export default function CheckPricing() {
         typeof service.currency === "string"
       );
       
-      // Validation cohérence des montants
+      // Validation cohÃ©rence des montants
       const coherenceOk = hasStructure && [
         cfg.lawyer.eur,
         cfg.lawyer.usd,
@@ -101,7 +101,7 @@ export default function CheckPricing() {
       
       setError(null);
     } catch (e) {
-      setError(`❌ ERROR: ${String(e)}`);
+      setError(`âŒ ERROR: ${String(e)}`);
       setData(null);
     }
   };
@@ -122,11 +122,11 @@ export default function CheckPricing() {
   };
 
   const getStatusEmoji = () => {
-    if (error) return '❌';
-    if (!data) return '⏳';
-    if (data.structure === 'VALID') return '✅';
-    if (data.structure === 'MISSING') return '🚫';
-    return '⚠️';
+    if (error) return 'âŒ';
+    if (!data) return 'â³';
+    if (data.structure === 'VALID') return 'âœ…';
+    if (data.structure === 'MISSING') return 'ðŸš«';
+    return 'âš ï¸';
   };
 
   return (
@@ -206,30 +206,30 @@ export default function CheckPricing() {
               {/* Quick Status */}
               <div style={{ marginBottom: '12px' }}>
                 <div style={{ color: data.typesOk ? '#0f0' : '#f80', marginBottom: '2px' }}>
-                  Types: {data.typesOk ? '✅' : '❌'}
+                  Types: {data.typesOk ? 'âœ…' : 'âŒ'}
                 </div>
                 <div style={{ color: data.coherenceOk ? '#0f0' : '#f80', marginBottom: '2px' }}>
-                  Cohérence: {data.coherenceOk ? '✅' : '❌'}
+                  CohÃ©rence: {data.coherenceOk ? 'âœ…' : 'âŒ'}
                 </div>
                 <div style={{ color: data.currenciesOk ? '#0f0' : '#f80', marginBottom: '2px' }}>
-                  Devises: {data.currenciesOk ? '✅' : '❌'}
+                  Devises: {data.currenciesOk ? 'âœ…' : 'âŒ'}
                 </div>
               </div>
 
               {/* Detailed Data */}
               <details>
                 <summary style={{ color: '#fff', cursor: 'pointer', marginBottom: '8px' }}>
-                  📊 Données détaillées
+                  ðŸ“Š DonnÃ©es dÃ©taillÃ©es
                 </summary>
                 
                 <div style={{ fontSize: '10px' }}>
                   {/* Lawyer Pricing */}
                   <div style={{ marginBottom: '8px' }}>
-                    <div style={{ color: '#6cf', fontWeight: 'bold' }}>👨‍⚖️ LAWYER:</div>
+                    <div style={{ color: '#6cf', fontWeight: 'bold' }}>ðŸ‘¨â€âš–ï¸ LAWYER:</div>
                     <div style={{ color: '#ccc', marginLeft: '8px' }}>
-                      EUR: {data.lawyer_eur?.totalAmount}€ 
-                      (Fee: {data.lawyer_eur?.connectionFeeAmount}€, 
-                      Provider: {data.lawyer_eur?.providerAmount}€)
+                      EUR: {data.lawyer_eur?.totalAmount}â‚¬ 
+                      (Fee: {data.lawyer_eur?.connectionFeeAmount}â‚¬, 
+                      Provider: {data.lawyer_eur?.providerAmount}â‚¬)
                     </div>
                     <div style={{ color: '#ccc', marginLeft: '8px' }}>
                       USD: ${data.lawyer_usd?.totalAmount} 
@@ -240,11 +240,11 @@ export default function CheckPricing() {
 
                   {/* Expat Pricing */}
                   <div style={{ marginBottom: '8px' }}>
-                    <div style={{ color: '#6f6', fontWeight: 'bold' }}>🌍 EXPAT:</div>
+                    <div style={{ color: '#6f6', fontWeight: 'bold' }}>ðŸŒ EXPAT:</div>
                     <div style={{ color: '#ccc', marginLeft: '8px' }}>
-                      EUR: {data.expat_eur?.totalAmount}€ 
-                      (Fee: {data.expat_eur?.connectionFeeAmount}€, 
-                      Provider: {data.expat_eur?.providerAmount}€)
+                      EUR: {data.expat_eur?.totalAmount}â‚¬ 
+                      (Fee: {data.expat_eur?.connectionFeeAmount}â‚¬, 
+                      Provider: {data.expat_eur?.providerAmount}â‚¬)
                     </div>
                     <div style={{ color: '#ccc', marginLeft: '8px' }}>
                       USD: ${data.expat_usd?.totalAmount} 
@@ -277,7 +277,7 @@ export default function CheckPricing() {
                 fontSize: '10px'
               }}
             >
-              🔄 Refresh
+              ðŸ”„ Refresh
             </button>
             <button 
               onClick={() => {
@@ -294,7 +294,7 @@ export default function CheckPricing() {
                 fontSize: '10px'
               }}
             >
-              📋 Copy
+              ðŸ“‹ Copy
             </button>
           </div>
         </div>

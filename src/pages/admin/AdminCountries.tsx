@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Globe, 
@@ -62,14 +62,14 @@ const AdminCountries: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Exemple de pays pour le développement
+      // Exemple de pays pour le dÃ©veloppement
       const mockCountries: Country[] = [
         {
           id: 'fr',
           name: 'France',
           code: 'FR',
           flag: 'https://flagcdn.com/w40/fr.png',
-          isActive: false, // Désactivé car service non disponible en France
+          isActive: false, // DÃ©sactivÃ© car service non disponible en France
           createdAt: new Date(),
           updatedAt: new Date()
         },
@@ -84,7 +84,7 @@ const AdminCountries: React.FC = () => {
         },
         {
           id: 'th',
-          name: 'Thaïlande',
+          name: 'ThaÃ¯lande',
           code: 'TH',
           flag: 'https://flagcdn.com/w40/th.png',
           isActive: true,
@@ -183,7 +183,7 @@ const AdminCountries: React.FC = () => {
       setShowAddModal(false);
       
       // Show success message
-      alert('Pays ajouté avec succès');
+      alert('Pays ajoutÃ© avec succÃ¨s');
       
     } catch (error) {
       console.error('Error adding country:', error);
@@ -205,7 +205,7 @@ const AdminCountries: React.FC = () => {
         return;
       }
       
-      // En production, on mettrait à jour dans Firestore
+      // En production, on mettrait Ã  jour dans Firestore
       // await updateDoc(doc(db, 'countries', selectedCountry.id), {
       //   name: formData.name,
       //   code: formData.code.toUpperCase(),
@@ -235,11 +235,11 @@ const AdminCountries: React.FC = () => {
       setShowEditModal(false);
       
       // Show success message
-      alert('Pays mis à jour avec succès');
+      alert('Pays mis Ã  jour avec succÃ¨s');
       
     } catch (error) {
       console.error('Error updating country:', error);
-      alert('Erreur lors de la mise à jour du pays');
+      alert('Erreur lors de la mise Ã  jour du pays');
     } finally {
       setIsActionLoading(false);
     }
@@ -262,7 +262,7 @@ const AdminCountries: React.FC = () => {
       setShowDeleteModal(false);
       
       // Show success message
-      alert('Pays supprimé avec succès');
+      alert('Pays supprimÃ© avec succÃ¨s');
       
     } catch (error) {
       console.error('Error deleting country:', error);
@@ -276,7 +276,7 @@ const AdminCountries: React.FC = () => {
     try {
       setIsActionLoading(true);
       
-      // En production, on mettrait à jour dans Firestore
+      // En production, on mettrait Ã  jour dans Firestore
       // await updateDoc(doc(db, 'countries', countryId), {
       //   isActive: !isActive,
       //   updatedAt: serverTimestamp()
@@ -292,11 +292,11 @@ const AdminCountries: React.FC = () => {
       );
       
       // Show success message
-      alert(`Pays ${!isActive ? 'activé' : 'désactivé'} avec succès`);
+      alert(`Pays ${!isActive ? 'activÃ©' : 'dÃ©sactivÃ©'} avec succÃ¨s`);
       
     } catch (error) {
       console.error('Error toggling country status:', error);
-      alert('Erreur lors de la mise à jour du statut du pays');
+      alert('Erreur lors de la mise Ã  jour du statut du pays');
     } finally {
       setIsActionLoading(false);
     }
@@ -324,7 +324,7 @@ const AdminCountries: React.FC = () => {
 
   return (
     <AdminLayout>
-      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des pays. Veuillez réessayer.</div>}>
+      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des pays. Veuillez rÃ©essayer.</div>}>
         <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Gestion des pays</h1>
@@ -368,7 +368,7 @@ const AdminCountries: React.FC = () => {
                       Statut
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dernière mise à jour
+                      DerniÃ¨re mise Ã  jour
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -444,7 +444,7 @@ const AdminCountries: React.FC = () => {
                             <button
                               onClick={() => handleToggleActive(country.id, country.isActive)}
                               className={`${country.isActive ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}
-                              title={country.isActive ? 'Désactiver' : 'Activer'}
+                              title={country.isActive ? 'DÃ©sactiver' : 'Activer'}
                               disabled={isActionLoading}
                             >
                               {country.isActive ? <XCircle size={18} /> : <CheckCircle size={18} />}
@@ -467,7 +467,7 @@ const AdminCountries: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                        Aucun pays trouvé
+                        Aucun pays trouvÃ©
                       </td>
                     </tr>
                   )}
@@ -530,7 +530,7 @@ const AdminCountries: React.FC = () => {
                 placeholder="https://flagcdn.com/w40/fr.png"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Laissez vide pour utiliser l'URL par défaut basée sur le code ISO
+                Laissez vide pour utiliser l'URL par dÃ©faut basÃ©e sur le code ISO
               </p>
             </div>
 
@@ -543,7 +543,7 @@ const AdminCountries: React.FC = () => {
                 className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
               />
               <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
-                Activer immédiatement
+                Activer immÃ©diatement
               </label>
             </div>
 
@@ -653,7 +653,7 @@ const AdminCountries: React.FC = () => {
                   className="bg-blue-600 hover:bg-blue-700"
                   loading={isActionLoading}
                 >
-                  Mettre à jour
+                  Mettre Ã  jour
                 </Button>
               </div>
             </div>
@@ -674,11 +674,11 @@ const AdminCountries: React.FC = () => {
                   <AlertTriangle className="h-5 w-5 text-red-400" />
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-red-800">
-                      Attention : Cette action est irréversible
+                      Attention : Cette action est irrÃ©versible
                     </h3>
                     <div className="mt-2 text-sm text-red-700">
                       <p>
-                        Vous êtes sur le point de supprimer définitivement le pays :
+                        Vous Ãªtes sur le point de supprimer dÃ©finitivement le pays :
                         <br />
                         <strong>{selectedCountry.name}</strong>
                       </p>

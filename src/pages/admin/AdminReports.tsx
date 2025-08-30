@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   AlertTriangle, 
@@ -38,7 +38,7 @@ interface Report {
   resolvedAt?: Date;
   resolvedBy?: string;
   adminNotes?: string;
-  // Champs spécifiques aux messages de contact
+  // Champs spÃ©cifiques aux messages de contact
   firstName?: string;
   lastName?: string;
   email?: string;
@@ -84,7 +84,7 @@ const AdminReports: React.FC = () => {
         id: doc.id,
         type: 'contact' as const,
         reporterId: 'system',
-        reporterName: 'Système',
+        reporterName: 'SystÃ¨me',
         targetId: doc.id,
         targetType: 'contact' as const,
         reason: 'Message de contact',
@@ -119,7 +119,7 @@ const AdminReports: React.FC = () => {
           reporterName: 'Jean Dupont',
           targetId: 'review456',
           targetType: 'review',
-          reason: 'Contenu inapproprié',
+          reason: 'Contenu inappropriÃ©',
           details: 'Cet avis contient des propos offensants et des insultes.',
           status: 'pending',
           createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
@@ -162,8 +162,8 @@ const AdminReports: React.FC = () => {
           updatedAt: serverTimestamp()
         });
         
-        // Envoyer email de réponse (simulation)
-        console.log('Email envoyé à:', selectedReport.email);
+        // Envoyer email de rÃ©ponse (simulation)
+        console.log('Email envoyÃ© Ã :', selectedReport.email);
       }
       
       setReports(prev => 
@@ -184,7 +184,7 @@ const AdminReports: React.FC = () => {
       setShowReportModal(false);
       setSelectedReport(null);
       
-      alert('Message traité avec succès');
+      alert('Message traitÃ© avec succÃ¨s');
       
     } catch (error) {
       console.error('Error resolving report:', error);
@@ -210,14 +210,14 @@ const AdminReports: React.FC = () => {
         return (
           <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center">
             <CheckCircle size={12} className="mr-1" />
-            Résolu
+            RÃ©solu
           </span>
         );
       case 'dismissed':
         return (
           <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium flex items-center">
             <XCircle size={12} className="mr-1" />
-            Ignoré
+            IgnorÃ©
           </span>
         );
       case 'pending':
@@ -272,7 +272,7 @@ const AdminReports: React.FC = () => {
 
   return (
     <AdminLayout>
-      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des signalements. Veuillez réessayer.</div>}>
+      <ErrorBoundary fallback={<div className="p-8 text-center">Une erreur est survenue lors du chargement des signalements. Veuillez rÃ©essayer.</div>}>
         <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Messages de contact et signalements</h1>
@@ -294,8 +294,8 @@ const AdminReports: React.FC = () => {
               >
                 <option value="all">Tous les statuts</option>
                 <option value="pending">En attente</option>
-                <option value="resolved">Résolus</option>
-                <option value="dismissed">Ignorés</option>
+                <option value="resolved">RÃ©solus</option>
+                <option value="dismissed">IgnorÃ©s</option>
               </select>
             </div>
           </div>
@@ -306,7 +306,7 @@ const AdminReports: React.FC = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expéditeur
+                      ExpÃ©diteur
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Type
@@ -375,7 +375,7 @@ const AdminReports: React.FC = () => {
                             <button
                               onClick={() => handleViewReport(report)}
                               className="text-blue-600 hover:text-blue-800"
-                              title="Voir détails"
+                              title="Voir dÃ©tails"
                             >
                               <Eye size={18} />
                             </button>
@@ -386,7 +386,7 @@ const AdminReports: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                        Aucun message trouvé
+                        Aucun message trouvÃ©
                       </td>
                     </tr>
                   )}
@@ -399,7 +399,7 @@ const AdminReports: React.FC = () => {
         <Modal
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
-          title="Détails du message"
+          title="DÃ©tails du message"
           size="large"
         >
           {selectedReport && (
@@ -416,21 +416,21 @@ const AdminReports: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-500">
-                    Reçu le {formatDate(selectedReport.createdAt)}
+                    ReÃ§u le {formatDate(selectedReport.createdAt)}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Informations de l'expéditeur</h4>
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">Informations de l'expÃ©diteur</h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-1">Nom</h5>
                       <div className="text-sm font-medium">
                         {selectedReport.firstName && selectedReport.lastName 
                           ? `${selectedReport.firstName} ${selectedReport.lastName}`
-                          : selectedReport.reporterName || 'Non spécifié'
+                          : selectedReport.reporterName || 'Non spÃ©cifiÃ©'
                         }
                       </div>
                     </div>
@@ -444,14 +444,14 @@ const AdminReports: React.FC = () => {
                     
                     {selectedReport.category && (
                       <div>
-                        <h5 className="text-sm font-medium text-gray-700 mb-1">Catégorie</h5>
+                        <h5 className="text-sm font-medium text-gray-700 mb-1">CatÃ©gorie</h5>
                         <div className="text-sm text-gray-700">{selectedReport.category}</div>
                       </div>
                     )}
                     
                     {selectedReport.priority && (
                       <div>
-                        <h5 className="text-sm font-medium text-gray-700 mb-1">Priorité</h5>
+                        <h5 className="text-sm font-medium text-gray-700 mb-1">PrioritÃ©</h5>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           selectedReport.priority === 'urgent' ? 'bg-red-100 text-red-800' :
                           selectedReport.priority === 'high' ? 'bg-orange-100 text-orange-800' :
@@ -488,7 +488,7 @@ const AdminReports: React.FC = () => {
               {selectedReport.status === 'pending' && (
                 <div>
                   <label htmlFor="adminNotes" className="block text-sm font-medium text-gray-700 mb-1">
-                    Réponse
+                    RÃ©ponse
                   </label>
                   <textarea
                     id="adminNotes"
@@ -496,7 +496,7 @@ const AdminReports: React.FC = () => {
                     onChange={(e) => setAdminNotes(e.target.value)}
                     rows={4}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Rédigez votre réponse..."
+                    placeholder="RÃ©digez votre rÃ©ponse..."
                   />
                 </div>
               )}
@@ -516,7 +516,7 @@ const AdminReports: React.FC = () => {
                     disabled={isActionLoading}
                   >
                     <CheckCircle size={16} className="mr-2" />
-                    Marquer comme traité
+                    Marquer comme traitÃ©
                   </Button>
                 )}
               </div>

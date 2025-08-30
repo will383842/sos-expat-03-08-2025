@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, LogIn, Shield } from 'lucide-react';
 import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, signOut } from 'firebase/auth';
@@ -79,7 +79,7 @@ const AdminLogin: React.FC = () => {
         
         navigate('/admin/dashboard');
       } else {
-        setError('Accès non autorisé. Vous n\'avez pas les droits d\'administration.');
+        setError('AccÃ¨s non autorisÃ©. Vous n\'avez pas les droits d\'administration.');
         try {
           await signOut(auth);
         } catch (error) {
@@ -102,11 +102,11 @@ const AdminLogin: React.FC = () => {
       case 'auth/wrong-password':
         return 'Email ou mot de passe incorrect';
       case 'auth/too-many-requests':
-        return 'Trop de tentatives. Réessayez plus tard';
+        return 'Trop de tentatives. RÃ©essayez plus tard';
       case 'auth/network-request-failed':
-        return 'Erreur de connexion. Vérifiez votre internet';
+        return 'Erreur de connexion. VÃ©rifiez votre internet';
       default:
-        return 'Une erreur est survenue. Veuillez réessayer';
+        return 'Une erreur est survenue. Veuillez rÃ©essayer';
     }
   };
 
@@ -122,7 +122,7 @@ const AdminLogin: React.FC = () => {
           Console d'administration
         </h2>
         <p className="mt-2 text-center text-sm text-gray-400">
-          Accès réservé aux administrateurs
+          AccÃ¨s rÃ©servÃ© aux administrateurs
         </p>
       </div>
 
@@ -213,7 +213,7 @@ const AdminLogin: React.FC = () => {
 
           <div className="mt-6 text-center">
             <a href="/" className="text-sm text-gray-400 hover:text-gray-300">
-              Retour à l'accueil
+              Retour Ã  l'accueil
             </a>
           </div>
         </div>

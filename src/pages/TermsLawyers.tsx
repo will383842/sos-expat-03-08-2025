@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Scale,
@@ -21,9 +21,9 @@ import { db } from '../config/firebase';
 
 /**
  * TermsLawyers
- * - Logique métier conservée : Firestore (legal_documents / terms_lawyers), sélection de langue locale.
- * - Design harmonisé avec Home / TermsExpats (gradients, chips, sommaire, cartes).
- * - 100% éditable depuis l’admin ; fallback FR/EN intégré.
+ * - Logique mÃ©tier conservÃ©e : Firestore (legal_documents / terms_lawyers), sÃ©lection de langue locale.
+ * - Design harmonisÃ© avec Home / TermsExpats (gradients, chips, sommaire, cartes).
+ * - 100% Ã©ditable depuis lâ€™admin ; fallback FR/EN intÃ©grÃ©.
  * - Aucune utilisation de `any`.
  */
 
@@ -36,7 +36,7 @@ const TermsLawyers: React.FC = () => {
     (language as 'fr' | 'en') || 'fr'
   );
 
-  // Rester aligné avec la langue globale si elle change
+  // Rester alignÃ© avec la langue globale si elle change
   useEffect(() => {
     if (language) setSelectedLanguage(language as 'fr' | 'en');
   }, [language]);
@@ -75,49 +75,49 @@ const TermsLawyers: React.FC = () => {
   const translations = {
     fr: {
       title: 'CGU Avocats',
-      subtitle: "Conditions générales d'utilisation pour les avocats prestataires",
-      lastUpdated: 'Version 2.2 – Dernière mise à jour : 16 juin 2025',
+      subtitle: "Conditions gÃ©nÃ©rales d'utilisation pour les avocats prestataires",
+      lastUpdated: 'Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025',
       loading: 'Chargement...',
-      joinNetwork: 'Rejoindre le réseau',
-      trustedByExperts: 'Déjà 2K+ avocats nous font confiance',
-      keyFeatures: 'Points clés',
+      joinNetwork: 'Rejoindre le rÃ©seau',
+      trustedByExperts: 'DÃ©jÃ  2K+ avocats nous font confiance',
+      keyFeatures: 'Points clÃ©s',
       features: [
         'Paiement garanti sous 7 jours',
         'Support technique 24/7',
-        'Interface mobile optimisée',
-        'Clients vérifiés',
+        'Interface mobile optimisÃ©e',
+        'Clients vÃ©rifiÃ©s',
       ],
       languageToggle: 'Changer de langue',
       sections: {
-        definitions: 'Définitions',
+        definitions: 'DÃ©finitions',
         scope: 'Objet, champ et acceptation',
-        status: "Statut de l'Avocat – Indépendance et conformité",
-        account: 'Création de compte, vérifications et sécurité',
-        rules: "Règles d'usage – Conflits, confidentialité, non-contournement",
-        relationship: 'Relation Avocat–Utilisateur (hors Plateforme)',
+        status: "Statut de l'Avocat â€“ IndÃ©pendance et conformitÃ©",
+        account: 'CrÃ©ation de compte, vÃ©rifications et sÃ©curitÃ©',
+        rules: "RÃ¨gles d'usage â€“ Conflits, confidentialitÃ©, non-contournement",
+        relationship: 'Relation Avocatâ€“Utilisateur (hors Plateforme)',
         fees: 'Frais, paiement unique et taxes',
-        payments: 'Paiements – KYC/LCB-FT – Sanctions',
-        data: 'Données personnelles (cadre global)',
-        ip: 'Propriété intellectuelle',
-        liability: 'Garanties, responsabilité et indemnisation',
-        law: 'Droit applicable – Arbitrage – Juridiction estonienne',
+        payments: 'Paiements â€“ KYC/LCB-FT â€“ Sanctions',
+        data: 'DonnÃ©es personnelles (cadre global)',
+        ip: 'PropriÃ©tÃ© intellectuelle',
+        liability: 'Garanties, responsabilitÃ© et indemnisation',
+        law: 'Droit applicable â€“ Arbitrage â€“ Juridiction estonienne',
         misc: 'Divers',
         contact: 'Contact',
       },
-      readyToJoin: 'Prêt à rejoindre SOS Expat ?',
-      readySubtitle: "Développez votre activité à l'international et aidez des milliers d'expatriés.",
+      readyToJoin: 'PrÃªt Ã  rejoindre SOS Expat ?',
+      readySubtitle: "DÃ©veloppez votre activitÃ© Ã  l'international et aidez des milliers d'expatriÃ©s.",
       startNow: 'Commencer maintenant',
       contactUs: 'Nous contacter',
       anchorTitle: 'Sommaire',
-      editHint: 'Document éditable depuis la console admin',
-      heroBadge: 'Nouveau — Conditions mises à jour',
+      editHint: 'Document Ã©ditable depuis la console admin',
+      heroBadge: 'Nouveau â€” Conditions mises Ã  jour',
       ctaHero: 'Rejoindre les avocats',
       contactForm: 'Formulaire de contact',
     },
     en: {
       title: 'Lawyer Terms',
       subtitle: 'Terms of Use for lawyer providers',
-      lastUpdated: 'Version 2.2 – Last updated: 16 June 2025',
+      lastUpdated: 'Version 2.2 â€“ Last updated: 16 June 2025',
       loading: 'Loading...',
       joinNetwork: 'Join the network',
       trustedByExperts: 'Already 2K+ lawyers trust us',
@@ -132,16 +132,16 @@ const TermsLawyers: React.FC = () => {
       sections: {
         definitions: 'Definitions',
         scope: 'Purpose, Scope and Acceptance',
-        status: 'Lawyer Status – Independence and Compliance',
+        status: 'Lawyer Status â€“ Independence and Compliance',
         account: 'Account, Checks and Security',
-        rules: 'Use Rules – Conflicts, Confidentiality, No Circumvention',
-        relationship: 'Lawyer–User Relationship (Off-Platform)',
+        rules: 'Use Rules â€“ Conflicts, Confidentiality, No Circumvention',
+        relationship: 'Lawyerâ€“User Relationship (Off-Platform)',
         fees: 'Fees, Single Payment and Taxes',
-        payments: 'Payments – AML/KYC – Sanctions',
+        payments: 'Payments â€“ AML/KYC â€“ Sanctions',
         data: 'Data Protection (Global Framework)',
         ip: 'Intellectual Property',
         liability: 'Warranties, Liability and Indemnity',
-        law: 'Governing Law – ICC Arbitration – Estonian Courts',
+        law: 'Governing Law â€“ ICC Arbitration â€“ Estonian Courts',
         misc: 'Miscellaneous',
         contact: 'Contact',
       },
@@ -151,7 +151,7 @@ const TermsLawyers: React.FC = () => {
       contactUs: 'Contact us',
       anchorTitle: 'Overview',
       editHint: 'Document editable from the admin console',
-      heroBadge: 'New — Terms updated',
+      heroBadge: 'New â€” Terms updated',
       ctaHero: 'Join as a lawyer',
       contactForm: 'Contact Form',
     },
@@ -160,10 +160,10 @@ const TermsLawyers: React.FC = () => {
   const t = translations[selectedLanguage];
 
   const handleLanguageChange = (newLang: 'fr' | 'en') => {
-    setSelectedLanguage(newLang); // Changement local (n’affecte pas la langue globale)
+    setSelectedLanguage(newLang); // Changement local (nâ€™affecte pas la langue globale)
   };
 
-  // --- Parser Markdown (mêmes règles que TermsExpats) ---
+  // --- Parser Markdown (mÃªmes rÃ¨gles que TermsExpats) ---
   const parseMarkdownContent = (text: string) => {
     const lines = text.split('\n');
     const elements: JSX.Element[] = [];
@@ -174,7 +174,7 @@ const TermsLawyers: React.FC = () => {
 
       if (line.trim() === '') continue;
 
-      // Séparateur
+      // SÃ©parateur
       if (line.trim() === '---') {
         elements.push(<hr key={currentIndex++} className="my-8 border-t-2 border-gray-200" />);
         continue;
@@ -194,7 +194,7 @@ const TermsLawyers: React.FC = () => {
         continue;
       }
 
-      // H2 (avec numéro optionnel au début)
+      // H2 (avec numÃ©ro optionnel au dÃ©but)
       if (line.startsWith('## ')) {
         const title = line.substring(3).trim();
         const match = title.match(/^(\d+)\.\s*(.*)$/);
@@ -232,7 +232,7 @@ const TermsLawyers: React.FC = () => {
         continue;
       }
 
-      // Points numérotés 2.1 / 3.2 …
+      // Points numÃ©rotÃ©s 2.1 / 3.2 â€¦
       const numberedMatch = line.match(/^(\d+\.\d+\.?)\s+(.*)$/);
       if (numberedMatch) {
         const number = numberedMatch[1];
@@ -266,7 +266,7 @@ const TermsLawyers: React.FC = () => {
         continue;
       }
 
-      // Bloc Contact dédié
+      // Bloc Contact dÃ©diÃ©
       if (line.includes('Pour toute question') || line.includes('Contact form') || line.includes('For any questions')) {
         elements.push(
           <div
@@ -321,187 +321,187 @@ const TermsLawyers: React.FC = () => {
     return elements;
   };
 
-  // --- Contenu par défaut (séparé FR / EN) ---
+  // --- Contenu par dÃ©faut (sÃ©parÃ© FR / EN) ---
   const defaultFr = `
-# Conditions Générales d'Utilisation – Avocats (Global)
+# Conditions GÃ©nÃ©rales d'Utilisation â€“ Avocats (Global)
 
-**SOS Expat d'Ulixai OÜ** (la « **Plateforme** », « **SOS** », « **nous** »)
+**SOS Expat d'Ulixai OÃœ** (la Â« **Plateforme** Â», Â« **SOS** Â», Â« **nous** Â»)
 
-**Version 2.2 – Dernière mise à jour : 16 juin 2025**
+**Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025**
 
 ---
 
-## 1. Définitions
+## 1. DÃ©finitions
 
-**Application / Site / Plateforme** : services numériques exploités par **Ulixai OÜ** permettant la mise en relation entre des utilisateurs (les « **Utilisateurs** ») et des avocats (les « **Avocats** »).
+**Application / Site / Plateforme** : services numÃ©riques exploitÃ©s par **Ulixai OÃœ** permettant la mise en relation entre des utilisateurs (les Â« **Utilisateurs** Â») et des avocats (les Â« **Avocats** Â»).
 
-**Mise en relation** : l'introduction technique/opérationnelle réalisée par la Plateforme entre un Utilisateur et un Avocat, matérialisée par (i) la transmission de coordonnées, (ii) l'ouverture d'un canal de communication (appel, message, visio), ou (iii) l'acceptation par l'Avocat d'une demande émise via la Plateforme.
+**Mise en relation** : l'introduction technique/opÃ©rationnelle rÃ©alisÃ©e par la Plateforme entre un Utilisateur et un Avocat, matÃ©rialisÃ©e par (i) la transmission de coordonnÃ©es, (ii) l'ouverture d'un canal de communication (appel, message, visio), ou (iii) l'acceptation par l'Avocat d'une demande Ã©mise via la Plateforme.
 
-**Pays d'Intervention** : la juridiction principalement visée par la Requête au moment de la Mise en relation. À défaut, le pays de résidence de l'Utilisateur au moment de la demande ; en cas de pluralité, la juridiction la plus étroitement liée à l'objet de la Requête.
+**Pays d'Intervention** : la juridiction principalement visÃ©e par la RequÃªte au moment de la Mise en relation. Ã€ dÃ©faut, le pays de rÃ©sidence de l'Utilisateur au moment de la demande ; en cas de pluralitÃ©, la juridiction la plus Ã©troitement liÃ©e Ã  l'objet de la RequÃªte.
 
-**Frais de Mise en relation** : frais dus à SOS pour chaque Mise en relation (art. 7) : **19 €** si payés en **EUR** ou **25 $ USD** si payés en **USD**, étant précisé qu'Ulixai peut modifier ces montants et/ou publier des barèmes locaux par pays/devise, avec effet prospectif.
+**Frais de Mise en relation** : frais dus Ã  SOS pour chaque Mise en relation (art. 7) : **19 â‚¬** si payÃ©s en **EUR** ou **25 $ USD** si payÃ©s en **USD**, Ã©tant prÃ©cisÃ© qu'Ulixai peut modifier ces montants et/ou publier des barÃ¨mes locaux par pays/devise, avec effet prospectif.
 
-**Requête** : la situation/projet juridique exposé par l'Utilisateur.
+**RequÃªte** : la situation/projet juridique exposÃ© par l'Utilisateur.
 
-**Prestataire(s) de paiement** : services tiers utilisés pour percevoir le paiement unique de l'Utilisateur et répartir les fonds.
+**Prestataire(s) de paiement** : services tiers utilisÃ©s pour percevoir le paiement unique de l'Utilisateur et rÃ©partir les fonds.
 
 ---
 
 ## 2. Objet, champ et acceptation
 
-2.1. Les présentes CGU régissent l'accès et l'utilisation de la Plateforme par les Avocats.
+2.1. Les prÃ©sentes CGU rÃ©gissent l'accÃ¨s et l'utilisation de la Plateforme par les Avocats.
 
-2.2. Ulixai agit uniquement en tant qu'intermédiaire technique de mise en relation. Ulixai n'exerce pas la profession d'avocat, ne fournit pas de conseil juridique et n'est pas partie à la relation Avocat-Utilisateur.
+2.2. Ulixai agit uniquement en tant qu'intermÃ©diaire technique de mise en relation. Ulixai n'exerce pas la profession d'avocat, ne fournit pas de conseil juridique et n'est pas partie Ã  la relation Avocat-Utilisateur.
 
-2.3. **Acceptation électronique (click-wrap).** L'Avocat accepte les CGU en cochant la case dédiée lors de l'inscription et/ou en utilisant la Plateforme. Cet acte vaut signature électronique et consentement contractuel. SOS peut conserver des journaux de preuve (horodatage, identifiants techniques).
+2.3. **Acceptation Ã©lectronique (click-wrap).** L'Avocat accepte les CGU en cochant la case dÃ©diÃ©e lors de l'inscription et/ou en utilisant la Plateforme. Cet acte vaut signature Ã©lectronique et consentement contractuel. SOS peut conserver des journaux de preuve (horodatage, identifiants techniques).
 
-2.4. **Modifications.** SOS peut mettre à jour les CGU et/ou le barème des frais (par pays/devise) à tout moment, avec effet prospectif après publication sur la Plateforme. L'usage continu vaut acceptation.
+2.4. **Modifications.** SOS peut mettre Ã  jour les CGU et/ou le barÃ¨me des frais (par pays/devise) Ã  tout moment, avec effet prospectif aprÃ¨s publication sur la Plateforme. L'usage continu vaut acceptation.
 
-2.5. Durée : indéterminée.
-
----
-
-## 3. Statut de l'Avocat – Indépendance et conformité
-
-3.1. L'Avocat agit en professionnel indépendant ; aucune relation d'emploi, mandat, agence, partenariat ou coentreprise n'est créée avec Ulixai.
-
-3.2. L'Avocat est seul responsable : (i) de ses diplômes, titres, inscriptions au barreau/équivalents et autorisations d'exercer ; (ii) de son assurance responsabilité civile professionnelle en vigueur et adaptée aux Pays d'Intervention ; (iii) du respect des lois et règles professionnelles locales (déontologie, publicité/démarchage, conflits d'intérêts, secret professionnel, LCB-FT/KYC, fiscalité, protection des consommateurs, etc.).
-
-3.3. Ulixai ne supervise pas et n'évalue pas le contenu ni la qualité des conseils de l'Avocat et n'endosse aucune responsabilité à ce titre.
-
-3.4. **Capacité professionnelle (B2B).** L'Avocat déclare agir exclusivement à des fins professionnelles. Les régimes protecteurs des consommateurs ne s'appliquent pas à la relation Ulixai–Avocat.
+2.5. DurÃ©e : indÃ©terminÃ©e.
 
 ---
 
-## 4. Création de compte, vérifications et sécurité
+## 3. Statut de l'Avocat â€“ IndÃ©pendance et conformitÃ©
 
-4.1. Conditions : droit d'exercer valide dans au moins une juridiction, justificatifs d'identité et de qualification, assurance RCP en cours de validité.
+3.1. L'Avocat agit en professionnel indÃ©pendant ; aucune relation d'emploi, mandat, agence, partenariat ou coentreprise n'est crÃ©Ã©e avec Ulixai.
 
-4.2. Processus : création de compte, fourniture des documents, validation manuelle pouvant inclure un entretien visio et des contrôles KYC/LCB-FT via des Prestataires.
+3.2. L'Avocat est seul responsable : (i) de ses diplÃ´mes, titres, inscriptions au barreau/Ã©quivalents et autorisations d'exercer ; (ii) de son assurance responsabilitÃ© civile professionnelle en vigueur et adaptÃ©e aux Pays d'Intervention ; (iii) du respect des lois et rÃ¨gles professionnelles locales (dÃ©ontologie, publicitÃ©/dÃ©marchage, conflits d'intÃ©rÃªts, secret professionnel, LCB-FT/KYC, fiscalitÃ©, protection des consommateurs, etc.).
 
-4.3. Exactitude & mise à jour : l'Avocat garantit l'exactitude/actualité des informations ; un (1) compte par Avocat.
+3.3. Ulixai ne supervise pas et n'Ã©value pas le contenu ni la qualitÃ© des conseils de l'Avocat et n'endosse aucune responsabilitÃ© Ã  ce titre.
 
-4.4. Sécurité : l'Avocat protège ses identifiants ; toute activité via le compte est réputée effectuée par lui ; signalement immédiat de toute compromission.
-
----
-
-## 5. Règles d'usage – Conflits, confidentialité, non-contournement
-
-5.1. **Conflits d'intérêts.** L'Avocat effectue un screening approprié avant tout conseil. En cas de conflit, il se retire et en informe l'Utilisateur.
-
-5.2. **Secret professionnel & confidentialité.** L'Avocat respecte la confidentialité/secret professionnel selon le droit applicable du Pays d'Intervention. Les échanges ne sont pas enregistrés par SOS, sauf obligations légales.
-
-5.3. **Non-contournement.** Ulixai ne perçoit aucune commission sur les honoraires. Chaque nouvelle Mise en relation avec un nouvel Utilisateur via la Plateforme donne lieu aux Frais de Mise en relation. Il est interdit de contourner la Plateforme pour éviter ces frais lors d'une nouvelle introduction.
-
-5.4. **Comportements interdits.** Usurpation d'identité/titre, contenus illicites, manipulation, collusion/boycott visant à nuire à la Plateforme, violation de lois sur sanctions/export, ou toute activité illégale.
-
-5.5. **Disponibilité.** La Plateforme est fournie « en l'état » ; aucune disponibilité ininterrompue n'est garantie (maintenance, incidents, force majeure). L'accès peut être restreint si la loi l'impose.
+3.4. **CapacitÃ© professionnelle (B2B).** L'Avocat dÃ©clare agir exclusivement Ã  des fins professionnelles. Les rÃ©gimes protecteurs des consommateurs ne s'appliquent pas Ã  la relation Ulixaiâ€“Avocat.
 
 ---
 
-## 6. Relation Avocat–Utilisateur (hors Plateforme)
+## 4. CrÃ©ation de compte, vÃ©rifications et sÃ©curitÃ©
 
-6.1. Après la Mise en relation, l'Avocat et l'Utilisateur peuvent contractualiser hors Plateforme (Ulixai n'intervient pas dans la fixation ni l'encaissement des honoraires, sauf mécanisme de paiement unique décrit ci-dessous).
+4.1. Conditions : droit d'exercer valide dans au moins une juridiction, justificatifs d'identitÃ© et de qualification, assurance RCP en cours de validitÃ©.
 
-6.2. L'Avocat remet ses conventions d'honoraires selon le droit local, collecte/reverse les taxes applicables et respecte les règles locales (publicité, démarchage, conflits d'intérêts, consommateurs).
+4.2. Processus : crÃ©ation de compte, fourniture des documents, validation manuelle pouvant inclure un entretien visio et des contrÃ´les KYC/LCB-FT via des Prestataires.
 
-6.3. Ulixai n'est pas responsable de la qualité, de l'exactitude ou du résultat des conseils de l'Avocat.
+4.3. Exactitude & mise Ã  jour : l'Avocat garantit l'exactitude/actualitÃ© des informations ; un (1) compte par Avocat.
+
+4.4. SÃ©curitÃ© : l'Avocat protÃ¨ge ses identifiants ; toute activitÃ© via le compte est rÃ©putÃ©e effectuÃ©e par lui ; signalement immÃ©diat de toute compromission.
+
+---
+
+## 5. RÃ¨gles d'usage â€“ Conflits, confidentialitÃ©, non-contournement
+
+5.1. **Conflits d'intÃ©rÃªts.** L'Avocat effectue un screening appropriÃ© avant tout conseil. En cas de conflit, il se retire et en informe l'Utilisateur.
+
+5.2. **Secret professionnel & confidentialitÃ©.** L'Avocat respecte la confidentialitÃ©/secret professionnel selon le droit applicable du Pays d'Intervention. Les Ã©changes ne sont pas enregistrÃ©s par SOS, sauf obligations lÃ©gales.
+
+5.3. **Non-contournement.** Ulixai ne perÃ§oit aucune commission sur les honoraires. Chaque nouvelle Mise en relation avec un nouvel Utilisateur via la Plateforme donne lieu aux Frais de Mise en relation. Il est interdit de contourner la Plateforme pour Ã©viter ces frais lors d'une nouvelle introduction.
+
+5.4. **Comportements interdits.** Usurpation d'identitÃ©/titre, contenus illicites, manipulation, collusion/boycott visant Ã  nuire Ã  la Plateforme, violation de lois sur sanctions/export, ou toute activitÃ© illÃ©gale.
+
+5.5. **DisponibilitÃ©.** La Plateforme est fournie Â« en l'Ã©tat Â» ; aucune disponibilitÃ© ininterrompue n'est garantie (maintenance, incidents, force majeure). L'accÃ¨s peut Ãªtre restreint si la loi l'impose.
+
+---
+
+## 6. Relation Avocatâ€“Utilisateur (hors Plateforme)
+
+6.1. AprÃ¨s la Mise en relation, l'Avocat et l'Utilisateur peuvent contractualiser hors Plateforme (Ulixai n'intervient pas dans la fixation ni l'encaissement des honoraires, sauf mÃ©canisme de paiement unique dÃ©crit ci-dessous).
+
+6.2. L'Avocat remet ses conventions d'honoraires selon le droit local, collecte/reverse les taxes applicables et respecte les rÃ¨gles locales (publicitÃ©, dÃ©marchage, conflits d'intÃ©rÃªts, consommateurs).
+
+6.3. Ulixai n'est pas responsable de la qualitÃ©, de l'exactitude ou du rÃ©sultat des conseils de l'Avocat.
 
 ---
 
 ## 7. Frais, paiement unique et taxes
 
-7.1. **Frais de Mise en relation (forfait).** 19 € (EUR) ou 25 $ (USD) par Mise en relation, hors taxes et hors frais du Prestataire de paiement. Ulixai peut modifier ces montants et/ou publier des barèmes locaux par pays/devise, avec effet prospectif.
+7.1. **Frais de Mise en relation (forfait).** 19 â‚¬ (EUR) ou 25 $ (USD) par Mise en relation, hors taxes et hors frais du Prestataire de paiement. Ulixai peut modifier ces montants et/ou publier des barÃ¨mes locaux par pays/devise, avec effet prospectif.
 
-7.2. **Paiement unique et répartition.** L'Utilisateur effectue un paiement unique via la Plateforme couvrant (i) les honoraires de l'Avocat (tels que convenus entre l'Avocat et l'Utilisateur) et (ii) les Frais de Mise en relation d'Ulixai. Ulixai (ou son Prestataire) encaisse ce paiement, déduit ses Frais de Mise en relation, puis reverse le solde à l'Avocat. L'Avocat autorise Ulixai à procéder à ces déductions et répartitions.
+7.2. **Paiement unique et rÃ©partition.** L'Utilisateur effectue un paiement unique via la Plateforme couvrant (i) les honoraires de l'Avocat (tels que convenus entre l'Avocat et l'Utilisateur) et (ii) les Frais de Mise en relation d'Ulixai. Ulixai (ou son Prestataire) encaisse ce paiement, dÃ©duit ses Frais de Mise en relation, puis reverse le solde Ã  l'Avocat. L'Avocat autorise Ulixai Ã  procÃ©der Ã  ces dÃ©ductions et rÃ©partitions.
 
-7.3. **Exigibilité & non-remboursement.** Les Frais de Mise en relation sont dus dès la Mise en relation et sont non remboursables (sauf geste commercial discrétionnaire d'Ulixai en cas d'échec exclusivement imputable à la Plateforme et dans la mesure permise par la loi).
+7.3. **ExigibilitÃ© & non-remboursement.** Les Frais de Mise en relation sont dus dÃ¨s la Mise en relation et sont non remboursables (sauf geste commercial discrÃ©tionnaire d'Ulixai en cas d'Ã©chec exclusivement imputable Ã  la Plateforme et dans la mesure permise par la loi).
 
-7.4. **Remboursement à l'Utilisateur.** Si un remboursement est accordé à l'Utilisateur, il est imputé sur la part de l'Avocat : Ulixai peut retenir/compenser le montant correspondant sur les versements futurs de l'Avocat, ou en demander le remboursement si aucun versement n'est à venir. Aucun remboursement des Frais de Mise en relation n'est dû, sauf décision discrétionnaire d'Ulixai.
+7.4. **Remboursement Ã  l'Utilisateur.** Si un remboursement est accordÃ© Ã  l'Utilisateur, il est imputÃ© sur la part de l'Avocat : Ulixai peut retenir/compenser le montant correspondant sur les versements futurs de l'Avocat, ou en demander le remboursement si aucun versement n'est Ã  venir. Aucun remboursement des Frais de Mise en relation n'est dÃ», sauf dÃ©cision discrÃ©tionnaire d'Ulixai.
 
-7.5. **Devises & conversion.** Plusieurs devises peuvent être proposées ; des taux/frais de conversion du Prestataire peuvent s'appliquer.
+7.5. **Devises & conversion.** Plusieurs devises peuvent Ãªtre proposÃ©es ; des taux/frais de conversion du Prestataire peuvent s'appliquer.
 
-7.6. **Taxes.** L'Avocat demeure responsable de ses obligations fiscales. Ulixai collecte et reverse, lorsque requis, la TVA/équivalent local sur les Frais de Mise en relation.
+7.6. **Taxes.** L'Avocat demeure responsable de ses obligations fiscales. Ulixai collecte et reverse, lorsque requis, la TVA/Ã©quivalent local sur les Frais de Mise en relation.
 
-7.7. **Compensation.** Ulixai peut compenser tout montant que l'Avocat lui doit (au titre d'un remboursement Utilisateur ou autre) avec toute somme due à l'Avocat.
-
----
-
-## 8. Paiements – KYC/LCB-FT – Sanctions
-
-8.1. Les paiements sont traités par des Prestataires tiers. L'Avocat accepte leurs conditions et processus KYC/LCB-FT.
-
-8.2. Ulixai peut différer, retenir ou annuler des paiements en cas de soupçon de fraude, de non-conformité ou d'injonction légale.
-
-8.3. L'accès peut être restreint dans des territoires soumis à sanctions/embargos si la loi l'exige. L'Avocat déclare ne figurer sur aucune liste de sanctions et respecter les contrôles export applicables.
+7.7. **Compensation.** Ulixai peut compenser tout montant que l'Avocat lui doit (au titre d'un remboursement Utilisateur ou autre) avec toute somme due Ã  l'Avocat.
 
 ---
 
-## 9. Données personnelles (cadre global)
+## 8. Paiements â€“ KYC/LCB-FT â€“ Sanctions
 
-9.1. **Rôles.** Pour les données des Utilisateurs reçues aux fins de Mise en relation, Ulixai et l'Avocat agissent chacun en responsable de traitement pour leurs finalités respectives.
+8.1. Les paiements sont traitÃ©s par des Prestataires tiers. L'Avocat accepte leurs conditions et processus KYC/LCB-FT.
 
-9.2. **Bases & finalités.** Exécution du contrat (Mise en relation), intérêts légitimes (sécurité, prévention de la fraude, amélioration), conformité légale (LCB-FT, sanctions), et, le cas échéant, consentement.
+8.2. Ulixai peut diffÃ©rer, retenir ou annuler des paiements en cas de soupÃ§on de fraude, de non-conformitÃ© ou d'injonction lÃ©gale.
 
-9.3. **Transferts internationaux** avec garanties appropriées lorsque requis.
+8.3. L'accÃ¨s peut Ãªtre restreint dans des territoires soumis Ã  sanctions/embargos si la loi l'exige. L'Avocat dÃ©clare ne figurer sur aucune liste de sanctions et respecter les contrÃ´les export applicables.
+
+---
+
+## 9. DonnÃ©es personnelles (cadre global)
+
+9.1. **RÃ´les.** Pour les donnÃ©es des Utilisateurs reÃ§ues aux fins de Mise en relation, Ulixai et l'Avocat agissent chacun en responsable de traitement pour leurs finalitÃ©s respectives.
+
+9.2. **Bases & finalitÃ©s.** ExÃ©cution du contrat (Mise en relation), intÃ©rÃªts lÃ©gitimes (sÃ©curitÃ©, prÃ©vention de la fraude, amÃ©lioration), conformitÃ© lÃ©gale (LCB-FT, sanctions), et, le cas Ã©chÃ©ant, consentement.
+
+9.3. **Transferts internationaux** avec garanties appropriÃ©es lorsque requis.
 
 9.4. **Droits & contact.** Exercice des droits via le formulaire de contact de la Plateforme.
 
-9.5. **Sécurité.** Mesures techniques/organisationnelles raisonnables ; notification des violations selon les lois applicables.
+9.5. **SÃ©curitÃ©.** Mesures techniques/organisationnelles raisonnables ; notification des violations selon les lois applicables.
 
-9.6. L'Avocat traite les données reçues conformément au droit du Pays d'Intervention et à sa déontologie (secret professionnel).
-
----
-
-## 10. Propriété intellectuelle
-
-La Plateforme, ses marques, logos, bases de données et contenus sont protégés. Aucun droit n'est cédé à l'Avocat, hormis un droit personnel, non exclusif, non transférable d'accès pendant la durée des CGU. Les contenus fournis par l'Avocat (profil, photo, descriptifs) font l'objet d'une licence mondiale, non exclusive en faveur d'Ulixai pour l'hébergement et l'affichage dans la Plateforme.
+9.6. L'Avocat traite les donnÃ©es reÃ§ues conformÃ©ment au droit du Pays d'Intervention et Ã  sa dÃ©ontologie (secret professionnel).
 
 ---
 
-## 11. Garanties, responsabilité et indemnisation
+## 10. PropriÃ©tÃ© intellectuelle
 
-11.1. Aucune garantie quant aux services juridiques ; Ulixai n'assure ni l'issue, ni la qualité, ni le volume d'affaires.
-
-11.2. Plateforme « en l'état » ; aucune garantie d'accessibilité continue.
-
-11.3. **Limitation de responsabilité** : dans la mesure permise, la responsabilité totale d'Ulixai envers l'Avocat est limitée aux dommages directs et ne peut excéder le total des Frais de Mise en relation perçus par Ulixai au titre de la transaction à l'origine de la réclamation.
-
-11.4. **Exclusions** : aucun dommage indirect/consécutif/spécial/punitif (perte de profits, clientèle, réputation, etc.).
-
-11.5. **Indemnisation** : l'Avocat indemnise et garantit Ulixai (et ses affiliés, dirigeants, employés, agents) contre toute réclamation/préjudice/frais (dont honoraires d'avocat) liés à (i) ses manquements aux CGU/lois, (ii) ses contenus, (iii) ses conseils/omissions.
-
-11.6. Aucune représentation : rien n'emporte mandat, emploi, partenariat ou coentreprise entre Ulixai et l'Avocat.
-
-11.7. **Survie** : les articles 5, 7, 8, 9, 10, 11, 12 et 13 survivent à la résiliation.
+La Plateforme, ses marques, logos, bases de donnÃ©es et contenus sont protÃ©gÃ©s. Aucun droit n'est cÃ©dÃ© Ã  l'Avocat, hormis un droit personnel, non exclusif, non transfÃ©rable d'accÃ¨s pendant la durÃ©e des CGU. Les contenus fournis par l'Avocat (profil, photo, descriptifs) font l'objet d'une licence mondiale, non exclusive en faveur d'Ulixai pour l'hÃ©bergement et l'affichage dans la Plateforme.
 
 ---
 
-## 12. Droit applicable – Arbitrage – Juridiction estonienne – Actions collectives
+## 11. Garanties, responsabilitÃ© et indemnisation
 
-12.1. **Droit matériel** : pour chaque Mise en relation, la relation Ulixai–Avocat est régie par les lois du Pays d'Intervention, sous réserve des règles d'ordre public locales et des normes internationales impératives. **À titre supplétif et pour l'interprétation/validité des présentes CGU ainsi que pour toute question non régie par le droit du Pays d'Intervention, le droit estonien s'applique.**
+11.1. Aucune garantie quant aux services juridiques ; Ulixai n'assure ni l'issue, ni la qualitÃ©, ni le volume d'affaires.
 
-12.2. **Arbitrage CCI obligatoire** : tout litige Ulixai/Avocat est résolu définitivement selon le Règlement d'Arbitrage de la CCI. **Siège : Tallinn (Estonie)**. **Langue : français**. Le tribunal applique le droit matériel défini à l'art. 12.1. Procédure confidentielle.
+11.2. Plateforme Â« en l'Ã©tat Â» ; aucune garantie d'accessibilitÃ© continue.
 
-12.3. **Renonciation aux actions collectives** : dans la mesure permise, toute action collective/de groupe/représentative est exclue ; réclamations individuelles uniquement.
+11.3. **Limitation de responsabilitÃ©** : dans la mesure permise, la responsabilitÃ© totale d'Ulixai envers l'Avocat est limitÃ©e aux dommages directs et ne peut excÃ©der le total des Frais de Mise en relation perÃ§us par Ulixai au titre de la transaction Ã  l'origine de la rÃ©clamation.
 
-12.4. **Compétence exclusive des tribunaux d'Estonie** : pour toute demande non arbitrable et pour l'exécution des sentences ou mesures urgentes, les **tribunaux estoniens** (compétents à Tallinn) ont **compétence exclusive**. L'Avocat renonce à toute objection de forum ou de non-convenance.
+11.4. **Exclusions** : aucun dommage indirect/consÃ©cutif/spÃ©cial/punitif (perte de profits, clientÃ¨le, rÃ©putation, etc.).
+
+11.5. **Indemnisation** : l'Avocat indemnise et garantit Ulixai (et ses affiliÃ©s, dirigeants, employÃ©s, agents) contre toute rÃ©clamation/prÃ©judice/frais (dont honoraires d'avocat) liÃ©s Ã  (i) ses manquements aux CGU/lois, (ii) ses contenus, (iii) ses conseils/omissions.
+
+11.6. Aucune reprÃ©sentation : rien n'emporte mandat, emploi, partenariat ou coentreprise entre Ulixai et l'Avocat.
+
+11.7. **Survie** : les articles 5, 7, 8, 9, 10, 11, 12 et 13 survivent Ã  la rÃ©siliation.
+
+---
+
+## 12. Droit applicable â€“ Arbitrage â€“ Juridiction estonienne â€“ Actions collectives
+
+12.1. **Droit matÃ©riel** : pour chaque Mise en relation, la relation Ulixaiâ€“Avocat est rÃ©gie par les lois du Pays d'Intervention, sous rÃ©serve des rÃ¨gles d'ordre public locales et des normes internationales impÃ©ratives. **Ã€ titre supplÃ©tif et pour l'interprÃ©tation/validitÃ© des prÃ©sentes CGU ainsi que pour toute question non rÃ©gie par le droit du Pays d'Intervention, le droit estonien s'applique.**
+
+12.2. **Arbitrage CCI obligatoire** : tout litige Ulixai/Avocat est rÃ©solu dÃ©finitivement selon le RÃ¨glement d'Arbitrage de la CCI. **SiÃ¨ge : Tallinn (Estonie)**. **Langue : franÃ§ais**. Le tribunal applique le droit matÃ©riel dÃ©fini Ã  l'art. 12.1. ProcÃ©dure confidentielle.
+
+12.3. **Renonciation aux actions collectives** : dans la mesure permise, toute action collective/de groupe/reprÃ©sentative est exclue ; rÃ©clamations individuelles uniquement.
+
+12.4. **CompÃ©tence exclusive des tribunaux d'Estonie** : pour toute demande non arbitrable et pour l'exÃ©cution des sentences ou mesures urgentes, les **tribunaux estoniens** (compÃ©tents Ã  Tallinn) ont **compÃ©tence exclusive**. L'Avocat renonce Ã  toute objection de forum ou de non-convenance.
 
 ---
 
 ## 13. Divers
 
-13.1. **Cession** : Ulixai peut céder les CGU à une entité de son groupe ou à un successeur ; l'Avocat ne peut céder sans accord écrit d'Ulixai.
+13.1. **Cession** : Ulixai peut cÃ©der les CGU Ã  une entitÃ© de son groupe ou Ã  un successeur ; l'Avocat ne peut cÃ©der sans accord Ã©crit d'Ulixai.
 
-13.2. **Intégralité** : les CGU constituent l'accord complet et remplacent tout accord antérieur relatif au même objet.
+13.2. **IntÃ©gralitÃ©** : les CGU constituent l'accord complet et remplacent tout accord antÃ©rieur relatif au mÃªme objet.
 
 13.3. **Notifications** : par publication sur la Plateforme, notification in-app ou via le formulaire de contact.
 
-13.4. **Interprétation** : les intitulés sont indicatifs. Aucune règle contra proferentem.
+13.4. **InterprÃ©tation** : les intitulÃ©s sont indicatifs. Aucune rÃ¨gle contra proferentem.
 
-13.5. **Langues** : des traductions peuvent être fournies ; l'anglais prévaut pour l'interprétation.
+13.5. **Langues** : des traductions peuvent Ãªtre fournies ; l'anglais prÃ©vaut pour l'interprÃ©tation.
 
-13.6. **Nullité partielle** : si une stipulation est nulle/inapplicable, le reste demeure en vigueur ; remplacement par une stipulation valide d'effet équivalent lorsque possible.
+13.6. **NullitÃ© partielle** : si une stipulation est nulle/inapplicable, le reste demeure en vigueur ; remplacement par une stipulation valide d'effet Ã©quivalent lorsque possible.
 
 13.7. **Non-renonciation** : l'absence d'exercice d'un droit n'emporte pas renonciation.
 
@@ -509,15 +509,15 @@ La Plateforme, ses marques, logos, bases de données et contenus sont protégés
 
 ## 14. Contact
 
-Pour toute question ou demande légale : **http://localhost:5174/contact**
+Pour toute question ou demande lÃ©gale : **http://localhost:5174/contact**
 `;
 
   const defaultEn = `
-# Terms of Use – Lawyers (Global)
+# Terms of Use â€“ Lawyers (Global)
 
-**SOS Expat by Ulixai OÜ** (the "**Platform**", "**SOS**", "**we**")
+**SOS Expat by Ulixai OÃœ** (the "**Platform**", "**SOS**", "**we**")
 
-**Version 2.2 – Last updated: 16 June 2025**
+**Version 2.2 â€“ Last updated: 16 June 2025**
 
 ---
 
@@ -529,15 +529,15 @@ Pour toute question ou demande légale : **http://localhost:5174/contact**
 
 ## 2. Purpose, Scope and Acceptance
 
-Ulixai acts **solely as a technical intermediary**. Ulixai does not provide legal advice and is not a party to Lawyer–User engagements. **Click-wrap acceptance** constitutes electronic signature and consent; SOS may keep technical evidence. SOS may update these Terms and/or fee schedules with prospective effect upon posting. Term: open-ended.
+Ulixai acts **solely as a technical intermediary**. Ulixai does not provide legal advice and is not a party to Lawyerâ€“User engagements. **Click-wrap acceptance** constitutes electronic signature and consent; SOS may keep technical evidence. SOS may update these Terms and/or fee schedules with prospective effect upon posting. Term: open-ended.
 
 ---
 
-## 3. Lawyer Status – Independence and Compliance
+## 3. Lawyer Status â€“ Independence and Compliance
 
 The Lawyer acts as an independent professional. No employment, mandate, agency, partnership or joint venture is created. The Lawyer is solely responsible for (i) qualifications, admissions and licenses, (ii) professional liability insurance adequate for all intended Countries of Intervention, (iii) local law and professional rules (ethics, advertising/solicitation, conflicts, confidentiality, AML/KYC, tax, consumer protection, etc.). Ulixai does not supervise or assess the Lawyer's advice.
 
-**Professional capacity (B2B).** The Lawyer confirms they act **exclusively for professional purposes**. Consumer protection regimes do not apply to the Ulixai–Lawyer relationship.
+**Professional capacity (B2B).** The Lawyer confirms they act **exclusively for professional purposes**. Consumer protection regimes do not apply to the Ulixaiâ€“Lawyer relationship.
 
 ---
 
@@ -547,13 +547,13 @@ Valid right to practice in at least one jurisdiction; identity/qualification doc
 
 ---
 
-## 5. Use Rules – Conflicts, Confidentiality, No Circumvention
+## 5. Use Rules â€“ Conflicts, Confidentiality, No Circumvention
 
 **Conflicts.** Screen for conflicts before any advice; withdraw and inform the User if a conflict exists. **Confidentiality.** Maintain privilege and confidentiality under the Country of Intervention's law. **No circumvention.** Ulixai takes no commission on legal fees. Each new Connection with a new User via the Platform triggers the Connection Fee. Avoiding the Platform to evade fees on a new introduction is prohibited. **Prohibited conduct** includes identity fraud, illegal content, manipulation, collusion/boycott, sanctions/export breaches, or any unlawful activity. **Availability** is "as is"; access may be restricted where required by law.
 
 ---
 
-## 6. Lawyer–User Relationship (Off-Platform)
+## 6. Lawyerâ€“User Relationship (Off-Platform)
 
 After the Connection, parties may contract **off-Platform**. Ulixai does not set or collect the Lawyer's fees (except via the single-payment mechanism below). The Lawyer provides local fee agreements, handles taxes, and complies with local rules.
 
@@ -573,7 +573,7 @@ After the Connection, parties may contract **off-Platform**. Ulixai does not set
 
 ---
 
-## 8. Payments – AML/KYC – Sanctions
+## 8. Payments â€“ AML/KYC â€“ Sanctions
 
 Payments are processed by third-party providers. The Lawyer agrees to their terms and AML/KYC procedures. Ulixai may delay, withhold or cancel payouts in case of suspected fraud, non-compliance, or legal order. Access may be restricted in sanctioned territories where required by law. The Lawyer warrants it is not on sanctions lists and complies with export controls.
 
@@ -597,11 +597,11 @@ No warranty for legal outcomes, quality, volume or Users' reliability. Platform 
 
 ---
 
-## 12. Governing Law – ICC Arbitration – Estonian Courts – Class Actions
+## 12. Governing Law â€“ ICC Arbitration â€“ Estonian Courts â€“ Class Actions
 
-**Substantive law:** for each Connection, the **laws of the Country of Intervention** govern the Ulixai–Lawyer relationship, subject to mandatory local rules and peremptory international norms.
+**Substantive law:** for each Connection, the **laws of the Country of Intervention** govern the Ulixaiâ€“Lawyer relationship, subject to mandatory local rules and peremptory international norms.
 
-**Mandatory ICC arbitration** for any Ulixai–Lawyer dispute. **Seat: Tallinn (Estonia). Language: French.** Tribunal applies the **substantive law** defined above. Proceedings are **confidential**.
+**Mandatory ICC arbitration** for any Ulixaiâ€“Lawyer dispute. **Seat: Tallinn (Estonia). Language: French.** Tribunal applies the **substantive law** defined above. Proceedings are **confidential**.
 
 **Class/collective actions are waived** to the extent permitted by law.
 
@@ -663,7 +663,7 @@ No warranty for legal outcomes, quality, volume or Users' reliability. Platform 
               <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full pl-5 pr-4 py-2.5 border border-white/20 text-white">
                 <Sparkles className="w-4 h-4 text-yellow-300" />
                 <span className="text-sm font-semibold">{t.heroBadge}</span>
-                <span className="mx-1 text-white/40">•</span>
+                <span className="mx-1 text-white/40">â€¢</span>
                 <span className="text-sm text-white/90">{t.lastUpdated}</span>
               </div>
 
@@ -714,7 +714,7 @@ No warranty for legal outcomes, quality, volume or Users' reliability. Platform 
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
                   <Users className="w-4 h-4" /> <span>{t.trustedByExperts}</span>
                 </span>
-                {/* Aucune note/avis affichés */}
+                {/* Aucune note/avis affichÃ©s */}
               </div>
 
               <div className="mt-8 flex items-center justify-center gap-4">
@@ -739,7 +739,7 @@ No warranty for legal outcomes, quality, volume or Users' reliability. Platform 
           </div>
         </section>
 
-        {/* Bandeau points clés */}
+        {/* Bandeau points clÃ©s */}
         <section className="py-10 bg-gray-950">
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -826,7 +826,7 @@ No warranty for legal outcomes, quality, volume or Users' reliability. Platform 
 
             <div className="mb-8 flex flex-wrap items-center justify-center gap-3 text-white/90">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
-                <Shield className="w-4 h-4" /> Sécurisé
+                <Shield className="w-4 h-4" /> SÃ©curisÃ©
               </span>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 border border-white/20 backdrop-blur-sm">
                 <Clock className="w-4 h-4" /> <span>Moins de 5&nbsp;minutes</span>
@@ -843,7 +843,7 @@ No warranty for legal outcomes, quality, volume or Users' reliability. Platform 
               >
                 <Briefcase className="w-5 h-5" />
                 <span>{t.startNow}</span>
-                {/* Flèche retirée sur ce CTA comme demandé */}
+                {/* FlÃ¨che retirÃ©e sur ce CTA comme demandÃ© */}
                 <span className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-black/5" />
               </Link>
 

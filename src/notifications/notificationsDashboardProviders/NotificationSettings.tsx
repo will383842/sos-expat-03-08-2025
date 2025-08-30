@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+ï»¿import React, { useEffect, useState } from 'react';
 import { getNotificationPreferences, saveNotificationPreferences } from './preferencesProviders';
 import { NotificationPreferences } from './types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,7 +29,7 @@ const NotificationSettings: React.FC = () => {
 
   return (
     <div className="p-4 bg-white rounded-lg shadow space-y-4 max-w-md">
-      <h2 className="text-lg font-semibold text-gray-800">Préférences de notifications</h2>
+      <h2 className="text-lg font-semibold text-gray-800">PrÃ©fÃ©rences de notifications</h2>
 
       <div className="space-y-2 text-sm text-gray-700">
         <label className="flex items-center gap-2">
@@ -56,7 +56,7 @@ const NotificationSettings: React.FC = () => {
             checked={prefs.enableModal}
             onChange={() => handleChange('enableModal')}
           />
-          Affichage de la fenêtre de rappel (popup)
+          Affichage de la fenÃªtre de rappel (popup)
         </label>
       </div>
     </div>

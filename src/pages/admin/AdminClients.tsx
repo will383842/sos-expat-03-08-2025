@@ -1,4 +1,4 @@
-// src/pages/admin/AdminClients.tsx
+﻿// src/pages/admin/AdminClients.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   collection,
@@ -43,7 +43,7 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import Button from "../../components/common/Button";
 import Modal from "../../components/common/Modal";
 
-/* ---------------------- i18n léger (aligné AdminReviews) ---------------------- */
+/* ---------------------- i18n lÃ©ger (alignÃ© AdminReviews) ---------------------- */
 type Lang = "fr" | "en";
 const detectLang = (): Lang => {
   const ls = (localStorage.getItem("admin_lang") || "").toLowerCase();
@@ -54,7 +54,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
   fr: {
     title: "Clients",
     subtitle: "Gestion des clients",
-    search: "Nom, email…",
+    search: "Nom, emailâ€¦",
     filters: "Filtres",
     export: "Exporter CSV",
     exportAll: "Exporter (tous filtres)",
@@ -65,11 +65,11 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     newThisMonth: "Nouveaux (mois)",
     status: "Statut",
     all: "Tous",
-    blocked: "Bloqué",
-    emailVerified: "Email vérifié",
-    verified: "Vérifié",
-    unverified: "Non vérifié",
-    period: "Période d'inscription",
+    blocked: "BloquÃ©",
+    emailVerified: "Email vÃ©rifiÃ©",
+    verified: "VÃ©rifiÃ©",
+    unverified: "Non vÃ©rifiÃ©",
+    period: "PÃ©riode d'inscription",
     today: "Aujourd'hui",
     week: "Cette semaine",
     month: "Ce mois",
@@ -78,39 +78,39 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     tableContact: "Contact",
     tableLocation: "Localisation",
     tableStatus: "Statut",
-    tableActivity: "Activité",
+    tableActivity: "ActivitÃ©",
     tableActions: "Actions",
-    lastLogin: "Dernière connexion",
-    callsSpend: "appels • €",
+    lastLogin: "DerniÃ¨re connexion",
+    callsSpend: "appels â€¢ â‚¬",
     activate: "Activer",
     suspend: "Suspendre",
     delete: "Supprimer",
     bulkActivate: "Activer",
     bulkSuspend: "Suspendre",
     bulkDelete: "Supprimer",
-    selected: "sélectionné(s)",
-    noneTitle: "Aucun client trouvé",
-    noneBody: "Aucun client ne correspond aux critères de recherche.",
-    loading: "Chargement…",
+    selected: "sÃ©lectionnÃ©(s)",
+    noneTitle: "Aucun client trouvÃ©",
+    noneBody: "Aucun client ne correspond aux critÃ¨res de recherche.",
+    loading: "Chargementâ€¦",
     rowsPerPage: "Lignes / page",
     page: "Page",
     of: "sur",
     confirmBulk: "Confirmer l'action",
-    confirmDeleteOne: "Supprimer définitivement ce client ?",
-    successUpdate: "Mise à jour réussie.",
-    errorUpdate: "Erreur lors de la mise à jour.",
-    retry: "Réessayer",
+    confirmDeleteOne: "Supprimer dÃ©finitivement ce client ?",
+    successUpdate: "Mise Ã  jour rÃ©ussie.",
+    errorUpdate: "Erreur lors de la mise Ã  jour.",
+    retry: "RÃ©essayer",
     signedUpOn: "Inscrit le",
     lang: "Langue",
     reasonTitleSuspend: "Raison de suspension",
     reasonTitleDelete: "Confirmer la suppression",
     reasonLabel: "Raison (obligatoire)",
-    reasonPlaceholder: "Ex: Abus, fraude, demande RGPD…",
+    reasonPlaceholder: "Ex: Abus, fraude, demande RGPDâ€¦",
     cancel: "Annuler",
     confirm: "Confirmer",
-    copied: "Copié ✅",
-    exportAllRunning: "Export en cours…",
-    exportAllDone: "Export terminé ✅",
+    copied: "CopiÃ© âœ…",
+    exportAllRunning: "Export en coursâ€¦",
+    exportAllDone: "Export terminÃ© âœ…",
     exportAllCap: "Limite atteinte (5000 lignes). Affinez vos filtres.",
     contact: "Contacter",
     copyEmail: "Copier email",
@@ -119,7 +119,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
   en: {
     title: "Clients",
     subtitle: "Customer management",
-    search: "Name, email…",
+    search: "Name, emailâ€¦",
     filters: "Filters",
     export: "Export CSV",
     exportAll: "Export (all filters)",
@@ -146,7 +146,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     tableActivity: "Activity",
     tableActions: "Actions",
     lastLogin: "Last login",
-    callsSpend: "calls • €",
+    callsSpend: "calls â€¢ â‚¬",
     activate: "Activate",
     suspend: "Suspend",
     delete: "Delete",
@@ -156,7 +156,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     selected: "selected",
     noneTitle: "No clients found",
     noneBody: "No clients match your filters.",
-    loading: "Loading…",
+    loading: "Loadingâ€¦",
     rowsPerPage: "Rows / page",
     page: "Page",
     of: "of",
@@ -170,12 +170,12 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     reasonTitleSuspend: "Suspension reason",
     reasonTitleDelete: "Confirm deletion",
     reasonLabel: "Reason (required)",
-    reasonPlaceholder: "Eg: Abuse, fraud, GDPR request…",
+    reasonPlaceholder: "Eg: Abuse, fraud, GDPR requestâ€¦",
     cancel: "Cancel",
     confirm: "Confirm",
-    copied: "Copied ✅",
-    exportAllRunning: "Export running…",
-    exportAllDone: "Export finished ✅",
+    copied: "Copied âœ…",
+    exportAllRunning: "Export runningâ€¦",
+    exportAllDone: "Export finished âœ…",
     exportAllCap: "Cap reached (5000 rows). Refine filters.",
     contact: "Contact",
     copyEmail: "Copy email",
@@ -258,7 +258,7 @@ const AdminClients: React.FC = () => {
     searchTerm: "",
   });
 
-  // ✅ Pagination à curseur & compteur exact
+  // âœ… Pagination Ã  curseur & compteur exact
   const [pageSize, setPageSize] = useState<number>(
     Number(localStorage.getItem("admin.clients.pageSize")) || 25
   );
@@ -293,7 +293,7 @@ const AdminClients: React.FC = () => {
     });
   }, []);
 
-  // 🔎 Compteur exact côté serveur (indépendant de la pagination)
+  // ðŸ”Ž Compteur exact cÃ´tÃ© serveur (indÃ©pendant de la pagination)
   const fetchExactCount = useCallback(async () => {
     try {
       const base = collection(db, "users") as CollectionReference<DocumentData>;
@@ -327,7 +327,7 @@ const AdminClients: React.FC = () => {
     }
   }, [filters]);
 
-  // ⏬ Chargement d’une page par curseur
+  // â¬ Chargement dâ€™une page par curseur
   const loadPage = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -389,7 +389,7 @@ const AdminClients: React.FC = () => {
         };
       });
 
-      // 🔍 Recherche locale (page courante)
+      // ðŸ” Recherche locale (page courante)
       if (filters.searchTerm.trim()) {
         const term = filters.searchTerm.trim().toLowerCase();
         rows = rows.filter(
@@ -450,14 +450,14 @@ const AdminClients: React.FC = () => {
       );
       alert(t("successUpdate"));
     } catch (error) {
-      console.error("Erreur de mise à jour du statut:", error);
+      console.error("Erreur de mise Ã  jour du statut:", error);
       alert(t("errorUpdate"));
     }
   };
 
   const handleBulkAction = async (action: "activer" | "suspendre" | "supprimer") => {
     if (selectedClients.length === 0) {
-      alert("Veuillez sélectionner au moins un client.");
+      alert("Veuillez sÃ©lectionner au moins un client.");
       return;
     }
     if (action === "suspendre" || action === "supprimer") {
@@ -486,7 +486,7 @@ const AdminClients: React.FC = () => {
 
   const exportPageCsv = () => {
     if (clients.length === 0) {
-      alert("Aucun client à exporter.");
+      alert("Aucun client Ã  exporter.");
       return;
     }
     const csvData = clients.map((c: Client) => ({
@@ -515,7 +515,7 @@ const AdminClients: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Export ALL (selon filtres) — parcours toutes les pages (max 5000)
+  // Export ALL (selon filtres) â€” parcours toutes les pages (max 5000)
   const exportAllCsv = async () => {
     try {
       alert(t("exportAllRunning"));
@@ -628,7 +628,7 @@ const AdminClients: React.FC = () => {
   return (
     <AdminLayout activeMenuKey="admin-users-clients">
       <div className="space-y-6">
-        {/* Header (rendu dans la page pour éviter les props inconnues d'AdminLayout) */}
+        {/* Header (rendu dans la page pour Ã©viter les props inconnues d'AdminLayout) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">{t("title")}</h1>
@@ -642,7 +642,7 @@ const AdminClients: React.FC = () => {
               className="border border-gray-300 rounded-md px-2 py-2 text-sm"
               title={t("lang")}
             >
-              <option value="fr">Français</option>
+              <option value="fr">FranÃ§ais</option>
               <option value="en">English</option>
             </select>
 
@@ -672,7 +672,7 @@ const AdminClients: React.FC = () => {
               </div>
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-500">{t("totalExact")}</h3>
-                <p className="text-2xl font-bold text-gray-900">{totalExact ?? "—"}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalExact ?? "â€”"}</p>
               </div>
             </div>
           </div>
@@ -800,7 +800,7 @@ const AdminClients: React.FC = () => {
                       country: (e.target.value || "all") as FilterOptions["country"],
                     })
                   }
-                  placeholder="FR, MA, SN…"
+                  placeholder="FR, MA, SNâ€¦"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -917,7 +917,7 @@ const AdminClients: React.FC = () => {
                           <div className="flex items-center">
                             <Mail size={14} className="mr-2 text-gray-400" />
                             <span className={client.emailVerified ? "text-green-600" : "text-red-600"}>
-                              {client.email} • {client.emailVerified ? t("verified") : t("unverified")}
+                              {client.email} â€¢ {client.emailVerified ? t("verified") : t("unverified")}
                             </span>
                           </div>
                           {client.phone && (
@@ -931,7 +931,7 @@ const AdminClients: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="flex items-center">
                           <MapPin size={14} className="mr-2 text-gray-400" />
-                          <span>{client.city ? `${client.city}, ` : ""}{client.country || "—"}</span>
+                          <span>{client.city ? `${client.city}, ` : ""}{client.country || "â€”"}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -961,11 +961,11 @@ const AdminClients: React.FC = () => {
                                     month: "short",
                                     day: "numeric",
                                   })
-                                : "—"}
+                                : "â€”"}
                             </span>
                           </div>
                           <div className="text-xs text-gray-500">
-                            {client.callsCount} {t("callsSpend").split(" ")[0]} • {client.totalSpent.toFixed(2)} €
+                            {client.callsCount} {t("callsSpend").split(" ")[0]} â€¢ {client.totalSpent.toFixed(2)} â‚¬
                           </div>
                         </div>
                       </td>
@@ -1049,7 +1049,7 @@ const AdminClients: React.FC = () => {
             )}
           </div>
 
-          {/* ✅ Footer de pagination à curseur + total exact */}
+          {/* âœ… Footer de pagination Ã  curseur + total exact */}
           <div className="flex items-center justify-between p-4 border-t bg-gray-50">
             <div className="flex items-center gap-3">
               <label className="text-sm text-gray-600">{t("rowsPerPage")}</label>
@@ -1074,7 +1074,7 @@ const AdminClients: React.FC = () => {
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <span className="text-sm">
-                  {pageIndex} {t("of")} {hasNext ? "…" : pageIndex}
+                  {pageIndex} {t("of")} {hasNext ? "â€¦" : pageIndex}
                 </span>
                 <Button
                   variant="secondary"
@@ -1088,7 +1088,7 @@ const AdminClients: React.FC = () => {
             </div>
 
             <div className="text-xs text-gray-500">
-              {t("totalExact")}: {totalExact ?? "—"}
+              {t("totalExact")}: {totalExact ?? "â€”"}
             </div>
           </div>
         </div>

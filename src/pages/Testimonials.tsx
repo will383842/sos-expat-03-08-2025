@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, MapPin, Calendar, ArrowRight, Search, Sparkles, ChevronRight, Briefcase, User, Award, Shield, Clock, Globe } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -43,15 +43,15 @@ const TESTIMONIALS_PER_PAGE = 9;
 const translations = {
   fr: {
     meta: {
-      title: 'Témoignages clients - SOS Expats',
-      description: 'Découvrez les expériences de nos utilisateurs partout dans le monde'
+      title: 'TÃ©moignages clients - SOS Expats',
+      description: 'DÃ©couvrez les expÃ©riences de nos utilisateurs partout dans le monde'
     },
     hero: {
-      badge: '4,9/5 • +2 500 avis vérifiés',
-      title: 'Témoignages clients',
-      subtitle: 'Découvrez les expériences de nos utilisateurs partout dans le monde',
+      badge: '4,9/5 â€¢ +2 500 avis vÃ©rifiÃ©s',
+      title: 'TÃ©moignages clients',
+      subtitle: 'DÃ©couvrez les expÃ©riences de nos utilisateurs partout dans le monde',
       stats: {
-        testimonials: 'Témoignages',
+        testimonials: 'TÃ©moignages',
         averageRating: 'Note moyenne',
         countries: 'Pays'
       }
@@ -59,22 +59,22 @@ const translations = {
     filters: {
       all: 'Tous les avis',
       lawyers: 'Avocats',
-      expats: 'Expatriés',
-      searchPlaceholder: 'Rechercher dans les témoignages...'
+      expats: 'ExpatriÃ©s',
+      searchPlaceholder: 'Rechercher dans les tÃ©moignages...'
     },
     card: {
-      verified: 'Vérifié',
+      verified: 'VÃ©rifiÃ©',
       helpful: 'utile',
       readMore: 'Lire la suite',
       foundHelpful: 'trouvent cela utile',
       lawyer: 'Avocat',
-      expat: 'Expatrié'
+      expat: 'ExpatriÃ©'
     },
     loading: {
-      testimonials: 'Chargement des témoignages...',
-      noResults: 'Aucun témoignage trouvé.',
-      adjustCriteria: 'Essayez de modifier vos critères de recherche.',
-      loadMore: 'Voir plus de témoignages',
+      testimonials: 'Chargement des tÃ©moignages...',
+      noResults: 'Aucun tÃ©moignage trouvÃ©.',
+      adjustCriteria: 'Essayez de modifier vos critÃ¨res de recherche.',
+      loadMore: 'Voir plus de tÃ©moignages',
       clearSearch: 'Effacer la recherche'
     },
     pagination: {
@@ -83,24 +83,24 @@ const translations = {
     },
     stats: {
       showing: 'Sur',
-      total: 'témoignages au total'
+      total: 'tÃ©moignages au total'
     },
     cta: {
-      secured: 'Sécurisé & confidentiel',
-      response5min: 'Réponse en moins de 5 min',
+      secured: 'SÃ©curisÃ© & confidentiel',
+      response5min: 'RÃ©ponse en moins de 5 min',
       countries150: '150+ pays couverts',
-      title: 'Vous êtes avocat ou expatrié ?',
-      subtitle: 'Rejoignez notre réseau d\'experts et transformez vos compétences en opportunités réelles. Aidez d\'autres expatriés et voyageurs tout en développant votre activité.',
+      title: 'Vous Ãªtes avocat ou expatriÃ© ?',
+      subtitle: 'Rejoignez notre rÃ©seau d\'experts et transformez vos compÃ©tences en opportunitÃ©s rÃ©elles. Aidez d\'autres expatriÃ©s et voyageurs tout en dÃ©veloppant votre activitÃ©.',
       findExpert: 'Trouver un expert',
       becomeExpert: 'Devenir expert',
-      joinExperts: 'Rejoignez plus de 2 000 experts qui font confiance à SOS Expats'
+      joinExperts: 'Rejoignez plus de 2 000 experts qui font confiance Ã  SOS Expats'
     },
     aria: {
       backToTop: 'Retour en haut',
-      languageSelector: 'Sélecteur de langue',
+      languageSelector: 'SÃ©lecteur de langue',
       filterButton: 'Filtre',
       searchInput: 'Champ de recherche',
-      testimonialCard: 'Carte de témoignage',
+      testimonialCard: 'Carte de tÃ©moignage',
       pageButton: 'Page',
       unknownDate: 'Date inconnue'
     }
@@ -111,7 +111,7 @@ const translations = {
       description: 'Discover the experiences of our users worldwide'
     },
     hero: {
-      badge: '4.9/5 • +2,500 verified reviews',
+      badge: '4.9/5 â€¢ +2,500 verified reviews',
       title: 'Client testimonials',
       subtitle: 'Discover the experiences of our users worldwide',
       stats: {
@@ -182,32 +182,32 @@ const smoothScrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// ✅ FONCTION DE MAPPING DES PAYS POUR URL SEO
+// âœ… FONCTION DE MAPPING DES PAYS POUR URL SEO
 const createCountrySlug = (country: string): string => {
   const slugMap: Record<string, string> = {
-    // Pays avec caractères spéciaux
-    'Thaïlande': 'thailande',
+    // Pays avec caractÃ¨res spÃ©ciaux
+    'ThaÃ¯lande': 'thailande',
     'Royaume-Uni': 'royaume-uni',
-    'États-Unis': 'etats-unis',
-    'Émirats Arabes Unis': 'emirats-arabes-unis',
-    'Corée du Sud': 'coree-du-sud',
-    'Nouvelle-Zélande': 'nouvelle-zelande',
+    'Ã‰tats-Unis': 'etats-unis',
+    'Ã‰mirats Arabes Unis': 'emirats-arabes-unis',
+    'CorÃ©e du Sud': 'coree-du-sud',
+    'Nouvelle-ZÃ©lande': 'nouvelle-zelande',
     'Afrique du Sud': 'afrique-du-sud',
-    'Côte d\'Ivoire': 'cote-divoire',
-    'République Tchèque': 'republique-tcheque',
+    'CÃ´te d\'Ivoire': 'cote-divoire',
+    'RÃ©publique TchÃ¨que': 'republique-tcheque',
     'Arabie Saoudite': 'arabie-saoudite',
-    'Norvège': 'norvege',
-    'Suède': 'suede',
-    'Pérou': 'perou',
-    'Sénégal': 'senegal',
-    'Indonésie': 'indonesie',
-    'Grèce': 'grece',
+    'NorvÃ¨ge': 'norvege',
+    'SuÃ¨de': 'suede',
+    'PÃ©rou': 'perou',
+    'SÃ©nÃ©gal': 'senegal',
+    'IndonÃ©sie': 'indonesie',
+    'GrÃ¨ce': 'grece',
     'Danemark': 'danemark',
     'Finlande': 'finlande',
     'Islande': 'islande',
     'Irlande': 'irlande',
     'Turquie': 'turquie',
-    // Pays simples (déjà en bon format)
+    // Pays simples (dÃ©jÃ  en bon format)
     'Canada': 'canada',
     'Espagne': 'espagne',
     'Allemagne': 'allemagne',
@@ -217,7 +217,7 @@ const createCountrySlug = (country: string): string => {
     'Suisse': 'suisse',
     'Australie': 'australie',
     'Japon': 'japon',
-    'Brésil': 'bresil',
+    'BrÃ©sil': 'bresil',
     'Mexique': 'mexique',
     'Argentine': 'argentine',
     'Chili': 'chili',
@@ -254,18 +254,18 @@ const createCountrySlug = (country: string): string => {
 // =================== MOCK DATA WITH i18n SUPPORT ===================
 const createMockReviews = (language: string): ReviewType[] => {
   const reviews_fr: ReviewType[] = [
-    // Expatriés (9 témoignages - 55%)
+    // ExpatriÃ©s (9 tÃ©moignages - 55%)
     {
       id: '1',
       callId: 'call1',
       clientId: 'client1',
       providerId: 'provider1',
       rating: 5,
-      comment: "Incroyable ! En 3 minutes j'avais un expatrié français au bout du fil depuis Bangkok. Il m'a expliqué toute la procédure visa Thaïlandais, les pièges à éviter et m'a même donné les contacts de son agent immobilier. Service qui change la vie !",
+      comment: "Incroyable ! En 3 minutes j'avais un expatriÃ© franÃ§ais au bout du fil depuis Bangkok. Il m'a expliquÃ© toute la procÃ©dure visa ThaÃ¯landais, les piÃ¨ges Ã  Ã©viter et m'a mÃªme donnÃ© les contacts de son agent immobilier. Service qui change la vie !",
       isPublic: true,
       createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
       clientName: 'Aisha M.',
-      clientCountry: 'Thaïlande',
+      clientCountry: 'ThaÃ¯lande',
       serviceType: 'expat_call',
       status: 'published',
       helpfulVotes: 23,
@@ -278,7 +278,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client2',
       providerId: 'provider2',
       rating: 5,
-      comment: "Génial ! L'expatrié m'a aidé avec mon installation à Vancouver. Banque, logement, assurance santé, transport... tout en 30 minutes ! Il connaissait tous les bons plans et m'a évité des mois de galère administrative.",
+      comment: "GÃ©nial ! L'expatriÃ© m'a aidÃ© avec mon installation Ã  Vancouver. Banque, logement, assurance santÃ©, transport... tout en 30 minutes ! Il connaissait tous les bons plans et m'a Ã©vitÃ© des mois de galÃ¨re administrative.",
       isPublic: true,
       createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
       clientName: 'Chen L.',
@@ -295,7 +295,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client3',
       providerId: 'provider3',
       rating: 4,
-      comment: "Super expérience ! Expatrié à Melbourne depuis 8 ans, il m'a donné tous les conseils pour mon working holiday visa. Écoles, quartiers, jobs... Une mine d'or d'informations pratiques !",
+      comment: "Super expÃ©rience ! ExpatriÃ© Ã  Melbourne depuis 8 ans, il m'a donnÃ© tous les conseils pour mon working holiday visa. Ã‰coles, quartiers, jobs... Une mine d'or d'informations pratiques !",
       isPublic: true,
       createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
       clientName: 'Emma K.',
@@ -312,11 +312,11 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client4',
       providerId: 'provider4',
       rating: 5,
-      comment: "Excellent ! L'expatrié vivant à Dubaï depuis 5 ans m'a tout expliqué : visa, compte bancaire, logement, culture locale. Il m'a même mis en contact avec sa communauté d'expats français !",
+      comment: "Excellent ! L'expatriÃ© vivant Ã  DubaÃ¯ depuis 5 ans m'a tout expliquÃ© : visa, compte bancaire, logement, culture locale. Il m'a mÃªme mis en contact avec sa communautÃ© d'expats franÃ§ais !",
       isPublic: true,
       createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
       clientName: 'Kwame A.',
-      clientCountry: 'Émirats Arabes Unis',
+      clientCountry: 'Ã‰mirats Arabes Unis',
       serviceType: 'expat_call',
       status: 'published',
       helpfulVotes: 27,
@@ -329,7 +329,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client5',
       providerId: 'provider5',
       rating: 5,
-      comment: "Parfait ! En urgence depuis Tokyo, j'ai eu un expatrié en 2 minutes. Il m'a aidé avec la paperasse japonaise complexe et m'a orienté vers les bonnes administrations. Très rassurant !",
+      comment: "Parfait ! En urgence depuis Tokyo, j'ai eu un expatriÃ© en 2 minutes. Il m'a aidÃ© avec la paperasse japonaise complexe et m'a orientÃ© vers les bonnes administrations. TrÃ¨s rassurant !",
       isPublic: true,
       createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
       clientName: 'Yuki T.',
@@ -346,11 +346,11 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client6',
       providerId: 'provider6',
       rating: 4,
-      comment: "Très utile ! L'expatrié français en Norvège m'a donné tous les tips pour Oslo : logement étudiant, jobs d'appoint, transports. Il m'a fait gagner un temps précieux pour mes études !",
+      comment: "TrÃ¨s utile ! L'expatriÃ© franÃ§ais en NorvÃ¨ge m'a donnÃ© tous les tips pour Oslo : logement Ã©tudiant, jobs d'appoint, transports. Il m'a fait gagner un temps prÃ©cieux pour mes Ã©tudes !",
       isPublic: true,
       createdAt: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
       clientName: 'Fatima R.',
-      clientCountry: 'Norvège',
+      clientCountry: 'NorvÃ¨ge',
       serviceType: 'expat_call',
       status: 'published',
       helpfulVotes: 15,
@@ -363,11 +363,11 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client7',
       providerId: 'provider7',
       rating: 5,
-      comment: "Formidable ! Depuis le Brésil, l'expatrié m'a tout expliqué sur São Paulo : quartiers sûrs, carte de transports, meilleures écoles pour mes enfants. Une aide inestimable !",
+      comment: "Formidable ! Depuis le BrÃ©sil, l'expatriÃ© m'a tout expliquÃ© sur SÃ£o Paulo : quartiers sÃ»rs, carte de transports, meilleures Ã©coles pour mes enfants. Une aide inestimable !",
       isPublic: true,
       createdAt: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000),
       clientName: 'Carlos M.',
-      clientCountry: 'Brésil',
+      clientCountry: 'BrÃ©sil',
       serviceType: 'expat_call',
       status: 'published',
       helpfulVotes: 29,
@@ -380,7 +380,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client8',
       providerId: 'provider8',
       rating: 5,
-      comment: "Extraordinaire ! L'expatrié à Singapour m'a guidé pas à pas pour mon installation. Permis de travail, logement, banque locale... Tout était clair et détaillé. Service top !",
+      comment: "Extraordinaire ! L'expatriÃ© Ã  Singapour m'a guidÃ© pas Ã  pas pour mon installation. Permis de travail, logement, banque locale... Tout Ã©tait clair et dÃ©taillÃ©. Service top !",
       isPublic: true,
       createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
       clientName: 'Priya S.',
@@ -397,11 +397,11 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client9',
       providerId: 'provider9',
       rating: 4,
-      comment: "Très professionnel ! L'expatrié français en Corée du Sud m'a donné tous les conseils pour Séoul : visa étudiant, logement universitaire, culture coréenne. Parfait pour mon échange !",
+      comment: "TrÃ¨s professionnel ! L'expatriÃ© franÃ§ais en CorÃ©e du Sud m'a donnÃ© tous les conseils pour SÃ©oul : visa Ã©tudiant, logement universitaire, culture corÃ©enne. Parfait pour mon Ã©change !",
       isPublic: true,
       createdAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000),
       clientName: 'Jin W.',
-      clientCountry: 'Corée du Sud',
+      clientCountry: 'CorÃ©e du Sud',
       serviceType: 'expat_call',
       status: 'published',
       helpfulVotes: 19,
@@ -409,14 +409,14 @@ const createMockReviews = (language: string): ReviewType[] => {
       verified: true
     },
 
-    // Avocats (7 témoignages - 45%)
+    // Avocats (7 tÃ©moignages - 45%)
     {
       id: '10',
       callId: 'call10',
       clientId: 'client10',
       providerId: 'provider10',
       rating: 5,
-      comment: "Avocat exceptionnel ! Depuis Londres, problème urgent avec mon propriétaire. L'avocat m'a expliqué mes droits en droit anglais, les démarches à suivre et m'a orienté vers un solicitor local. Précis et efficace !",
+      comment: "Avocat exceptionnel ! Depuis Londres, problÃ¨me urgent avec mon propriÃ©taire. L'avocat m'a expliquÃ© mes droits en droit anglais, les dÃ©marches Ã  suivre et m'a orientÃ© vers un solicitor local. PrÃ©cis et efficace !",
       isPublic: true,
       createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
       clientName: 'James P.',
@@ -433,7 +433,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client11',
       providerId: 'provider11',
       rating: 5,
-      comment: "Consultation remarquable ! Accident de voiture en Allemagne, l'avocat spécialisé en droit international m'a tout expliqué : assurances, procédures, droits. Il m'a évité des erreurs coûteuses !",
+      comment: "Consultation remarquable ! Accident de voiture en Allemagne, l'avocat spÃ©cialisÃ© en droit international m'a tout expliquÃ© : assurances, procÃ©dures, droits. Il m'a Ã©vitÃ© des erreurs coÃ»teuses !",
       isPublic: true,
       createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
       clientName: 'Anya V.',
@@ -450,7 +450,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client12',
       providerId: 'provider12',
       rating: 4,
-      comment: "Très compétent ! Litige commercial en Italie, l'avocat m'a donné une analyse claire de ma situation juridique et les options disponibles. Conseil précieux pour mon business !",
+      comment: "TrÃ¨s compÃ©tent ! Litige commercial en Italie, l'avocat m'a donnÃ© une analyse claire de ma situation juridique et les options disponibles. Conseil prÃ©cieux pour mon business !",
       isPublic: true,
       createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
       clientName: 'Giuseppe L.',
@@ -467,11 +467,11 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client13',
       providerId: 'provider13',
       rating: 5,
-      comment: "Avocat brillant ! Problème de visa aux États-Unis, il m'a expliqué toutes les procédures d'immigration, les risques et solutions. Grâce à lui, j'ai évité l'expulsion !",
+      comment: "Avocat brillant ! ProblÃ¨me de visa aux Ã‰tats-Unis, il m'a expliquÃ© toutes les procÃ©dures d'immigration, les risques et solutions. GrÃ¢ce Ã  lui, j'ai Ã©vitÃ© l'expulsion !",
       isPublic: true,
       createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
       clientName: 'Maria G.',
-      clientCountry: 'États-Unis',
+      clientCountry: 'Ã‰tats-Unis',
       serviceType: 'lawyer_call',
       status: 'published',
       helpfulVotes: 45,
@@ -484,7 +484,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client14',
       providerId: 'provider14',
       rating: 5,
-      comment: "Service juridique excellent ! Divorce international complexe, l'avocat a su naviguer entre droit français et espagnol. Conseil clair, stratégie efficace. Je recommande vivement !",
+      comment: "Service juridique excellent ! Divorce international complexe, l'avocat a su naviguer entre droit franÃ§ais et espagnol. Conseil clair, stratÃ©gie efficace. Je recommande vivement !",
       isPublic: true,
       createdAt: new Date(Date.now() - 17 * 24 * 60 * 60 * 1000),
       clientName: 'Ahmed B.',
@@ -501,7 +501,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client15',
       providerId: 'provider15',
       rating: 4,
-      comment: "Très professionnel ! Contrat de travail au Mexique, l'avocat m'a expliqué toutes les clauses, mes droits et obligations. Il m'a aidé à négocier de meilleures conditions !",
+      comment: "TrÃ¨s professionnel ! Contrat de travail au Mexique, l'avocat m'a expliquÃ© toutes les clauses, mes droits et obligations. Il m'a aidÃ© Ã  nÃ©gocier de meilleures conditions !",
       isPublic: true,
       createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
       clientName: 'Sofia R.',
@@ -518,7 +518,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client16',
       providerId: 'provider16',
       rating: 5,
-      comment: "Avocat remarquable ! Problème fiscal en Suisse, il m'a expliqué les implications légales, les démarches et m'a orienté vers un fiscaliste local. Service impeccable !",
+      comment: "Avocat remarquable ! ProblÃ¨me fiscal en Suisse, il m'a expliquÃ© les implications lÃ©gales, les dÃ©marches et m'a orientÃ© vers un fiscaliste local. Service impeccable !",
       isPublic: true,
       createdAt: new Date(Date.now() - 24 * 24 * 60 * 60 * 1000),
       clientName: 'Lars H.',
@@ -641,7 +641,7 @@ const createMockReviews = (language: string): ReviewType[] => {
       clientId: 'client7',
       providerId: 'provider7',
       rating: 5,
-      comment: "Wonderful! From Brazil, the expat explained everything about São Paulo: safe neighborhoods, transport cards, best schools for my children. Invaluable help!",
+      comment: "Wonderful! From Brazil, the expat explained everything about SÃ£o Paulo: safe neighborhoods, transport cards, best schools for my children. Invaluable help!",
       isPublic: true,
       createdAt: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000),
       clientName: 'Carlos M.',
@@ -825,10 +825,10 @@ const Testimonials: React.FC = () => {
     return language || 'fr';
   });
   
-  // 🔥 CORRECTION: Utiliser useMemo pour recalculer t quand la langue change
+  // ðŸ”¥ CORRECTION: Utiliser useMemo pour recalculer t quand la langue change
   const t = useMemo(() => {
     const selectedTranslations = translations[currentLanguage as keyof typeof translations] || translations.fr;
-    console.log('🌍 Traductions actives:', currentLanguage, selectedTranslations.hero.title); // Debug
+    console.log('ðŸŒ Traductions actives:', currentLanguage, selectedTranslations.hero.title); // Debug
     return selectedTranslations;
   }, [currentLanguage]);
   
@@ -870,7 +870,7 @@ const Testimonials: React.FC = () => {
   const loadTestimonials = useCallback(async () => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Réduit le délai pour une meilleure UX
+      await new Promise(resolve => setTimeout(resolve, 300)); // RÃ©duit le dÃ©lai pour une meilleure UX
       
       const mockReviews = createMockReviews(currentLanguage);
       let filteredReviews = mockReviews;
@@ -901,18 +901,18 @@ const Testimonials: React.FC = () => {
     }
   }, [filter, currentLanguage]);
 
-  // Charger les témoignages au montage et quand le filtre ou la langue change
+  // Charger les tÃ©moignages au montage et quand le filtre ou la langue change
   useEffect(() => {
     loadTestimonials();
   }, [loadTestimonials]);
 
-  // Effect séparé pour forcer le rechargement quand la langue change
+  // Effect sÃ©parÃ© pour forcer le rechargement quand la langue change
   useEffect(() => {
-    // Réinitialiser la page à 1 quand la langue change
+    // RÃ©initialiser la page Ã  1 quand la langue change
     setPage(1);
-    // Effacer le terme de recherche pour éviter des résultats incohérents
+    // Effacer le terme de recherche pour Ã©viter des rÃ©sultats incohÃ©rents
     setSearchTerm('');
-    // Recharger immédiatement
+    // Recharger immÃ©diatement
     loadTestimonials();
   }, [currentLanguage]);
 
@@ -946,22 +946,22 @@ const Testimonials: React.FC = () => {
     smoothScrollToTop();
   }, []);
 
-  // ✅ FONCTION DE REDIRECTION CORRIGÉE POUR URL SEO PARFAITE
+  // âœ… FONCTION DE REDIRECTION CORRIGÃ‰E POUR URL SEO PARFAITE
   const handleTestimonialClick = useCallback((testimonial: ReviewType) => {
-    // Déterminer le type de service pour l'URL (lawyer ou expat)
+    // DÃ©terminer le type de service pour l'URL (lawyer ou expat)
     const serviceType = testimonial.serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
     
-    // Créer le slug du pays pour l'URL SEO
+    // CrÃ©er le slug du pays pour l'URL SEO
     const countrySlug = createCountrySlug(testimonial.clientCountry);
     
-    // Obtenir l'année du témoignage
+    // Obtenir l'annÃ©e du tÃ©moignage
     const year = testimonial.createdAt.getFullYear();
     
     // Construire l'URL SEO-friendly parfaite pour Google
     // Format: /testimonials/:serviceType/:country/:year/:language/:id
     const path = `/testimonials/${serviceType}/${countrySlug}/${year}/${currentLanguage}/${testimonial.id}`;
     
-    console.log('🚀 Navigation vers:', path); // Pour débugger
+    console.log('ðŸš€ Navigation vers:', path); // Pour dÃ©bugger
     navigate(path);
     
     // Analytics pour tracking
@@ -978,9 +978,9 @@ const Testimonials: React.FC = () => {
   }, [navigate, currentLanguage]);
 
   const handleLanguageChange = useCallback((newLanguage: string) => {
-    console.log('🌍 Changement de langue:', currentLanguage, '->', newLanguage); // Debug
+    console.log('ðŸŒ Changement de langue:', currentLanguage, '->', newLanguage); // Debug
     setCurrentLanguage(newLanguage);
-    // Force un re-render immédiat
+    // Force un re-render immÃ©diat
     setIsLoading(true);
   }, [currentLanguage]);
 
@@ -1033,8 +1033,8 @@ const Testimonials: React.FC = () => {
                   aria-label={t.aria.languageSelector}
                   disabled={isLoading}
                 >
-                  <option value="fr">🇫🇷 Français</option>
-                  <option value="en">🇺🇸 English</option>
+                  <option value="fr">ðŸ‡«ðŸ‡· FranÃ§ais</option>
+                  <option value="en">ðŸ‡ºðŸ‡¸ English</option>
                 </select>
                 {isLoading && (
                   <div className="absolute inset-y-0 right-2 flex items-center">
@@ -1176,7 +1176,7 @@ const Testimonials: React.FC = () => {
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <span>{t.stats.showing} {STATS_TOTAL_TESTIMONIALS} {t.stats.total}</span>
                   <div className="w-1 h-1 bg-gray-400 rounded-full" />
-                  <span>4,9/5 ⭐</span>
+                  <span>4,9/5 â­</span>
                 </div>
               </div>
               

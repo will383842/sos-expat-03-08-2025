@@ -1,4 +1,4 @@
-// src/pages/admin/AdminKYCProviders.tsx
+﻿// src/pages/admin/AdminKYCProviders.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   collection,
@@ -136,7 +136,7 @@ const AdminKYCProviders: React.FC = () => {
     try {
       setLoading(true);
 
-      // Requête pour récupérer les profils avec état KYC
+      // RequÃªte pour rÃ©cupÃ©rer les profils avec Ã©tat KYC
       const constraints: QueryConstraint[] = [
         where('kycStatus', '!=', null),
         orderBy('kycStatus'),
@@ -144,9 +144,9 @@ const AdminKYCProviders: React.FC = () => {
         limit(100),
       ];
 
-      // Si filtre précis sur kycStatus
+      // Si filtre prÃ©cis sur kycStatus
       if (filters.kycStatus !== 'all') {
-        // Quand on filtre par égalité, on ne peut pas garder un orderBy('kycStatus') redondant
+        // Quand on filtre par Ã©galitÃ©, on ne peut pas garder un orderBy('kycStatus') redondant
         constraints.length = 0;
         constraints.push(where('kycStatus', '==', filters.kycStatus), orderBy('submittedAt', 'desc'), limit(100));
       }
@@ -156,7 +156,7 @@ const AdminKYCProviders: React.FC = () => {
 
       let providersData: KYCProvider[] = [];
 
-      // Pour chaque profil, récupérer la sous-collection des documents
+      // Pour chaque profil, rÃ©cupÃ©rer la sous-collection des documents
       for (const snap of snapshot.docs) {
         const data = snap.data() as DocumentData;
 
@@ -216,7 +216,7 @@ const AdminKYCProviders: React.FC = () => {
         providersData.push(provider);
       }
 
-      // Filtres côté client
+      // Filtres cÃ´tÃ© client
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
         providersData = providersData.filter((provider) =>
@@ -292,7 +292,7 @@ const AdminKYCProviders: React.FC = () => {
       } = {
         kycStatus: newStatus,
         kycReviewedAt: new Date(),
-        kycReviewedBy: 'admin', // TODO: remplace par l'ID de l'admin connecté
+        kycReviewedBy: 'admin', // TODO: remplace par l'ID de l'admin connectÃ©
         updatedAt: new Date(),
       };
 
@@ -301,7 +301,7 @@ const AdminKYCProviders: React.FC = () => {
       }
 
       if (newStatus === 'approved') {
-        // Si KYC approuvé, on peut aussi activer le profil
+        // Si KYC approuvÃ©, on peut aussi activer le profil
         updates.validationStatus = 'approved';
         updates.status = 'active';
       }
@@ -321,16 +321,16 @@ const AdminKYCProviders: React.FC = () => {
         ),
       );
 
-      alert(`✅ Statut KYC mis à jour vers "${newStatus}"`);
+      alert(`âœ… Statut KYC mis Ã  jour vers "${newStatus}"`);
     } catch (error) {
-      console.error('Erreur mise à jour KYC:', error);
-      alert('❌ Erreur lors de la mise à jour du statut KYC');
+      console.error('Erreur mise Ã  jour KYC:', error);
+      alert('âŒ Erreur lors de la mise Ã  jour du statut KYC');
     }
   };
 
   const handleBulkAction = async (action: 'approuver' | 'rejeter' | 'incomplete') => {
     if (selectedProviders.length === 0) {
-      alert('Veuillez sélectionner au moins un prestataire');
+      alert('Veuillez sÃ©lectionner au moins un prestataire');
       return;
     }
 
@@ -340,7 +340,7 @@ const AdminKYCProviders: React.FC = () => {
       if (!rejectionReason) return;
     }
 
-    const confirmMessage = `Êtes-vous sûr de vouloir ${action} ${selectedProviders.length} dossier(s) KYC ?`;
+    const confirmMessage = `ÃŠtes-vous sÃ»r de vouloir ${action} ${selectedProviders.length} dossier(s) KYC ?`;
     if (!confirm(confirmMessage)) return;
 
     try {
@@ -354,10 +354,10 @@ const AdminKYCProviders: React.FC = () => {
 
       await Promise.all(promises);
       setSelectedProviders([]);
-      alert(`✅ Action "${action}" appliquée à ${selectedProviders.length} dossier(s)`);
+      alert(`âœ… Action "${action}" appliquÃ©e Ã  ${selectedProviders.length} dossier(s)`);
     } catch (error) {
       console.error('Erreur action en lot:', error);
-      alert("❌ Erreur lors de l'action en lot");
+      alert("âŒ Erreur lors de l'action en lot");
     }
   };
 
@@ -398,20 +398,20 @@ const AdminKYCProviders: React.FC = () => {
   const getDocumentTypeLabel = (type: KYCDocument['type']) => {
     switch (type) {
       case 'identity':
-        return "Pièce d'identité";
+        return "PiÃ¨ce d'identitÃ©";
       case 'proof_address':
         return 'Justificatif domicile';
       case 'professional_document':
         return 'Document professionnel';
       case 'bank_statement':
-        return 'RIB/Relevé bancaire';
+        return 'RIB/RelevÃ© bancaire';
       default:
         return type;
     }
   };
 
   const getServiceTypeLabel = (type: ServiceType) => {
-    return type === 'lawyer_call' ? 'Avocat' : 'Expatrié';
+    return type === 'lawyer_call' ? 'Avocat' : 'ExpatriÃ©';
   };
 
   const getDocumentCompleteness = (documents: KYCDocument[]) => {
@@ -432,7 +432,7 @@ const AdminKYCProviders: React.FC = () => {
               Validation KYC Prestataires
             </h1>
             <p className="text-gray-600 mt-1">
-              {stats.total} dossiers • {stats.pending} en attente • {stats.thisWeek} cette semaine
+              {stats.total} dossiers â€¢ {stats.pending} en attente â€¢ {stats.thisWeek} cette semaine
             </p>
           </div>
 
@@ -476,7 +476,7 @@ const AdminKYCProviders: React.FC = () => {
                 <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Approuvés</h3>
+                <h3 className="text-sm font-medium text-gray-500">ApprouvÃ©s</h3>
                 <p className="text-2xl font-bold text-gray-900">{stats.approved}</p>
               </div>
             </div>
@@ -488,7 +488,7 @@ const AdminKYCProviders: React.FC = () => {
                 <XCircle className="w-6 h-6 text-red-600" />
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Rejetés</h3>
+                <h3 className="text-sm font-medium text-gray-500">RejetÃ©s</h3>
                 <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
               </div>
             </div>
@@ -518,7 +518,7 @@ const AdminKYCProviders: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
                     type="text"
-                    placeholder="Nom, email, n° barreau..."
+                    placeholder="Nom, email, nÂ° barreau..."
                     value={filters.searchTerm}
                     onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
                     className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500"
@@ -535,8 +535,8 @@ const AdminKYCProviders: React.FC = () => {
                 >
                   <option value="all">Tous les statuts</option>
                   <option value="pending">En attente</option>
-                  <option value="approved">Approuvé</option>
-                  <option value="rejected">Rejeté</option>
+                  <option value="approved">ApprouvÃ©</option>
+                  <option value="rejected">RejetÃ©</option>
                   <option value="incomplete">Incomplet</option>
                 </select>
               </div>
@@ -552,7 +552,7 @@ const AdminKYCProviders: React.FC = () => {
                 >
                   <option value="all">Tous types</option>
                   <option value="lawyer_call">Avocat</option>
-                  <option value="expat_call">Expatrié</option>
+                  <option value="expat_call">ExpatriÃ©</option>
                 </select>
               </div>
 
@@ -566,21 +566,21 @@ const AdminKYCProviders: React.FC = () => {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="all">Tous documents</option>
-                  <option value="identity">Pièce d'identité</option>
+                  <option value="identity">PiÃ¨ce d'identitÃ©</option>
                   <option value="proof_address">Justificatif domicile</option>
                   <option value="professional_document">Document professionnel</option>
-                  <option value="bank_statement">RIB/Relevé bancaire</option>
+                  <option value="bank_statement">RIB/RelevÃ© bancaire</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Période de soumission</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">PÃ©riode de soumission</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) => setFilters({ ...filters, dateRange: e.target.value as FilterOptions['dateRange'] })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500"
                 >
-                  <option value="all">Toutes les périodes</option>
+                  <option value="all">Toutes les pÃ©riodes</option>
                   <option value="today">Aujourd'hui</option>
                   <option value="week">Cette semaine</option>
                   <option value="month">Ce mois</option>
@@ -595,7 +595,7 @@ const AdminKYCProviders: React.FC = () => {
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <p className="text-orange-800">
-                <strong>{selectedProviders.length}</strong> dossier(s) sélectionné(s)
+                <strong>{selectedProviders.length}</strong> dossier(s) sÃ©lectionnÃ©(s)
               </p>
               <div className="flex space-x-3">
                 <Button onClick={() => handleBulkAction('approuver')} className="bg-green-600 hover:bg-green-700 text-white">
@@ -623,8 +623,8 @@ const AdminKYCProviders: React.FC = () => {
             ) : providers.length === 0 ? (
               <div className="text-center py-12">
                 <Shield className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun dossier KYC trouvé</h3>
-                <p className="mt-1 text-sm text-gray-500">Aucun dossier ne correspond aux critères de recherche.</p>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun dossier KYC trouvÃ©</h3>
+                <p className="mt-1 text-sm text-gray-500">Aucun dossier ne correspond aux critÃ¨res de recherche.</p>
               </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
@@ -715,7 +715,7 @@ const AdminKYCProviders: React.FC = () => {
                             </span>
                           </div>
                           {provider.professionalInfo.barNumber && (
-                            <div className="text-xs text-blue-600">N° {provider.professionalInfo.barNumber}</div>
+                            <div className="text-xs text-blue-600">NÂ° {provider.professionalInfo.barNumber}</div>
                           )}
                         </div>
                       </td>
@@ -776,15 +776,15 @@ const AdminKYCProviders: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="space-y-1 text-xs">
-                          {provider.personalInfo.nationality && <div>🌍 {provider.personalInfo.nationality}</div>}
+                          {provider.personalInfo.nationality && <div>ðŸŒ {provider.personalInfo.nationality}</div>}
                           {provider.personalInfo.birthDate && (
-                            <div>📅 {provider.personalInfo.birthDate.toLocaleDateString('fr-FR')}</div>
+                            <div>ðŸ“… {provider.personalInfo.birthDate.toLocaleDateString('fr-FR')}</div>
                           )}
                           {provider.bankInfo.iban && (
-                            <div className="font-mono">💳 {provider.bankInfo.iban.substring(0, 10)}...</div>
+                            <div className="font-mono">ðŸ’³ {provider.bankInfo.iban.substring(0, 10)}...</div>
                           )}
                           {provider.professionalInfo.experience && (
-                            <div>⚖️ {provider.professionalInfo.experience} ans exp.</div>
+                            <div>âš–ï¸ {provider.professionalInfo.experience} ans exp.</div>
                           )}
                         </div>
                       </td>
@@ -817,8 +817,8 @@ const AdminKYCProviders: React.FC = () => {
                               className="text-xs border border-gray-300 rounded px-1 py-1"
                             >
                               <option value="pending">En attente</option>
-                              <option value="approved">Approuvé</option>
-                              <option value="rejected">Rejeté</option>
+                              <option value="approved">ApprouvÃ©</option>
+                              <option value="rejected">RejetÃ©</option>
                               <option value="incomplete">Incomplet</option>
                             </select>
                           </div>
@@ -860,21 +860,21 @@ const AdminKYCProviders: React.FC = () => {
                         <strong>Email:</strong> {selectedProvider.email}
                       </div>
                       <div>
-                        <strong>Téléphone:</strong> {selectedProvider.phone || 'Non renseigné'}
+                        <strong>TÃ©lÃ©phone:</strong> {selectedProvider.phone || 'Non renseignÃ©'}
                       </div>
                       <div>
-                        <strong>Nationalité:</strong>{' '}
-                        {selectedProvider.personalInfo.nationality || 'Non renseignée'}
+                        <strong>NationalitÃ©:</strong>{' '}
+                        {selectedProvider.personalInfo.nationality || 'Non renseignÃ©e'}
                       </div>
                       <div>
                         <strong>Date de naissance:</strong>{' '}
-                        {selectedProvider.personalInfo.birthDate?.toLocaleDateString('fr-FR') || 'Non renseignée'}
+                        {selectedProvider.personalInfo.birthDate?.toLocaleDateString('fr-FR') || 'Non renseignÃ©e'}
                       </div>
                       <div>
-                        <strong>Adresse:</strong> {selectedProvider.personalInfo.address || 'Non renseignée'}
+                        <strong>Adresse:</strong> {selectedProvider.personalInfo.address || 'Non renseignÃ©e'}
                       </div>
                       <div>
-                        <strong>Code postal:</strong> {selectedProvider.personalInfo.postalCode || 'Non renseigné'}
+                        <strong>Code postal:</strong> {selectedProvider.personalInfo.postalCode || 'Non renseignÃ©'}
                       </div>
                     </div>
                   </div>
@@ -886,18 +886,18 @@ const AdminKYCProviders: React.FC = () => {
                         <strong>Type:</strong> {getServiceTypeLabel(selectedProvider.serviceType)}
                       </div>
                       <div>
-                        <strong>Profession:</strong> {selectedProvider.professionalInfo.profession || 'Non renseignée'}
+                        <strong>Profession:</strong> {selectedProvider.professionalInfo.profession || 'Non renseignÃ©e'}
                       </div>
                       {selectedProvider.professionalInfo.barNumber && (
                         <div>
-                          <strong>N° Barreau:</strong> {selectedProvider.professionalInfo.barNumber}
+                          <strong>NÂ° Barreau:</strong> {selectedProvider.professionalInfo.barNumber}
                         </div>
                       )}
                       <div>
-                        <strong>Entreprise:</strong> {selectedProvider.professionalInfo.company || 'Non renseignée'}
+                        <strong>Entreprise:</strong> {selectedProvider.professionalInfo.company || 'Non renseignÃ©e'}
                       </div>
                       <div>
-                        <strong>Expérience:</strong> {selectedProvider.professionalInfo.experience || 0} ans
+                        <strong>ExpÃ©rience:</strong> {selectedProvider.professionalInfo.experience || 0} ans
                       </div>
                     </div>
                   </div>
@@ -906,13 +906,13 @@ const AdminKYCProviders: React.FC = () => {
                     <h4 className="font-medium text-gray-900 mb-3">Informations bancaires</h4>
                     <div className="space-y-2 text-sm">
                       <div>
-                        <strong>IBAN:</strong> {selectedProvider.bankInfo.iban || 'Non renseigné'}
+                        <strong>IBAN:</strong> {selectedProvider.bankInfo.iban || 'Non renseignÃ©'}
                       </div>
                       <div>
-                        <strong>BIC:</strong> {selectedProvider.bankInfo.bic || 'Non renseigné'}
+                        <strong>BIC:</strong> {selectedProvider.bankInfo.bic || 'Non renseignÃ©'}
                       </div>
                       <div>
-                        <strong>Banque:</strong> {selectedProvider.bankInfo.bankName || 'Non renseignée'}
+                        <strong>Banque:</strong> {selectedProvider.bankInfo.bankName || 'Non renseignÃ©e'}
                       </div>
                     </div>
                   </div>
@@ -933,14 +933,14 @@ const AdminKYCProviders: React.FC = () => {
                                   doc.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                                 }`}
                               >
-                                {doc.verified ? 'Vérifié' : 'En attente'}
+                                {doc.verified ? 'VÃ©rifiÃ©' : 'En attente'}
                               </span>
                             </div>
                             <div className="text-xs text-gray-500 mb-2">
-                              Envoyé le {doc.uploadedAt.toLocaleDateString('fr-FR')}
+                              EnvoyÃ© le {doc.uploadedAt.toLocaleDateString('fr-FR')}
                             </div>
                             {doc.rejectionReason && (
-                              <div className="text-xs text-red-600 mb-2">Rejeté: {doc.rejectionReason}</div>
+                              <div className="text-xs text-red-600 mb-2">RejetÃ©: {doc.rejectionReason}</div>
                             )}
                             <div className="flex space-x-2">
                               <button
@@ -950,9 +950,9 @@ const AdminKYCProviders: React.FC = () => {
                                 <Eye size={12} className="mr-1" />
                                 Voir
                               </button>
-                              {/* TODO: Validation document (mettre à jour la sous-collection si besoin) */}
+                              {/* TODO: Validation document (mettre Ã  jour la sous-collection si besoin) */}
                               <button
-                                onClick={() => alert("Fonction 'Valider' à implémenter pour ce document.")}
+                                onClick={() => alert("Fonction 'Valider' Ã  implÃ©menter pour ce document.")}
                                 className="flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                               >
                                 <CheckCircle size={12} className="mr-1" />

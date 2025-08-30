@@ -1,5 +1,5 @@
-// ========================================
-// CountrySelect.tsx — Multi-select of countries (pattern-matched to MultiLanguageSelect)
+﻿// ========================================
+// CountrySelect.tsx â€” Multi-select of countries (pattern-matched to MultiLanguageSelect)
 // ========================================
 import React, { useState, useMemo, useCallback } from 'react';
 import Select, { MultiValue } from 'react-select';
@@ -68,7 +68,7 @@ const CountrySelect: React.FC<CountrySelectProps> = React.memo(({
   const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale[currentLocale], [currentLocale]);
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
-      ? (inputValue ? `Aucun pays trouvé pour "${inputValue}"` : 'Aucun pays disponible')
+      ? (inputValue ? `Aucun pays trouvÃ© pour "${inputValue}"` : 'Aucun pays disponible')
       : (inputValue ? `No country found for "${inputValue}"` : 'No countries available');
   }, [currentLocale]);
 

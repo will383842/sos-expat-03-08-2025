@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { doc, updateDoc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
@@ -123,12 +123,12 @@ const ProfileEdit: React.FC = () => {
           break;
         case "phone":
           if (value && !VALIDATION_RULES.phone.pattern.test(value)) {
-            errors.phone = "Numéro de téléphone invalide";
+            errors.phone = "NumÃ©ro de tÃ©lÃ©phone invalide";
           }
           break;
         case "newPassword":
           if (value && value.length < VALIDATION_RULES.password.minLength) {
-            errors.newPassword = `Le mot de passe doit contenir au moins ${VALIDATION_RULES.password.minLength} caractères`;
+            errors.newPassword = `Le mot de passe doit contenir au moins ${VALIDATION_RULES.password.minLength} caractÃ¨res`;
           }
           break;
         case "confirmPassword":
@@ -144,7 +144,7 @@ const ProfileEdit: React.FC = () => {
     [passwords.new]
   );
 
-  /** Chargement des données */
+  /** Chargement des donnÃ©es */
   useEffect(() => {
     const load = async () => {
       if (!authInitialized) return;
@@ -213,7 +213,7 @@ const ProfileEdit: React.FC = () => {
 
     const file = files[0];
     if (!UPLOAD_CONFIG.acceptedTypes.includes(file.type)) {
-      setMessages((p) => ({ ...p, error: "Format de fichier non supporté. Utilisez JPEG, PNG ou WebP." }));
+      setMessages((p) => ({ ...p, error: "Format de fichier non supportÃ©. Utilisez JPEG, PNG ou WebP." }));
       return;
     }
     if (file.size > UPLOAD_CONFIG.maxSize) {
@@ -241,7 +241,7 @@ const ProfileEdit: React.FC = () => {
         const r = await getDocs(q);
         return r.empty;
       } catch (e) {
-        console.error("Erreur lors de la vérification de l'email:", e);
+        console.error("Erreur lors de la vÃ©rification de l'email:", e);
         return false;
       }
     },
@@ -251,7 +251,7 @@ const ProfileEdit: React.FC = () => {
   const reauthenticateUser = useCallback(async () => {
     const current = auth.currentUser;
     if (!current?.email) throw new Error("Email utilisateur non disponible");
-    if (!passwords.current) throw new Error("Mot de passe actuel requis pour cette opération");
+    if (!passwords.current) throw new Error("Mot de passe actuel requis pour cette opÃ©ration");
 
     const cred = EmailAuthProvider.credential(current.email, passwords.current);
     await reauthenticateWithCredential(current as FirebaseUser, cred);
@@ -265,7 +265,7 @@ const ProfileEdit: React.FC = () => {
         try {
           await deleteObject(ref(storage, userData.photoURL));
         } catch (err) {
-          console.warn("Ancienne photo non supprimée :", err);
+          console.warn("Ancienne photo non supprimÃ©e :", err);
         }
       }
 
@@ -311,13 +311,13 @@ const ProfileEdit: React.FC = () => {
           return;
         }
 
-        // Unicité email
+        // UnicitÃ© email
         if ((formData.email || "") !== (userData?.email || "")) {
           const unique = await checkEmailUniqueness(formData.email || "");
           if (!unique) {
             setMessages((p) => ({
               ...p,
-              error: "Cette adresse email est déjà utilisée par un autre utilisateur.",
+              error: "Cette adresse email est dÃ©jÃ  utilisÃ©e par un autre utilisateur.",
             }));
             return;
           }
@@ -326,7 +326,7 @@ const ProfileEdit: React.FC = () => {
         const current = auth.currentUser;
         if (!current) throw new Error("Session Auth inexistante");
 
-        // Réauth si changement email ou mdp
+        // RÃ©auth si changement email ou mdp
         if ((formData.email && formData.email !== userData?.email) || passwords.new) {
           await reauthenticateUser();
         }
@@ -336,7 +336,7 @@ const ProfileEdit: React.FC = () => {
           await fbUpdatePassword(current as FirebaseUser, passwords.new);
         }
 
-        // Update email (si changé)
+        // Update email (si changÃ©)
         if (formData.email && formData.email !== current.email) {
           await fbUpdateEmail(current as FirebaseUser, formData.email);
         }
@@ -364,16 +364,16 @@ const ProfileEdit: React.FC = () => {
           await updateDoc(doc(db, "sos_profiles", ctxUser.uid), {
             photoURL,
             updatedAt: new Date(),
-          }).catch((err) => console.warn("Erreur mise à jour sos_profiles :", err));
+          }).catch((err) => console.warn("Erreur mise Ã  jour sos_profiles :", err));
         }
 
-        setMessages((p) => ({ ...p, success: "Profil mis à jour avec succès !" }));
+        setMessages((p) => ({ ...p, success: "Profil mis Ã  jour avec succÃ¨s !" }));
         setPasswords({ new: "", confirm: "", current: "" });
         setPhoto({ file: null, preview: photoURL ?? null });
         setUserData((prev) => ({ ...(prev ?? ({} as UserData)), ...(updateData as UserData) }));
       } catch (err) {
-        console.error("Erreur lors de la mise à jour:", err);
-        let errorMessage = "Erreur lors de la mise à jour du profil";
+        console.error("Erreur lors de la mise Ã  jour:", err);
+        let errorMessage = "Erreur lors de la mise Ã  jour du profil";
 
         if (err && typeof err === "object" && "code" in err) {
           const code = (err as { code: string }).code;
@@ -385,16 +385,16 @@ const ProfileEdit: React.FC = () => {
               errorMessage = "Le nouveau mot de passe est trop faible";
               break;
             case "auth/email-already-in-use":
-              errorMessage = "Cette adresse email est déjà utilisée";
+              errorMessage = "Cette adresse email est dÃ©jÃ  utilisÃ©e";
               break;
             case "auth/requires-recent-login":
-              errorMessage = "Veuillez vous reconnecter pour effectuer cette opération";
+              errorMessage = "Veuillez vous reconnecter pour effectuer cette opÃ©ration";
               break;
             default:
               if ("message" in err && typeof (err as { message?: string }).message === "string") {
                 const m = (err as { message: string }).message;
                 if (m.includes("majuscule") || m.includes("minuscule") || m.includes("chiffre")) {
-                  errorMessage = "Le mot de passe doit contenir au moins 6 caractères";
+                  errorMessage = "Le mot de passe doit contenir au moins 6 caractÃ¨res";
                 }
               }
               break;
@@ -449,10 +449,10 @@ const ProfileEdit: React.FC = () => {
     return (
       <Layout>
         <div className="max-w-2xl mx-auto py-20 px-4 text-center">
-          <p className="text-red-600 mb-4">Impossible de charger les données du profil.</p>
+          <p className="text-red-600 mb-4">Impossible de charger les donnÃ©es du profil.</p>
           <div className="space-x-4">
             <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700">
-              Réessayer
+              RÃ©essayer
             </Button>
             <Button onClick={() => navigateTo("/dashboard")} className="bg-gray-600 hover:bg-gray-700">
               Retour au tableau de bord
@@ -502,7 +502,7 @@ const ProfileEdit: React.FC = () => {
                   onChange={handlePhotoChange}
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 cursor-pointer"
                 />
-                <p className="text-xs text-gray-500 mt-1">Formats acceptés: JPEG, PNG, WebP (max 5MB)</p>
+                <p className="text-xs text-gray-500 mt-1">Formats acceptÃ©s: JPEG, PNG, WebP (max 5MB)</p>
               </div>
             </div>
 
@@ -510,7 +510,7 @@ const ProfileEdit: React.FC = () => {
             <section>
               <h2 className={styles.sectionTitle}>Informations personnelles</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input disabled value={displayData.firstName || ""} className={styles.disabled} placeholder="Prénom" />
+                <input disabled value={displayData.firstName || ""} className={styles.disabled} placeholder="PrÃ©nom" />
                 <input disabled value={displayData.lastName || ""} className={styles.disabled} placeholder="Nom" />
                 <div className="md:col-span-2">
                   <input
@@ -526,9 +526,9 @@ const ProfileEdit: React.FC = () => {
               </div>
             </section>
 
-            {/* Sécurité */}
+            {/* SÃ©curitÃ© */}
             <section>
-              <h2 className={styles.sectionTitle}>Sécurité</h2>
+              <h2 className={styles.sectionTitle}>SÃ©curitÃ©</h2>
               <div className="space-y-4">
                 {((formData.email ?? displayData.email) !== displayData.email || passwords.new) && (
                   <input
@@ -536,7 +536,7 @@ const ProfileEdit: React.FC = () => {
                     value={passwords.current}
                     onChange={(e) => handlePasswordChange("current", e.target.value)}
                     className={styles.input}
-                    placeholder="Mot de passe actuel (requis pour les modifications de sécurité)"
+                    placeholder="Mot de passe actuel (requis pour les modifications de sÃ©curitÃ©)"
                   />
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -569,9 +569,9 @@ const ProfileEdit: React.FC = () => {
               </div>
             </section>
 
-            {/* Coordonnées */}
+            {/* CoordonnÃ©es */}
             <section>
-              <h2 className={styles.sectionTitle}>Coordonnées</h2>
+              <h2 className={styles.sectionTitle}>CoordonnÃ©es</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input
                   name="phoneCode"
@@ -586,17 +586,17 @@ const ProfileEdit: React.FC = () => {
                     value={String(formData.phone ?? "")}
                     onChange={handleChange}
                     className={getInputStyle("phone")}
-                    placeholder="Numéro de téléphone"
+                    placeholder="NumÃ©ro de tÃ©lÃ©phone"
                   />
                   {fieldErrors.phone && <p className="text-red-500 text-xs mt-1">{fieldErrors.phone}</p>}
                 </div>
               </div>
             </section>
 
-            {/* Spécifique par rôle */}
+            {/* SpÃ©cifique par rÃ´le */}
             {role === "lawyer" && (
               <section>
-                <h2 className={styles.sectionTitle}>Détails professionnels</h2>
+                <h2 className={styles.sectionTitle}>DÃ©tails professionnels</h2>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
@@ -604,7 +604,7 @@ const ProfileEdit: React.FC = () => {
                       value={String(formData.country ?? "")}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Pays de résidence"
+                      placeholder="Pays de rÃ©sidence"
                     />
                     <input
                       name="currentCountry"
@@ -618,7 +618,7 @@ const ProfileEdit: React.FC = () => {
                       value={String(formData.barNumber ?? "")}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Numéro de barreau"
+                      placeholder="NumÃ©ro de barreau"
                     />
                     <input
                       name="experienceYears"
@@ -626,7 +626,7 @@ const ProfileEdit: React.FC = () => {
                       value={formData.experienceYears ?? ""}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Années d'expérience"
+                      placeholder="AnnÃ©es d'expÃ©rience"
                     />
                   </div>
 
@@ -634,7 +634,7 @@ const ProfileEdit: React.FC = () => {
                     disabled
                     value={String(formData.diplomaYear ?? "")}
                     className={styles.disabled}
-                    placeholder="Année du diplôme"
+                    placeholder="AnnÃ©e du diplÃ´me"
                   />
 
                   <textarea
@@ -652,7 +652,7 @@ const ProfileEdit: React.FC = () => {
                       value={String(formData.specialties ?? "")}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Spécialités (séparées par des virgules)"
+                      placeholder="SpÃ©cialitÃ©s (sÃ©parÃ©es par des virgules)"
                     />
                     <input
                       name="interventionCountries"
@@ -668,7 +668,7 @@ const ProfileEdit: React.FC = () => {
                     value={String(formData.languages ?? "")}
                     onChange={handleChange}
                     className={styles.input}
-                    placeholder="Langues parlées (séparées par des virgules)"
+                    placeholder="Langues parlÃ©es (sÃ©parÃ©es par des virgules)"
                   />
 
                   <input
@@ -691,7 +691,7 @@ const ProfileEdit: React.FC = () => {
                       value={String(formData.country ?? "")}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Pays de résidence"
+                      placeholder="Pays de rÃ©sidence"
                     />
                     <input
                       name="currentCountry"
@@ -713,7 +713,7 @@ const ProfileEdit: React.FC = () => {
                       value={formData.expatYears ?? ""}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Années d'expatriation"
+                      placeholder="AnnÃ©es d'expatriation"
                     />
                   </div>
 
@@ -722,7 +722,7 @@ const ProfileEdit: React.FC = () => {
                     value={String(formData.expDescription ?? "")}
                     onChange={handleChange}
                     className={styles.input}
-                    placeholder="Votre expérience d'expatriation"
+                    placeholder="Votre expÃ©rience d'expatriation"
                     rows={4}
                   />
 
@@ -731,7 +731,7 @@ const ProfileEdit: React.FC = () => {
                     value={String(formData.whyHelp ?? "")}
                     onChange={handleChange}
                     className={styles.input}
-                    placeholder="Pourquoi souhaitez-vous aider d'autres expatriés ?"
+                    placeholder="Pourquoi souhaitez-vous aider d'autres expatriÃ©s ?"
                     rows={3}
                   />
 
@@ -740,7 +740,7 @@ const ProfileEdit: React.FC = () => {
                     value={String(formData.languages ?? "")}
                     onChange={handleChange}
                     className={styles.input}
-                    placeholder="Langues parlées (séparées par des virgules)"
+                    placeholder="Langues parlÃ©es (sÃ©parÃ©es par des virgules)"
                   />
                 </div>
               </section>
@@ -748,21 +748,21 @@ const ProfileEdit: React.FC = () => {
 
             {role === "client" && (
               <section>
-                <h2 className={styles.sectionTitle}>Informations complémentaires</h2>
+                <h2 className={styles.sectionTitle}>Informations complÃ©mentaires</h2>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       disabled
                       value={String(formData.nationality ?? "")}
                       className={styles.disabled}
-                      placeholder="Nationalité"
+                      placeholder="NationalitÃ©"
                     />
                     <input
                       name="country"
                       value={String(formData.country ?? "")}
                       onChange={handleChange}
                       className={styles.input}
-                      placeholder="Pays de résidence"
+                      placeholder="Pays de rÃ©sidence"
                     />
                     <input
                       name="status"
@@ -793,7 +793,7 @@ const ProfileEdit: React.FC = () => {
 
             {messages.success && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                <p className="font-semibold">Succès</p>
+                <p className="font-semibold">SuccÃ¨s</p>
                 <p className="text-sm">{messages.success}</p>
               </div>
             )}
@@ -810,7 +810,7 @@ const ProfileEdit: React.FC = () => {
                 {loading.submitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Mise à jour en cours...
+                    Mise Ã  jour en cours...
                   </>
                 ) : (
                   "Valider les modifications"

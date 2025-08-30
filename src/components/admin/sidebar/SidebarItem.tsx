@@ -1,4 +1,4 @@
-// src/components/admin/sidebar/SidebarItem.tsx
+﻿// src/components/admin/sidebar/SidebarItem.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { ChevronDown, ChevronRight, Dot } from "lucide-react";
@@ -35,9 +35,9 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   const isThirdLevel = level === 2;
 
   // DEBUG: Tracer les rendus
-  console.log(`🔍 SidebarItem rendu: ${node.label} (level: ${level}, collapsed: ${isSidebarCollapsed})`);
+  console.log(`ðŸ” SidebarItem rendu: ${node.label} (level: ${level}, collapsed: ${isSidebarCollapsed})`);
 
-  // Vérifier si cet élément ou un de ses enfants est actif
+  // VÃ©rifier si cet Ã©lÃ©ment ou un de ses enfants est actif
   const isActiveOrHasActiveChild = useMemo(() => {
     if (node.path && location.pathname === node.path) {
       return true;
@@ -61,17 +61,17 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     return false;
   }, [node, location.pathname, hasChildren]);
 
-  // Vérifier si c'est exactement cette page qui est active (pas un enfant)
+  // VÃ©rifier si c'est exactement cette page qui est active (pas un enfant)
   const isExactlyActive = node.path && location.pathname === node.path;
 
-  // Auto-expand si contient un élément actif
+  // Auto-expand si contient un Ã©lÃ©ment actif
   useEffect(() => {
     if (isActiveOrHasActiveChild && hasChildren) {
       setIsExpanded(true);
     }
   }, [isActiveOrHasActiveChild, hasChildren]);
 
-  // Styles basés sur le niveau et l'état
+  // Styles basÃ©s sur le niveau et l'Ã©tat
   const getContainerStyles = () => {
     if (isRootLevel) {
       return "mb-2";
@@ -89,7 +89,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     const baseStyles = "w-full flex items-center justify-between rounded-md text-sm transition-all duration-200 group";
     
     if (isRootLevel) {
-      // Onglets principaux : TOUJOURS surlignés en gris - FORCE avec !important
+      // Onglets principaux : TOUJOURS surlignÃ©s en gris - FORCE avec !important
       const textColor = isExactlyActive ? "!text-gray-900" : "!text-gray-700";
       return `${baseStyles} px-3 py-3 font-semibold ${textColor} !bg-gray-300 hover:!bg-gray-400`;
     }
@@ -115,7 +115,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     const baseStyles = "w-full flex items-center rounded-md text-sm transition-all duration-200 group text-left";
     
     if (isRootLevel) {
-      // Onglets principaux : TOUJOURS surlignés en gris - FORCE avec !important
+      // Onglets principaux : TOUJOURS surlignÃ©s en gris - FORCE avec !important
       const textColor = isActive ? "!text-gray-900" : "!text-gray-700";
       return `${baseStyles} px-3 py-3 font-semibold ${textColor} !bg-gray-300 hover:!bg-gray-400`;
     }
@@ -160,7 +160,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     }
   };
 
-  // Rendu du badge si présent
+  // Rendu du badge si prÃ©sent
   const renderBadge = () => {
     if (!node.badge) return null;
     
@@ -173,7 +173,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     );
   };
 
-  // Rendu de l'icône
+  // Rendu de l'icÃ´ne
   const renderIcon = () => {
     if (isSidebarCollapsed && !isRootLevel) return null;
     
@@ -193,7 +193,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       );
     }
     
-    // Icône par défaut pour les éléments sans icône (niveaux profonds)
+    // IcÃ´ne par dÃ©faut pour les Ã©lÃ©ments sans icÃ´ne (niveaux profonds)
     if (isThirdLevel || level > 2) {
       return (
         <Dot 
@@ -210,7 +210,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     return null;
   };
 
-  // Rendu du chevron pour les éléments expandables
+  // Rendu du chevron pour les Ã©lÃ©ments expandables
   const renderChevron = () => {
     if (!hasChildren || (isSidebarCollapsed && isRootLevel)) return null;
     
@@ -270,7 +270,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           className={getButtonStyles()}
           title={node.description}
           aria-expanded={isExpanded}
-          aria-label={`${isExpanded ? 'Réduire' : 'Étendre'} ${node.label}`}
+          aria-label={`${isExpanded ? 'RÃ©duire' : 'Ã‰tendre'} ${node.label}`}
         >
           <div className="flex items-center min-w-0 flex-1">
             {renderIcon()}
@@ -287,7 +287,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           {renderTooltip()}
         </button>
 
-        {/* Enfants - ATTENTION: Condition stricte pour éviter double rendu */}
+        {/* Enfants - ATTENTION: Condition stricte pour Ã©viter double rendu */}
         {isExpanded && !isSidebarCollapsed && node.children && (
           <div className="mt-2 space-y-1 transition-all duration-200">
             {node.children.map((child) => (
@@ -327,3 +327,4 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 };
 
 export default SidebarItem;
+

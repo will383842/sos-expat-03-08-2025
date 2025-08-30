@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
+﻿import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { logError } from '../../utils/logging';
 
@@ -164,14 +164,14 @@ class ErrorBoundary extends Component<Props, State> {
                 className="text-sm text-red-700 space-y-2"
               >
                 <p>
-                  Nous avons rencontré un problème lors du chargement de cette section.
+                  Nous avons rencontrÃ© un problÃ¨me lors du chargement de cette section.
                 </p>
                 <p>
-                  L'erreur a été automatiquement signalée à notre équipe technique.
+                  L'erreur a Ã©tÃ© automatiquement signalÃ©e Ã  notre Ã©quipe technique.
                 </p>
                 {this.state.eventId && (
                   <p className="text-xs text-red-600">
-                    Référence : {this.state.eventId}
+                    RÃ©fÃ©rence : {this.state.eventId}
                   </p>
                 )}
               </div>
@@ -181,15 +181,15 @@ class ErrorBoundary extends Component<Props, State> {
                 <button 
                   onClick={this.handleRetry}
                   className="inline-flex items-center justify-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors duration-200"
-                  aria-label="Réessayer de charger le contenu"
+                  aria-label="RÃ©essayer de charger le contenu"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Réessayer
+                  RÃ©essayer
                 </button>
                 <button 
                   onClick={this.handleReload}
                   className="inline-flex items-center justify-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
-                  aria-label="Recharger la page complète"
+                  aria-label="Recharger la page complÃ¨te"
                 >
                   Recharger la page
                 </button>
@@ -199,7 +199,7 @@ class ErrorBoundary extends Component<Props, State> {
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="mt-6 p-3 bg-gray-100 rounded-md">
                   <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 rounded">
-                    Détails techniques (développement uniquement)
+                    DÃ©tails techniques (dÃ©veloppement uniquement)
                   </summary>
                   <div className="mt-3 p-3 bg-gray-900 text-gray-100 rounded-md overflow-auto">
                     <div className="text-xs font-mono space-y-2">

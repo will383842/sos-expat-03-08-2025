@@ -1,5 +1,5 @@
-// ========================================
-// ExpatHelpSelect.tsx — Multi-select of expat help types (flat)
+﻿// ========================================
+// ExpatHelpSelect.tsx â€” Multi-select of expat help types (flat)
 // ========================================
 import React, { useState, useMemo, useCallback } from 'react';
 import Select, { MultiValue } from 'react-select';
@@ -63,7 +63,7 @@ const ExpatHelpSelect: React.FC<ExpatHelpSelectProps> = React.memo(({
   const defaultPlaceholder = useMemo(() => defaultPlaceholderByLocale[currentLocale], [currentLocale]);
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     return currentLocale === 'fr'
-      ? (inputValue ? `Aucune catégorie trouvée pour "${inputValue}"` : 'Aucune catégorie disponible')
+      ? (inputValue ? `Aucune catÃ©gorie trouvÃ©e pour "${inputValue}"` : 'Aucune catÃ©gorie disponible')
       : (inputValue ? `No category found for "${inputValue}"` : 'No categories available');
   }, [currentLocale]);
 

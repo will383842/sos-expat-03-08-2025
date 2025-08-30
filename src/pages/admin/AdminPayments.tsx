@@ -1,4 +1,4 @@
-// src/pages/admin/AdminPayments.tsx
+﻿// src/pages/admin/AdminPayments.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   collection,
@@ -28,7 +28,7 @@ interface PaymentRecord {
   providerName?: string;
   clientId: string;
   clientName?: string;
-  createdAt: Date; // on normalise en Date pour l’UI
+  createdAt: Date; // on normalise en Date pour lâ€™UI
 }
 
 const PAGE_SIZE = 25;
@@ -46,12 +46,12 @@ const AdminPayments: React.FC = () => {
   const [endDate, setEndDate] = useState<string>(''); // yyyy-mm-dd
   const [search, setSearch] = useState<string>('');
 
-  // Conversion sécurisée Date -> Timestamp (pour where)
+  // Conversion sÃ©curisÃ©e Date -> Timestamp (pour where)
   const startTs = useMemo(() => {
     if (!startDate) return undefined;
     const d = new Date(startDate);
     if (Number.isNaN(d.getTime())) return undefined;
-    // début de journée
+    // dÃ©but de journÃ©e
     d.setHours(0, 0, 0, 0);
     return Timestamp.fromDate(d);
   }, [startDate]);
@@ -60,7 +60,7 @@ const AdminPayments: React.FC = () => {
     if (!endDate) return undefined;
     const d = new Date(endDate);
     if (Number.isNaN(d.getTime())) return undefined;
-    // fin de journée
+    // fin de journÃ©e
     d.setHours(23, 59, 59, 999);
     return Timestamp.fromDate(d);
   }, [endDate]);
@@ -150,9 +150,9 @@ const AdminPayments: React.FC = () => {
     [statusFilter, startTs, endTs, lastDoc]
   );
 
-  // Chargement initial et à chaque changement de filtres
+  // Chargement initial et Ã  chaque changement de filtres
   useEffect(() => {
-    // on remet la pagination à zéro quand les filtres changent
+    // on remet la pagination Ã  zÃ©ro quand les filtres changent
     setLastDoc(null);
     setHasMore(true);
     void buildQuery(true);
@@ -193,10 +193,10 @@ const AdminPayments: React.FC = () => {
                 onChange={(e) => setStatusFilter(e.target.value as PaymentStatus | 'all')}
               >
                 <option value="all">Tous</option>
-                <option value="paid">Payé</option>
+                <option value="paid">PayÃ©</option>
                 <option value="pending">En attente</option>
-                <option value="failed">Échec</option>
-                <option value="refunded">Remboursé</option>
+                <option value="failed">Ã‰chec</option>
+                <option value="refunded">RemboursÃ©</option>
               </select>
             </div>
 
@@ -225,7 +225,7 @@ const AdminPayments: React.FC = () => {
               <div className="flex">
                 <input
                   className="flex-1 border rounded-l px-3 py-2"
-                  placeholder="id / client / prestataire…"
+                  placeholder="id / client / prestataireâ€¦"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -279,15 +279,15 @@ const AdminPayments: React.FC = () => {
                   <td className="px-4 py-3">
                     {p.status === 'paid' ? (
                       <span className="inline-flex items-center text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded">
-                        <CheckCircle size={14} className="mr-1" /> Payé
+                        <CheckCircle size={14} className="mr-1" /> PayÃ©
                       </span>
                     ) : p.status === 'refunded' ? (
                       <span className="inline-flex items-center text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded">
-                        Remboursé
+                        RemboursÃ©
                       </span>
                     ) : p.status === 'failed' ? (
                       <span className="inline-flex items-center text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
-                        <XCircle size={14} className="mr-1" /> Échec
+                        <XCircle size={14} className="mr-1" /> Ã‰chec
                       </span>
                     ) : (
                       <span className="inline-flex items-center text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">
@@ -301,7 +301,7 @@ const AdminPayments: React.FC = () => {
               {!isLoading && filteredBySearch.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
-                    Aucun paiement trouvé.
+                    Aucun paiement trouvÃ©.
                   </td>
                 </tr>
               )}
@@ -309,7 +309,7 @@ const AdminPayments: React.FC = () => {
           </table>
 
           {isLoading && (
-            <div className="p-4 text-center text-gray-600">Chargement…</div>
+            <div className="p-4 text-center text-gray-600">Chargementâ€¦</div>
           )}
         </div>
 

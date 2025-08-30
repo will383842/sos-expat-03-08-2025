@@ -1,4 +1,4 @@
-// src/pages/Dashboard.tsx
+﻿// src/pages/Dashboard.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -49,7 +49,7 @@ import { db, auth } from '../config/firebase';
 import { updateEmail as fbUpdateEmail, updateProfile as fbUpdateProfile } from 'firebase/auth';
 
 // ===============================
-// 🎨 DESIGN TOKENS (UI only — aucune incidence métier)
+// ðŸŽ¨ DESIGN TOKENS (UI only â€” aucune incidence mÃ©tier)
 // ===============================
 const UI = {
   card:
@@ -172,7 +172,7 @@ type TabType =
 type CallStatus = 'completed' | 'pending' | 'in_progress' | 'failed';
 
 // ===============================
-// Sous-composants UI (logique inchangée, styles modernisés)
+// Sous-composants UI (logique inchangÃ©e, styles modernisÃ©s)
 // ===============================
 const Field: React.FC<{
   label: string;
@@ -230,7 +230,7 @@ const ChipInput: React.FC<{
               onClick={() => remove(i)}
               aria-label={`Supprimer ${v}`}
             >
-              ×
+              Ã—
             </button>
           </span>
         ))}
@@ -259,7 +259,7 @@ const ChipInput: React.FC<{
 const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
-    <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{value || '—'}</p>
+    <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{value || 'â€”'}</p>
   </div>
 );
 
@@ -284,7 +284,7 @@ const PillsRow: React.FC<{ label: string; items: string[]; color: 'blue' | 'gree
             </span>
           ))
         ) : (
-          <span className="text-sm text-gray-900 dark:text-gray-100">—</span>
+          <span className="text-sm text-gray-900 dark:text-gray-100">â€”</span>
         )}
       </div>
     </div>
@@ -342,7 +342,7 @@ const Dashboard: React.FC = () => {
     Array<{ id: string; type: 'lawyer' | 'expat'; name: string; country?: string; photo?: string }>
   >([]);
 
-  // Profil (édition) pré-rempli
+  // Profil (Ã©dition) prÃ©-rempli
   const baseProfile: ProfileData = useMemo(
     () => ({
       email: user?.email || '',
@@ -372,17 +372,17 @@ const Dashboard: React.FC = () => {
   );
   const [profileData, setProfileData] = useState<ProfileData>(baseProfile);
 
-  // Langues (sélecteur identique aux formulaires)
+  // Langues (sÃ©lecteur identique aux formulaires)
   const [selectedLanguages, setSelectedLanguages] = useState<Array<{ value: string; label: string }>>(
     (baseProfile.languages || []).map((l) => ({ value: l, label: l }))
   );
 
-  // Redirect si pas loggé
+  // Redirect si pas loggÃ©
   useEffect(() => {
     if (!user) navigate('/login');
   }, [user, navigate]);
 
-  // Status en temps réel (priorité = sos_profiles, fallback = users)
+  // Status en temps rÃ©el (prioritÃ© = sos_profiles, fallback = users)
   useEffect(() => {
     if (!user?.id) return;
 
@@ -454,12 +454,12 @@ const Dashboard: React.FC = () => {
     })();
   }, [user?.id]);
 
-  // Historique notifications (optionnel – placeholder)
+  // Historique notifications (optionnel â€“ placeholder)
   useEffect(() => {
     setNotifications([]);
   }, []);
 
-  // Appels (placeholder lisible – garde tes fetch si tu en as)
+  // Appels (placeholder lisible â€“ garde tes fetch si tu en as)
   useEffect(() => {
     setCalls([]);
   }, []);
@@ -475,14 +475,14 @@ const Dashboard: React.FC = () => {
     }).format(date);
 
   const formatDuration = (minutes: number): string => `${minutes} min`;
-  const formatPrice = (price: number): string => `${price.toFixed(2)} €`;
+  const formatPrice = (price: number): string => `${price.toFixed(2)} â‚¬`;
 
   const getStatusBadge = (status: CallStatus): JSX.Element => {
     const statusConfig: Record<CallStatus, { className: string; text: string }> = {
       completed: {
         className:
           'px-2 py-1 bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300 rounded-full text-xs font-medium',
-        text: language === 'fr' ? 'Terminé' : 'Completed'
+        text: language === 'fr' ? 'TerminÃ©' : 'Completed'
       },
       pending: {
         className:
@@ -497,19 +497,19 @@ const Dashboard: React.FC = () => {
       failed: {
         className:
           'px-2 py-1 bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300 rounded-full text-xs font-medium',
-        text: language === 'fr' ? 'Échoué' : 'Failed'
+        text: language === 'fr' ? 'Ã‰chouÃ©' : 'Failed'
       }
     };
     const config = statusConfig[status];
     return <span className={config.className}>{config.text}</span>;
   };
 
-  // Palette alignée Home (fallback si rôle non défini)
+  // Palette alignÃ©e Home (fallback si rÃ´le non dÃ©fini)
   const headerGradient = getHeaderClassForRole(user?.role);
   const softCard = UI.card;
 
   // ===============================
-  // PHOTO : persistance immédiate (users + sos_profiles + Auth)
+  // PHOTO : persistance immÃ©diate (users + sos_profiles + Auth)
   // ===============================
   const handleInstantPhotoPersist = useCallback(
     async (url: string) => {
@@ -538,17 +538,17 @@ const Dashboard: React.FC = () => {
           await fbUpdateProfile(auth.currentUser, { photoURL: url }).catch(() => {});
         }
 
-        // MAJ UI immédiate
+        // MAJ UI immÃ©diate
         setProfileData((prev) => ({ ...prev, profilePhoto: url }));
 
         await logAuditEvent(user.id, 'profile_photo_updated', { newUrl: url });
         await refreshUser?.(); // propage vers sidebar / profil
 
-        setSuccessMessage(language === 'fr' ? 'Photo mise à jour ✅' : 'Photo updated ✅');
+        setSuccessMessage(language === 'fr' ? 'Photo mise Ã  jour âœ…' : 'Photo updated âœ…');
         setTimeout(() => setSuccessMessage(null), 2000);
       } catch {
         setErrorMessage(
-          language === 'fr' ? 'Erreur lors de la mise à jour de la photo' : 'Error updating photo'
+          language === 'fr' ? 'Erreur lors de la mise Ã  jour de la photo' : 'Error updating photo'
         );
         setTimeout(() => setErrorMessage(null), 2500);
       }
@@ -557,7 +557,7 @@ const Dashboard: React.FC = () => {
   );
 
   // ===============================
-  // Sauvegarde des paramètres
+  // Sauvegarde des paramÃ¨tres
   // ===============================
   const saveSettings = async (): Promise<void> => {
     if (!user) return;
@@ -610,7 +610,7 @@ const Dashboard: React.FC = () => {
         });
       }
 
-      // Si changement d'email => met à jour l'identifiant Auth
+      // Si changement d'email => met Ã  jour l'identifiant Auth
       const emailChanged =
         user.email.trim().toLowerCase() !== profileData.email.trim().toLowerCase();
       if (emailChanged && firebaseUser) {
@@ -619,7 +619,7 @@ const Dashboard: React.FC = () => {
         } catch {
           throw new Error(
             language === 'fr'
-              ? "Impossible de changer l’email (reconnexion récente requise). Déconnectez-vous puis reconnectez-vous et réessayez."
+              ? "Impossible de changer lâ€™email (reconnexion rÃ©cente requise). DÃ©connectez-vous puis reconnectez-vous et rÃ©essayez."
               : 'Cannot change email (recent login required). Please sign out/in and try again.'
           );
         }
@@ -664,18 +664,18 @@ const Dashboard: React.FC = () => {
       });
       await refreshUser?.();
 
-      setSuccessMessage(language === 'fr' ? 'Paramètres mis à jour ✔️' : 'Settings updated ✔️');
+      setSuccessMessage(language === 'fr' ? 'ParamÃ¨tres mis Ã  jour âœ”ï¸' : 'Settings updated âœ”ï¸');
       setTimeout(() => setSuccessMessage(null), 2500);
     } catch {
       setErrorMessage(
-        language === 'fr' ? 'Erreur lors de la mise à jour des paramètres' : 'Error updating settings'
+        language === 'fr' ? 'Erreur lors de la mise Ã  jour des paramÃ¨tres' : 'Error updating settings'
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logout sans écran blanc
+  // Logout sans Ã©cran blanc
   const handleLogout = useCallback(async () => {
     try {
       await logout();
@@ -687,7 +687,7 @@ const Dashboard: React.FC = () => {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-        {language === 'fr' ? 'Redirection…' : 'Redirecting…'}
+        {language === 'fr' ? 'Redirectionâ€¦' : 'Redirectingâ€¦'}
       </div>
     );
   }
@@ -731,7 +731,7 @@ const Dashboard: React.FC = () => {
                             : 'Lawyer'
                           : user.role === 'expat'
                           ? language === 'fr'
-                            ? 'Expatrié'
+                            ? 'ExpatriÃ©'
                             : 'Expat'
                           : user.role === 'admin'
                           ? 'Admin'
@@ -747,7 +747,7 @@ const Dashboard: React.FC = () => {
                   <ul className="space-y-2">
                     {[
                       { key: 'profile', icon: <User className="mr-3 h-5 w-5" />, fr: 'Mon profil', en: 'My profile' },
-                      { key: 'settings', icon: <Settings className="mr-3 h-5 w-5" />, fr: 'Paramètres', en: 'Settings' },
+                      { key: 'settings', icon: <Settings className="mr-3 h-5 w-5" />, fr: 'ParamÃ¨tres', en: 'Settings' },
                       { key: 'calls', icon: <Phone className="mr-3 h-5 w-5" />, fr: 'Mes appels', en: 'My calls' },
                       { key: 'invoices', icon: <FileText className="mr-3 h-5 w-5" />, fr: 'Mes factures', en: 'My invoices' },
                       { key: 'reviews', icon: <Star className="mr-3 h-5 w-5" />, fr: 'Mes avis', en: 'My reviews' },
@@ -765,7 +765,7 @@ const Dashboard: React.FC = () => {
                           `}
                           title={language === 'fr' ? item.fr : item.en}
                         >
-                          {/* Barre active à gauche (UI only) */}
+                          {/* Barre active Ã  gauche (UI only) */}
                           <span
                             className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 ${
                               activeTab === item.key
@@ -802,7 +802,7 @@ const Dashboard: React.FC = () => {
                         className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                       >
                         <LogOut className="mr-3 h-5 w-5" />
-                        {language === 'fr' ? 'Déconnexion' : 'Logout'}
+                        {language === 'fr' ? 'DÃ©connexion' : 'Logout'}
                       </button>
                     </li>
                   </ul>
@@ -810,7 +810,7 @@ const Dashboard: React.FC = () => {
 
                 <div className="p-6">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                    {language === 'fr' ? 'Statut de disponibilité' : 'Availability status'}
+                    {language === 'fr' ? 'Statut de disponibilitÃ©' : 'Availability status'}
                   </h3>
                   {user && (user.role === 'lawyer' || user.role === 'expat') ? (
                     <AvailabilityToggle className="justify-center" />
@@ -827,7 +827,7 @@ const Dashboard: React.FC = () => {
 
             {/* CONTENU PRINCIPAL */}
             <div className="lg:col-span-3 space-y-8">
-              {/* PROFIL — lecture seule */}
+              {/* PROFIL â€” lecture seule */}
               {activeTab === 'profile' && (
                 <div className={`${softCard} overflow-hidden`}>
                   <div className={`px-6 py-4 ${headerGradient} flex justify-between items-center`}>
@@ -859,7 +859,7 @@ const Dashboard: React.FC = () => {
                           <InfoRow label="Email" value={user.email} />
                           {(user as { phone?: string }).phone && (
                             <InfoRow
-                              label={language === 'fr' ? 'Téléphone' : 'Phone'}
+                              label={language === 'fr' ? 'TÃ©lÃ©phone' : 'Phone'}
                               value={`${(user as { phoneCountryCode?: string }).phoneCountryCode || '+33'} ${(user as { phone?: string }).phone}`}
                             />
                           )}
@@ -930,13 +930,13 @@ const Dashboard: React.FC = () => {
                           {user.role === 'lawyer' && (
                             <>
                               <InfoRow
-                                label={language === 'fr' ? "Années d'expérience" : 'Years of experience'}
+                                label={language === 'fr' ? "AnnÃ©es d'expÃ©rience" : 'Years of experience'}
                                 value={`${(user as { yearsOfExperience?: number }).yearsOfExperience ?? 0} ${
                                   language === 'fr' ? 'ans' : 'years'
                                 }`}
                               />
                               <PillsRow
-                                label={language === 'fr' ? 'Spécialités' : 'Specialties'}
+                                label={language === 'fr' ? 'SpÃ©cialitÃ©s' : 'Specialties'}
                                 items={(user as { specialties?: string[] }).specialties || []}
                                 color="blue"
                               />
@@ -946,7 +946,7 @@ const Dashboard: React.FC = () => {
                                 color="blue"
                               />
                               <InfoRow
-                                label={language === 'fr' ? 'Année de diplôme' : 'Graduation year'}
+                                label={language === 'fr' ? 'AnnÃ©e de diplÃ´me' : 'Graduation year'}
                                 value={`${(user as { graduationYear?: number }).graduationYear || ''}`}
                               />
                             </>
@@ -954,11 +954,11 @@ const Dashboard: React.FC = () => {
                           {user.role === 'expat' && (
                             <>
                               <InfoRow
-                                label={language === 'fr' ? 'Pays de résidence' : 'Country of residence'}
+                                label={language === 'fr' ? 'Pays de rÃ©sidence' : 'Country of residence'}
                                 value={(user as { residenceCountry?: string }).residenceCountry || ''}
                               />
                               <InfoRow
-                                label={language === 'fr' ? "Années d'expatriation" : 'Years as expat'}
+                                label={language === 'fr' ? "AnnÃ©es d'expatriation" : 'Years as expat'}
                                 value={`${(user as { yearsAsExpat?: number }).yearsAsExpat ?? 0} ${
                                   language === 'fr' ? 'ans' : 'years'
                                 }`}
@@ -976,7 +976,7 @@ const Dashboard: React.FC = () => {
                             </>
                           )}
                           <PillsRow
-                            label={language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
+                            label={language === 'fr' ? 'Langues parlÃ©es' : 'Languages spoken'}
                             items={(user as { languages?: string[] }).languages || []}
                             color="red"
                           />
@@ -987,12 +987,12 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* PARAMÈTRES — édition complète */}
+              {/* PARAMÃˆTRES â€” Ã©dition complÃ¨te */}
               {activeTab === 'settings' && (
                 <div className={`${softCard} overflow-hidden`}>
                   <div className={`px-6 py-4 ${headerGradient}`}>
                     <h2 className="text-xl font-semibold">
-                      {language === 'fr' ? 'Paramètres' : 'Settings'}
+                      {language === 'fr' ? 'ParamÃ¨tres' : 'Settings'}
                     </h2>
                   </div>
 
@@ -1000,7 +1000,7 @@ const Dashboard: React.FC = () => {
                     {successMessage && <Alert type="success" message={successMessage} />}
                     {errorMessage && <Alert type="error" message={errorMessage} />}
 
-                    {/* Photo de profil : mise à jour immédiate */}
+                    {/* Photo de profil : mise Ã  jour immÃ©diate */}
                     <section>
                       <h3 className={`${UI.sectionTitle} mb-2`}>
                         {language === 'fr' ? 'Photo de profil' : 'Profile photo'}
@@ -1026,12 +1026,12 @@ const Dashboard: React.FC = () => {
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         {language === 'fr'
-                          ? 'La nouvelle photo remplace immédiatement l’ancienne dans tout le dashboard.'
+                          ? 'La nouvelle photo remplace immÃ©diatement lâ€™ancienne dans tout le dashboard.'
                           : 'The new photo replaces the old one immediately across the dashboard.'}
                       </p>
                     </section>
 
-                    {/* Commun à tous les rôles */}
+                    {/* Commun Ã  tous les rÃ´les */}
                     <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Field
                         label="Email"
@@ -1041,7 +1041,7 @@ const Dashboard: React.FC = () => {
                       />
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          {language === 'fr' ? 'Téléphone' : 'Phone'}
+                          {language === 'fr' ? 'TÃ©lÃ©phone' : 'Phone'}
                         </label>
                         <div className="flex gap-2">
                           <select
@@ -1051,12 +1051,12 @@ const Dashboard: React.FC = () => {
                             }
                             className="w-28 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
-                            <option value="+33">🇫🇷 +33</option>
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+49">🇩🇪 +49</option>
-                            <option value="+34">🇪🇸 +34</option>
-                            <option value="+39">🇮🇹 +39</option>
+                            <option value="+33">ðŸ‡«ðŸ‡· +33</option>
+                            <option value="+1">ðŸ‡ºðŸ‡¸ +1</option>
+                            <option value="+44">ðŸ‡¬ðŸ‡§ +44</option>
+                            <option value="+49">ðŸ‡©ðŸ‡ª +49</option>
+                            <option value="+34">ðŸ‡ªðŸ‡¸ +34</option>
+                            <option value="+39">ðŸ‡®ðŸ‡¹ +39</option>
                           </select>
                           <input
                             value={profileData.phone}
@@ -1068,7 +1068,7 @@ const Dashboard: React.FC = () => {
                       </div>
 
                       <Field
-                        label={language === 'fr' ? 'Pays de résidence' : 'Country of residence'}
+                        label={language === 'fr' ? 'Pays de rÃ©sidence' : 'Country of residence'}
                         value={profileData.residenceCountry || profileData.currentCountry}
                         onChange={(v) =>
                           setProfileData((p) => ({
@@ -1082,7 +1082,7 @@ const Dashboard: React.FC = () => {
                       <Field
                         label={
                           language === 'fr'
-                            ? 'Pays où vous êtes actuellement'
+                            ? 'Pays oÃ¹ vous Ãªtes actuellement'
                             : 'Current presence country'
                         }
                         value={profileData.currentPresenceCountry || ''}
@@ -1107,12 +1107,12 @@ const Dashboard: React.FC = () => {
                             }
                             className="w-28 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
-                            <option value="+33">🇫🇷 +33</option>
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+49">🇩🇪 +49</option>
-                            <option value="+34">🇪🇸 +34</option>
-                            <option value="+39">🇮🇹 +39</option>
+                            <option value="+33">ðŸ‡«ðŸ‡· +33</option>
+                            <option value="+1">ðŸ‡ºðŸ‡¸ +1</option>
+                            <option value="+44">ðŸ‡¬ðŸ‡§ +44</option>
+                            <option value="+49">ðŸ‡©ðŸ‡ª +49</option>
+                            <option value="+34">ðŸ‡ªðŸ‡¸ +34</option>
+                            <option value="+39">ðŸ‡®ðŸ‡¹ +39</option>
                           </select>
                           <input
                             value={profileData.whatsappNumber || ''}
@@ -1125,10 +1125,10 @@ const Dashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Langues — même sélecteur que l’inscription */}
+                      {/* Langues â€” mÃªme sÃ©lecteur que lâ€™inscription */}
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          {language === 'fr' ? 'Langues parlées' : 'Languages spoken'}
+                          {language === 'fr' ? 'Langues parlÃ©es' : 'Languages spoken'}
                         </label>
                         <MultiLanguageSelect
                           value={selectedLanguages}
@@ -1142,7 +1142,7 @@ const Dashboard: React.FC = () => {
                           locale={language === 'fr' ? 'fr' : 'en'}
                           placeholder={
                             language === 'fr'
-                              ? 'Rechercher et sélectionner les langues...'
+                              ? 'Rechercher et sÃ©lectionner les langues...'
                               : 'Search and select languages...'
                           }
                         />
@@ -1158,17 +1158,17 @@ const Dashboard: React.FC = () => {
                           rows={5}
                           className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/[0.03] text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
                           placeholder={
-                            language === 'fr' ? 'Votre bio professionnelle…' : 'Your professional bio…'
+                            language === 'fr' ? 'Votre bio professionnelleâ€¦' : 'Your professional bioâ€¦'
                           }
                         />
                       </div>
                     </section>
 
-                    {/* Rôle : Lawyer */}
+                    {/* RÃ´le : Lawyer */}
                     {user.role === 'lawyer' && (
                       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Field
-                          label={language === 'fr' ? "Années d'expérience" : 'Years of experience'}
+                          label={language === 'fr' ? "AnnÃ©es d'expÃ©rience" : 'Years of experience'}
                           type="number"
                           value={String(profileData.yearsOfExperience ?? 0)}
                           onChange={(v) =>
@@ -1176,7 +1176,7 @@ const Dashboard: React.FC = () => {
                           }
                         />
                         <Field
-                          label={language === 'fr' ? 'Année de diplôme' : 'Graduation year'}
+                          label={language === 'fr' ? 'AnnÃ©e de diplÃ´me' : 'Graduation year'}
                           type="number"
                           value={String(profileData.graduationYear || new Date().getFullYear() - 5)}
                           onChange={(v) =>
@@ -1188,12 +1188,12 @@ const Dashboard: React.FC = () => {
                         />
                         <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            {language === 'fr' ? 'Spécialités' : 'Specialties'}
+                            {language === 'fr' ? 'SpÃ©cialitÃ©s' : 'Specialties'}
                           </label>
                           <ChipInput
                             value={profileData.specialties || []}
                             onChange={(next) => setProfileData((p) => ({ ...p, specialties: next }))}
-                            placeholder={language === 'fr' ? 'Ajoutez une spécialité' : 'Add a specialty'}
+                            placeholder={language === 'fr' ? 'Ajoutez une spÃ©cialitÃ©' : 'Add a specialty'}
                           />
                         </div>
                         <div className="md:col-span-2">
@@ -1210,7 +1210,7 @@ const Dashboard: React.FC = () => {
                         </div>
                         <Field
                           label={
-                            language === 'fr' ? 'Numéro au barreau (optionnel)' : 'Bar number (optional)'
+                            language === 'fr' ? 'NumÃ©ro au barreau (optionnel)' : 'Bar number (optional)'
                           }
                           value={profileData.barNumber || ''}
                           onChange={(v) => setProfileData((p) => ({ ...p, barNumber: v }))}
@@ -1228,11 +1228,11 @@ const Dashboard: React.FC = () => {
                       </section>
                     )}
 
-                    {/* Rôle : Expat */}
+                    {/* RÃ´le : Expat */}
                     {user.role === 'expat' && (
                       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Field
-                          label={language === 'fr' ? "Années d'expatriation" : 'Years as expat'}
+                          label={language === 'fr' ? "AnnÃ©es d'expatriation" : 'Years as expat'}
                           type="number"
                           value={String(profileData.yearsAsExpat ?? 0)}
                           onChange={(v) =>
@@ -1272,7 +1272,7 @@ const Dashboard: React.FC = () => {
                         fullWidth
                         className="bg-red-600 hover:bg-red-700"
                       >
-                        {language === 'fr' ? 'Enregistrer les paramètres' : 'Save settings'}
+                        {language === 'fr' ? 'Enregistrer les paramÃ¨tres' : 'Save settings'}
                       </Button>
                     </div>
                   </div>
@@ -1338,7 +1338,7 @@ const Dashboard: React.FC = () => {
                     ) : (
                       <p className={`${UI.textMuted} text-center py-8`}>
                         {language === 'fr'
-                          ? "Vous n'avez pas encore effectué d'appels."
+                          ? "Vous n'avez pas encore effectuÃ© d'appels."
                           : "You haven't made any calls yet."}
                       </p>
                     )}
@@ -1391,7 +1391,7 @@ const Dashboard: React.FC = () => {
                     {(user?.role === 'lawyer' || user?.role === 'expat') && (
                       <div className="mb-8">
                         <h3 className={`${UI.sectionTitle} mb-4`}>
-                          {language === 'fr' ? 'Préférences de notifications' : 'Notification preferences'}
+                          {language === 'fr' ? 'PrÃ©fÃ©rences de notifications' : 'Notification preferences'}
                         </h3>
                         <NotificationSettings />
                       </div>
@@ -1461,9 +1461,9 @@ const Dashboard: React.FC = () => {
                                     ? 'Avocat'
                                     : 'Lawyer'
                                   : language === 'fr'
-                                  ? 'Expatrié'
+                                  ? 'ExpatriÃ©'
                                   : 'Expat'}
-                                {f.country ? ` • ${f.country}` : ''}
+                                {f.country ? ` â€¢ ${f.country}` : ''}
                               </p>
                             </div>
                           </li>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Star, MapPin, Calendar, ArrowLeft, Share2, Facebook, Mail, Briefcase, User, Check, Clock, Shield, Globe, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -34,7 +34,7 @@ interface TestimonialData {
   year: number;
 }
 
-// ✅ DONNÉES HARMONISÉES AVEC TESTIMONIALS.TSX
+// âœ… DONNÃ‰ES HARMONISÃ‰ES AVEC TESTIMONIALS.TSX
 const TESTIMONIALS_DATA: Record<string, TestimonialData> = {
   '1': {
     id: '1',
@@ -46,19 +46,19 @@ const TESTIMONIALS_DATA: Record<string, TestimonialData> = {
     date: '2024-12-15',
     year: 2024,
     title: {
-      fr: 'Aide exceptionnelle pour installation en Thaïlande',
+      fr: 'Aide exceptionnelle pour installation en ThaÃ¯lande',
       en: 'Exceptional help for relocation to Thailand'
     },
     fullContent: {
-      fr: `Incroyable ! En 3 minutes j'avais un expatrié français au bout du fil depuis Bangkok. Il m'a expliqué toute la procédure visa Thaïlandais, les pièges à éviter et m'a même donné les contacts de son agent immobilier. Service qui change la vie !
+      fr: `Incroyable ! En 3 minutes j'avais un expatriÃ© franÃ§ais au bout du fil depuis Bangkok. Il m'a expliquÃ© toute la procÃ©dure visa ThaÃ¯landais, les piÃ¨ges Ã  Ã©viter et m'a mÃªme donnÃ© les contacts de son agent immobilier. Service qui change la vie !
 
-L'expatrié connaissait parfaitement les démarches administratives locales et m'a guidé pas à pas. Il connaissait tous les bons plans et m'a évité des mois de galère administrative.
+L'expatriÃ© connaissait parfaitement les dÃ©marches administratives locales et m'a guidÃ© pas Ã  pas. Il connaissait tous les bons plans et m'a Ã©vitÃ© des mois de galÃ¨re administrative.
 
-Le service client est réactif et la plateforme très intuitive. Le rapport qualité-prix est imbattable et la réactivité impressionnante.
+Le service client est rÃ©actif et la plateforme trÃ¨s intuitive. Le rapport qualitÃ©-prix est imbattable et la rÃ©activitÃ© impressionnante.
 
-Je recommande vivement SOS Expat & Travelers pour tous les expatriés qui ont besoin d'aide pratique urgente. C'est un service qui peut vraiment vous sauver dans des situations compliquées à l'étranger.
+Je recommande vivement SOS Expat & Travelers pour tous les expatriÃ©s qui ont besoin d'aide pratique urgente. C'est un service qui peut vraiment vous sauver dans des situations compliquÃ©es Ã  l'Ã©tranger.
 
-La qualité du conseil était exceptionnelle, avec la rapidité et la praticité d'un service en ligne moderne. Parfait pour les installations à l'étranger !`,
+La qualitÃ© du conseil Ã©tait exceptionnelle, avec la rapiditÃ© et la praticitÃ© d'un service en ligne moderne. Parfait pour les installations Ã  l'Ã©tranger !`,
       en: `Incredible! In 3 minutes I had a French expat on the phone from Bangkok. He explained the entire Thai visa procedure, pitfalls to avoid and even gave me his real estate agent's contacts. Life-changing service!
 
 The expat knew the local administrative procedures perfectly and guided me step by step. He knew all the good tips and saved me months of administrative hassle.
@@ -72,7 +72,7 @@ The quality of advice was exceptional, with the speed and practicality of a mode
     avatar: 'https://images.unsplash.com/photo-1494790108755-2616b74193d4?auto=format&fit=crop&w=400&h=400&q=80',
     verified: true,
     serviceUsed: {
-      fr: 'Appel Expatrié',
+      fr: 'Appel ExpatriÃ©',
       en: 'Expat Call'
     },
     duration: '20 minutes',
@@ -91,34 +91,34 @@ The quality of advice was exceptional, with the speed and practicality of a mode
     date: '2024-11-20',
     year: 2024,
     title: {
-      fr: 'Installation réussie à Vancouver',
+      fr: 'Installation rÃ©ussie Ã  Vancouver',
       en: 'Successful relocation to Vancouver'
     },
     fullContent: {
-      fr: `Génial ! L'expatrié m'a aidé avec mon installation à Vancouver. Banque, logement, assurance santé, transport... tout en 30 minutes ! Il connaissait tous les bons plans et m'a évité des mois de galère administrative.
+      fr: `GÃ©nial ! L'expatriÃ© m'a aidÃ© avec mon installation Ã  Vancouver. Banque, logement, assurance santÃ©, transport... tout en 30 minutes ! Il connaissait tous les bons plans et m'a Ã©vitÃ© des mois de galÃ¨re administrative.
 
-L'expatrié connaissait parfaitement les démarches administratives locales et m'a guidé pas à pas. Il m'a même envoyé des liens utiles après notre appel.
+L'expatriÃ© connaissait parfaitement les dÃ©marches administratives locales et m'a guidÃ© pas Ã  pas. Il m'a mÃªme envoyÃ© des liens utiles aprÃ¨s notre appel.
 
-Le rapport qualité-prix est imbattable. Pour seulement 19€, j'ai économisé des semaines de recherches et de stress. La plateforme est très facile à utiliser, même pour les personnes peu à l'aise avec la technologie.
+Le rapport qualitÃ©-prix est imbattable. Pour seulement 19â‚¬, j'ai Ã©conomisÃ© des semaines de recherches et de stress. La plateforme est trÃ¨s facile Ã  utiliser, mÃªme pour les personnes peu Ã  l'aise avec la technologie.
 
-Je n'hésiterai pas à faire appel à leurs services à nouveau si j'ai d'autres questions sur la vie au Canada. Un grand merci à toute l'équipe SOS Expats !`,
+Je n'hÃ©siterai pas Ã  faire appel Ã  leurs services Ã  nouveau si j'ai d'autres questions sur la vie au Canada. Un grand merci Ã  toute l'Ã©quipe SOS Expats !`,
       en: `Great! The expat helped me with my installation in Vancouver. Banking, housing, health insurance, transport... everything in 30 minutes! He knew all the good tips and saved me months of administrative hassle.
 
 The expat knew the local administrative procedures perfectly and guided me step by step. He even sent me useful links after our call.
 
-The value for money is unbeatable. For only €19, I saved weeks of research and stress. The platform is very easy to use, even for people who are not comfortable with technology.
+The value for money is unbeatable. For only â‚¬19, I saved weeks of research and stress. The platform is very easy to use, even for people who are not comfortable with technology.
 
 I won't hesitate to use their services again if I have other questions about life in Canada. A big thank you to the entire SOS Expats team!`
     },
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&h=400&q=80',
     verified: true,
     serviceUsed: {
-      fr: 'Appel Expatrié',
+      fr: 'Appel ExpatriÃ©',
       en: 'Expat Call'
     },
     duration: '30 minutes',
     helpType: {
-      fr: ['Démarches administratives', 'Installation', 'Logement', 'Banque'],
+      fr: ['DÃ©marches administratives', 'Installation', 'Logement', 'Banque'],
       en: ['Administrative procedures', 'Relocation', 'Housing', 'Banking']
     }
   },
@@ -132,19 +132,19 @@ I won't hesitate to use their services again if I have other questions about lif
     date: '2024-12-12',
     year: 2024,
     title: {
-      fr: 'Aide juridique exceptionnelle à Londres',
+      fr: 'Aide juridique exceptionnelle Ã  Londres',
       en: 'Exceptional legal help in London'
     },
     fullContent: {
-      fr: `Avocat exceptionnel ! Depuis Londres, problème urgent avec mon propriétaire. L'avocat m'a expliqué mes droits en droit anglais, les démarches à suivre et m'a orienté vers un solicitor local. Précis et efficace !
+      fr: `Avocat exceptionnel ! Depuis Londres, problÃ¨me urgent avec mon propriÃ©taire. L'avocat m'a expliquÃ© mes droits en droit anglais, les dÃ©marches Ã  suivre et m'a orientÃ© vers un solicitor local. PrÃ©cis et efficace !
 
-L'avocat connaissait parfaitement le droit immobilier britannique et m'a donné des conseils précis pour résoudre mon conflit avec le propriétaire. Il m'a expliqué toutes mes options légales de manière claire et professionnelle.
+L'avocat connaissait parfaitement le droit immobilier britannique et m'a donnÃ© des conseils prÃ©cis pour rÃ©soudre mon conflit avec le propriÃ©taire. Il m'a expliquÃ© toutes mes options lÃ©gales de maniÃ¨re claire et professionnelle.
 
-Le service de prise de rendez-vous est très flexible, j'ai pu avoir ma consultation le jour même. La qualité de l'appel était excellente, sans problèmes techniques.
+Le service de prise de rendez-vous est trÃ¨s flexible, j'ai pu avoir ma consultation le jour mÃªme. La qualitÃ© de l'appel Ã©tait excellente, sans problÃ¨mes techniques.
 
-Je recommande vivement ce service pour tous les expatriés qui ont besoin d'aide juridique urgente au Royaume-Uni. Un gain de temps et d'argent considérable !
+Je recommande vivement ce service pour tous les expatriÃ©s qui ont besoin d'aide juridique urgente au Royaume-Uni. Un gain de temps et d'argent considÃ©rable !
 
-La qualité du conseil était au niveau d'un cabinet d'avocat traditionnel, mais avec la rapidité et la praticité d'un service en ligne moderne. Parfait pour les urgences juridiques !`,
+La qualitÃ© du conseil Ã©tait au niveau d'un cabinet d'avocat traditionnel, mais avec la rapiditÃ© et la praticitÃ© d'un service en ligne moderne. Parfait pour les urgences juridiques !`,
       en: `Exceptional lawyer! From London, urgent problem with my landlord. The lawyer explained my rights under English law, the steps to follow and directed me to a local solicitor. Precise and efficient!
 
 The lawyer knew British property law perfectly and gave me precise advice to resolve my conflict with the landlord. He explained all my legal options clearly and professionally.
@@ -177,19 +177,19 @@ The quality of advice was at the level of a traditional law firm, but with the s
     date: '2024-12-01',
     year: 2024,
     title: {
-      fr: 'Problème visa résolu aux États-Unis',
+      fr: 'ProblÃ¨me visa rÃ©solu aux Ã‰tats-Unis',
       en: 'Visa problem solved in the United States'
     },
     fullContent: {
-      fr: `Avocat brillant ! Problème de visa aux États-Unis, il m'a expliqué toutes les procédures d'immigration, les risques et solutions. Grâce à lui, j'ai évité l'expulsion !
+      fr: `Avocat brillant ! ProblÃ¨me de visa aux Ã‰tats-Unis, il m'a expliquÃ© toutes les procÃ©dures d'immigration, les risques et solutions. GrÃ¢ce Ã  lui, j'ai Ã©vitÃ© l'expulsion !
 
-L'avocat spécialisé en droit de l'immigration américaine m'a donné des conseils précis et m'a orienté vers les bonnes démarches. Il connaissait parfaitement la législation américaine et française.
+L'avocat spÃ©cialisÃ© en droit de l'immigration amÃ©ricaine m'a donnÃ© des conseils prÃ©cis et m'a orientÃ© vers les bonnes dÃ©marches. Il connaissait parfaitement la lÃ©gislation amÃ©ricaine et franÃ§aise.
 
-Le service client est réactif et la plateforme très intuitive. J'ai reçu un suivi détaillé après l'appel avec tous les documents nécessaires.
+Le service client est rÃ©actif et la plateforme trÃ¨s intuitive. J'ai reÃ§u un suivi dÃ©taillÃ© aprÃ¨s l'appel avec tous les documents nÃ©cessaires.
 
-Je recommande vivement SOS Expat & Travelers pour tous les expatriés qui ont des problèmes juridiques urgents. C'est un service qui peut vraiment vous sauver dans des situations critiques.
+Je recommande vivement SOS Expat & Travelers pour tous les expatriÃ©s qui ont des problÃ¨mes juridiques urgents. C'est un service qui peut vraiment vous sauver dans des situations critiques.
 
-La qualité du conseil était exceptionnelle, avec une expertise pointue en droit de l'immigration. Service indispensable pour les expatriés !`,
+La qualitÃ© du conseil Ã©tait exceptionnelle, avec une expertise pointue en droit de l'immigration. Service indispensable pour les expatriÃ©s !`,
       en: `Brilliant lawyer! Visa problem in the United States, he explained all immigration procedures, risks and solutions. Thanks to him, I avoided deportation!
 
 The lawyer specialized in American immigration law gave me precise advice and directed me to the right procedures. He knew American and French legislation perfectly.
@@ -208,7 +208,7 @@ The quality of advice was exceptional, with sharp expertise in immigration law. 
     },
     duration: '35 minutes',
     helpType: {
-      fr: ['Droit de l\'immigration', 'Visa', 'Procédures administratives', 'Droit américain'],
+      fr: ['Droit de l\'immigration', 'Visa', 'ProcÃ©dures administratives', 'Droit amÃ©ricain'],
       en: ['Immigration law', 'Visa', 'Administrative procedures', 'American law']
     }
   }
@@ -216,7 +216,7 @@ The quality of advice was exceptional, with sharp expertise in immigration law. 
 
 // Country translations / Traductions des pays
 const COUNTRY_TRANSLATIONS: Record<string, { fr: string; en: string }> = {
-  'thailande': { fr: 'Thaïlande', en: 'Thailand' },
+  'thailande': { fr: 'ThaÃ¯lande', en: 'Thailand' },
   'espagne': { fr: 'Espagne', en: 'Spain' },
   'canada': { fr: 'Canada', en: 'Canada' },
   'france': { fr: 'France', en: 'France' },
@@ -226,45 +226,45 @@ const COUNTRY_TRANSLATIONS: Record<string, { fr: string; en: string }> = {
   'belgique': { fr: 'Belgique', en: 'Belgium' },
   'suisse': { fr: 'Suisse', en: 'Switzerland' },
   'royaume-uni': { fr: 'Royaume-Uni', en: 'United Kingdom' },
-  'etats-unis': { fr: 'États-Unis', en: 'United States' },
+  'etats-unis': { fr: 'Ã‰tats-Unis', en: 'United States' },
   'australie': { fr: 'Australie', en: 'Australia' },
   'japon': { fr: 'Japon', en: 'Japan' },
-  'bresil': { fr: 'Brésil', en: 'Brazil' },
+  'bresil': { fr: 'BrÃ©sil', en: 'Brazil' },
   'mexique': { fr: 'Mexique', en: 'Mexico' },
   'argentine': { fr: 'Argentine', en: 'Argentina' },
   'chili': { fr: 'Chili', en: 'Chile' },
   'colombie': { fr: 'Colombie', en: 'Colombia' },
-  'perou': { fr: 'Pérou', en: 'Peru' },
+  'perou': { fr: 'PÃ©rou', en: 'Peru' },
   'maroc': { fr: 'Maroc', en: 'Morocco' },
   'tunisie': { fr: 'Tunisie', en: 'Tunisia' },
-  'senegal': { fr: 'Sénégal', en: 'Senegal' },
-  'cote-divoire': { fr: 'Côte d\'Ivoire', en: 'Ivory Coast' },
+  'senegal': { fr: 'SÃ©nÃ©gal', en: 'Senegal' },
+  'cote-divoire': { fr: 'CÃ´te d\'Ivoire', en: 'Ivory Coast' },
   'vietnam': { fr: 'Vietnam', en: 'Vietnam' },
   'cambodge': { fr: 'Cambodge', en: 'Cambodia' },
   'inde': { fr: 'Inde', en: 'India' },
   'chine': { fr: 'Chine', en: 'China' },
   'singapour': { fr: 'Singapour', en: 'Singapore' },
   'malaisie': { fr: 'Malaisie', en: 'Malaysia' },
-  'indonesie': { fr: 'Indonésie', en: 'Indonesia' },
+  'indonesie': { fr: 'IndonÃ©sie', en: 'Indonesia' },
   'philippines': { fr: 'Philippines', en: 'Philippines' },
-  'coree-du-sud': { fr: 'Corée du Sud', en: 'South Korea' },
-  'nouvelle-zelande': { fr: 'Nouvelle-Zélande', en: 'New Zealand' },
+  'coree-du-sud': { fr: 'CorÃ©e du Sud', en: 'South Korea' },
+  'nouvelle-zelande': { fr: 'Nouvelle-ZÃ©lande', en: 'New Zealand' },
   'afrique-du-sud': { fr: 'Afrique du Sud', en: 'South Africa' },
-  'emirats-arabes-unis': { fr: 'Émirats Arabes Unis', en: 'United Arab Emirates' },
+  'emirats-arabes-unis': { fr: 'Ã‰mirats Arabes Unis', en: 'United Arab Emirates' },
   'qatar': { fr: 'Qatar', en: 'Qatar' },
   'arabie-saoudite': { fr: 'Arabie Saoudite', en: 'Saudi Arabia' },
   'turquie': { fr: 'Turquie', en: 'Turkey' },
-  'grece': { fr: 'Grèce', en: 'Greece' },
+  'grece': { fr: 'GrÃ¨ce', en: 'Greece' },
   'croatie': { fr: 'Croatie', en: 'Croatia' },
   'pologne': { fr: 'Pologne', en: 'Poland' },
-  'republique-tcheque': { fr: 'République Tchèque', en: 'Czech Republic' },
+  'republique-tcheque': { fr: 'RÃ©publique TchÃ¨que', en: 'Czech Republic' },
   'hongrie': { fr: 'Hongrie', en: 'Hungary' },
   'roumanie': { fr: 'Roumanie', en: 'Romania' },
   'bulgarie': { fr: 'Bulgarie', en: 'Bulgaria' },
   'russie': { fr: 'Russie', en: 'Russia' },
   'ukraine': { fr: 'Ukraine', en: 'Ukraine' },
-  'norvege': { fr: 'Norvège', en: 'Norway' },
-  'suede': { fr: 'Suède', en: 'Sweden' },
+  'norvege': { fr: 'NorvÃ¨ge', en: 'Norway' },
+  'suede': { fr: 'SuÃ¨de', en: 'Sweden' },
   'danemark': { fr: 'Danemark', en: 'Denmark' },
   'finlande': { fr: 'Finlande', en: 'Finland' },
   'islande': { fr: 'Islande', en: 'Iceland' },
@@ -275,7 +275,7 @@ const COUNTRY_TRANSLATIONS: Record<string, { fr: string; en: string }> = {
 };
 
 const TestimonialDetail: React.FC = () => {
-  // ✅ USEPARAMS CORRIGÉ AVEC LA NOUVELLE STRUCTURE URL
+  // âœ… USEPARAMS CORRIGÃ‰ AVEC LA NOUVELLE STRUCTURE URL
   const { serviceType, country, year, language: urlLanguage, id } = useParams<{
     serviceType: string;
     country: string;
@@ -287,17 +287,17 @@ const TestimonialDetail: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useApp();
 
-  // ✅ FALLBACK SUR ID SI PAS TROUVÉ
+  // âœ… FALLBACK SUR ID SI PAS TROUVÃ‰
   const testimonialData = useMemo(() => {
     const data = TESTIMONIALS_DATA[id || '1'];
     if (!data) {
-      // Fallback sur le premier témoignage disponible
+      // Fallback sur le premier tÃ©moignage disponible
       return TESTIMONIALS_DATA['1'];
     }
     return data;
   }, [id]);
 
-  // Memoization of date formatting / Mémoisation du formatage de date
+  // Memoization of date formatting / MÃ©moisation du formatage de date
   const formattedDate = useMemo(() => {
     const date = new Date(testimonialData.date);
     return date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
@@ -307,7 +307,7 @@ const TestimonialDetail: React.FC = () => {
     });
   }, [testimonialData.date, language]);
 
-  // Memoization of stars / Mémoisation des étoiles
+  // Memoization of stars / MÃ©moisation des Ã©toiles
   const stars = useMemo(() => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
@@ -327,11 +327,11 @@ const TestimonialDetail: React.FC = () => {
     return countryKey.charAt(0).toUpperCase() + countryKey.slice(1);
   };
 
-  // Optimized share function / Fonction de partage optimisée
+  // Optimized share function / Fonction de partage optimisÃ©e
   const handleShare = (platform: string) => {
     const currentUrl = window.location.href;
     const titleText = language === 'fr' 
-      ? `${testimonialData.name} a sollicité un ${testimonialData.type === 'lawyer' ? 'avocat' : 'expatrié'} - ${testimonialData.title.fr}`
+      ? `${testimonialData.name} a sollicitÃ© un ${testimonialData.type === 'lawyer' ? 'avocat' : 'expatriÃ©'} - ${testimonialData.title.fr}`
       : `${testimonialData.name} consulted a ${testimonialData.type === 'lawyer' ? 'lawyer' : 'expat'} - ${testimonialData.title.en}`;
     const contentText = language === 'fr' ? testimonialData.fullContent.fr : testimonialData.fullContent.en;
     const description = `${contentText.substring(0, 100)}...`;
@@ -343,16 +343,16 @@ const TestimonialDetail: React.FC = () => {
 
     if (platform === 'copy') {
       navigator.clipboard?.writeText(currentUrl).then(() => {
-        alert(language === 'fr' ? 'Lien copié !' : 'Link copied!');
+        alert(language === 'fr' ? 'Lien copiÃ© !' : 'Link copied!');
       }).catch(() => {
-        // Fallback for unsupported browsers / Fallback pour les navigateurs non supportés
+        // Fallback for unsupported browsers / Fallback pour les navigateurs non supportÃ©s
         const textArea = document.createElement('textarea');
         textArea.value = currentUrl;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        alert(language === 'fr' ? 'Lien copié !' : 'Link copied!');
+        alert(language === 'fr' ? 'Lien copiÃ© !' : 'Link copied!');
       });
     } else if (shareUrls[platform as keyof typeof shareUrls]) {
       if (platform === 'email') {
@@ -363,41 +363,41 @@ const TestimonialDetail: React.FC = () => {
     }
   };
 
-  // Optimized texts according to language / Textes optimisés selon la langue
+  // Optimized texts according to language / Textes optimisÃ©s selon la langue
   const texts = {
     fr: {
-      backToTestimonials: 'Retour aux témoignages',
-      verified: 'Vérifié',
-      solicitedLawyer: 'A sollicité un avocat',
-      solicitedExpat: 'A sollicité un expatrié',
-      shareTestimonial: 'Partager ce témoignage',
-      serviceDetails: 'Détails du service',
-      serviceUsed: 'Service utilisé',
-      duration: 'Durée',
+      backToTestimonials: 'Retour aux tÃ©moignages',
+      verified: 'VÃ©rifiÃ©',
+      solicitedLawyer: 'A sollicitÃ© un avocat',
+      solicitedExpat: 'A sollicitÃ© un expatriÃ©',
+      shareTestimonial: 'Partager ce tÃ©moignage',
+      serviceDetails: 'DÃ©tails du service',
+      serviceUsed: 'Service utilisÃ©',
+      duration: 'DurÃ©e',
       helpType: 'Type d\'aide',
       needHelp: 'Besoin d\'aide aussi ?',
-      helpDescription: 'Obtenez de l\'aide d\'un expert vérifié en moins de 5 minutes',
+      helpDescription: 'Obtenez de l\'aide d\'un expert vÃ©rifiÃ© en moins de 5 minutes',
       findExpert: 'Trouver un expert',
-      otherTestimonials: 'Autres témoignages',
-      viewAllTestimonials: 'Voir tous les témoignages',
+      otherTestimonials: 'Autres tÃ©moignages',
+      viewAllTestimonials: 'Voir tous les tÃ©moignages',
       shareOnFacebook: 'Partager sur Facebook',
       shareByEmail: 'Partager par email',
       copyLink: 'Copier le lien',
-      secured: 'Sécurisé',
+      secured: 'SÃ©curisÃ©',
       lessThan5Min: 'Moins de 5 min',
       worldwide: 'Mondial',
       reviews: 'avis',
       minutesAbbrev: 'minutes',
-      testimonialPageTitle: 'Témoignage de',
-      testimonialPageDescription: 'Découvrez l\'expérience de nos utilisateurs avec nos experts avocats et expatriés. Conseils juridiques et pratiques pour expatriés.',
+      testimonialPageTitle: 'TÃ©moignage de',
+      testimonialPageDescription: 'DÃ©couvrez l\'expÃ©rience de nos utilisateurs avec nos experts avocats et expatriÃ©s. Conseils juridiques et pratiques pour expatriÃ©s.',
       lawyerConsultation: 'Consultation d\'avocat',
-      expatConsultation: 'Consultation d\'expatrié',
-      readTestimonial: 'Lire le témoignage de',
-      userExperience: 'Expérience utilisateur',
+      expatConsultation: 'Consultation d\'expatriÃ©',
+      readTestimonial: 'Lire le tÃ©moignage de',
+      userExperience: 'ExpÃ©rience utilisateur',
       expertAdvice: 'Conseils d\'expert',
       customerSatisfaction: 'Satisfaction client',
       internationalSupport: 'Support international',
-      starsOutOf5: 'étoiles sur 5'
+      starsOutOf5: 'Ã©toiles sur 5'
     },
     en: {
       backToTestimonials: 'Back to testimonials',
@@ -437,18 +437,18 @@ const TestimonialDetail: React.FC = () => {
 
   const t = texts[language === 'fr' ? 'fr' : 'en'];
 
-  // SEO Meta data / Données méta SEO
+  // SEO Meta data / DonnÃ©es mÃ©ta SEO
   const currentTitle = language === 'fr' ? testimonialData.title.fr : testimonialData.title.en;
   const currentContent = language === 'fr' ? testimonialData.fullContent.fr : testimonialData.fullContent.en;
   const pageTitle = `${t.testimonialPageTitle} ${testimonialData.name} - ${currentTitle}`;
   const pageDescription = `${t.testimonialPageDescription} ${currentContent.substring(0, 160)}...`;
   const countryName = getCountryName(testimonialData.country);
 
-  // Set page title for SEO / Définir le titre de la page pour le SEO
+  // Set page title for SEO / DÃ©finir le titre de la page pour le SEO
   React.useEffect(() => {
     document.title = pageTitle;
     
-    // Set meta description / Définir la méta description
+    // Set meta description / DÃ©finir la mÃ©ta description
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
       metaDescription.setAttribute('content', pageDescription);
@@ -459,7 +459,7 @@ const TestimonialDetail: React.FC = () => {
       document.head.appendChild(meta);
     }
 
-    // Set Open Graph meta tags / Définir les méta tags Open Graph
+    // Set Open Graph meta tags / DÃ©finir les mÃ©ta tags Open Graph
     const setOrCreateMeta = (property: string, content: string) => {
       let meta = document.querySelector(`meta[property="${property}"]`);
       if (meta) {
@@ -478,7 +478,7 @@ const TestimonialDetail: React.FC = () => {
     setOrCreateMeta('og:url', window.location.href);
     setOrCreateMeta('og:image', testimonialData.avatar);
     
-    // Set structured data for better SEO / Définir les données structurées pour un meilleur SEO
+    // Set structured data for better SEO / DÃ©finir les donnÃ©es structurÃ©es pour un meilleur SEO
     const structuredData = {
       "@context": "https://schema.org",
       "@type": "Review",
@@ -486,7 +486,7 @@ const TestimonialDetail: React.FC = () => {
         "@type": "Service",
         "name": language === 'fr' ? "SOS Expat & Travelers" : "SOS Expat & Travelers",
         "description": language === 'fr' 
-          ? "Service de consultation juridique et pratique pour expatriés" 
+          ? "Service de consultation juridique et pratique pour expatriÃ©s" 
           : "Legal and practical consultation service for expats"
       },
       "reviewRating": {
@@ -558,7 +558,7 @@ const TestimonialDetail: React.FC = () => {
               </div>
 
               <div className="flex-1 text-center lg:text-left">
-                {/* Modern exchange type badge / Badge type d'échange moderne */}
+                {/* Modern exchange type badge / Badge type d'Ã©change moderne */}
                 <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white">
                   {testimonialData.type === 'lawyer' ? 
                     <Briefcase size={16} className="text-red-400" /> : 
@@ -660,7 +660,7 @@ const TestimonialDetail: React.FC = () => {
 
             {/* Modern sidebar / Sidebar moderne */}
             <aside className="xl:col-span-1 space-y-8">
-              {/* Service details with modern design / Détails du service avec design moderne */}
+              {/* Service details with modern design / DÃ©tails du service avec design moderne */}
               <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white pointer-events-none"></div>
                 
@@ -722,7 +722,7 @@ const TestimonialDetail: React.FC = () => {
                     {t.helpDescription}
                   </p>
                   
-                  {/* Reassurance points / Points de réassurance */}
+                  {/* Reassurance points / Points de rÃ©assurance */}
                   <div className="flex flex-wrap justify-center gap-3 mb-6 text-sm">
                     <span className="inline-flex items-center gap-1.5 text-green-600 font-medium">
                       <Check size={14} />
@@ -751,7 +751,7 @@ const TestimonialDetail: React.FC = () => {
           </div>
         </main>
 
-        {/* Related testimonials section with modern design / Section témoignages connexes avec design moderne */}
+        {/* Related testimonials section with modern design / Section tÃ©moignages connexes avec design moderne */}
         <section className="relative py-20 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"></div>
           <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-blue-500/10"></div>
@@ -763,7 +763,7 @@ const TestimonialDetail: React.FC = () => {
           <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
             <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 mb-6">
               <Star className="w-5 h-5 text-yellow-400" />
-              <span className="text-white font-bold">4,9/5 • +2 500 {t.reviews}</span>
+              <span className="text-white font-bold">4,9/5 â€¢ +2 500 {t.reviews}</span>
             </div>
 
             <h3 className="text-4xl lg:text-5xl font-black text-white mb-4">
@@ -771,7 +771,7 @@ const TestimonialDetail: React.FC = () => {
             </h3>
             <p className="text-xl text-white/80 mb-12 max-w-2xl mx-auto">
               {language === 'fr' 
-                ? 'Découvrez d\'autres témoignages d\'expatriés et voyageurs qui ont fait confiance à nos experts.'
+                ? 'DÃ©couvrez d\'autres tÃ©moignages d\'expatriÃ©s et voyageurs qui ont fait confiance Ã  nos experts.'
                 : 'Discover other testimonials from expats and travelers who trusted our experts.'
               }
             </p>

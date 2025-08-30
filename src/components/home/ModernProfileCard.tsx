@@ -1,5 +1,5 @@
-// TODO: lazy import ce composant (React.lazy) pour réduire le bundle initial
-// src/components/home/ModernProfileCard.tsx - VERSION PRODUCTION OPTIMISÉE
+﻿// TODO: lazy import ce composant (React.lazy) pour rÃ©duire le bundle initial
+// src/components/home/ModernProfileCard.tsx - VERSION PRODUCTION OPTIMISÃ‰E
 import * as React from 'react';
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { Star, Globe, Users, Zap, Eye, ArrowRight, Wifi, WifiOff } from 'lucide-react';
@@ -33,7 +33,7 @@ interface ModernProfileCardProps {
   language?: 'fr' | 'en';
 }
 
-// Constants - Centralisées pour éviter les recreations
+// Constants - CentralisÃ©es pour Ã©viter les recreations
 const CARD_DIMENSIONS = {
   width: 320, // Mobile-first, responsive
   height: 520,
@@ -48,20 +48,20 @@ const TOUCH_TARGETS = {
 } as const;
 
 const LANGUAGE_MAP: Record<string, string> = {
-  'Français': 'Français',
-  'French': 'Français',
-  'fr': 'Français',
-  'FR': 'Français',
+  'FranÃ§ais': 'FranÃ§ais',
+  'French': 'FranÃ§ais',
+  'fr': 'FranÃ§ais',
+  'FR': 'FranÃ§ais',
   'Anglais': 'Anglais',
   'English': 'Anglais',
   'en': 'Anglais',
   'EN': 'Anglais',
   'Espagnol': 'Espagnol',
   'Spanish': 'Espagnol',
-  'Español': 'Espagnol',
+  'EspaÃ±ol': 'Espagnol',
   'es': 'Espagnol',
   'ES': 'Espagnol',
-  'Português': 'Portugais',
+  'PortuguÃªs': 'Portugais',
   'Portuguese': 'Portugais',
   'pt': 'Portugais',
   'PT': 'Portugais',
@@ -73,19 +73,19 @@ const LANGUAGE_MAP: Record<string, string> = {
   'Italian': 'Italien',
   'it': 'Italien',
   'IT': 'Italien',
-  'Nederlands': 'Néerlandais',
-  'Dutch': 'Néerlandais',
-  'nl': 'Néerlandais',
-  'NL': 'Néerlandais',
-  'Русский': 'Russe',
+  'Nederlands': 'NÃ©erlandais',
+  'Dutch': 'NÃ©erlandais',
+  'nl': 'NÃ©erlandais',
+  'NL': 'NÃ©erlandais',
+  'Ð ÑƒÑÑÐºÐ¸Ð¹': 'Russe',
   'Russian': 'Russe',
   'ru': 'Russe',
   'RU': 'Russe',
-  '中文': 'Chinois',
+  'ä¸­æ–‡': 'Chinois',
   'Chinese': 'Chinois',
   'zh': 'Chinois',
   'ZH': 'Chinois',
-  'العربية': 'Arabe',
+  'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©': 'Arabe',
   'Arabic': 'Arabe',
   'ar': 'Arabe',
   'AR': 'Arabe'
@@ -96,42 +96,42 @@ const DEFAULT_AVATAR = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/
 
 // Flag emojis map
 const FLAG_MAP: Record<string, string> = {
-  'France': '🇫🇷',
-  'Espagne': '🇪🇸',
-  'Spain': '🇪🇸',
-  'Canada': '🇨🇦',
-  'Portugal': '🇵🇹',
-  'Allemagne': '🇩🇪',
-  'Germany': '🇩🇪',
-  'Italie': '🇮🇹',
-  'Italy': '🇮🇹',
-  'Belgique': '🇧🇪',
-  'Belgium': '🇧🇪',
-  'Suisse': '🇨🇭',
-  'Switzerland': '🇨🇭',
-  'Royaume-Uni': '🇬🇧',
-  'United Kingdom': '🇬🇧',
-  'États-Unis': '🇺🇸',
-  'United States': '🇺🇸',
-  'Pays-Bas': '🇳🇱',
-  'Netherlands': '🇳🇱',
-  'Autriche': '🇦🇹',
-  'Austria': '🇦🇹',
-  'Luxembourg': '🇱🇺',
-  'Maroc': '🇲🇦',
-  'Morocco': '🇲🇦',
-  'Tunisie': '🇹🇳',
-  'Tunisia': '🇹🇳',
-  'Algérie': '🇩🇿',
-  'Algeria': '🇩🇿',
-  'Sénégal': '🇸🇳',
-  'Senegal': '🇸🇳',
-  'Côte d\'Ivoire': '🇨🇮',
-  'Ivory Coast': '🇨🇮'
+  'France': 'ðŸ‡«ðŸ‡·',
+  'Espagne': 'ðŸ‡ªðŸ‡¸',
+  'Spain': 'ðŸ‡ªðŸ‡¸',
+  'Canada': 'ðŸ‡¨ðŸ‡¦',
+  'Portugal': 'ðŸ‡µðŸ‡¹',
+  'Allemagne': 'ðŸ‡©ðŸ‡ª',
+  'Germany': 'ðŸ‡©ðŸ‡ª',
+  'Italie': 'ðŸ‡®ðŸ‡¹',
+  'Italy': 'ðŸ‡®ðŸ‡¹',
+  'Belgique': 'ðŸ‡§ðŸ‡ª',
+  'Belgium': 'ðŸ‡§ðŸ‡ª',
+  'Suisse': 'ðŸ‡¨ðŸ‡­',
+  'Switzerland': 'ðŸ‡¨ðŸ‡­',
+  'Royaume-Uni': 'ðŸ‡¬ðŸ‡§',
+  'United Kingdom': 'ðŸ‡¬ðŸ‡§',
+  'Ã‰tats-Unis': 'ðŸ‡ºðŸ‡¸',
+  'United States': 'ðŸ‡ºðŸ‡¸',
+  'Pays-Bas': 'ðŸ‡³ðŸ‡±',
+  'Netherlands': 'ðŸ‡³ðŸ‡±',
+  'Autriche': 'ðŸ‡¦ðŸ‡¹',
+  'Austria': 'ðŸ‡¦ðŸ‡¹',
+  'Luxembourg': 'ðŸ‡±ðŸ‡º',
+  'Maroc': 'ðŸ‡²ðŸ‡¦',
+  'Morocco': 'ðŸ‡²ðŸ‡¦',
+  'Tunisie': 'ðŸ‡¹ðŸ‡³',
+  'Tunisia': 'ðŸ‡¹ðŸ‡³',
+  'AlgÃ©rie': 'ðŸ‡©ðŸ‡¿',
+  'Algeria': 'ðŸ‡©ðŸ‡¿',
+  'SÃ©nÃ©gal': 'ðŸ‡¸ðŸ‡³',
+  'Senegal': 'ðŸ‡¸ðŸ‡³',
+  'CÃ´te d\'Ivoire': 'ðŸ‡¨ðŸ‡®',
+  'Ivory Coast': 'ðŸ‡¨ðŸ‡®'
 };
 
-// Système i18n - Détection navigateur + fallback
-// TODO: intégrer avec react-i18next si disponible dans le projet
+// SystÃ¨me i18n - DÃ©tection navigateur + fallback
+// TODO: intÃ©grer avec react-i18next si disponible dans le projet
 const TRANSLATIONS = {
   fr: {
     professions: {
@@ -150,7 +150,7 @@ const TRANSLATIONS = {
       online: 'En ligne',
       offline: 'Hors ligne',
       languages: 'Langues',
-      specialties: 'Spécialités',
+      specialties: 'SpÃ©cialitÃ©s',
       years: 'ans',
       reviews: 'avis',
       viewProfile: 'Voir le profil',
@@ -195,61 +195,61 @@ const TRANSLATIONS = {
   }
 } as const;
 
-// Icônes métiers avec couleurs optimisées pour le contraste
+// IcÃ´nes mÃ©tiers avec couleurs optimisÃ©es pour le contraste
 const PROFESSION_ICONS: Record<string, { icon: string; bgColor: string; textColor: string }> = {
   'lawyer': { 
-    icon: '⚖️', 
+    icon: 'âš–ï¸', 
     bgColor: 'bg-slate-100', 
-    textColor: 'text-slate-800' // Contraste amélioré
+    textColor: 'text-slate-800' // Contraste amÃ©liorÃ©
   },
   'expat': { 
-    icon: '🌍', 
+    icon: 'ðŸŒ', 
     bgColor: 'bg-blue-100', 
     textColor: 'text-blue-800' 
   },
   'accountant': { 
-    icon: '🧮', 
+    icon: 'ðŸ§®', 
     bgColor: 'bg-green-100', 
     textColor: 'text-green-800' 
   },
   'notary': { 
-    icon: '📜', 
+    icon: 'ðŸ“œ', 
     bgColor: 'bg-amber-100', 
     textColor: 'text-amber-800' 
   },
   'tax_consultant': { 
-    icon: '💰', 
+    icon: 'ðŸ’°', 
     bgColor: 'bg-yellow-100', 
     textColor: 'text-yellow-800' 
   },
   'real_estate': { 
-    icon: '🏠', 
+    icon: 'ðŸ ', 
     bgColor: 'bg-orange-100', 
     textColor: 'text-orange-800' 
   },
   'translator': { 
-    icon: '📝', 
+    icon: 'ðŸ“', 
     bgColor: 'bg-purple-100', 
     textColor: 'text-purple-800' 
   },
   'hr_consultant': { 
-    icon: '👥', 
+    icon: 'ðŸ‘¥', 
     bgColor: 'bg-pink-100', 
     textColor: 'text-pink-800' 
   },
   'financial_advisor': { 
-    icon: '📊', 
+    icon: 'ðŸ“Š', 
     bgColor: 'bg-indigo-100', 
     textColor: 'text-indigo-800' 
   },
   'insurance_broker': { 
-    icon: '🛡️', 
+    icon: 'ðŸ›¡ï¸', 
     bgColor: 'bg-cyan-100', 
     textColor: 'text-cyan-800' 
   }
 };
 
-// Détection langue navigateur avec fallback
+// DÃ©tection langue navigateur avec fallback
 const getBrowserLanguage = (): 'fr' | 'en' => {
   if (typeof window === 'undefined') return 'fr';
   
@@ -261,7 +261,7 @@ const getBrowserLanguage = (): 'fr' | 'en' => {
 const getLanguage = (userLanguage?: string): 'fr' | 'en' => {
   if (userLanguage) return userLanguage as 'fr' | 'en';
   
-  // TODO: vérifier si localStorage.getItem('language') existe dans le projet
+  // TODO: vÃ©rifier si localStorage.getItem('language') existe dans le projet
   return getBrowserLanguage();
 };
 
@@ -292,7 +292,7 @@ const t = (lang: 'fr' | 'en', key: string, subKey?: string, interpolations?: Rec
   return text;
 };
 
-// Fonctions utilitaires mémoïsées
+// Fonctions utilitaires mÃ©moÃ¯sÃ©es
 const getProfessionInfo = (type: string) => {
   return PROFESSION_ICONS[type] || PROFESSION_ICONS['expat'];
 };
@@ -302,10 +302,10 @@ const getLanguageLabel = (language: string): string => {
 };
 
 const getCountryFlag = (country: string): string => {
-  return FLAG_MAP[country] || '🌍';
+  return FLAG_MAP[country] || 'ðŸŒ';
 };
 
-// Hook pour les couleurs de statut (mémoïsé)
+// Hook pour les couleurs de statut (mÃ©moÃ¯sÃ©)
 const useStatusColors = (isOnline: boolean) => {
   return useMemo(() => 
     isOnline ? {
@@ -332,7 +332,7 @@ const useStatusColors = (isOnline: boolean) => {
 const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({ 
   provider, 
   onProfileClick, 
-  // isUserConnected, // Paramètre gardé pour compatibilité API
+  // isUserConnected, // ParamÃ¨tre gardÃ© pour compatibilitÃ© API
   index = 0,
   language 
 }) => {
@@ -341,16 +341,16 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
   const [imageError, setImageError] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Langue utilisée avec détection navigateur
+  // Langue utilisÃ©e avec dÃ©tection navigateur
   const currentLang = useMemo(() => getLanguage(language), [language]);
   
-  // Couleurs de statut mémoïsées
+  // Couleurs de statut mÃ©moÃ¯sÃ©es
   const statusColors = useStatusColors(provider.isOnline);
   
-  // Info profession mémoïsée
+  // Info profession mÃ©moÃ¯sÃ©e
   const professionInfo = useMemo(() => getProfessionInfo(provider.type), [provider.type]);
   
-  // Gestion erreur image optimisée
+  // Gestion erreur image optimisÃ©e
   const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.currentTarget;
     if (target.src !== DEFAULT_AVATAR && !imageError) {
@@ -359,14 +359,14 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
     }
   }, [imageError]);
 
-  // Gestion du clic optimisée
+  // Gestion du clic optimisÃ©e
   const handleClick = useCallback(() => {
     onProfileClick(provider);
   }, [provider, onProfileClick]);
 
-  // Gestion hover optimisée pour mobile
+  // Gestion hover optimisÃ©e pour mobile
   const handleMouseEnter = useCallback(() => {
-    // Éviter les effets hover sur tactile
+    // Ã‰viter les effets hover sur tactile
     if (window.matchMedia('(hover: hover)').matches) {
       setIsHovered(true);
     }
@@ -376,23 +376,23 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
     setIsHovered(false);
   }, []);
 
-  // Formatage des langues optimisé
+  // Formatage des langues optimisÃ©
   const formattedLanguages = useMemo(() => {
     const mappedLanguages = provider.languages.map(lang => getLanguageLabel(lang));
     if (mappedLanguages.length <= 3) {
-      return mappedLanguages.join(' • ');
+      return mappedLanguages.join(' â€¢ ');
     }
-    return `${mappedLanguages.slice(0, 2).join(' • ')} +${mappedLanguages.length - 2} ${t(currentLang, 'labels', 'others')}`;
+    return `${mappedLanguages.slice(0, 2).join(' â€¢ ')} +${mappedLanguages.length - 2} ${t(currentLang, 'labels', 'others')}`;
   }, [provider.languages, currentLang]);
 
-  // Formatage des spécialités optimisé
+  // Formatage des spÃ©cialitÃ©s optimisÃ©
   const formattedSpecialties = useMemo(() => {
     if (!provider.specialties?.length) return null;
     
     if (provider.specialties.length <= 2) {
-      return provider.specialties.join(' • ');
+      return provider.specialties.join(' â€¢ ');
     }
-    return `${provider.specialties.slice(0, 2).join(' • ')} +${provider.specialties.length - 2}`;
+    return `${provider.specialties.slice(0, 2).join(' â€¢ ')} +${provider.specialties.length - 2}`;
   }, [provider.specialties]);
 
   // ARIA labels
@@ -436,7 +436,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
         }}
       >
         
-        {/* Header avec photo et statut - Dimensions explicites pour éviter layout shift */}
+        {/* Header avec photo et statut - Dimensions explicites pour Ã©viter layout shift */}
         <div 
           className="relative overflow-hidden bg-slate-100"
           style={{ height: `${CARD_DIMENSIONS.imageHeight}px` }}
@@ -457,10 +457,10 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
             height={CARD_DIMENSIONS.imageHeight}
           />
           
-          {/* Overlay gradient amélioré */}
+          {/* Overlay gradient amÃ©liorÃ© */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
           
-          {/* Statut en ligne - Taille tactile optimisée */}
+          {/* Statut en ligne - Taille tactile optimisÃ©e */}
           <div className="absolute top-3 left-3">
             <div 
               className={`
@@ -480,7 +480,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
             </div>
           </div>
           
-          {/* Badge métier avec contraste amélioré */}
+          {/* Badge mÃ©tier avec contraste amÃ©liorÃ© */}
           <div className="absolute top-3 right-3">
             <div className={`
               inline-flex items-center gap-2 px-3 py-2 rounded-full 
@@ -494,7 +494,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
             </div>
           </div>
           
-          {/* Note avec accessibilité améliorée */}
+          {/* Note avec accessibilitÃ© amÃ©liorÃ©e */}
           <div className="absolute bottom-3 right-3">
             <div 
               className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/95 backdrop-blur-sm border border-slate-200 shadow-sm"
@@ -506,13 +506,13 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
           </div>
         </div>
         
-        {/* Contenu principal - Hauteur fixe pour éviter layout shift */}
+        {/* Contenu principal - Hauteur fixe pour Ã©viter layout shift */}
         <div 
           className="p-3 flex flex-col"
           style={{ height: `${CARD_DIMENSIONS.contentHeight}px` }}
         >
           
-          {/* Nom et expérience */}
+          {/* Nom et expÃ©rience */}
           <div className="space-y-2 mb-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold text-slate-800 truncate flex-1">
@@ -526,7 +526,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
               </div>
             </div>
             
-            {/* Nationalité avec drapeau */}
+            {/* NationalitÃ© avec drapeau */}
             {provider.nationality && (
               <div className="flex items-center gap-2">
                 <span className="text-lg" aria-hidden="true">
@@ -537,7 +537,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
             )}
           </div>
 
-          {/* Informations organisées - Hauteur fixe avec overflow */}
+          {/* Informations organisÃ©es - Hauteur fixe avec overflow */}
           <div className="space-y-2 h-28 overflow-hidden">
             
             {/* Pays */}
@@ -557,7 +557,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
               </div>
             </div>
             
-            {/* Spécialités */}
+            {/* SpÃ©cialitÃ©s */}
             {formattedSpecialties && (
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -584,7 +584,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
             </div>
           </div>
           
-          {/* Bouton CTA - Taille tactile optimisée */}
+          {/* Bouton CTA - Taille tactile optimisÃ©e */}
           <div className="mt-3">
             <button 
               className={`
@@ -615,7 +615,7 @@ const ModernProfileCard: React.FC<ModernProfileCardProps> = React.memo(({
         </div>
       </article>
 
-      {/* Styles optimisés avec prefers-reduced-motion */}
+      {/* Styles optimisÃ©s avec prefers-reduced-motion */}
       <style>{`
         article {
           animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;

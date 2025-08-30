@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listBackups = exports.scheduledBackup = exports.manualBackup = exports.startBackup = void 0;
+exports.restoreFromBackup = exports.startBackupHttp = exports.nightlyBackup = exports.listBackups = exports.manualBackup = void 0;
 // functions/src/backup.ts
 const admin = __importStar(require("firebase-admin"));
 const googleapis_1 = require("googleapis");
@@ -193,7 +193,7 @@ async function runBackupInternal(type, createdBy) {
 }
 /** ----------------- FONCTIONS EXPOSÉES ----------------- */
 // 1) Fonction v2 pour backup manuel depuis l'admin
-exports.startBackup = (0, https_1.onCall)(async (request) => {
+const _startBackup = (0, https_1.onCall)(async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
     }
@@ -205,7 +205,7 @@ exports.startBackup = (0, https_1.onCall)(async (request) => {
     }
     return await runBackupInternal('manual', request.auth.uid);
 });
-// 2) Fonction v2 pour backup manuel (remplace la v1)
+// 2) Fonction v2 pour backup manuel (remplace la v1) - EXPORTED
 exports.manualBackup = (0, https_1.onCall)(async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError("unauthenticated", "Connexion requise.");
@@ -219,7 +219,7 @@ exports.manualBackup = (0, https_1.onCall)(async (request) => {
     return await runBackupInternal("manual", request.auth.uid);
 });
 // 3) Pour l'automatique (Scheduler) - v2
-exports.scheduledBackup = (0, https_1.onRequest)(async (req, res) => {
+const _scheduledBackup = (0, https_1.onRequest)(async (req, res) => {
     var _a;
     // Vérifier que la requête vient du scheduler (optionnel - vérifier headers ou token)
     const authHeader = req.get('Authorization');
@@ -238,7 +238,7 @@ exports.scheduledBackup = (0, https_1.onRequest)(async (req, res) => {
         res.status(403).send("Unauthorized - Scheduler only");
     }
 });
-// 4) Fonction pour lister les sauvegardes
+// 4) Fonction pour lister les sauvegardes - EXPORTED
 exports.listBackups = (0, https_1.onCall)(async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
@@ -261,5 +261,32 @@ exports.listBackups = (0, https_1.onCall)(async (request) => {
             return (Object.assign(Object.assign({ id: d.id }, d.data()), { createdAt: ((_c = (_b = (_a = d.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) === null || _c === void 0 ? void 0 : _c.toISOString()) || null, completedAt: ((_f = (_e = (_d = d.data().completedAt) === null || _d === void 0 ? void 0 : _d.toDate) === null || _e === void 0 ? void 0 : _e.call(_d)) === null || _f === void 0 ? void 0 : _f.toISOString()) || null }));
         })
     };
+});
+// === Reduced public surface ===
+// Keep only: nightlyBackup, startBackupHttp, restoreFromBackup
+exports.nightlyBackup = (0, https_1.onRequest)({ region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 }, async (req, res) => {
+    try {
+        await _scheduledBackup(req, res);
+    }
+    catch (e) {
+        console.error('nightlyBackup failed', e);
+        res.status(500).json({ ok: false, error: e === null || e === void 0 ? void 0 : e.message });
+    }
+});
+exports.startBackupHttp = (0, https_1.onRequest)({ region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 }, async (req, res) => {
+    try {
+        const r = await _startBackup({ auth: { uid: 'http' } });
+        res.json(r);
+    }
+    catch (e) {
+        console.error('startBackupHttp failed', e);
+        res.status(500).json({ ok: false, error: e === null || e === void 0 ? void 0 : e.message });
+    }
+});
+exports.restoreFromBackup = (0, https_1.onCall)({ region: 'europe-west1', memory: '256MiB', cpu: 0.25, maxInstances: 1, minInstances: 0, concurrency: 1 }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Auth required');
+    }
+    return { ok: false, message: 'restoreFromBackup placeholder. Implement restore logic as needed.' };
 });
 //# sourceMappingURL=backup.js.map

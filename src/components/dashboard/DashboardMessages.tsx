@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { db } from "@/config/firebase";
 import {
   collection,
@@ -64,10 +64,10 @@ const DashboardMessages: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">📩 Mes messages</h2>
+      <h2 className="text-2xl font-bold">ðŸ“© Mes messages</h2>
 
       {messages.length === 0 && (
-        <p className="text-gray-500">Aucun message pour l’instant.</p>
+        <p className="text-gray-500">Aucun message pour lâ€™instant.</p>
       )}
 
       {messages.map((msg) => (
@@ -76,7 +76,7 @@ const DashboardMessages: React.FC = () => {
             <CardContent>
               <div className="p-4 space-y-2">
                 <p className="font-semibold text-sm text-gray-500">
-                  Reçu le{" "}
+                  ReÃ§u le{" "}
                   {new Date(msg.createdAt.seconds * 1000).toLocaleString()}
                 </p>
                 <p>
@@ -85,7 +85,7 @@ const DashboardMessages: React.FC = () => {
                 </p>
                 <p>
                   <strong>Pays :</strong>{" "}
-                  {msg.metadata?.clientCountry || "Non précisé"}
+                  {msg.metadata?.clientCountry || "Non prÃ©cisÃ©"}
                 </p>
                 <p>
                   <strong>Message :</strong> {msg.message}
@@ -97,7 +97,7 @@ const DashboardMessages: React.FC = () => {
                     variant="outline"
                     onClick={() => markAsRead(msg.id)}
                   >
-                    ✅ Marquer comme lu
+                    âœ… Marquer comme lu
                   </Button>
                 )}
               </div>

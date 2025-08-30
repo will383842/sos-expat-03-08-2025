@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu, X, Phone, Shield, ChevronDown, Globe, User, UserPlus,
@@ -57,7 +57,7 @@ interface AppUser {
  *  Flags
  *  ================================ */
 const FrenchFlag = memo(() => (
-  <div className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20" role="img" aria-label="Drapeau français">
+  <div className="relative p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg ring-1 ring-white/20" role="img" aria-label="Drapeau franÃ§ais">
     <div className="w-6 h-4 rounded-md overflow-hidden shadow-sm flex">
       <div className="w-1/3 h-full bg-blue-600" />
       <div className="w-1/3 h-full bg-white" />
@@ -93,19 +93,19 @@ BritishFlag.displayName = 'BritishFlag';
  *  i18n Config
  *  ================================ */
 const SUPPORTED_LANGUAGES: Language[] = [
-  { code: 'fr', name: 'French', nativeName: 'Français', flag: <FrenchFlag /> },
+  { code: 'fr', name: 'French', nativeName: 'FranÃ§ais', flag: <FrenchFlag /> },
   { code: 'en', name: 'English', nativeName: 'English', flag: <BritishFlag /> },
 ];
 
 const LEFT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/', labelKey: 'nav.home', mobileIcon: '🏠', desktopIcon: '🏠' },
-  { path: '/sos-appel', labelKey: 'nav.viewProfiles', mobileIcon: '👥', desktopIcon: '👥' },
-  { path: '/testimonials', labelKey: 'nav.testimonials', mobileIcon: '💬', desktopIcon: '💬' },
+  { path: '/', labelKey: 'nav.home', mobileIcon: 'ðŸ ', desktopIcon: 'ðŸ ' },
+  { path: '/sos-appel', labelKey: 'nav.viewProfiles', mobileIcon: 'ðŸ‘¥', desktopIcon: 'ðŸ‘¥' },
+  { path: '/testimonials', labelKey: 'nav.testimonials', mobileIcon: 'ðŸ’¬', desktopIcon: 'ðŸ’¬' },
 ];
 
 const RIGHT_NAVIGATION_ITEMS: NavigationItem[] = [
-  { path: '/how-it-works', labelKey: 'nav.howItWorks', mobileIcon: '⚡', desktopIcon: '⚡' },
-  { path: '/pricing', labelKey: 'nav.pricing', mobileIcon: '💎', desktopIcon: '💎' },
+  { path: '/how-it-works', labelKey: 'nav.howItWorks', mobileIcon: 'âš¡', desktopIcon: 'âš¡' },
+  { path: '/pricing', labelKey: 'nav.pricing', mobileIcon: 'ðŸ’Ž', desktopIcon: 'ðŸ’Ž' },
 ];
 
 const ALL_NAVIGATION_ITEMS = [...LEFT_NAVIGATION_ITEMS, ...RIGHT_NAVIGATION_ITEMS];
@@ -133,7 +133,7 @@ const useScrolled = () => {
 };
 
 /** ================================
- *  Availability logic (source de vérité = sos_profiles)
+ *  Availability logic (source de vÃ©ritÃ© = sos_profiles)
  *  ================================ */
 const useAvailabilityToggle = () => {
   const { user } = useAuth();
@@ -147,7 +147,7 @@ const useAvailabilityToggle = () => {
     user?.type === 'lawyer' ||
     user?.type === 'expat';
 
-  // --- Helpers d'écriture ---
+  // --- Helpers d'Ã©criture ---
   const writeSosProfile = useCallback(async (newStatus: boolean) => {
     if (!user || !isProvider) return;
 
@@ -173,7 +173,7 @@ const useAvailabilityToggle = () => {
       // continue
     }
 
-    // 2) S'il n'existe pas, crée/merge par {uid}
+    // 2) S'il n'existe pas, crÃ©e/merge par {uid}
     try {
       const snap = await getDoc(sosRef);
       if (!snap.exists()) {
@@ -198,7 +198,7 @@ const useAvailabilityToggle = () => {
       // continue vers fallback query
     }
 
-    // 3) Fallback : anciens docs avec id ≠ uid → update tous les docs où uid == userId
+    // 3) Fallback : anciens docs avec id â‰  uid â†’ update tous les docs oÃ¹ uid == userId
     const q = query(collection(db, 'sos_profiles'), where('uid', '==', userId));
     const found = await getDocs(q);
     if (!found.empty) {
@@ -208,7 +208,7 @@ const useAvailabilityToggle = () => {
       return;
     }
 
-    // 4) Dernier recours : créer doc {uid}
+    // 4) Dernier recours : crÃ©er doc {uid}
     await setDoc(sosRef, {
       type: typedUser.role || typedUser.type,
       fullName:
@@ -241,16 +241,16 @@ const useAvailabilityToggle = () => {
     try {
       await updateDoc(userRef, payload);
     } catch (e) {
-      // Tentative avec setDoc merge si updateDoc échoue
+      // Tentative avec setDoc merge si updateDoc Ã©choue
       try {
         await setDoc(userRef, { uid: userId, ...payload }, { merge: true });
       } catch (e2) {
-        console.warn('Users presence update ignorée (règles/email) :', e2);
+        console.warn('Users presence update ignorÃ©e (rÃ¨gles/email) :', e2);
       }
     }
   }, [user]);
 
-  // --- Ecoute temps réel : sos_profiles = source de vérité pour l'UI ---
+  // --- Ecoute temps rÃ©el : sos_profiles = source de vÃ©ritÃ© pour l'UI ---
   useEffect(() => {
     if (!user || !isProvider) return;
     if (sosSnapshotSubscribed.current) return;
@@ -280,7 +280,7 @@ const useAvailabilityToggle = () => {
     };
   }, [user?.uid, isProvider]);
 
-  // Garde en phase avec un éventuel changement externe du user
+  // Garde en phase avec un Ã©ventuel changement externe du user
   useEffect(() => {
     if (user?.isOnline !== undefined) setIsOnline(!!user.isOnline);
   }, [user?.isOnline]);
@@ -295,14 +295,14 @@ const useAvailabilityToggle = () => {
     setIsUpdating(true);
 
     try {
-      // 1) Écrire d'abord dans sos_profiles (vérité)
+      // 1) Ã‰crire d'abord dans sos_profiles (vÃ©ritÃ©)
       await writeSosProfile(newStatus);
       // 2) Puis essayer users (best-effort)
       await writeUsersPresenceBestEffort(newStatus);
 
       setIsOnline(newStatus);
 
-      // Broadcast (on émet les DEUX événements pour compatibilité)
+      // Broadcast (on Ã©met les DEUX Ã©vÃ©nements pour compatibilitÃ©)
       window.dispatchEvent(new CustomEvent('availability:changed', { detail: { isOnline: newStatus } }));
       window.dispatchEvent(new CustomEvent('availabilityChanged', { detail: { isOnline: newStatus } }));
 
@@ -350,7 +350,7 @@ const HeaderAvailabilityToggle = memo(() => {
       ) : (
         <WifiOff className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
       )}
-      <span>{isOnline ? `🟢 ${t.online}` : `🔴 ${t.offline}`}</span>
+      <span>{isOnline ? `ðŸŸ¢ ${t.online}` : `ðŸ”´ ${t.offline}`}</span>
     </button>
   );
 });
@@ -457,7 +457,7 @@ const LanguageDropdown = memo<{ isMobile?: boolean; variant?: 'light' | 'dark' }
         className="group flex items-center space-x-2 text-white hover:text-yellow-200 transition-all duration-300 hover:scale-105 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] justify-center"
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label="Sélectionner la langue"
+        aria-label="SÃ©lectionner la langue"
       >
         <div className="group-hover:scale-110 transition-transform duration-300">{currentLanguage.flag}</div>
         <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${open ? 'rotate-180 text-yellow-300' : ''}`} />
@@ -525,7 +525,7 @@ const PWAInstallArea = memo(({ scrolled }: { scrolled: boolean }) => {
 
         <div className="hidden lg:block h-5 overflow-hidden">
           <div className={`text-xs ${scrolled ? 'text-gray-300' : 'text-gray-600'} transition-opacity duration-700 ease-in-out ${showSlogan ? 'opacity-100' : 'opacity-0'}`}>
-            {language === 'fr' ? "L'appli qui fait du bien !" : 'The feel-good app!'}{installed ? ' 🎉' : ''}
+            {language === 'fr' ? "L'appli qui fait du bien !" : 'The feel-good app!'}{installed ? ' ðŸŽ‰' : ''}
           </div>
         </div>
       </div>
@@ -600,7 +600,7 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     signup: language === 'fr' ? "S'inscrire" : 'Sign up',
     dashboard: language === 'fr' ? 'Tableau de bord' : 'Dashboard',
     adminConsole: language === 'fr' ? 'Console Admin' : 'Admin Console',
-    logout: language === 'fr' ? 'Déconnexion' : 'Logout',
+    logout: language === 'fr' ? 'DÃ©connexion' : 'Logout',
   };
 
   if (!user) {
@@ -753,7 +753,7 @@ const Header: React.FC = () => {
       'nav.home': { fr: 'Accueil', en: 'Home' },
       'nav.viewProfiles': { fr: 'Profils aidants', en: 'Helper profiles' },
       'nav.testimonials': { fr: 'Avis', en: 'Reviews' },
-      'nav.howItWorks': { fr: 'Comment ça marche', en: 'How it Works' },
+      'nav.howItWorks': { fr: 'Comment Ã§a marche', en: 'How it Works' },
       'nav.pricing': { fr: 'Tarifs', en: 'Pricing' },
     };
     return translations[labelKey]?.[language] || labelKey;
@@ -931,7 +931,7 @@ const Header: React.FC = () => {
               '@context': 'https://schema.org',
               '@type': 'Organization',
               name: 'SOS Expat d\'Ulixai',
-              description: language === 'fr' ? "Service d'assistance pour expatriés et voyageurs" : 'Assistance service for expats and travelers',
+              description: language === 'fr' ? "Service d'assistance pour expatriÃ©s et voyageurs" : 'Assistance service for expats and travelers',
               url: window.location.origin,
               logo: `${window.location.origin}/icons/icon-512x512-maskable.png`,
               contactPoint: {
@@ -966,7 +966,7 @@ const Header: React.FC = () => {
           const currentPage = location.pathname;
           const baseTitle = 'SOS Expat d\'Ulixai';
           const baseDescription = language === 'fr'
-            ? "Service d'assistance immédiate pour expatriés et voyageurs. Connexion en moins de 5 minutes avec des experts vérifiés."
+            ? "Service d'assistance immÃ©diate pour expatriÃ©s et voyageurs. Connexion en moins de 5 minutes avec des experts vÃ©rifiÃ©s."
             : 'Immediate assistance service for expats and travelers. Connect in less than 5 minutes with verified experts.';
           const currentNavItem = ALL_NAVIGATION_ITEMS.find((i) => i.path === currentPage);
           const pageTitle = currentNavItem ? getNavigationLabel(currentNavItem.labelKey) : getNavigationLabel('nav.home');

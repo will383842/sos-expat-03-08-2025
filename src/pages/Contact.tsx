@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Send, CheckCircle, Mail, Globe, MapPin, MessageCircle, User, Calendar, Flag, Languages as LanguagesIcon, AlertCircle, ChevronDown, Heart, Zap, Sparkles, Phone, Star, ArrowRight } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
@@ -13,7 +13,7 @@ interface NavigatorConnection {
   };
 }
 
-// Interface pour les données du formulaire
+// Interface pour les donnÃ©es du formulaire
 interface FormData {
   firstName: string;
   lastName: string;
@@ -53,7 +53,7 @@ const Contact: React.FC = () => {
     message: ''
   });
   
-  // State séparé pour les langues parlées (format array simple)
+  // State sÃ©parÃ© pour les langues parlÃ©es (format array simple)
   const [spokenLanguages, setSpokenLanguages] = useState<string[]>([]);
   const [languagesDropdownOpen, setLanguagesDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,7 +72,7 @@ const Contact: React.FC = () => {
     }
   }, []);
 
-  // Fermer le dropdown au clic extérieur
+  // Fermer le dropdown au clic extÃ©rieur
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -87,7 +87,7 @@ const Contact: React.FC = () => {
     }
   }, [languagesDropdownOpen]);
 
-  // Scroll vers le haut lors de la soumission réussie
+  // Scroll vers le haut lors de la soumission rÃ©ussie
   useEffect(() => {
     if (isSubmitted) {
       window.scrollTo({ 
@@ -100,100 +100,100 @@ const Contact: React.FC = () => {
   // Textes i18n avec ton fun et jovial
   const t = useMemo(() => ({
     // Meta & SEO
-    metaTitle: lang === 'fr' ? 'On vous écoute ! • SOS Expats' : 'We\'re all ears! • SOS Expats',
+    metaTitle: lang === 'fr' ? 'On vous Ã©coute ! â€¢ SOS Expats' : 'We\'re all ears! â€¢ SOS Expats',
     metaDesc: lang === 'fr' 
-      ? 'Une question ? Un souci ? Notre équipe sympa est là pour vous aider avec le sourire ✨'
-      : 'Got a question? Need help? Our friendly team is here to help with a smile ✨',
+      ? 'Une question ? Un souci ? Notre Ã©quipe sympa est lÃ  pour vous aider avec le sourire âœ¨'
+      : 'Got a question? Need help? Our friendly team is here to help with a smile âœ¨',
     
     // Header fun
-    pageTitle: lang === 'fr' ? 'On vous écoute !' : 'We\'re all ears!',
+    pageTitle: lang === 'fr' ? 'On vous Ã©coute !' : 'We\'re all ears!',
     pageSubtitle: lang === 'fr' 
-      ? 'Notre équipe super sympa est là pour vous 🤗'
-      : 'Our super friendly team is here for you 🤗',
+      ? 'Notre Ã©quipe super sympa est lÃ  pour vous ðŸ¤—'
+      : 'Our super friendly team is here for you ðŸ¤—',
     pageDescription: lang === 'fr' 
-      ? 'Une question ? Un pépin ? Envoyez-nous un petit message et on revient vers vous en mode turbo ! 🚀'
-      : 'Got a question? A little hiccup? Drop us a message and we\'ll get back to you super fast! 🚀',
+      ? 'Une question ? Un pÃ©pin ? Envoyez-nous un petit message et on revient vers vous en mode turbo ! ðŸš€'
+      : 'Got a question? A little hiccup? Drop us a message and we\'ll get back to you super fast! ðŸš€',
     
-    // Form labels avec émojis
-    firstName: lang === 'fr' ? 'Votre prénom' : 'Your first name',
+    // Form labels avec Ã©mojis
+    firstName: lang === 'fr' ? 'Votre prÃ©nom' : 'Your first name',
     lastName: lang === 'fr' ? 'Votre nom' : 'Your last name',
     email: lang === 'fr' ? 'Votre email' : 'Your email',
-    phoneNumber: lang === 'fr' ? 'Votre téléphone' : 'Your phone',
-    customCode: lang === 'fr' ? 'Indicatif personnalisé' : 'Custom country code',
-    originCountry: lang === 'fr' ? 'D\'où venez-vous ?' : 'Where are you from?',
-    interventionCountry: lang === 'fr' ? 'Où vous faut-il de l\'aide ?' : 'Where do you need help?',
+    phoneNumber: lang === 'fr' ? 'Votre tÃ©lÃ©phone' : 'Your phone',
+    customCode: lang === 'fr' ? 'Indicatif personnalisÃ©' : 'Custom country code',
+    originCountry: lang === 'fr' ? 'D\'oÃ¹ venez-vous ?' : 'Where are you from?',
+    interventionCountry: lang === 'fr' ? 'OÃ¹ vous faut-il de l\'aide ?' : 'Where do you need help?',
     spokenLanguages: lang === 'fr' ? 'Vos langues magiques' : 'Your magical languages',
-    nationalities: lang === 'fr' ? 'Vos nationalités' : 'Your nationalities',
+    nationalities: lang === 'fr' ? 'Vos nationalitÃ©s' : 'Your nationalities',
     category: lang === 'fr' ? 'Type de demande' : 'Request type',
     subject: lang === 'fr' ? 'Le sujet en bref' : 'Subject in brief',
     message: lang === 'fr' ? 'Votre message' : 'Your message',
     
     // Placeholders fun
-    firstNamePlaceholder: lang === 'fr' ? 'Comment on vous appelle ? 😊' : 'What should we call you? 😊',
+    firstNamePlaceholder: lang === 'fr' ? 'Comment on vous appelle ? ðŸ˜Š' : 'What should we call you? ðŸ˜Š',
     lastNamePlaceholder: lang === 'fr' ? 'Votre nom de famille...' : 'Your family name...',
     emailPlaceholder: lang === 'fr' ? 'votre@email.com' : 'your@email.com',
     phonePlaceholder: '06 12 34 56 78',
     customCodePlaceholder: lang === 'fr' ? 'Ex: +225' : 'Ex: +225',
     originCountryPlaceholder: lang === 'fr' ? 'France' : 'France',
-    interventionCountryPlaceholder: lang === 'fr' ? 'Où avez-vous besoin d\'un coup de main ?' : 'Where do you need a helping hand?',
-    nationalitiesPlaceholder: lang === 'fr' ? 'Française, Belge...' : 'French, Belgian...',
-    subjectPlaceholder: lang === 'fr' ? 'En quelques mots... ✨' : 'In a few words... ✨',
+    interventionCountryPlaceholder: lang === 'fr' ? 'OÃ¹ avez-vous besoin d\'un coup de main ?' : 'Where do you need a helping hand?',
+    nationalitiesPlaceholder: lang === 'fr' ? 'FranÃ§aise, Belge...' : 'French, Belgian...',
+    subjectPlaceholder: lang === 'fr' ? 'En quelques mots... âœ¨' : 'In a few words... âœ¨',
     messagePlaceholder: lang === 'fr' 
-      ? 'Racontez-nous tout ! Plus c\'est détaillé, mieux on peut vous aider 🎯'
-      : 'Tell us everything! The more detailed, the better we can help you 🎯',
+      ? 'Racontez-nous tout ! Plus c\'est dÃ©taillÃ©, mieux on peut vous aider ðŸŽ¯'
+      : 'Tell us everything! The more detailed, the better we can help you ðŸŽ¯',
     
     // Buttons
     sendMessage: lang === 'fr' ? 'Envoyer avec amour' : 'Send with love',
-    sending: lang === 'fr' ? 'Envoi en cours... ⏳' : 'Sending... ⏳',
+    sending: lang === 'fr' ? 'Envoi en cours... â³' : 'Sending... â³',
     sendAnother: lang === 'fr' ? 'Envoyer un autre message' : 'Send another message',
-    backHome: lang === 'fr' ? 'Retour à l\'accueil' : 'Back to home',
+    backHome: lang === 'fr' ? 'Retour Ã  l\'accueil' : 'Back to home',
     
     // Success messages
-    messageSent: lang === 'fr' ? 'Message envoyé ! 🎉' : 'Message sent! 🎉',
+    messageSent: lang === 'fr' ? 'Message envoyÃ© ! ðŸŽ‰' : 'Message sent! ðŸŽ‰',
     messageReceived: lang === 'fr'
-      ? 'Super ! On a bien reçu votre message. Notre équipe va vous répondre très vite !'
+      ? 'Super ! On a bien reÃ§u votre message. Notre Ã©quipe va vous rÃ©pondre trÃ¨s vite !'
       : 'Great! We received your message. Our team will respond very quickly!',
     
     // Contact info fun
     contactInfo: lang === 'fr' ? 'Comment on peut vous aider' : 'How we can help you',
     sosService: lang === 'fr' ? 'Service S.O.S Express' : 'S.O.S Express Service',
-    available247: lang === 'fr' ? 'Toujours là pour vous !' : 'Always here for you!',
-    quickResponse: lang === 'fr' ? 'Réponse ultra-rapide' : 'Lightning-fast response',
-    usually24h: lang === 'fr' ? 'Généralement sous 24h !' : 'Usually within 24h!',
+    available247: lang === 'fr' ? 'Toujours lÃ  pour vous !' : 'Always here for you!',
+    quickResponse: lang === 'fr' ? 'RÃ©ponse ultra-rapide' : 'Lightning-fast response',
+    usually24h: lang === 'fr' ? 'GÃ©nÃ©ralement sous 24h !' : 'Usually within 24h!',
     multilingualSupport: lang === 'fr' ? 'Support multilingue' : 'Multilingual support',
-    multipleLanguages: lang === 'fr' ? 'Français maintenant, autres langues très bientôt !' : 'French now, other languages very soon!',
+    multipleLanguages: lang === 'fr' ? 'FranÃ§ais maintenant, autres langues trÃ¨s bientÃ´t !' : 'French now, other languages very soon!',
     
     // Form
     formTitle: lang === 'fr' ? 'Envoyez-nous un petit message !' : 'Drop us a little message!',
-    formDescription: lang === 'fr' ? 'Quelques infos et c\'est parti 🚀' : 'Just a few details and we\'re off! 🚀',
-    selectCategory: lang === 'fr' ? 'Choisissez votre catégorie...' : 'Pick your category...',
-    responseTime: lang === 'fr' ? 'Temps de réponse' : 'Response time',
-    maxTime: lang === 'fr' ? 'Super rapide ⚡' : 'Super fast ⚡',
+    formDescription: lang === 'fr' ? 'Quelques infos et c\'est parti ðŸš€' : 'Just a few details and we\'re off! ðŸš€',
+    selectCategory: lang === 'fr' ? 'Choisissez votre catÃ©gorie...' : 'Pick your category...',
+    responseTime: lang === 'fr' ? 'Temps de rÃ©ponse' : 'Response time',
+    maxTime: lang === 'fr' ? 'Super rapide âš¡' : 'Super fast âš¡',
     secureData: lang === 'fr' 
-      ? 'Vos données sont en sécurité absolue avec nous 🔒' 
-      : 'Your data is absolutely safe with us 🔒',
+      ? 'Vos donnÃ©es sont en sÃ©curitÃ© absolue avec nous ðŸ”’' 
+      : 'Your data is absolutely safe with us ðŸ”’',
     
     // Progress
     progressTitle: lang === 'fr' ? 'Votre progression' : 'Your progress',
-    almostThere: lang === 'fr' ? 'Vous y êtes presque !' : 'You\'re almost there!',
+    almostThere: lang === 'fr' ? 'Vous y Ãªtes presque !' : 'You\'re almost there!',
     
     // Errors fun
     errorSending: lang === 'fr' 
-      ? 'Oups ! Petit souci technique. Pouvez-vous réessayer ? 🙏'
-      : 'Oops! Small technical hiccup. Can you try again? 🙏',
+      ? 'Oups ! Petit souci technique. Pouvez-vous rÃ©essayer ? ðŸ™'
+      : 'Oops! Small technical hiccup. Can you try again? ðŸ™',
     
     // Validation errors with emojis
-    required: lang === 'fr' ? 'Ce petit champ nous manque 🥺' : 'We need this little field 🥺',
-    invalidEmail: lang === 'fr' ? 'Cette adresse email a l\'air bizarre 🤔' : 'This email looks a bit off 🤔',
-    invalidPhone: lang === 'fr' ? 'Ce numéro ne nous semble pas correct 📱' : 'This number doesn\'t look right 📱',
-    invalidCustomCode: lang === 'fr' ? 'L\'indicatif doit commencer par + 📞' : 'Country code must start with + 📞',
-    selectLanguages: lang === 'fr' ? 'Choisissez au moins une langue 🗣️' : 'Pick at least one language 🗣️',
-    acceptTermsRequired: lang === 'fr' ? 'Un petit clic sur les conditions, s\'il vous plaît 📋' : 'A little click on the terms, please 📋',
-    formHasErrors: lang === 'fr' ? 'Quelques petites retouches et c\'est parfait ! ✨' : 'A few little tweaks and it\'s perfect! ✨',
+    required: lang === 'fr' ? 'Ce petit champ nous manque ðŸ¥º' : 'We need this little field ðŸ¥º',
+    invalidEmail: lang === 'fr' ? 'Cette adresse email a l\'air bizarre ðŸ¤”' : 'This email looks a bit off ðŸ¤”',
+    invalidPhone: lang === 'fr' ? 'Ce numÃ©ro ne nous semble pas correct ðŸ“±' : 'This number doesn\'t look right ðŸ“±',
+    invalidCustomCode: lang === 'fr' ? 'L\'indicatif doit commencer par + ðŸ“ž' : 'Country code must start with + ðŸ“ž',
+    selectLanguages: lang === 'fr' ? 'Choisissez au moins une langue ðŸ—£ï¸' : 'Pick at least one language ðŸ—£ï¸',
+    acceptTermsRequired: lang === 'fr' ? 'Un petit clic sur les conditions, s\'il vous plaÃ®t ðŸ“‹' : 'A little click on the terms, please ðŸ“‹',
+    formHasErrors: lang === 'fr' ? 'Quelques petites retouches et c\'est parfait ! âœ¨' : 'A few little tweaks and it\'s perfect! âœ¨',
     
     // Terms and conditions
     acceptTerms: lang === 'fr' ? 'J\'accepte les' : 'I accept the',
-    termsAndConditions: lang === 'fr' ? 'conditions générales' : 'terms and conditions',
+    termsAndConditions: lang === 'fr' ? 'conditions gÃ©nÃ©rales' : 'terms and conditions',
     termsLink: '/conditions-generales-clients',
     
     // Other
@@ -201,7 +201,7 @@ const Contact: React.FC = () => {
     
     // Fun helpers
     helpTitle: lang === 'fr' ? 'Petite aide' : 'Little help',
-    completeFields: lang === 'fr' ? 'Champs à compléter' : 'Fields to complete',
+    completeFields: lang === 'fr' ? 'Champs Ã  complÃ©ter' : 'Fields to complete',
   }), [lang]);
 
   // Validation du formulaire
@@ -225,12 +225,12 @@ const Contact: React.FC = () => {
       errors.email = t.invalidEmail;
     }
 
-    // Validation du téléphone
+    // Validation du tÃ©lÃ©phone
     if (formData.phoneNumber && !/^[\d\s\-+()]{6,}$/.test(formData.phoneNumber)) {
       errors.phoneNumber = t.invalidPhone;
     }
 
-    // Validation de l'indicatif personnalisé
+    // Validation de l'indicatif personnalisÃ©
     if (formData.phoneCountryCode === '+other') {
       if (!formData.customCountryCode.trim()) {
         errors.customCountryCode = t.required;
@@ -239,12 +239,12 @@ const Contact: React.FC = () => {
       }
     }
 
-    // Validation des langues parlées
+    // Validation des langues parlÃ©es
     if (spokenLanguages.length === 0) {
       errors.spokenLanguages = t.selectLanguages;
     }
 
-    // Validation des conditions générales
+    // Validation des conditions gÃ©nÃ©rales
     if (!acceptTerms) {
       errors.acceptTerms = t.acceptTermsRequired;
     }
@@ -257,7 +257,7 @@ const Contact: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Effacer l'erreur du champ quand l'utilisateur commence à taper
+    // Effacer l'erreur du champ quand l'utilisateur commence Ã  taper
     if (formErrors[name]) {
       setFormErrors(prev => {
         const newErrors = { ...prev };
@@ -269,17 +269,17 @@ const Contact: React.FC = () => {
 
   // Liste des langues disponibles
   const availableLanguages = useMemo(() => [
-    'Français', 'English', 'العربية', 'Español', 'Italiano', 'Deutsch', 
-    'Português', '中文', '日本語', '한국어', 'Русский', 'Nederlands', 
-    'Polski', 'Türkçe', 'Svenska', 'Norsk', 'Dansk', 'Suomi',
-    'Ελληνικά', 'हिन्दी', 'Čeština', 'Slovenčina', 'Magyar',
-    'Română', 'Hrvatski', 'Srpski', 'Български', 'Lietuvių',
-    'Latviešu', 'Eesti', 'Slovenščina', 'עברית', 'فارسی',
-    'ไทย', 'Tiếng Việt', 'Bahasa Indonesia', 'Bahasa Malaysia',
+    'FranÃ§ais', 'English', 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©', 'EspaÃ±ol', 'Italiano', 'Deutsch', 
+    'PortuguÃªs', 'ä¸­æ–‡', 'æ—¥æœ¬èªž', 'í•œêµ­ì–´', 'Ð ÑƒÑÑÐºÐ¸Ð¹', 'Nederlands', 
+    'Polski', 'TÃ¼rkÃ§e', 'Svenska', 'Norsk', 'Dansk', 'Suomi',
+    'Î•Î»Î»Î·Î½Î¹ÎºÎ¬', 'à¤¹à¤¿à¤¨à¥à¤¦à¥€', 'ÄŒeÅ¡tina', 'SlovenÄina', 'Magyar',
+    'RomÃ¢nÄƒ', 'Hrvatski', 'Srpski', 'Ð‘ÑŠÐ»Ð³Ð°Ñ€ÑÐºÐ¸', 'LietuviÅ³',
+    'LatvieÅ¡u', 'Eesti', 'SlovenÅ¡Äina', '×¢×‘×¨×™×ª', 'ÙØ§Ø±Ø³ÛŒ',
+    'à¹„à¸—à¸¢', 'Tiáº¿ng Viá»‡t', 'Bahasa Indonesia', 'Bahasa Malaysia',
     'Filipino'
   ], []);
 
-  // Fonction pour gérer les changements de langues
+  // Fonction pour gÃ©rer les changements de langues
   const handleLanguageToggle = useCallback((language: string) => {
     setSpokenLanguages(prev => {
       if (prev.includes(language)) {
@@ -309,7 +309,7 @@ const Contact: React.FC = () => {
     // Validation du formulaire
     if (!validateForm()) {
       setShowErrors(true);
-      // Scroll vers la première erreur
+      // Scroll vers la premiÃ¨re erreur
       const firstErrorElement = document.querySelector('.error-field');
       if (firstErrorElement) {
         firstErrorElement.scrollIntoView({ 
@@ -327,7 +327,7 @@ const Contact: React.FC = () => {
       // Analytics de completion time
       const completionTime = Date.now() - formStartTime;
 
-      // Vérifier si l'utilisateur existe déjà
+      // VÃ©rifier si l'utilisateur existe dÃ©jÃ 
       const usersQuery = query(
         collection(db, 'users'), 
         where('email', '==', formData.email)
@@ -352,13 +352,13 @@ const Contact: React.FC = () => {
         };
       }
 
-      // Convertir les langues sélectionnées
+      // Convertir les langues sÃ©lectionnÃ©es
       const spokenLanguagesString = spokenLanguages.join(', ');
       const finalPhoneCode = getPhoneCode();
 
-      // Préparer les données complètes pour Firebase
+      // PrÃ©parer les donnÃ©es complÃ¨tes pour Firebase
       const contactData = {
-        // Données du formulaire - TOUS LES CHAMPS
+        // DonnÃ©es du formulaire - TOUS LES CHAMPS
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -374,7 +374,7 @@ const Contact: React.FC = () => {
         acceptedTerms: acceptTerms,
         acceptedTermsAt: new Date().toISOString(),
         
-        // Métadonnées système
+        // MÃ©tadonnÃ©es systÃ¨me
         createdAt: serverTimestamp(),
         submittedAt: new Date().toISOString(),
         status: 'new',
@@ -384,7 +384,7 @@ const Contact: React.FC = () => {
         // Informations utilisateur
         user: userInfo,
         
-        // Analytics et métadonnées techniques
+        // Analytics et mÃ©tadonnÃ©es techniques
         userAgent: navigator.userAgent,
         language: language,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -401,7 +401,7 @@ const Contact: React.FC = () => {
         formVersion: '3.2',
         source: 'contact_form_web_fun',
         
-        // Métadonnées enrichies
+        // MÃ©tadonnÃ©es enrichies
         metadata: {
           version: '3.2',
           source: 'contact_form_fun',
@@ -484,34 +484,34 @@ const Contact: React.FC = () => {
   };
 
   const categories = useMemo(() => [
-    { value: 'technical', label: lang === 'fr' ? '🔧 Problème technique' : '🔧 Technical issue' },
-    { value: 'billing', label: lang === 'fr' ? '💳 Facturation' : '💳 Billing' },
-    { value: 'account', label: lang === 'fr' ? '👤 Compte utilisateur' : '👤 User account' },
-    { value: 'expert', label: lang === 'fr' ? '🎓 Question sur les experts' : '🎓 Expert question' },
-    { value: 'service', label: lang === 'fr' ? '⭐ Qualité de service' : '⭐ Service quality' },
-    { value: 'partnership', label: lang === 'fr' ? '🤝 Partenariat' : '🤝 Partnership' },
-    { value: 'urgent', label: lang === 'fr' ? '🚨 Urgent' : '🚨 Urgent' },
-    { value: 'other', label: `💬 ${t.other}` }
+    { value: 'technical', label: lang === 'fr' ? 'ðŸ”§ ProblÃ¨me technique' : 'ðŸ”§ Technical issue' },
+    { value: 'billing', label: lang === 'fr' ? 'ðŸ’³ Facturation' : 'ðŸ’³ Billing' },
+    { value: 'account', label: lang === 'fr' ? 'ðŸ‘¤ Compte utilisateur' : 'ðŸ‘¤ User account' },
+    { value: 'expert', label: lang === 'fr' ? 'ðŸŽ“ Question sur les experts' : 'ðŸŽ“ Expert question' },
+    { value: 'service', label: lang === 'fr' ? 'â­ QualitÃ© de service' : 'â­ Service quality' },
+    { value: 'partnership', label: lang === 'fr' ? 'ðŸ¤ Partenariat' : 'ðŸ¤ Partnership' },
+    { value: 'urgent', label: lang === 'fr' ? 'ðŸš¨ Urgent' : 'ðŸš¨ Urgent' },
+    { value: 'other', label: `ðŸ’¬ ${t.other}` }
   ], [lang, t.other]);
 
   const countryCodes = useMemo(() => [
-    { value: '+33', label: '🇫🇷 +33 (France)' },
-    { value: '+1', label: '🇺🇸 +1 (USA/Canada)' },
-    { value: '+44', label: '🇬🇧 +44 (UK)' },
-    { value: '+49', label: '🇩🇪 +49 (Germany)' },
-    { value: '+39', label: '🇮🇹 +39 (Italy)' },
-    { value: '+34', label: '🇪🇸 +34 (Spain)' },
-    { value: '+32', label: '🇧🇪 +32 (Belgium)' },
-    { value: '+41', label: '🇨🇭 +41 (Switzerland)' },
-    { value: '+31', label: '🇳🇱 +31 (Netherlands)' },
-    { value: '+352', label: '🇱🇺 +352 (Luxembourg)' },
-    { value: '+213', label: '🇩🇿 +213 (Algeria)' },
-    { value: '+212', label: '🇲🇦 +212 (Morocco)' },
-    { value: '+216', label: '🇹🇳 +216 (Tunisia)' },
-    { value: '+86', label: '🇨🇳 +86 (China)' },
-    { value: '+91', label: '🇮🇳 +91 (India)' },
-    { value: '+55', label: '🇧🇷 +55 (Brazil)' },
-    { value: '+other', label: `🌍 ${t.other}` }
+    { value: '+33', label: 'ðŸ‡«ðŸ‡· +33 (France)' },
+    { value: '+1', label: 'ðŸ‡ºðŸ‡¸ +1 (USA/Canada)' },
+    { value: '+44', label: 'ðŸ‡¬ðŸ‡§ +44 (UK)' },
+    { value: '+49', label: 'ðŸ‡©ðŸ‡ª +49 (Germany)' },
+    { value: '+39', label: 'ðŸ‡®ðŸ‡¹ +39 (Italy)' },
+    { value: '+34', label: 'ðŸ‡ªðŸ‡¸ +34 (Spain)' },
+    { value: '+32', label: 'ðŸ‡§ðŸ‡ª +32 (Belgium)' },
+    { value: '+41', label: 'ðŸ‡¨ðŸ‡­ +41 (Switzerland)' },
+    { value: '+31', label: 'ðŸ‡³ðŸ‡± +31 (Netherlands)' },
+    { value: '+352', label: 'ðŸ‡±ðŸ‡º +352 (Luxembourg)' },
+    { value: '+213', label: 'ðŸ‡©ðŸ‡¿ +213 (Algeria)' },
+    { value: '+212', label: 'ðŸ‡²ðŸ‡¦ +212 (Morocco)' },
+    { value: '+216', label: 'ðŸ‡¹ðŸ‡³ +216 (Tunisia)' },
+    { value: '+86', label: 'ðŸ‡¨ðŸ‡³ +86 (China)' },
+    { value: '+91', label: 'ðŸ‡®ðŸ‡³ +91 (India)' },
+    { value: '+55', label: 'ðŸ‡§ðŸ‡· +55 (Brazil)' },
+    { value: '+other', label: `ðŸŒ ${t.other}` }
   ], [t.other]);
 
   // Progress calculation
@@ -611,7 +611,7 @@ const Contact: React.FC = () => {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-50 flex items-center justify-center py-8 px-4">
-          {/* Fond animé avec particules */}
+          {/* Fond animÃ© avec particules */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-full blur-3xl animate-pulse" />
             <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-gradient-to-r from-green-400/20 to-emerald-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -620,7 +620,7 @@ const Contact: React.FC = () => {
 
           <div className="relative z-10 max-w-md w-full">
             <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-emerald-100 p-8 text-center">
-              {/* Animation de succès */}
+              {/* Animation de succÃ¨s */}
               <div className="flex justify-center mb-6">
                 <div className="w-24 h-24 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center shadow-xl animate-bounce">
                   <CheckCircle className="w-12 h-12 text-white" />
@@ -629,10 +629,10 @@ const Contact: React.FC = () => {
               
               {/* Confetti effect */}
               <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-8 left-8 text-2xl animate-ping">🎉</div>
-                <div className="absolute top-12 right-12 text-xl animate-pulse delay-300">✨</div>
-                <div className="absolute bottom-16 left-12 text-lg animate-bounce delay-500">🌟</div>
-                <div className="absolute bottom-20 right-8 text-xl animate-pulse delay-700">💫</div>
+                <div className="absolute top-8 left-8 text-2xl animate-ping">ðŸŽ‰</div>
+                <div className="absolute top-12 right-12 text-xl animate-pulse delay-300">âœ¨</div>
+                <div className="absolute bottom-16 left-12 text-lg animate-bounce delay-500">ðŸŒŸ</div>
+                <div className="absolute bottom-20 right-8 text-xl animate-pulse delay-700">ðŸ’«</div>
               </div>
               
               <h2 className="text-3xl font-black text-gray-900 mb-4">
@@ -647,15 +647,15 @@ const Contact: React.FC = () => {
               <div className="bg-emerald-50 rounded-2xl p-4 mb-8 border border-emerald-200">
                 <div className="flex items-center justify-center space-x-6 text-sm">
                   <div className="text-center">
-                    <div className="font-bold text-emerald-700">⚡</div>
+                    <div className="font-bold text-emerald-700">âš¡</div>
                     <div className="text-emerald-600">Ultra rapide</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-emerald-700">🤗</div>
+                    <div className="font-bold text-emerald-700">ðŸ¤—</div>
                     <div className="text-emerald-600">Avec le sourire</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-emerald-700">🎯</div>
+                    <div className="font-bold text-emerald-700">ðŸŽ¯</div>
                     <div className="text-emerald-600">Sur-mesure</div>
                   </div>
                 </div>
@@ -689,9 +689,9 @@ const Contact: React.FC = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-50">
-        {/* Header avec design fun et énergique */}
+        {/* Header avec design fun et Ã©nergique */}
         <header className="relative pt-12 pb-16 overflow-hidden">
-          {/* Fond animé */}
+          {/* Fond animÃ© */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-full blur-3xl animate-pulse" />
             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-green-400/20 to-emerald-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -705,7 +705,7 @@ const Contact: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <Heart className="w-5 h-5 text-emerald-600 animate-pulse" />
                   <span className="text-sm font-bold text-emerald-700">
-                    {lang === 'fr' ? 'Équipe super sympa' : 'Super friendly team'}
+                    {lang === 'fr' ? 'Ã‰quipe super sympa' : 'Super friendly team'}
                   </span>
                   <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse delay-300" />
                 </div>
@@ -732,7 +732,7 @@ const Contact: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <Zap className="w-5 h-5 text-emerald-600" />
                   <span className="text-sm font-bold text-gray-800">
-                    {lang === 'fr' ? 'Réponse < 24h' : 'Response < 24h'}
+                    {lang === 'fr' ? 'RÃ©ponse < 24h' : 'Response < 24h'}
                   </span>
                 </div>
               </div>
@@ -835,7 +835,7 @@ const Contact: React.FC = () => {
                     </div>
                     {progress > 80 && (
                       <p className="text-xs mt-2 text-center font-medium">
-                        {t.almostThere} 🎉
+                        {t.almostThere} ðŸŽ‰
                       </p>
                     )}
                   </div>
@@ -876,11 +876,11 @@ const Contact: React.FC = () => {
                 )}
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
-                  {/* Section 1: Qui êtes-vous ? */}
+                  {/* Section 1: Qui Ãªtes-vous ? */}
                   <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-6 border border-emerald-200">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center">
                       <User className="w-6 h-6 mr-2 text-emerald-600" />
-                      {lang === 'fr' ? 'Qui êtes-vous ? 😊' : 'Who are you? 😊'}
+                      {lang === 'fr' ? 'Qui Ãªtes-vous ? ðŸ˜Š' : 'Who are you? ðŸ˜Š'}
                     </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -913,7 +913,7 @@ const Contact: React.FC = () => {
                           aria-invalid={!!formErrors.firstName}
                         />
                         <FieldSuccess show={validStates.firstName}>
-                          {lang === 'fr' ? 'Parfait ! ✨' : 'Perfect! ✨'}
+                          {lang === 'fr' ? 'Parfait ! âœ¨' : 'Perfect! âœ¨'}
                         </FieldSuccess>
                         <ErrorMessage error={formErrors.firstName} fieldName="firstName" />
                       </div>
@@ -947,7 +947,7 @@ const Contact: React.FC = () => {
                           aria-invalid={!!formErrors.lastName}
                         />
                         <FieldSuccess show={validStates.lastName}>
-                          {lang === 'fr' ? 'Parfait ! ✨' : 'Perfect! ✨'}
+                          {lang === 'fr' ? 'Parfait ! âœ¨' : 'Perfect! âœ¨'}
                         </FieldSuccess>
                         <ErrorMessage error={formErrors.lastName} fieldName="lastName" />
                       </div>
@@ -983,7 +983,7 @@ const Contact: React.FC = () => {
                         aria-invalid={!!formErrors.email}
                       />
                       <FieldSuccess show={!!validStates.email}>
-                        {lang === 'fr' ? 'Email nickel ! 📧' : 'Perfect email! 📧'}
+                        {lang === 'fr' ? 'Email nickel ! ðŸ“§' : 'Perfect email! ðŸ“§'}
                       </FieldSuccess>
                       <ErrorMessage error={formErrors.email} fieldName="email" />
                     </div>
@@ -993,7 +993,7 @@ const Contact: React.FC = () => {
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center">
                       <Phone className="w-6 h-6 mr-2 text-green-600" />
-                      {lang === 'fr' ? 'Comment vous joindre ? 📞' : 'How to reach you? 📞'}
+                      {lang === 'fr' ? 'Comment vous joindre ? ðŸ“ž' : 'How to reach you? ðŸ“ž'}
                     </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
@@ -1015,7 +1015,7 @@ const Contact: React.FC = () => {
                               ? 'border-emerald-400 bg-emerald-50 shadow-lg' 
                               : 'border-gray-300 hover:border-emerald-300'
                           }`}
-                          aria-label={lang === 'fr' ? 'Sélectionner l\'indicatif pays' : 'Select country code'}
+                          aria-label={lang === 'fr' ? 'SÃ©lectionner l\'indicatif pays' : 'Select country code'}
                         >
                           {countryCodes.map(code => (
                             <option key={code.value} value={code.value} className="bg-white text-gray-900">
@@ -1081,16 +1081,16 @@ const Contact: React.FC = () => {
                       </div>
                     </div>
                     <FieldSuccess show={validStates.phone}>
-                      {lang === 'fr' ? 'Super ! On pourra vous appeler 📱' : 'Great! We can call you 📱'}
+                      {lang === 'fr' ? 'Super ! On pourra vous appeler ðŸ“±' : 'Great! We can call you ðŸ“±'}
                     </FieldSuccess>
                     <ErrorMessage error={formErrors.phoneNumber || formErrors.customCountryCode} />
                   </div>
 
-                  {/* Section 3: Géographie */}
+                  {/* Section 3: GÃ©ographie */}
                   <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-6 border border-emerald-200">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center">
                       <MapPin className="w-6 h-6 mr-2 text-emerald-600" />
-                      {lang === 'fr' ? 'Votre géographie 🌍' : 'Your geography 🌍'}
+                      {lang === 'fr' ? 'Votre gÃ©ographie ðŸŒ' : 'Your geography ðŸŒ'}
                     </h3>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1123,7 +1123,7 @@ const Contact: React.FC = () => {
                           aria-invalid={!!formErrors.originCountry}
                         />
                         <FieldSuccess show={validStates.originCountry}>
-                          {lang === 'fr' ? 'Noté ! 🌍' : 'Got it! 🌍'}
+                          {lang === 'fr' ? 'NotÃ© ! ðŸŒ' : 'Got it! ðŸŒ'}
                         </FieldSuccess>
                         <ErrorMessage error={formErrors.originCountry} fieldName="originCountry" />
                       </div>
@@ -1156,7 +1156,7 @@ const Contact: React.FC = () => {
                           aria-invalid={!!formErrors.interventionCountry}
                         />
                         <FieldSuccess show={validStates.interventionCountry}>
-                          {lang === 'fr' ? 'On va vous aider là-bas ! 🎯' : 'We\'ll help you there! 🎯'}
+                          {lang === 'fr' ? 'On va vous aider lÃ -bas ! ðŸŽ¯' : 'We\'ll help you there! ðŸŽ¯'}
                         </FieldSuccess>
                         <ErrorMessage error={formErrors.interventionCountry} fieldName="interventionCountry" />
                       </div>
@@ -1190,7 +1190,7 @@ const Contact: React.FC = () => {
                         aria-invalid={!!formErrors.nationalities}
                       />
                       <FieldSuccess show={validStates.nationalities}>
-                        {lang === 'fr' ? 'Parfait ! 🏳️' : 'Perfect! 🏳️'}
+                        {lang === 'fr' ? 'Parfait ! ðŸ³ï¸' : 'Perfect! ðŸ³ï¸'}
                       </FieldSuccess>
                       <ErrorMessage error={formErrors.nationalities} fieldName="nationalities" />
                     </div>
@@ -1200,7 +1200,7 @@ const Contact: React.FC = () => {
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center">
                       <LanguagesIcon className="w-6 h-6 mr-2 text-green-600" />
-                      {t.spokenLanguages} * {lang === 'fr' ? '🗣️' : '🗣️'}
+                      {t.spokenLanguages} * {lang === 'fr' ? 'ðŸ—£ï¸' : 'ðŸ—£ï¸'}
                     </h3>
 
                     <div className="relative group">
@@ -1221,7 +1221,7 @@ const Contact: React.FC = () => {
                       >
                         <span className={spokenLanguages.length > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
                           {spokenLanguages.length > 0 
-                            ? `${spokenLanguages.length} ${lang === 'fr' ? 'langue(s) sélectionnée(s)' : 'language(s) selected'} ✨`
+                            ? `${spokenLanguages.length} ${lang === 'fr' ? 'langue(s) sÃ©lectionnÃ©e(s)' : 'language(s) selected'} âœ¨`
                             : lang === 'fr' ? 'Choisissez vos langues magiques...' : 'Choose your magical languages...'
                           }
                         </span>
@@ -1269,7 +1269,7 @@ const Contact: React.FC = () => {
                                 className="ml-2 text-emerald-600 hover:text-emerald-800 focus:outline-none text-lg"
                                 aria-label={`Remove ${lang}`}
                               >
-                                ×
+                                Ã—
                               </button>
                             </span>
                           ))}
@@ -1277,7 +1277,7 @@ const Contact: React.FC = () => {
                       )}
                     </div>
                     <FieldSuccess show={validStates.languages}>
-                      {lang === 'fr' ? 'Super ! On peut discuter dans votre langue ! 🌐' : 'Great! We can chat in your language! 🌐'}
+                      {lang === 'fr' ? 'Super ! On peut discuter dans votre langue ! ðŸŒ' : 'Great! We can chat in your language! ðŸŒ'}
                     </FieldSuccess>
                     <ErrorMessage error={formErrors.spokenLanguages} fieldName="spokenLanguages" />
                   </div>
@@ -1286,7 +1286,7 @@ const Contact: React.FC = () => {
                   <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-6 border border-emerald-200">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center">
                       <MessageCircle className="w-6 h-6 mr-2 text-emerald-600" />
-                      {lang === 'fr' ? 'Votre demande 💬' : 'Your request 💬'}
+                      {lang === 'fr' ? 'Votre demande ðŸ’¬' : 'Your request ðŸ’¬'}
                     </h3>
 
                     {/* Category */}
@@ -1325,7 +1325,7 @@ const Contact: React.FC = () => {
                         ))}
                       </select>
                       <FieldSuccess show={validStates.category}>
-                        {lang === 'fr' ? 'Catégorie choisie ! 🎯' : 'Category selected! 🎯'}
+                        {lang === 'fr' ? 'CatÃ©gorie choisie ! ðŸŽ¯' : 'Category selected! ðŸŽ¯'}
                       </FieldSuccess>
                       <ErrorMessage error={formErrors.category} fieldName="category" />
                     </div>
@@ -1359,7 +1359,7 @@ const Contact: React.FC = () => {
                         aria-invalid={!!formErrors.subject}
                       />
                       <FieldSuccess show={validStates.subject}>
-                        {lang === 'fr' ? 'Sujet clair ! 📝' : 'Clear subject! 📝'}
+                        {lang === 'fr' ? 'Sujet clair ! ðŸ“' : 'Clear subject! ðŸ“'}
                       </FieldSuccess>
                       <ErrorMessage error={formErrors.subject} fieldName="subject" />
                     </div>
@@ -1400,8 +1400,8 @@ const Contact: React.FC = () => {
                             formData.message.length >= 10 ? 'text-emerald-600' : 'text-gray-500'
                           }`}>
                             {formData.message.length >= 10 
-                              ? lang === 'fr' ? '✓ Message assez détaillé' : '✓ Message detailed enough'
-                              : lang === 'fr' ? `Encore ${10 - formData.message.length} caractères...` : `${10 - formData.message.length} more characters...`
+                              ? lang === 'fr' ? 'âœ“ Message assez dÃ©taillÃ©' : 'âœ“ Message detailed enough'
+                              : lang === 'fr' ? `Encore ${10 - formData.message.length} caractÃ¨res...` : `${10 - formData.message.length} more characters...`
                             }
                           </span>
                           <span className="text-gray-400">
@@ -1419,13 +1419,13 @@ const Contact: React.FC = () => {
                       </div>
                       
                       <FieldSuccess show={validStates.message}>
-                        {lang === 'fr' ? 'Message parfait ! On va pouvoir bien vous aider ! 🎯' : 'Perfect message! We\'ll be able to help you well! 🎯'}
+                        {lang === 'fr' ? 'Message parfait ! On va pouvoir bien vous aider ! ðŸŽ¯' : 'Perfect message! We\'ll be able to help you well! ðŸŽ¯'}
                       </FieldSuccess>
                       <ErrorMessage error={formErrors.message} fieldName="message" />
                     </div>
                   </div>
 
-                  {/* Section 6: Temps de réponse */}
+                  {/* Section 6: Temps de rÃ©ponse */}
                   <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-6 text-white">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
@@ -1494,7 +1494,7 @@ const Contact: React.FC = () => {
                           </label>
                         </div>
                         <FieldSuccess show={acceptTerms}>
-                          {lang === 'fr' ? 'Merci ! Tout est en ordre ! ✅' : 'Thanks! Everything is in order! ✅'}
+                          {lang === 'fr' ? 'Merci ! Tout est en ordre ! âœ…' : 'Thanks! Everything is in order! âœ…'}
                         </FieldSuccess>
                         <ErrorMessage error={formErrors.acceptTerms} fieldName="acceptTerms" />
                       </div>
@@ -1548,30 +1548,30 @@ const Contact: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-gray-900">
-                    {lang === 'fr' ? 'Une communauté qui vous veut du bien' : 'A community that wants the best for you'}
+                    {lang === 'fr' ? 'Une communautÃ© qui vous veut du bien' : 'A community that wants the best for you'}
                   </h3>
                   <p className="text-gray-600">
-                    {lang === 'fr' ? 'Des experts passionnés, partout dans le monde' : 'Passionate experts, all around the world'}
+                    {lang === 'fr' ? 'Des experts passionnÃ©s, partout dans le monde' : 'Passionate experts, all around the world'}
                   </p>
                 </div>
               </div>
               
               <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500">
                 <a href="/politique-confidentialite" className="hover:text-emerald-600 underline transition-colors">
-                  🔒 {lang === 'fr' ? 'Confidentialité' : 'Privacy'}
+                  ðŸ”’ {lang === 'fr' ? 'ConfidentialitÃ©' : 'Privacy'}
                 </a>
                 <a href="/centre-aide" className="hover:text-emerald-600 underline transition-colors">
-                  💬 {lang === 'fr' ? 'Centre d\'aide' : 'Help Center'}
+                  ðŸ’¬ {lang === 'fr' ? 'Centre d\'aide' : 'Help Center'}
                 </a>
                 <a href="/conditions-generales-clients" className="hover:text-emerald-600 underline transition-colors">
-                  📋 {lang === 'fr' ? 'Conditions générales' : 'Terms & Conditions'}
+                  ðŸ“‹ {lang === 'fr' ? 'Conditions gÃ©nÃ©rales' : 'Terms & Conditions'}
                 </a>
               </div>
               
               <div className="mt-6 flex justify-center space-x-4 text-2xl">
-                <span className="animate-bounce">🌍</span>
-                <span className="animate-bounce delay-100">❤️</span>
-                <span className="animate-bounce delay-200">✨</span>
+                <span className="animate-bounce">ðŸŒ</span>
+                <span className="animate-bounce delay-100">â¤ï¸</span>
+                <span className="animate-bounce delay-200">âœ¨</span>
               </div>
             </div>
           </div>

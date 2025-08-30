@@ -1,9 +1,9 @@
-import React, { memo, useMemo } from 'react';
+﻿import React, { memo, useMemo } from 'react';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 
-// Types pour une meilleure sécurité de type
+// Types pour une meilleure sÃ©curitÃ© de type
 interface Service {
   name: string;
   status: 'operational' | 'degraded' | 'outage' | 'maintenance';
@@ -24,7 +24,7 @@ const ServiceStatus: React.FC = () => {
   const { language } = useApp();
   const isFrench = language === 'fr';
 
-  // Configuration des services (logique conservée)
+  // Configuration des services (logique conservÃ©e)
   const services: Service[] = useMemo(
     () => [
       {
@@ -34,7 +34,7 @@ const ServiceStatus: React.FC = () => {
         lastIncident: null,
       },
       {
-        name: isFrench ? 'Système de paiement' : 'Payment system',
+        name: isFrench ? 'SystÃ¨me de paiement' : 'Payment system',
         status: 'operational',
         uptime: '99.8%',
         lastIncident: null,
@@ -55,19 +55,19 @@ const ServiceStatus: React.FC = () => {
     [isFrench]
   );
 
-  // Configuration d’affichage des statuts (logique conservée)
+  // Configuration dâ€™affichage des statuts (logique conservÃ©e)
   const statusConfig: Record<StatusKey, StatusConfig> = useMemo(
     () => ({
       operational: {
         icon: <CheckCircle className="w-5 h-5 text-green-500" />,
-        text: isFrench ? 'Opérationnel' : 'Operational',
+        text: isFrench ? 'OpÃ©rationnel' : 'Operational',
         colorClass: 'text-green-700',
         chipClass:
           'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200',
       },
       degraded: {
         icon: <AlertCircle className="w-5 h-5 text-yellow-500" />,
-        text: isFrench ? 'Dégradé' : 'Degraded',
+        text: isFrench ? 'DÃ©gradÃ©' : 'Degraded',
         colorClass: 'text-yellow-700',
         chipClass:
           'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-700 border border-yellow-200',
@@ -95,28 +95,28 @@ const ServiceStatus: React.FC = () => {
     () => ({
       title: isFrench ? 'Statut du service' : 'Service Status',
       subtitle: isFrench
-        ? "Surveillez l'état de nos services en temps réel"
+        ? "Surveillez l'Ã©tat de nos services en temps rÃ©el"
         : 'Monitor the status of our services in real time',
-      allOperational: isFrench ? 'Tous les systèmes opérationnels' : 'All systems operational',
-      lastUpdated: isFrench ? 'Dernière mise à jour' : 'Last updated',
-      serviceStatus: isFrench ? 'État des services' : 'Service status',
-      uptime: isFrench ? 'disponibilité' : 'uptime',
+      allOperational: isFrench ? 'Tous les systÃ¨mes opÃ©rationnels' : 'All systems operational',
+      lastUpdated: isFrench ? 'DerniÃ¨re mise Ã  jour' : 'Last updated',
+      serviceStatus: isFrench ? 'Ã‰tat des services' : 'Service status',
+      uptime: isFrench ? 'disponibilitÃ©' : 'uptime',
       last30Days: isFrench ? '30 derniers jours' : 'Last 30 days',
       incidentHistory: isFrench ? 'Historique des incidents' : 'Incident history',
       noIncidents: isFrench
-        ? 'Aucun incident signalé au cours des 30 derniers jours'
+        ? 'Aucun incident signalÃ© au cours des 30 derniers jours'
         : 'No incidents reported in the last 30 days',
     }),
     [isFrench]
   );
 
-  // Date formatée
+  // Date formatÃ©e
   const formattedDate = useMemo(
     () => new Date().toLocaleString(isFrench ? 'fr-FR' : 'en-US'),
     [isFrench]
   );
 
-  // Composant élément de service (mémorisé)
+  // Composant Ã©lÃ©ment de service (mÃ©morisÃ©)
   const ServiceItem = memo(({ service }: { service: Service }) => {
     const cfg = statusConfig[service.status];
 
@@ -146,7 +146,7 @@ const ServiceStatus: React.FC = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-950">
-        {/* HERO / Style aligné à la Home */}
+        {/* HERO / Style alignÃ© Ã  la Home */}
         <section className="relative pt-20 pb-14 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-teal-500/10" />

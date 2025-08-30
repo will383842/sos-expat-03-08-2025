@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { RouteMetadata } from '../../config/routes';
 
@@ -11,7 +11,7 @@ interface SEOHeadProps {
 
 const SEOHead: React.FC<SEOHeadProps> = ({
   metadata,
-  siteName = 'Consultation Juridique Expatriés',
+  siteName = 'Consultation Juridique ExpatriÃ©s',
   siteUrl = 'https://votre-site.com',
   defaultImage = '/images/og-default.jpg'
 }) => {
@@ -33,7 +33,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       {/* Langue du document */}
       <html lang={lang} />
       
-      {/* Métadonnées de base */}
+      {/* MÃ©tadonnÃ©es de base */}
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       {keywords.length > 0 && <meta name="keywords" content={keywords.join(', ')} />}
@@ -56,7 +56,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={fullOgImage} />
       
-      {/* Métadonnées techniques */}
+      {/* MÃ©tadonnÃ©es techniques */}
       <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
       <meta name="theme-color" content="#1f2937" />
       <meta name="robots" content="index, follow" />
@@ -70,7 +70,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
         </>
       )}
       
-      {/* Préconnexions pour optimiser les performances */}
+      {/* PrÃ©connexions pour optimiser les performances */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       
@@ -97,7 +97,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
                   "itemOffered": {
                     "@type": "Service",
                     "name": "Consultation juridique",
-                    "description": "Consultation personnalisée avec des avocats spécialisés"
+                    "description": "Consultation personnalisÃ©e avec des avocats spÃ©cialisÃ©s"
                   }
                 }
               ]
@@ -111,13 +111,13 @@ const SEOHead: React.FC<SEOHeadProps> = ({
 
 export default SEOHead;
 
-// Hook personnalisé pour utiliser les métadonnées dans les composants
+// Hook personnalisÃ© pour utiliser les mÃ©tadonnÃ©es dans les composants
 export const useSEO = (metadata: RouteMetadata) => {
   React.useEffect(() => {
-    // Mise à jour du titre dans le document pour les SPA
+    // Mise Ã  jour du titre dans le document pour les SPA
     document.title = metadata.title;
     
-    // Mise à jour de la description
+    // Mise Ã  jour de la description
     const descriptionMeta = document.querySelector('meta[name="description"]');
     if (descriptionMeta) {
       descriptionMeta.setAttribute('content', metadata.description);
@@ -125,7 +125,7 @@ export const useSEO = (metadata: RouteMetadata) => {
   }, [metadata.title, metadata.description]);
 };
 
-// Composant wrapper pour les pages avec métadonnées automatiques
+// Composant wrapper pour les pages avec mÃ©tadonnÃ©es automatiques
 interface PageWithSEOProps {
   metadata: RouteMetadata;
   children: React.ReactNode;

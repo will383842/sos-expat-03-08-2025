@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Cookie as CookieIcon, Settings, Eye, Shield, Check, Globe, Clock, Languages } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
@@ -14,12 +14,12 @@ const Cookies: React.FC = () => {
     (language as 'fr' | 'en') || 'fr'
   );
 
-  // Rester aligné avec la langue globale si elle change
+  // Rester alignÃ© avec la langue globale si elle change
   useEffect(() => {
     if (language) setSelectedLanguage(language as 'fr' | 'en');
   }, [language]);
 
-  // Récupération Firestore (même logique métier)
+  // RÃ©cupÃ©ration Firestore (mÃªme logique mÃ©tier)
   useEffect(() => {
     const fetchCookiesPolicy = async () => {
       try {
@@ -55,22 +55,22 @@ const Cookies: React.FC = () => {
     fr: {
       title: 'Politique des Cookies',
       subtitle: 'Comment nous utilisons les cookies sur notre site',
-      lastUpdated: 'Version 2.2 – Dernière mise à jour : 16 juin 2025',
+      lastUpdated: 'Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025',
       loading: 'Chargement...',
       features: [
-        'Bannière de consentement',
-        'Contrôle granulaire',
+        'BanniÃ¨re de consentement',
+        'ContrÃ´le granulaire',
         'Respect RGPD',
         'Transparence totale',
       ],
       anchorTitle: 'Sommaire',
       contactCta: 'Nous contacter',
-      editHint: 'Document éditable depuis la console admin',
+      editHint: 'Document Ã©ditable depuis la console admin',
     },
     en: {
       title: 'Cookie Policy',
       subtitle: 'How we use cookies on our site',
-      lastUpdated: 'Version 2.2 – Last updated: 16 June 2025',
+      lastUpdated: 'Version 2.2 â€“ Last updated: 16 June 2025',
       loading: 'Loading...',
       features: [
         'Consent banner',
@@ -90,7 +90,7 @@ const Cookies: React.FC = () => {
     setSelectedLanguage(newLang);
   };
 
-  // -------- Parser Markdown (même logique que les autres pages) --------
+  // -------- Parser Markdown (mÃªme logique que les autres pages) --------
   const parseMarkdownContent = (text: string) => {
     const lines = text.split('\n');
     const elements: JSX.Element[] = [];
@@ -177,7 +177,7 @@ const Cookies: React.FC = () => {
         continue;
       }
 
-      // Bloc contact spécial (redirige vers http://localhost:5174/contact)
+      // Bloc contact spÃ©cial (redirige vers http://localhost:5174/contact)
       if (
         line.toLowerCase().includes('contact') &&
         line.toLowerCase().includes('http://localhost:5174/contact')
@@ -231,86 +231,86 @@ const Cookies: React.FC = () => {
     return elements;
   };
 
-  // ---------- Contenu par défaut (bilingue) ----------
+  // ---------- Contenu par dÃ©faut (bilingue) ----------
   const defaultFr = `
 # Politique des Cookies
 
-**Version 2.2 – Dernière mise à jour : 16 juin 2025**
+**Version 2.2 â€“ DerniÃ¨re mise Ã  jour : 16 juin 2025**
 
 ---
 
-## 1. Qu’est-ce qu’un cookie ?
+## 1. Quâ€™est-ce quâ€™un cookie ?
 
-Un **cookie** est un petit fichier texte déposé sur votre terminal (ordinateur, mobile, tablette) lorsque vous visitez un site. Il permet au site de **reconnaître votre appareil**, de **mémoriser** vos préférences et d’**améliorer** votre expérience.
+Un **cookie** est un petit fichier texte dÃ©posÃ© sur votre terminal (ordinateur, mobile, tablette) lorsque vous visitez un site. Il permet au site de **reconnaÃ®tre votre appareil**, de **mÃ©moriser** vos prÃ©fÃ©rences et dâ€™**amÃ©liorer** votre expÃ©rience.
 
 ---
 
 ## 2. Pourquoi utilisons-nous des cookies ?
 
-2.1. **Fonctionnement essentiel** : assurer l’authentification, la sécurité, la sélection de la langue et le maintien de votre session.  
-2.2. **Mesure d’audience** : comprendre l’usage du site pour l’améliorer (pages visitées, temps passé, événements).  
-2.3. **Performance** : optimiser la vitesse de chargement et la stabilité.  
-2.4. **Communication** : permettre la téléphonie/visio et les notifications techniques.
+2.1. **Fonctionnement essentiel** : assurer lâ€™authentification, la sÃ©curitÃ©, la sÃ©lection de la langue et le maintien de votre session.  
+2.2. **Mesure dâ€™audience** : comprendre lâ€™usage du site pour lâ€™amÃ©liorer (pages visitÃ©es, temps passÃ©, Ã©vÃ©nements).  
+2.3. **Performance** : optimiser la vitesse de chargement et la stabilitÃ©.  
+2.4. **Communication** : permettre la tÃ©lÃ©phonie/visio et les notifications techniques.
 
 ---
 
 ## 3. Types de cookies
 
-3.1. **Cookies essentiels** : strictement nécessaires au fonctionnement du site.  
-3.2. **Cookies analytiques** : statistiques d’usage agrégées et anonymisées lorsque possible.  
-3.3. **Cookies de performance** : amélioration de l’affichage, cache et distribution de contenu.
+3.1. **Cookies essentiels** : strictement nÃ©cessaires au fonctionnement du site.  
+3.2. **Cookies analytiques** : statistiques dâ€™usage agrÃ©gÃ©es et anonymisÃ©es lorsque possible.  
+3.3. **Cookies de performance** : amÃ©lioration de lâ€™affichage, cache et distribution de contenu.
 
 ---
 
-## 4. Base légale et durée
+## 4. Base lÃ©gale et durÃ©e
 
-4.1. **Essentiels** : intérêt légitime (fournir le service demandé).  
-4.2. **Anlaytiques/Performance** : **votre consentement** via la bannière.  
-4.3. **Durées** : session (effacés à la fermeture) ou persistants (quelques heures à 13 mois max selon la finalité).
+4.1. **Essentiels** : intÃ©rÃªt lÃ©gitime (fournir le service demandÃ©).  
+4.2. **Anlaytiques/Performance** : **votre consentement** via la banniÃ¨re.  
+4.3. **DurÃ©es** : session (effacÃ©s Ã  la fermeture) ou persistants (quelques heures Ã  13 mois max selon la finalitÃ©).
 
 ---
 
 ## 5. Gestion de votre consentement
 
-5.1. Vous pouvez **accepter/refuser** les catégories non essentielles via notre **bannière de consentement**.  
-5.2. Vous pouvez à tout moment **retirer votre consentement** depuis le lien « Préférences cookies » en bas de page.  
-5.3. Paramétrez également votre **navigateur** pour bloquer/supprimer les cookies.
+5.1. Vous pouvez **accepter/refuser** les catÃ©gories non essentielles via notre **banniÃ¨re de consentement**.  
+5.2. Vous pouvez Ã  tout moment **retirer votre consentement** depuis le lien Â« PrÃ©fÃ©rences cookies Â» en bas de page.  
+5.3. ParamÃ©trez Ã©galement votre **navigateur** pour bloquer/supprimer les cookies.
 
 ---
 
-## 6. Cookies émis par des tiers
+## 6. Cookies Ã©mis par des tiers
 
-Nous pouvons utiliser des prestataires susceptibles de déposer leurs propres cookies : **Stripe** (paiement), **Twilio** (téléphonie), **Firebase** (auth/BDD/hébergement) et, selon activation, un outil d’**analyse d’audience**. Ces tiers sont susceptibles d’opérer **hors UE** ; des **garanties appropriées** sont mises en place lorsque requis.
+Nous pouvons utiliser des prestataires susceptibles de dÃ©poser leurs propres cookies : **Stripe** (paiement), **Twilio** (tÃ©lÃ©phonie), **Firebase** (auth/BDD/hÃ©bergement) et, selon activation, un outil dâ€™**analyse dâ€™audience**. Ces tiers sont susceptibles dâ€™opÃ©rer **hors UE** ; des **garanties appropriÃ©es** sont mises en place lorsque requis.
 
 ---
 
 ## 7. Transferts internationaux
 
-Lorsque des transferts de données s’opèrent hors de votre pays, nous nous assurons qu’ils reposent sur des **mécanismes de protection** reconnus (clauses contractuelles types, décision d’adéquation, etc.) lorsque la loi l’exige.
+Lorsque des transferts de donnÃ©es sâ€™opÃ¨rent hors de votre pays, nous nous assurons quâ€™ils reposent sur des **mÃ©canismes de protection** reconnus (clauses contractuelles types, dÃ©cision dâ€™adÃ©quation, etc.) lorsque la loi lâ€™exige.
 
 ---
 
 ## 8. Vos droits
 
-Conformément au droit applicable (ex. RGPD), vous disposez de droits d’**accès**, **rectification**, **effacement**, **opposition**, **limitation** et **portabilité** dans les conditions prévues par la loi. Vous pouvez exercer vos droits via notre **formulaire de contact** : http://localhost:5174/contact
+ConformÃ©ment au droit applicable (ex. RGPD), vous disposez de droits dâ€™**accÃ¨s**, **rectification**, **effacement**, **opposition**, **limitation** et **portabilitÃ©** dans les conditions prÃ©vues par la loi. Vous pouvez exercer vos droits via notre **formulaire de contact** : http://localhost:5174/contact
 
 ---
 
-## 9. Mise à jour de cette politique
+## 9. Mise Ã  jour de cette politique
 
-Nous pouvons modifier cette politique pour refléter les évolutions réglementaires ou techniques. La version à jour est publiée sur cette page avec la **date de mise à jour**.
+Nous pouvons modifier cette politique pour reflÃ©ter les Ã©volutions rÃ©glementaires ou techniques. La version Ã  jour est publiÃ©e sur cette page avec la **date de mise Ã  jour**.
 
 ---
 
 ## 10. Contact
 
-Pour toute question relative aux cookies ou à la protection des données, contactez-nous : **http://localhost:5174/contact**
+Pour toute question relative aux cookies ou Ã  la protection des donnÃ©es, contactez-nous : **http://localhost:5174/contact**
 `;
 
   const defaultEn = `
 # Cookie Policy
 
-**Version 2.2 – Last updated: 16 June 2025**
+**Version 2.2 â€“ Last updated: 16 June 2025**
 
 ---
 
@@ -387,15 +387,15 @@ For any questions regarding cookies or data protection, please contact us: **htt
   // Sommaire UI
   const anchorMap = useMemo(
     () => [
-      { num: 1, label: selectedLanguage === 'fr' ? 'Qu’est-ce qu’un cookie ?' : 'What is a cookie?' },
+      { num: 1, label: selectedLanguage === 'fr' ? 'Quâ€™est-ce quâ€™un cookie ?' : 'What is a cookie?' },
       { num: 2, label: selectedLanguage === 'fr' ? "Pourquoi nous les utilisons" : 'Why we use them' },
       { num: 3, label: selectedLanguage === 'fr' ? 'Types de cookies' : 'Types of cookies' },
-      { num: 4, label: selectedLanguage === 'fr' ? 'Base légale & durée' : 'Legal basis & duration' },
+      { num: 4, label: selectedLanguage === 'fr' ? 'Base lÃ©gale & durÃ©e' : 'Legal basis & duration' },
       { num: 5, label: selectedLanguage === 'fr' ? 'Gestion du consentement' : 'Managing consent' },
       { num: 6, label: selectedLanguage === 'fr' ? 'Cookies tiers' : 'Third-party cookies' },
       { num: 7, label: selectedLanguage === 'fr' ? 'Transferts internationaux' : 'International transfers' },
       { num: 8, label: selectedLanguage === 'fr' ? 'Vos droits' : 'Your rights' },
-      { num: 9, label: selectedLanguage === 'fr' ? 'Mises à jour' : 'Updates' },
+      { num: 9, label: selectedLanguage === 'fr' ? 'Mises Ã  jour' : 'Updates' },
       { num: 10, label: selectedLanguage === 'fr' ? 'Contact' : 'Contact' },
     ],
     [selectedLanguage]
@@ -463,7 +463,7 @@ For any questions regarding cookies or data protection, please contact us: **htt
               </h1>
               <p className="text-lg sm:text-2xl text-gray-300 max-w-3xl mx-auto">{t.subtitle}</p>
 
-              {/* Points clés */}
+              {/* Points clÃ©s */}
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-white/90">
                 {[
                   { icon: <Shield className="w-6 h-6" />, text: t.features[0], gradient: 'from-green-500 to-emerald-500' },

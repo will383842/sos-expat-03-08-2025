@@ -1,0 +1,40 @@
+﻿import { onCall } from "firebase-functions/v2/https";
+import { setGlobalOptions } from "firebase-functions/v2";
+import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+// Région globale (tu as déjà europe-west1 dans ton projet)
+setGlobalOptions({ region: "europe-west1" });
+
+if (!admin.apps.length) admin.initializeApp();
+
+export const admin_templates_seed = onCall(async (_req) => {
+  const db = getFirestore();
+  const dir = path.join(__dirname, "..", "assets");
+
+  const routing = JSON.parse(fs.readFileSync(path.join(dir, "sos-expat-message-routing.json"), "utf8"));
+  const fr = JSON.parse(fs.readFileSync(path.join(dir, "sos-expat-message-templates-fr.json"), "utf8"));
+  const en = JSON.parse(fs.readFileSync(path.join(dir, "sos-expat-message-templates-en.json"), "utf8"));
+
+  // ROUTING
+  await db.collection("message_routing").doc("config").set({
+    version: routing.version ?? 1,
+    routing: routing.routing ?? routing
+  }, { merge: true });
+
+  const writeLocale = async (locale: string, payload: any) => {
+    const root = db.collection("message_templates").doc(locale);
+    if (payload.defaults) await root.collection("_meta").doc("defaults").set(payload.defaults);
+    const list = payload.templates ?? payload;
+    for (const t of list) {
+      await root.collection("items").doc(t.id).set(t);
+    }
+  };
+
+  await writeLocale("fr-FR", fr);
+  await writeLocale("en", en);
+
+  return { ok: true };
+});

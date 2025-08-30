@@ -1,4 +1,4 @@
-// ========================================
+﻿// ========================================
 // src/components/forms-data/MultiLanguageSelect.tsx - VERSION ADAPTATIVE
 // ========================================
 
@@ -41,13 +41,13 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
 }) => {
   const [inputValue, setInputValue] = useState('');
   
-  // 🎯 PRIORITÉ : locale prop > détection automatique
+  // ðŸŽ¯ PRIORITÃ‰ : locale prop > dÃ©tection automatique
   const currentLocale = useMemo<'fr' | 'en'>(() => {
-    // Si une locale est explicitement passée, l'utiliser
+    // Si une locale est explicitement passÃ©e, l'utiliser
     if (locale) {
       return locale;
     }
-    // Sinon détecter automatiquement
+    // Sinon dÃ©tecter automatiquement
     return getDetectedBrowserLanguage() as 'fr' | 'en';
   }, [locale]);
 
@@ -62,7 +62,7 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
     return searchLanguagesMultilingual(inputValue);
   }, [inputValue, currentLanguages, currentLocale]);
 
-  // Options avec compatibilité
+  // Options avec compatibilitÃ©
   const options = useMemo((): LanguageOption[] => {
     return filteredLanguages.map(lang => {
       const isShared = highlightShared && providerLanguages.includes(lang.code);
@@ -86,13 +86,13 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
     });
   }, [options, highlightShared]);
 
-  // 🎯 STYLES COMPLÈTEMENT ADAPTATIFS - Hérite du parent
+  // ðŸŽ¯ STYLES COMPLÃˆTEMENT ADAPTATIFS - HÃ©rite du parent
   const adaptiveStyles: StylesConfig<LanguageOption, true> = {
     control: (provided, state) => ({
       ...provided,
-      // Réinitialiser tous les styles pour hériter du parent
+      // RÃ©initialiser tous les styles pour hÃ©riter du parent
     border: state.isFocused
-      ? '2px solid var(--input-border-focus, #dc2626)' // rouge (équivalent focus:ring-red-500/border-red-600)
+      ? '2px solid var(--input-border-focus, #dc2626)' // rouge (Ã©quivalent focus:ring-red-500/border-red-600)
       : '2px solid var(--input-border, #e5e7eb)',       // gris-200
    backgroundColor: 'var(--input-bg, #ffffff)',
      boxShadow: 'none',
@@ -107,7 +107,7 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
      margin: '0',
 
       outline: 'none',
-      // Supprimer les transitions pour éviter les conflits
+      // Supprimer les transitions pour Ã©viter les conflits
       transition: 'none',
       '&:hover': {
         border: 'none',
@@ -126,7 +126,7 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
     
     placeholder: (provided) => ({
       ...provided,
-      // Hériter de la couleur et taille du parent
+      // HÃ©riter de la couleur et taille du parent
       color: 'inherit',
       fontSize: 'inherit',
       fontFamily: 'inherit',
@@ -153,7 +153,7 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
     // Le menu utilise des styles standards mais adaptatifs
     menu: (provided) => ({
       ...provided,
-      // Garder quelques styles pour la lisibilité
+      // Garder quelques styles pour la lisibilitÃ©
       background: 'white',
       border: '1px solid #e5e7eb',
       borderRadius: '0.75rem', // 12px
@@ -193,15 +193,15 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
       };
     },
     
-    // 🎨 PILLS ADAPTATIFS - Héritent du style de la page
+    // ðŸŽ¨ PILLS ADAPTATIFS - HÃ©ritent du style de la page
     multiValue: (provided, state) => {
       const { data } = state;
       return {
         ...provided,
-        // Base adaptative - hérite des variables CSS de la page
+        // Base adaptative - hÃ©rite des variables CSS de la page
         backgroundColor: data.isShared ? 'var(--color-success-bg, #f0fdf4)' : 'var(--color-primary-bg, #eff6ff)',
         border: data.isShared ? '1px solid var(--color-success-border, #bbf7d0)' : '1px solid var(--color-primary-border, #dbeafe)',
-        borderRadius: 'var(--border-radius-pill, 9999px)', // Par défaut très arrondi
+        borderRadius: 'var(--border-radius-pill, 9999px)', // Par dÃ©faut trÃ¨s arrondi
         margin: '0.125rem',
         fontSize: 'var(--font-size-sm, 0.875rem)',
         fontWeight: 'var(--font-weight-medium, 500)',
@@ -275,15 +275,15 @@ const MultiLanguageSelect: React.FC<MultiLanguageSelectProps> = React.memo(({
   // Message "aucune option"
   const noOptionsMessage = useCallback(({ inputValue }: { inputValue: string }) => {
     if (currentLocale === 'fr') {
-      return inputValue ? `Aucune langue trouvée pour "${inputValue}"` : "Aucune langue disponible";
+      return inputValue ? `Aucune langue trouvÃ©e pour "${inputValue}"` : "Aucune langue disponible";
     } else {
       return inputValue ? `No language found for "${inputValue}"` : "No languages available";
     }
   }, [currentLocale]);
 
-  // Placeholder par défaut
+  // Placeholder par dÃ©faut
   const defaultPlaceholder = useMemo(() => {
-    return currentLocale === 'fr' ? "Rechercher et sélectionner..." : "Search and select...";
+    return currentLocale === 'fr' ? "Rechercher et sÃ©lectionner..." : "Search and select...";
   }, [currentLocale]);
 
   return (

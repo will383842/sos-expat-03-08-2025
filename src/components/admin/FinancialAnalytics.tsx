@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -48,7 +48,7 @@ export const FinancialAnalytics: React.FC = () => {
     try {
       setLoading(true);
       
-      // Calculer la date de début selon le timeframe
+      // Calculer la date de dÃ©but selon le timeframe
       const now = new Date();
       const startDate = new Date();
       
@@ -165,7 +165,7 @@ export const FinancialAnalytics: React.FC = () => {
     // Revenus par type de service
     const serviceMap = new Map<string, number>();
     paymentsData.forEach(payment => {
-      const service = payment.serviceType === 'lawyer_call' ? 'Appels Avocat' : 'Appels Expatrié';
+      const service = payment.serviceType === 'lawyer_call' ? 'Appels Avocat' : 'Appels ExpatriÃ©';
       serviceMap.set(service, (serviceMap.get(service) || 0) + payment.amount);
     });
 
@@ -188,7 +188,7 @@ export const FinancialAnalytics: React.FC = () => {
       percentage: (amount / totalRevenue) * 100
     }));
 
-    // Calcul de croissance mensuelle (simplifié)
+    // Calcul de croissance mensuelle (simplifiÃ©)
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -211,7 +211,7 @@ export const FinancialAnalytics: React.FC = () => {
       totalProviderPayouts,
       paymentCount,
       avgTransactionValue,
-      conversionRate: 85, // Placeholder - vous pouvez calculer depuis vos données
+      conversionRate: 85, // Placeholder - vous pouvez calculer depuis vos donnÃ©es
       revenueByDay,
       revenueByService,
       revenueByCurrency,
@@ -227,8 +227,8 @@ export const FinancialAnalytics: React.FC = () => {
       Montant: p.amount,
       Devise: p.currency.toUpperCase(),
       'Frais Plateforme': p.platformFee,
-      'Rémunération Prestataire': p.providerAmount,
-      'Type Service': p.serviceType === 'lawyer_call' ? 'Avocat' : 'Expatrié',
+      'RÃ©munÃ©ration Prestataire': p.providerAmount,
+      'Type Service': p.serviceType === 'lawyer_call' ? 'Avocat' : 'ExpatriÃ©',
       Statut: p.status
     }));
 
@@ -258,7 +258,7 @@ export const FinancialAnalytics: React.FC = () => {
   if (!analytics) {
     return (
       <div className="text-center text-gray-600">
-        Aucune donnée disponible pour la période sélectionnée
+        Aucune donnÃ©e disponible pour la pÃ©riode sÃ©lectionnÃ©e
       </div>
     );
   }
@@ -273,7 +273,7 @@ export const FinancialAnalytics: React.FC = () => {
             Analytics Financiers
           </h2>
           <p className="text-gray-600 mt-1">
-            Analyse détaillée des revenus et performances
+            Analyse dÃ©taillÃ©e des revenus et performances
           </p>
         </div>
         
@@ -354,7 +354,7 @@ export const FinancialAnalytics: React.FC = () => {
               <p className="text-purple-100 text-sm">Nb. Transactions</p>
               <p className="text-3xl font-bold">{analytics.paymentCount}</p>
               <p className="text-purple-100 text-sm">
-                Moy: {analytics.avgTransactionValue.toFixed(0)}€
+                Moy: {analytics.avgTransactionValue.toFixed(0)}â‚¬
               </p>
             </div>
             <Calendar className="w-12 h-12 text-purple-200" />
@@ -364,7 +364,7 @@ export const FinancialAnalytics: React.FC = () => {
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg text-white">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-orange-100 text-sm">Rémun. Prestataires</p>
+              <p className="text-orange-100 text-sm">RÃ©mun. Prestataires</p>
               <p className="text-3xl font-bold">
                 {analytics.totalProviderPayouts.toLocaleString('fr-FR', {
                   style: 'currency',
@@ -382,9 +382,9 @@ export const FinancialAnalytics: React.FC = () => {
 
       {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Évolution des revenus */}
+        {/* Ã‰volution des revenus */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Évolution des Revenus</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ã‰volution des Revenus</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={analytics.revenueByDay}>
@@ -393,7 +393,7 @@ export const FinancialAnalytics: React.FC = () => {
                 <YAxis />
                 <Tooltip 
                   formatter={(value: number, name: string) => [
-                    `${value.toFixed(0)}€`,
+                    `${value.toFixed(0)}â‚¬`,
                     name === 'revenue' ? 'Revenus' : 'Frais'
                   ]}
                 />
@@ -416,9 +416,9 @@ export const FinancialAnalytics: React.FC = () => {
           </div>
         </div>
 
-        {/* Répartition par service */}
+        {/* RÃ©partition par service */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Service</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">RÃ©partition par Service</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -436,17 +436,17 @@ export const FinancialAnalytics: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => [`${value.toFixed(0)}€`, 'Revenus']} />
+                <Tooltip formatter={(value: number) => [`${value.toFixed(0)}â‚¬`, 'Revenus']} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Tableau détaillé des revenus par devise */}
+      {/* Tableau dÃ©taillÃ© des revenus par devise */}
       {analytics.revenueByCurrency.length > 1 && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Devise</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">RÃ©partition par Devise</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {analytics.revenueByCurrency.map((currency, index) => (
               <div key={currency.currency} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -474,10 +474,10 @@ export const FinancialAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Tableau des transactions récentes */}
+      {/* Tableau des transactions rÃ©centes */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Transactions Récentes</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Transactions RÃ©centes</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -524,7 +524,7 @@ export const FinancialAnalytics: React.FC = () => {
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {payment.serviceType === 'lawyer_call' ? 'Avocat' : 'Expatrié'}
+                      {payment.serviceType === 'lawyer_call' ? 'Avocat' : 'ExpatriÃ©'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

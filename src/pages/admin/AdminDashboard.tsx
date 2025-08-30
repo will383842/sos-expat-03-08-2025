@@ -1,4 +1,4 @@
-// src/pages/admin/AdminDashboard.tsx - VERSION NETTOYÉE
+﻿// src/pages/admin/AdminDashboard.tsx - VERSION NETTOYÃ‰E
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -26,7 +26,7 @@ import Modal from '../../components/common/Modal';
 import { validateDataIntegrity, cleanupObsoleteData } from '../../utils/firestore';
 import testNotificationSystem from '../../services/notifications/notificationService';
 
-// Interface pour les paramètres admin (SIMPLIFIÉ - sans commission)
+// Interface pour les paramÃ¨tres admin (SIMPLIFIÃ‰ - sans commission)
 interface AdminSettings {
   twilioSettings: {
     maxAttempts: number;
@@ -42,7 +42,7 @@ interface AdminSettings {
   updatedBy?: string;
 }
 
-// Interface pour le rapport d'intégrité
+// Interface pour le rapport d'intÃ©gritÃ©
 interface IntegrityReport {
   isValid: boolean;
   issues: string[];
@@ -91,7 +91,7 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // extraction sûre de l'ID et du rôle pour éviter any
+  // extraction sÃ»re de l'ID et du rÃ´le pour Ã©viter any
   const userId = typeof (user as { id?: unknown } | null)?.id === 'string'
     ? (user as { id?: string }).id
     : undefined;
@@ -99,7 +99,7 @@ const AdminDashboard: React.FC = () => {
     ? (user as { role?: string }).role
     : undefined;
 
-  // États avec valeurs par défaut
+  // Ã‰tats avec valeurs par dÃ©faut
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -117,7 +117,7 @@ const AdminDashboard: React.FC = () => {
     providerRevenue: 0
   });
 
-  // Notification helper (simplifié)
+  // Notification helper (simplifiÃ©)
   const invokeTestNotification = async (providerId: string): Promise<void> => {
     const candidate = testNotificationSystem as unknown;
     
@@ -183,7 +183,7 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user]);
 
-  // Load admin settings (SIMPLIFIÉ - sans commission)
+  // Load admin settings (SIMPLIFIÃ‰ - sans commission)
   const loadAdminData = useCallback(async (): Promise<void> => {
     if (!user) return;
 
@@ -193,16 +193,16 @@ const AdminDashboard: React.FC = () => {
       
       if (settingsDoc.exists()) {
         const data = settingsDoc.data() as Record<string, unknown>;
-        // Migration: exclure sosCommission si présent
+        // Migration: exclure sosCommission si prÃ©sent
         const { sosCommission, ...cleanSettings } = data as Record<string, unknown>;
         setSettings(normalizeAdminSettings(cleanSettings));
         
         // Si sosCommission existait, marquer pour migration
         if (sosCommission) {
-          console.warn('🔄 Migration détectée: sosCommission retiré de admin_settings. Utilisez admin_config/pricing.');
+          console.warn('ðŸ”„ Migration dÃ©tectÃ©e: sosCommission retirÃ© de admin_settings. Utilisez admin_config/pricing.');
         }
       } else {
-        // Paramètres par défaut SANS commission
+        // ParamÃ¨tres par dÃ©faut SANS commission
         const defaultSettings: AdminSettings = {
           twilioSettings: {
             maxAttempts: 3,
@@ -227,14 +227,14 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user, loadStats]);
 
-  // Chargement des données au montage du composant
+  // Chargement des donnÃ©es au montage du composant
   useEffect(() => {
     if (user) {
       void loadAdminData();
     }
   }, [user, loadAdminData]);
 
-  // Handle settings change (SIMPLIFIÉ)
+  // Handle settings change (SIMPLIFIÃ‰)
   const handleSettingsChange = (path: string, value: string | number | boolean): void => {
     if (!settings) return;
 
@@ -250,7 +250,7 @@ const AdminDashboard: React.FC = () => {
     setSettings(newSettings);
   };
 
-  // Save settings (SIMPLIFIÉ)
+  // Save settings (SIMPLIFIÃ‰)
   const saveSettings = async (): Promise<void> => {
     if (!settings || !user) return;
 
@@ -261,10 +261,10 @@ const AdminDashboard: React.FC = () => {
         updatedAt: serverTimestamp(),
         updatedBy: userId
       });
-      alert('✅ Paramètres sauvegardés avec succès !');
+      alert('âœ… ParamÃ¨tres sauvegardÃ©s avec succÃ¨s !');
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('❌ Erreur lors de la sauvegarde');
+      alert('âŒ Erreur lors de la sauvegarde');
     } finally {
       setIsSaving(false);
     }
@@ -285,7 +285,7 @@ const AdminDashboard: React.FC = () => {
       setShowIntegrityModal(true);
     } catch (error) {
       console.error('Error checking integrity:', error);
-      alert("❌ Erreur lors de la vérification d'intégrité");
+      alert("âŒ Erreur lors de la vÃ©rification d'intÃ©gritÃ©");
     } finally {
       setIsCheckingIntegrity(false);
     }
@@ -293,7 +293,7 @@ const AdminDashboard: React.FC = () => {
 
   // Clean obsolete data
   const handleCleanupData = async (): Promise<void> => {
-    if (!confirm('⚠️ Êtes-vous sûr de vouloir nettoyer les données obsolètes ? Cette action est irréversible.')) {
+    if (!confirm('âš ï¸ ÃŠtes-vous sÃ»r de vouloir nettoyer les donnÃ©es obsolÃ¨tes ? Cette action est irrÃ©versible.')) {
       return;
     }
 
@@ -301,13 +301,13 @@ const AdminDashboard: React.FC = () => {
     try {
       const success = await cleanupObsoleteData();
       if (success) {
-        alert('✅ Nettoyage des données terminé avec succès');
+        alert('âœ… Nettoyage des donnÃ©es terminÃ© avec succÃ¨s');
       } else {
-        alert('❌ Erreur lors du nettoyage des données');
+        alert('âŒ Erreur lors du nettoyage des donnÃ©es');
       }
     } catch (error) {
       console.error('Error cleaning data:', error);
-      alert('❌ Erreur lors du nettoyage des données');
+      alert('âŒ Erreur lors du nettoyage des donnÃ©es');
     } finally {
       setIsCleaningData(false);
     }
@@ -315,7 +315,7 @@ const AdminDashboard: React.FC = () => {
 
   // Test notification system
   const handleTestNotifications = async (): Promise<void> => {
-    if (!confirm("🔔 Voulez-vous tester le système de notifications ?")) {
+    if (!confirm("ðŸ”” Voulez-vous tester le systÃ¨me de notifications ?")) {
       return;
     }
 
@@ -323,11 +323,11 @@ const AdminDashboard: React.FC = () => {
     try {
       const testProviderId = prompt("Entrez l'ID du prestataire pour le test:") || 'test-provider-id';
       await invokeTestNotification(testProviderId);
-      alert('✅ Test de notification envoyé avec succès !');
+      alert('âœ… Test de notification envoyÃ© avec succÃ¨s !');
     } catch (error) {
       console.error('Erreur lors du test de notification:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-      alert(`❌ Erreur lors du test de notification: ${errorMessage}`);
+      alert(`âŒ Erreur lors du test de notification: ${errorMessage}`);
     } finally {
       setIsTestingNotifications(false);
     }
@@ -349,8 +349,8 @@ const AdminDashboard: React.FC = () => {
       <AdminLayout>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Accès non autorisé</h1>
-            <p className="text-gray-600">Vous devez être administrateur pour accéder à cette page.</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">AccÃ¨s non autorisÃ©</h1>
+            <p className="text-gray-600">Vous devez Ãªtre administrateur pour accÃ©der Ã  cette page.</p>
           </div>
         </div>
       </AdminLayout>
@@ -402,11 +402,11 @@ const AdminDashboard: React.FC = () => {
                   </Button>
                   <Button onClick={handleCheckIntegrity} loading={isCheckingIntegrity} className="bg-blue-600 hover:bg-blue-700">
                     <Shield size={20} className="mr-2" />
-                    Vérifier l'intégrité
+                    VÃ©rifier l'intÃ©gritÃ©
                   </Button>
                   <Button onClick={handleCleanupData} loading={isCleaningData} className="bg-orange-600 hover:bg-orange-700">
                     <Trash size={20} className="mr-2" />
-                    Nettoyer les données
+                    Nettoyer les donnÃ©es
                   </Button>
                   <Button onClick={handleTestNotifications} loading={isTestingNotifications} className="bg-purple-600 hover:bg-purple-700">
                     <Mail size={20} className="mr-2" />
@@ -433,7 +433,7 @@ const AdminDashboard: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Appels réussis</p>
+                    <p className="text-sm font-medium text-gray-600">Appels rÃ©ussis</p>
                     <p className="text-3xl font-bold text-green-600">{stats.successfulCalls.toLocaleString()}</p>
                   </div>
                   <BarChart3 className="w-8 h-8 text-green-600" />
@@ -445,7 +445,7 @@ const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Revenus totaux</p>
                     <p className="text-3xl font-bold text-purple-600">
-                      {stats.totalRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                      {stats.totalRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}â‚¬
                     </p>
                   </div>
                   <DollarSign className="w-8 h-8 text-purple-600" />
@@ -457,7 +457,7 @@ const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Commission SOS</p>
                     <p className="text-3xl font-bold text-red-600">
-                      {stats.platformRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                      {stats.platformRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}â‚¬
                     </p>
                   </div>
                   <Settings className="w-8 h-8 text-red-600" />
@@ -469,7 +469,7 @@ const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Revenus prestataires</p>
                     <p className="text-3xl font-bold text-orange-600">
-                      {stats.providerRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                      {stats.providerRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}â‚¬
                     </p>
                   </div>
                   <Users className="w-8 h-8 text-orange-600" />
@@ -477,12 +477,12 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Accès rapides vers autres sections */}
+            {/* AccÃ¨s rapides vers autres sections */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <Settings className="w-5 h-5 mr-2 text-blue-600" />
-                  🚀 Accès rapides
+                  ðŸš€ AccÃ¨s rapides
                 </h2>
               </div>
               <div className="p-6">
@@ -516,12 +516,12 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Paramètres Twilio */}
+              {/* ParamÃ¨tres Twilio */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                     <Phone className="w-5 h-5 mr-2" />
-                    ☎️ Paramètres d'appel (Twilio)
+                    â˜Žï¸ ParamÃ¨tres d'appel (Twilio)
                   </h2>
                 </div>
                 <div className="p-6 space-y-4">
@@ -550,17 +550,17 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Paramètres de notifications */}
+              {/* ParamÃ¨tres de notifications */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                     <Mail className="w-5 h-5 mr-2" />
-                    🔔 Paramètres de notifications
+                    ðŸ”” ParamÃ¨tres de notifications
                   </h2>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700">Email activé</label>
+                    <label className="text-sm font-medium text-gray-700">Email activÃ©</label>
                     <input
                       type="checkbox"
                       checked={settings?.notificationSettings?.enableEmail ?? true}
@@ -569,7 +569,7 @@ const AdminDashboard: React.FC = () => {
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700">SMS activé</label>
+                    <label className="text-sm font-medium text-gray-700">SMS activÃ©</label>
                     <input
                       type="checkbox"
                       checked={settings?.notificationSettings?.enableSMS ?? true}
@@ -578,7 +578,7 @@ const AdminDashboard: React.FC = () => {
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700">WhatsApp activé</label>
+                    <label className="text-sm font-medium text-gray-700">WhatsApp activÃ©</label>
                     <input
                       type="checkbox"
                       checked={settings?.notificationSettings?.enableWhatsApp ?? true}
@@ -595,14 +595,14 @@ const AdminDashboard: React.FC = () => {
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <Star className="w-5 h-5 mr-2" />
-                  ⭐ Gestion des avis
+                  â­ Gestion des avis
                 </h2>
               </div>
               <div className="p-6">
                 <p className="text-gray-600 mb-4">
-                  Gérez les avis clients de la plateforme. Vous pouvez modérer, publier ou masquer les avis.
+                  GÃ©rez les avis clients de la plateforme. Vous pouvez modÃ©rer, publier ou masquer les avis.
                 </p>
-                <Button onClick={() => navigate('/admin/reviews')}>Accéder à la gestion des avis</Button>
+                <Button onClick={() => navigate('/admin/reviews')}>AccÃ©der Ã  la gestion des avis</Button>
               </div>
             </div>
           </div>
@@ -611,7 +611,7 @@ const AdminDashboard: React.FC = () => {
           <Modal
             isOpen={showIntegrityModal}
             onClose={() => setShowIntegrityModal(false)}
-            title="Rapport d'intégrité des données"
+            title="Rapport d'intÃ©gritÃ© des donnÃ©es"
             size="large"
           >
             {integrityReport && (
@@ -628,14 +628,14 @@ const AdminDashboard: React.FC = () => {
                       <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
                     )}
                     <h3 className={`font-medium ${integrityReport.isValid ? 'text-green-800' : 'text-red-800'}`}>
-                      {integrityReport.isValid ? 'Données intègres' : `${integrityReport.issues.length} problème(s) détecté(s)`}
+                      {integrityReport.isValid ? 'DonnÃ©es intÃ¨gres' : `${integrityReport.issues.length} problÃ¨me(s) dÃ©tectÃ©(s)`}
                     </h3>
                   </div>
                 </div>
 
                 {integrityReport.issues.length > 0 && (
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Problèmes détectés :</h4>
+                    <h4 className="font-medium text-gray-900 mb-2">ProblÃ¨mes dÃ©tectÃ©s :</h4>
                     <ul className="space-y-1">
                       {integrityReport.issues.map((issue, index) => (
                         <li key={index} className="text-sm text-red-600 flex items-start">

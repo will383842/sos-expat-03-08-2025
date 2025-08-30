@@ -1,4 +1,4 @@
-// src/pages/Login.tsx - VERSION COMPLÈTE AVEC TOUTES LES FONCTIONNALITÉS
+﻿// src/pages/Login.tsx - VERSION COMPLÃˆTE AVEC TOUTES LES FONCTIONNALITÃ‰S
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, LogIn, Shield, Smartphone, Globe, CheckCircle, Sparkles, Star, Lock, Mail, User } from 'lucide-react';
@@ -7,9 +7,9 @@ import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-// ✅ CORRECTION: Import correct du type Provider
+// âœ… CORRECTION: Import correct du type Provider
 import type { Provider } from '../contexts/types';
-// ✅ CORRECTION: Imports Firebase corrects (suppression des imports non utilisés)
+// âœ… CORRECTION: Imports Firebase corrects (suppression des imports non utilisÃ©s)
 import { 
   setPersistence, 
   browserLocalPersistence, 
@@ -18,14 +18,14 @@ import {
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
-// ✅ CORRECTION: Interface LoginFormData corrigée
+// âœ… CORRECTION: Interface LoginFormData corrigÃ©e
 interface LoginFormData {
   email: string;
   password: string;
   rememberMe: boolean;
 }
 
-// ✅ CORRECTION: Interface FormErrors corrigée
+// âœ… CORRECTION: Interface FormErrors corrigÃ©e
 interface FormErrors {
   email?: string;
   password?: string;
@@ -39,7 +39,7 @@ interface ExistingUserData {
   avatar?: string;
 }
 
-/** Typage léger et sûr pour gtag, sans `any` */
+/** Typage lÃ©ger et sÃ»r pour gtag, sans `any` */
 type GtagFunction = (...args: unknown[]) => void;
 interface GtagWindow {
   gtag?: GtagFunction;
@@ -48,7 +48,7 @@ const getGtag = (): GtagFunction | undefined =>
   (typeof window !== 'undefined' ? (window as unknown as GtagWindow).gtag : undefined);
 
 /* ================================
-   PWA install hook (réutilisé de HomePage)
+   PWA install hook (rÃ©utilisÃ© de HomePage)
    ================================ */
 type BIPEvent = Event & {
   prompt: () => Promise<void>;
@@ -105,7 +105,7 @@ const usePWAInstall = () => {
 };
 
 /* ================================
-   Bouton PWA + hint sympa (réutilisé de HomePage)
+   Bouton PWA + hint sympa (rÃ©utilisÃ© de HomePage)
    ================================ */
 function PWAInstallIconWithHint({
   canInstall,
@@ -121,7 +121,7 @@ function PWAInstallIconWithHint({
   const computeHint = () => {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     
-    // Détection iOS avec typage sûr
+    // DÃ©tection iOS avec typage sÃ»r
     const isIOS = /iPad|iPhone|iPod/.test(ua) || 
       (typeof navigator !== 'undefined' && 
        'platform' in navigator && 
@@ -133,15 +133,15 @@ function PWAInstallIconWithHint({
     const isDesktop = !isIOS && !isAndroid;
 
     if (isIOS) {
-      return "📱 Pour installer l'app sur iPhone/iPad :\n1. Ouvrez cette page dans Safari\n2. Appuyez sur l'icône Partage (carré avec flèche)\n3. Choisissez « Sur l'écran d'accueil »\n4. Appuyez sur « Ajouter »";
+      return "ðŸ“± Pour installer l'app sur iPhone/iPad :\n1. Ouvrez cette page dans Safari\n2. Appuyez sur l'icÃ´ne Partage (carrÃ© avec flÃ¨che)\n3. Choisissez Â« Sur l'Ã©cran d'accueil Â»\n4. Appuyez sur Â« Ajouter Â»";
     }
     if (isAndroid) {
-      return "📱 Pour installer l'app sur Android :\n1. Ouvrez cette page dans Chrome\n2. Appuyez sur le menu ⋮ (3 points)\n3. Choisissez « Installer l'application »\n4. Confirmez l'installation";
+      return "ðŸ“± Pour installer l'app sur Android :\n1. Ouvrez cette page dans Chrome\n2. Appuyez sur le menu â‹® (3 points)\n3. Choisissez Â« Installer l'application Â»\n4. Confirmez l'installation";
     }
     if (isDesktop) {
-      return "💻 Pour installer l'app sur votre ordinateur :\n1. Utilisez Chrome ou Edge\n2. Cliquez sur l'icône d'installation dans la barre d'adresse (à droite)\n3. Ou utilisez le menu ⋮ → « Installer SOS Expats »\n4. L'app s'ouvrira comme une application native";
+      return "ðŸ’» Pour installer l'app sur votre ordinateur :\n1. Utilisez Chrome ou Edge\n2. Cliquez sur l'icÃ´ne d'installation dans la barre d'adresse (Ã  droite)\n3. Ou utilisez le menu â‹® â†’ Â« Installer SOS Expats Â»\n4. L'app s'ouvrira comme une application native";
     }
-    return "🌐 Pour installer l'app :\nUtilisez Chrome ou Edge sur ordinateur, ou Safari (iPhone) / Chrome (Android) sur mobile.";
+    return "ðŸŒ Pour installer l'app :\nUtilisez Chrome ou Edge sur ordinateur, ou Safari (iPhone) / Chrome (Android) sur mobile.";
   };
 
   const reveal = (text?: string) => {
@@ -173,7 +173,7 @@ function PWAInstallIconWithHint({
       >
         <img
           src="/icons/icon-512x512-maskable.png"
-          alt="Icône appli SOS Expat"
+          alt="IcÃ´ne appli SOS Expat"
           className={`${canInstall ? 'animate-bounce' : 'animate-pulse'} w-full h-full object-cover`}
         />
       </button>
@@ -194,50 +194,50 @@ function PWAInstallIconWithHint({
   );
 }
 
-// Hook de traduction optimisé avec contexte App
+// Hook de traduction optimisÃ© avec contexte App
 const useTranslation = () => {
   const { language } = useApp();
 
   const t = useCallback((key: string, defaultValue?: string): string => {
     const translations: Record<string, Record<string, string>> = {
       'meta.title': {
-        fr: "Connexion - SOS Expats | Services d'assistance aux expatriés",
+        fr: "Connexion - SOS Expats | Services d'assistance aux expatriÃ©s",
         en: 'Login - SOS Expats | Expat assistance services'
       },
       'meta.description': {
-        fr: "Connectez-vous à votre compte SOS Expats pour accéder à tous nos services d'assistance personnalisés aux expatriés. Support 24/7, démarches administratives, conseils juridiques.",
+        fr: "Connectez-vous Ã  votre compte SOS Expats pour accÃ©der Ã  tous nos services d'assistance personnalisÃ©s aux expatriÃ©s. Support 24/7, dÃ©marches administratives, conseils juridiques.",
         en: 'Sign in to your SOS Expats account to access all our personalized expat assistance services. 24/7 support, administrative procedures, legal advice.'
       },
       'meta.keywords': {
-        fr: 'connexion, login, SOS Expats, expatriés, assistance, services, support 24/7',
+        fr: 'connexion, login, SOS Expats, expatriÃ©s, assistance, services, support 24/7',
         en: 'login, SOS Expats, expats, assistance, services, 24/7 support'
       },
       'meta.og_title': {
-        fr: 'Connexion SOS Expats - Votre portail expatrié sécurisé',
+        fr: 'Connexion SOS Expats - Votre portail expatriÃ© sÃ©curisÃ©',
         en: 'SOS Expats Login - Your secure expat portal'
       },
       'meta.og_description': {
-        fr: "Accédez instantanément à votre espace personnel SOS Expats. Services d'accompagnement premium pour expatriés dans le monde entier.",
+        fr: "AccÃ©dez instantanÃ©ment Ã  votre espace personnel SOS Expats. Services d'accompagnement premium pour expatriÃ©s dans le monde entier.",
         en: 'Instantly access your personal SOS Expats space. Premium support services for expats worldwide.'
       },
       'meta.og_image_alt': { fr: 'Connexion SOS Expats', en: 'SOS Expats Login' },
       'meta.twitter_image_alt': { fr: 'Interface de connexion SOS Expats', en: 'SOS Expats login interface' },
-      'login.title': { fr: 'Connexion à votre compte', en: 'Sign in to your account' },
-      'login.subtitle': { fr: 'Accédez à votre espace personnel et gérez vos services', en: 'Access your personal space and manage your services' },
+      'login.title': { fr: 'Connexion Ã  votre compte', en: 'Sign in to your account' },
+      'login.subtitle': { fr: 'AccÃ©dez Ã  votre espace personnel et gÃ©rez vos services', en: 'Access your personal space and manage your services' },
       'login.or': { fr: 'Ou', en: 'Or' },
-      'login.create_account': { fr: 'créez un nouveau compte', en: 'create a new account' },
-      'login.create_account_aria': { fr: 'Créer un nouveau compte utilisateur', en: 'Create a new user account' },
+      'login.create_account': { fr: 'crÃ©ez un nouveau compte', en: 'create a new account' },
+      'login.create_account_aria': { fr: 'CrÃ©er un nouveau compte utilisateur', en: 'Create a new user account' },
       'login.email_label': { fr: 'Adresse email', en: 'Email address' },
       'login.email_placeholder': { fr: 'votre@email.com', en: 'your@email.com' },
       'login.email_help': { fr: "Utilisez l'email de votre compte", en: 'Use your account email' },
       'login.password_label': { fr: 'Mot de passe', en: 'Password' },
       'login.password_placeholder': { fr: 'Votre mot de passe', en: 'Your password' },
-      'login.password_help': { fr: 'Minimum 6 caractères', en: 'Minimum 6 characters' },
+      'login.password_help': { fr: 'Minimum 6 caractÃ¨res', en: 'Minimum 6 characters' },
       'login.show_password': { fr: 'Afficher le mot de passe', en: 'Show password' },
       'login.hide_password': { fr: 'Hide password', en: 'Hide password' },
       'login.remember_me': { fr: 'Se souvenir de moi', en: 'Remember me' },
-      'login.forgot_password': { fr: 'Mot de passe oublié ?', en: 'Forgot password?' },
-      'login.forgot_password_help': { fr: 'Mot de passe oublié ?', en: 'Forgot password?' },
+      'login.forgot_password': { fr: 'Mot de passe oubliÃ© ?', en: 'Forgot password?' },
+      'login.forgot_password_help': { fr: 'Mot de passe oubliÃ© ?', en: 'Forgot password?' },
       'login.submit_button': { fr: 'Se connecter', en: 'Sign in' },
       'login.submit_button_description': { fr: 'Cliquez pour vous connecter avec vos identifiants', en: 'Click to sign in with your credentials' },
       'login.logging_in': { fr: 'Connexion...', en: 'Signing in...' },
@@ -247,26 +247,26 @@ const useTranslation = () => {
       'validation.email_required': { fr: "L'adresse email est requise", en: 'Email address is required' },
       'validation.email_invalid': { fr: "Format d'email invalide", en: 'Invalid email format' },
       'validation.password_required': { fr: 'Le mot de passe est requis', en: 'Password is required' },
-      'validation.password_min_length': { fr: 'Le mot de passe doit contenir au moins 6 caractères', en: 'Password must be at least 6 characters' },
+      'validation.password_min_length': { fr: 'Le mot de passe doit contenir au moins 6 caractÃ¨res', en: 'Password must be at least 6 characters' },
       'error.title': { fr: 'Erreur de connexion', en: 'Login error' },
-      'error.description': { fr: 'Nous nous excusons pour ce désagrément. Veuillez réessayer.', en: 'We apologize for this inconvenience. Please try again.' },
-      'error.retry': { fr: 'Réessayer', en: 'Retry' },
+      'error.description': { fr: 'Nous nous excusons pour ce dÃ©sagrÃ©ment. Veuillez rÃ©essayer.', en: 'We apologize for this inconvenience. Please try again.' },
+      'error.retry': { fr: 'RÃ©essayer', en: 'Retry' },
       'error.offline': { fr: 'Connexion internet requise', en: 'Internet connection required' },
       'loading.message': { fr: 'Connexion en cours...', en: 'Signing in...' },
-      'offline.message': { fr: 'Mode hors ligne - Certaines fonctionnalités peuvent être limitées', en: 'Offline mode - Some features may be limited' },
+      'offline.message': { fr: 'Mode hors ligne - Certaines fonctionnalitÃ©s peuvent Ãªtre limitÃ©es', en: 'Offline mode - Some features may be limited' },
       'pwa.install': { fr: "Installer l'app", en: 'Install app' },
       'pwa.install_button': { fr: 'Installer', en: 'Install' },
-      'security.ssl': { fr: 'Connexion sécurisée SSL', en: 'Secure SSL connection' },
-      'trust.secure': { fr: 'Sécurisé', en: 'Secure' },
+      'security.ssl': { fr: 'Connexion sÃ©curisÃ©e SSL', en: 'Secure SSL connection' },
+      'trust.secure': { fr: 'SÃ©curisÃ©', en: 'Secure' },
       'trust.support_24_7': { fr: 'Support 24/7', en: '24/7 Support' },
       'language.selector': { fr: 'Changer la langue', en: 'Change language' },
       'form.required': { fr: 'requis', en: 'required' },
       'redirect.message': {
-        fr: 'Après connexion, vous serez redirigé pour finaliser votre réservation',
+        fr: 'AprÃ¨s connexion, vous serez redirigÃ© pour finaliser votre rÃ©servation',
         en: 'After login, you will be redirected to complete your booking'
       },
-      'create_account.button': { fr: 'Créer un nouveau compte', en: 'Create a new account' },
-      'remember_me.saved': { fr: 'Sauvegardé', en: 'Saved' },
+      'create_account.button': { fr: 'CrÃ©er un nouveau compte', en: 'Create a new account' },
+      'remember_me.saved': { fr: 'SauvegardÃ©', en: 'Saved' },
       'remember_me.clear': { fr: 'Effacer', en: 'Clear' }
     };
 
@@ -276,7 +276,7 @@ const useTranslation = () => {
   return { t, language };
 };
 
-// Error Boundary optimisé - COMPLET
+// Error Boundary optimisÃ© - COMPLET
 interface ErrorBoundaryProps {
   children: React.ReactNode;
   FallbackComponent: React.ComponentType<ErrorFallbackProps>;
@@ -345,7 +345,7 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({ resetErrorBoundary }) => 
   );
 };
 
-// ✅ COMPOSANT LOGIN PRINCIPAL COMPLET AVEC TOUTES LES FONCTIONNALITÉS
+// âœ… COMPOSANT LOGIN PRINCIPAL COMPLET AVEC TOUTES LES FONCTIONNALITÃ‰S
 const Login: React.FC = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
@@ -356,7 +356,7 @@ const Login: React.FC = () => {
   // Hook PWA
   const { install, canInstall } = usePWAInstall();
 
-  // ✅ CORRECTION: État formData typé correctement
+  // âœ… CORRECTION: Ã‰tat formData typÃ© correctement
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
@@ -389,7 +389,7 @@ const Login: React.FC = () => {
     install(); 
   }, [install]);
 
-  // Navigation vers Register avec préservation du state
+  // Navigation vers Register avec prÃ©servation du state
   const navigateToRegister = useCallback(() => {
     const registerUrl = `/register?redirect=${encodedRedirectUrl}`;
     navigate(registerUrl, {
@@ -397,7 +397,7 @@ const Login: React.FC = () => {
     });
   }, [encodedRedirectUrl, navigate, location.state]);
 
-  // ✅ CORRECTION: Types sûrs pour la gestion du Provider
+  // âœ… CORRECTION: Types sÃ»rs pour la gestion du Provider
   type NavState = Readonly<{ selectedProvider?: Provider }>;
 
   function isProviderLike(v: unknown): v is Provider {
@@ -408,9 +408,9 @@ const Login: React.FC = () => {
       && (o.type === 'lawyer' || o.type === 'expat');
   }
 
-  // ✅ CORRECTION: Lecture des données sauvegardées au chargement
+  // âœ… CORRECTION: Lecture des donnÃ©es sauvegardÃ©es au chargement
   useEffect(() => {
-    // Lire les préférences sauvegardées
+    // Lire les prÃ©fÃ©rences sauvegardÃ©es
     const savedRememberMe = localStorage.getItem('rememberMe') === '1';
     const savedEmail = localStorage.getItem('savedEmail') || '';
     
@@ -423,7 +423,7 @@ const Login: React.FC = () => {
     }
   }, []);
 
-  // Persiste le provider passé via state (depuis "Réservez maintenant")
+  // Persiste le provider passÃ© via state (depuis "RÃ©servez maintenant")
   useEffect(() => {
     const rawState: unknown = location.state;
     const state = (rawState ?? null) as NavState | null;
@@ -433,7 +433,7 @@ const Login: React.FC = () => {
       try {
         sessionStorage.setItem('selectedProvider', JSON.stringify(sp));
       } catch {
-        // sessionStorage non disponible (mode privé, quotas…)
+        // sessionStorage non disponible (mode privÃ©, quotasâ€¦)
       }
     }
   }, [location.state]);
@@ -597,7 +597,7 @@ const Login: React.FC = () => {
     [formErrors, validateField]
   );
 
-  // ✅ CORRECTION: Fonction pour effacer les données sauvegardées
+  // âœ… CORRECTION: Fonction pour effacer les donnÃ©es sauvegardÃ©es
   const clearSavedData = useCallback(() => {
     localStorage.removeItem('rememberMe');
     localStorage.removeItem('savedEmail');
@@ -630,7 +630,7 @@ const Login: React.FC = () => {
     updateMetaTag('author', 'SOS Expats');
     updateMetaTag('language', currentLang);
 
-    // OpenGraph avec calcul d'og:locale sans erreur TS (évite `never`)
+    // OpenGraph avec calcul d'og:locale sans erreur TS (Ã©vite `never`)
     const ogLocale =
       currentLang === 'fr'
         ? 'fr_FR'
@@ -763,7 +763,7 @@ const Login: React.FC = () => {
     }
   }, [authInitialized, user, navigate, redirectUrl]);
 
-  // ✅ CORRECTION: Enhanced form submission avec persistence Firebase - COMPLET
+  // âœ… CORRECTION: Enhanced form submission avec persistence Firebase - COMPLET
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -790,14 +790,14 @@ const Login: React.FC = () => {
       try {
         performance.mark('login-attempt-start');
 
-        // ✅ CORRECTION CRITIQUE : Configurer la persistence AVANT le login
+        // âœ… CORRECTION CRITIQUE : Configurer la persistence AVANT le login
         const persistenceType = formData.rememberMe 
           ? browserLocalPersistence    // Persist across browser sessions
           : browserSessionPersistence; // Only current session
 
         await setPersistence(auth, persistenceType);
 
-        // ✅ CORRECTION : Sauvegarder email si rememberMe est coché
+        // âœ… CORRECTION : Sauvegarder email si rememberMe est cochÃ©
         if (formData.rememberMe) {
           localStorage.setItem('rememberMe', '1');
           localStorage.setItem('savedEmail', formData.email.trim().toLowerCase());
@@ -836,12 +836,12 @@ const Login: React.FC = () => {
     [formData, validateForm, login, submitAttempts, isOnline, t, formErrors]
   );
 
-  // ✅ CORRECTION: Enhanced Google login avec persistence conditionnelle - COMPLET
+  // âœ… CORRECTION: Enhanced Google login avec persistence conditionnelle - COMPLET
   const handleGoogleLogin = useCallback(async () => {
     try {
       performance.mark('google-login-start');
 
-      // ✅ Persistence basée sur rememberMe même pour Google
+      // âœ… Persistence basÃ©e sur rememberMe mÃªme pour Google
       const persistenceType = formData.rememberMe 
         ? browserLocalPersistence 
         : browserSessionPersistence;
@@ -886,7 +886,7 @@ const Login: React.FC = () => {
 
   
 
-  // 🔁 RÉCUPÉRER LE RÉSULTAT GOOGLE EN COOP/COEP (Redirect flow) - COMPLET
+  // ðŸ” RÃ‰CUPÃ‰RER LE RÃ‰SULTAT GOOGLE EN COOP/COEP (Redirect flow) - COMPLET
   const redirectHandledRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
@@ -896,7 +896,7 @@ const Login: React.FC = () => {
         // Si la page est "crossOriginIsolated", on vient d'un signInWithRedirect
         const isCrossOriginIsolated = window.crossOriginIsolated === true;
         if (!isCrossOriginIsolated) return;
-        if (redirectHandledRef.current) return; // évite double-traitement (StrictMode)
+        if (redirectHandledRef.current) return; // Ã©vite double-traitement (StrictMode)
 
         const result = await getRedirectResult(auth);
         if (!result || !result.user) return;
@@ -910,11 +910,11 @@ const Login: React.FC = () => {
         if (userDoc.exists()) {
           const existingData = userDoc.data();
 
-          // Blocage rôle pour Google si ≠ client
+          // Blocage rÃ´le pour Google si â‰  client
           if (existingData.role && existingData.role !== 'client') {
             await auth.signOut();
-            const { message, helpText } = { message: '🚫 La connexion Google est réservée aux clients', helpText: '👨‍⚖️ Avocats et 🌍 expatriés : utilisez votre email et mot de passe professionnels ci-dessous' };
-            setFormErrors({ general: helpText ? `${message}\n\n💡 ${helpText}` : message });
+            const { message, helpText } = { message: 'ðŸš« La connexion Google est rÃ©servÃ©e aux clients', helpText: 'ðŸ‘¨â€âš–ï¸ Avocats et ðŸŒ expatriÃ©s : utilisez votre email et mot de passe professionnels ci-dessous' };
+            setFormErrors({ general: helpText ? `${message}\n\nðŸ’¡ ${helpText}` : message });
 
             await logAuthEvent('google_login_role_restriction', {
               userId: googleUser.uid,
@@ -936,7 +936,7 @@ const Login: React.FC = () => {
         console.warn('[Auth] getRedirectResult error', e);
       } finally {
         if (!cancelled) {
-          // Pas besoin de setIsLoading ici car géré par AuthContext
+          // Pas besoin de setIsLoading ici car gÃ©rÃ© par AuthContext
           console.log('Google redirect flow completed');
         }
       }
@@ -966,7 +966,7 @@ const Login: React.FC = () => {
               <LoadingSpinner size="large" color="red" />
             </div>
             <h2 className="text-xl font-black text-white mb-3">{t('loading.message')}</h2>
-            <p className="text-base text-gray-400 mb-6">Vérification de vos identifiants...</p>
+            <p className="text-base text-gray-400 mb-6">VÃ©rification de vos identifiants...</p>
             <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full animate-pulse transition-all duration-1000"
@@ -1049,7 +1049,7 @@ const Login: React.FC = () => {
                   <div className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
                     <div className="ml-3">
-                      <p className="text-sm text-blue-300 font-bold">🎯 {t('redirect.message')}</p>
+                      <p className="text-sm text-blue-300 font-bold">ðŸŽ¯ {t('redirect.message')}</p>
                     </div>
                   </div>
                 </div>
@@ -1159,7 +1159,7 @@ const Login: React.FC = () => {
                   {formErrors.password && <p className="mt-2 text-sm text-red-400 font-medium">{formErrors.password}</p>}
                 </div>
 
-                {/* ✅ Enhanced remember me section avec indicateurs visuels - COMPLET */}
+                {/* âœ… Enhanced remember me section avec indicateurs visuels - COMPLET */}
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center">
                     <input
@@ -1173,16 +1173,16 @@ const Login: React.FC = () => {
                     <label htmlFor="remember-me" className="ml-3 text-gray-300 select-none cursor-pointer font-bold">
                       {t('login.remember_me')}
                     </label>
-                    {/* ✅ Indicateur visuel si données sauvegardées */}
+                    {/* âœ… Indicateur visuel si donnÃ©es sauvegardÃ©es */}
                     {formData.rememberMe && formData.email && (
                       <span className="ml-2 text-xs text-green-400 font-black">
-                        ✓ {t('remember_me.saved')}
+                        âœ“ {t('remember_me.saved')}
                       </span>
                     )}
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    {/* Bouton pour effacer les données sauvegardées */}
+                    {/* Bouton pour effacer les donnÃ©es sauvegardÃ©es */}
                     {(localStorage.getItem('rememberMe') === '1') && (
                       <button
                         type="button"
@@ -1279,7 +1279,7 @@ const Login: React.FC = () => {
                   </button>
                 </p>
 
-                {/* Bouton de création de compte plus visible - COMPLET */}
+                {/* Bouton de crÃ©ation de compte plus visible - COMPLET */}
                 <div>
                   <button
                     onClick={navigateToRegister}
@@ -1299,12 +1299,12 @@ const Login: React.FC = () => {
                     <Shield className="h-3 w-3 mr-1 text-green-400" />
                     <span className="font-bold">{t('trust.secure')}</span>
                   </span>
-                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-600">â€¢</span>
                   <span className="flex items-center">
                     <Smartphone className="h-3 w-3 mr-1 text-blue-400" />
                     <span className="font-bold">PWA Mobile</span>
                   </span>
-                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-600">â€¢</span>
                   <span className="flex items-center">
                     <Star className="h-3 w-3 mr-1 text-yellow-400" />
                     <span className="font-bold">{t('trust.support_24_7')}</span>
@@ -1313,7 +1313,7 @@ const Login: React.FC = () => {
 
                 {/* Performance indicator (dev only) - COMPLET */}
                 {process.env.NODE_ENV === 'development' && (
-                  <div className="text-xs text-gray-600 font-medium">⚡ Optimized for Core Web Vitals</div>
+                  <div className="text-xs text-gray-600 font-medium">âš¡ Optimized for Core Web Vitals</div>
                 )}
               </footer>
             </div>

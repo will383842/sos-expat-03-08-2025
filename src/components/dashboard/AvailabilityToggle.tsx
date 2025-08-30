@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 
 type Props = {
@@ -10,7 +10,7 @@ const AvailabilityToggle: React.FC<Props> = ({ className = "" }) => {
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // Calcul état online/offline depuis user
+  // Calcul Ã©tat online/offline depuis user
   const isOnline = useMemo(() => {
     if (!user) return false;
     if (user.availability === "available") return true;
@@ -30,7 +30,7 @@ const AvailabilityToggle: React.FC<Props> = ({ className = "" }) => {
     setSaving(true);
     try {
       await setUserAvailability(isOnline ? "offline" : "available");
-      // pas d’update locale → on attend le snapshot Firestore
+      // pas dâ€™update locale â†’ on attend le snapshot Firestore
     } catch (e) {
       setErrorText(
         e instanceof Error ? e.message : "Une erreur est survenue."

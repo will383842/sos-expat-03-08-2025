@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Phone, MapPin, Facebook, Twitter, Linkedin, ArrowUp, LucideIcon, Globe } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { Link } from 'react-router-dom';
@@ -28,7 +28,7 @@ const SOCIAL = {
   li: (import.meta.env.VITE_LINKEDIN_URL as string | undefined) || ''
 };
 
-// Petite utilitaire: normalise fr/en à partir du navigateur
+// Petite utilitaire: normalise fr/en Ã  partir du navigateur
 const detectBrowserLang = (): 'fr' | 'en' => {
   if (typeof navigator === 'undefined') return 'fr';
   const raw = (navigator.language || (navigator as any).userLanguage || 'fr').toLowerCase();
@@ -50,36 +50,36 @@ const Footer: React.FC = () => {
       fr: {
         'footer.services.title': 'Services',
         'footer.services.sosCall': 'S.O.S Appel',
-        'footer.services.expatCall': 'Appel expatrié',
+        'footer.services.expatCall': 'Appel expatriÃ©',
         'footer.services.pricing': 'Tarifs',
         'footer.services.experts': 'Nos experts',
-        'footer.services.testimonials': 'Témoignages',
+        'footer.services.testimonials': 'TÃ©moignages',
         'footer.support.title': 'Support',
         'footer.support.contact': 'Contact',
         'footer.support.helpCenter': 'Centre d\'aide',
         'footer.support.serviceStatus': 'Statut du service',
         'footer.contact.title': 'Contact',
         'footer.contact.emailAria': 'Envoyer un email',
-        'footer.contact.presence': 'Présence internationale dans plus de 120 pays',
-        'footer.contact.locationAria': 'Notre présence internationale',
+        'footer.contact.presence': 'PrÃ©sence internationale dans plus de 120 pays',
+        'footer.contact.locationAria': 'Notre prÃ©sence internationale',
         'footer.contact.callUs': 'Contactez-nous',
         'footer.contact.phoneAria': 'Nous contacter',
         'footer.social.facebookAria': 'Suivez-nous sur Facebook',
         'footer.social.twitterAria': 'Suivez-nous sur Twitter',
         'footer.social.linkedinAria': 'Suivez-nous sur LinkedIn',
-        'footer.social.ariaLabel': 'Réseaux sociaux',
-        'footer.company.description': 'Plateforme d\'appel d\'urgence connectant les expatriés francophones avec des avocats et conseillers vérifiés partout dans le monde.',
+        'footer.social.ariaLabel': 'RÃ©seaux sociaux',
+        'footer.company.description': 'Plateforme d\'appel d\'urgence connectant les expatriÃ©s francophones avec des avocats et conseillers vÃ©rifiÃ©s partout dans le monde.',
         'footer.services.navAria': 'Navigation des services',
         'footer.support.navAria': 'Navigation du support',
         'footer.ariaLabel': 'Pied de page du site',
-        'footer.legal.privacy': 'Politique de confidentialité',
+        'footer.legal.privacy': 'Politique de confidentialitÃ©',
         'footer.legal.termsClients': 'CGU Clients',
         'footer.legal.termsLawyers': 'CGU Avocats',
-        'footer.legal.termsExpats': 'CGU Expatriés',
+        'footer.legal.termsExpats': 'CGU ExpatriÃ©s',
         'footer.legal.consumers': 'Consommateurs',
-        'footer.legal.seo': 'Référencement',
-        'footer.legal.navAria': 'Liens légaux',
-        'footer.copyright': 'Tous droits réservés.',
+        'footer.legal.seo': 'RÃ©fÃ©rencement',
+        'footer.legal.navAria': 'Liens lÃ©gaux',
+        'footer.copyright': 'Tous droits rÃ©servÃ©s.',
         'common.loading': 'Chargement...'
       },
       en: {
@@ -121,12 +121,12 @@ const Footer: React.FC = () => {
     return translations[resolvedLang][key] || translations.fr[key] || key;
   }, [resolvedLang]);
 
-  // ---------- Liens légaux par défaut (fallback) ----------
+  // ---------- Liens lÃ©gaux par dÃ©faut (fallback) ----------
   const defaultLegalLinks = useMemo<LegalLink[]>(() => (
     [
       { label: t('footer.legal.privacy'), href: '/politique-confidentialite', order: 10 },
       { label: t('footer.legal.termsClients'), href: '/cgu-clients', order: 20 },
-      // CGU Avocats et CGU Expatriés supprimés du fallback
+      // CGU Avocats et CGU ExpatriÃ©s supprimÃ©s du fallback
       { label: 'Cookies', href: '/cookies', order: 50 },
       { label: t('footer.legal.consumers'), href: '/consommateurs', order: 60 }
     ]
@@ -190,7 +190,7 @@ const Footer: React.FC = () => {
     }
   ]), [t]);
 
-  // ---------- Chargement des liens légaux depuis Firestore (avec cache + fallback) ----------
+  // ---------- Chargement des liens lÃ©gaux depuis Firestore (avec cache + fallback) ----------
   useEffect(() => {
     let isMounted = true;
 
@@ -218,13 +218,13 @@ const Footer: React.FC = () => {
     const loadLegalDocuments = async () => {
       const cached = readCache();
       if (cached && cached.length) {
-        setLegalLinks(cached.filter(l => !['CGU Avocats', 'CGU Expatriés', 'Lawyer Terms', 'Expat Terms'].includes(l.label)));
+        setLegalLinks(cached.filter(l => !['CGU Avocats', 'CGU ExpatriÃ©s', 'Lawyer Terms', 'Expat Terms'].includes(l.label)));
         setIsLoading(false);
       }
 
       try {
         if (!db) {
-          if (IS_DEV) console.log('[Footer] Firebase indisponible, fallback par défaut');
+          if (IS_DEV) console.log('[Footer] Firebase indisponible, fallback par dÃ©faut');
           if (isMounted && !cached) {
             setLegalLinks(defaultLegalLinks);
             setIsLoading(false);
@@ -244,7 +244,7 @@ const Footer: React.FC = () => {
         if (!isMounted) return;
 
         if (snapshot.empty) {
-          if (IS_DEV) console.log('[Footer] Aucun doc légal en base, fallback');
+          if (IS_DEV) console.log('[Footer] Aucun doc lÃ©gal en base, fallback');
           if (!cached) setLegalLinks(defaultLegalLinks);
           writeCache(defaultLegalLinks);
         } else {
@@ -274,7 +274,7 @@ const Footer: React.FC = () => {
             })
             .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
             // filtre ici aussi
-            .filter(l => !['CGU Avocats', 'CGU Expatriés', 'Lawyer Terms', 'Expat Terms'].includes(l.label));
+            .filter(l => !['CGU Avocats', 'CGU ExpatriÃ©s', 'Lawyer Terms', 'Expat Terms'].includes(l.label));
 
           setLegalLinks(items);
           writeCache(items);
@@ -525,7 +525,7 @@ const Footer: React.FC = () => {
 
           <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
             <div className="text-gray-400 text-sm text-center lg:text-left order-2 lg:order-1">
-              <span className="font-medium text-white">© {currentYear} SOS Urgently.</span>
+              <span className="font-medium text-white">Â© {currentYear} SOS Urgently.</span>
               <span className="ml-1">{t('footer.copyright')}</span>
             </div>
 

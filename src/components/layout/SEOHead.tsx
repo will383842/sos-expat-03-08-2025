@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
 interface SEOHeadProps {
@@ -22,7 +22,7 @@ interface SEOHeadProps {
   siteName?: string;
   twitterSite?: string;
   twitterCreator?: string;
-  // Props spécifiques pour les IA et crawlers avancés
+  // Props spÃ©cifiques pour les IA et crawlers avancÃ©s
   aiSummary?: string;
   contentType?: string;
   readingTime?: string;
@@ -61,7 +61,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
   lastReviewed,
   citations = []
 }) => {
-  // Construction URL canonique sécurisée
+  // Construction URL canonique sÃ©curisÃ©e
   const buildCanonicalUrl = (): string => {
     if (canonicalUrl?.startsWith('http')) {
       return canonicalUrl;
@@ -79,12 +79,12 @@ const SEOHead: React.FC<SEOHeadProps> = ({
 
   const fullCanonicalUrl = buildCanonicalUrl();
   
-  // Validation et nettoyage des données
+  // Validation et nettoyage des donnÃ©es
   const cleanTitle = title?.trim() || '';
   const cleanDescription = description?.trim().substring(0, 160) || '';
   const fullOgImage = ogImage?.startsWith('http') ? ogImage : `https://sosexpats.com${ogImage}`;
   
-  // Génération automatique de données structurées enrichies pour les IA
+  // GÃ©nÃ©ration automatique de donnÃ©es structurÃ©es enrichies pour les IA
   const generateEnrichedStructuredData = () => {
     const baseData = structuredData || {};
     
@@ -116,7 +116,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
         'name': cleanTitle,
         'description': cleanDescription
       },
-      // Métadonnées pour crawling IA
+      // MÃ©tadonnÃ©es pour crawling IA
       'potentialAction': {
         '@type': 'ReadAction',
         'target': fullCanonicalUrl
@@ -137,7 +137,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       {keywords && <meta name="keywords" content={keywords} />}
       {author && <meta name="author" content={author} />}
       
-      {/* Meta spécifiques pour les IA et ChatGPT */}
+      {/* Meta spÃ©cifiques pour les IA et ChatGPT */}
       {aiSummary && <meta name="summary" content={aiSummary} />}
       {readingTime && <meta name="reading-time" content={readingTime} />}
       {expertise && <meta name="expertise-level" content={expertise} />}
@@ -146,12 +146,12 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       {lastReviewed && <meta name="last-reviewed" content={lastReviewed} />}
       {contentType && <meta name="content-type" content={contentType} />}
       
-      {/* Meta pour l'indexation sémantique par les IA */}
+      {/* Meta pour l'indexation sÃ©mantique par les IA */}
       <meta name="ai-crawlable" content="true" />
       <meta name="content-language" content={locale.split('_')[0]} />
       <meta name="document-state" content="dynamic" />
       
-      {/* Citations pour la crédibilité IA */}
+      {/* Citations pour la crÃ©dibilitÃ© IA */}
       {citations.length > 0 && (
         <meta name="citations" content={citations.join('; ')} />
       )}
@@ -210,7 +210,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
         {JSON.stringify(generateEnrichedStructuredData(), null, 0)}
       </script>
       
-      {/* Données supplémentaires pour l'IA en JSON-LD */}
+      {/* DonnÃ©es supplÃ©mentaires pour l'IA en JSON-LD */}
       <script type="application/ld+json">
         {JSON.stringify({
           '@context': 'https://schema.org',

@@ -1,4 +1,4 @@
-// src/components/common/ScrollToTopButton.tsx
+﻿// src/components/common/ScrollToTopButton.tsx
 import { useEffect, useState } from "react";
 import { ChevronUp } from "lucide-react";
 

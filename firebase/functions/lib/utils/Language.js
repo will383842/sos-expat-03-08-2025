@@ -15,7 +15,7 @@ exports.pickBestClientLang = pickBestClientLang;
 exports.VOICE_LOCALES = {
     fr: 'fr-FR',
     en: 'en-US',
-    es: 'es-ES',
+    es: 'es-ES'
 };
 /** Ensemble de langues supportées côté produit/voix */
 exports.SUPPORTED_LANGS = ['fr', 'en', 'es'];
@@ -88,7 +88,7 @@ function orderedIntersection(a, b) {
  * 6) Sinon fallback global.
  */
 function resolveCommonLanguage(clientLangs, providerLangs, options = {}) {
-    const { prioritizeClientOrder = true, fallback = exports.DEFAULT_FALLBACK_LANG, preferredIntersectionFirst, } = options;
+    const { prioritizeClientOrder = true, fallback = exports.DEFAULT_FALLBACK_LANG, preferredIntersectionFirst } = options;
     const c = normalizeLangList(clientLangs);
     const p = normalizeLangList(providerLangs);
     // Rien de valide des deux côtés -> fallback direct
@@ -103,7 +103,7 @@ function resolveCommonLanguage(clientLangs, providerLangs, options = {}) {
         return {
             langKey: preferredIntersectionFirst,
             ttsLocale: exports.VOICE_LOCALES[preferredIntersectionFirst],
-            origin: 'intersection',
+            origin: 'intersection'
         };
     }
     // 1) prendre la 1ère de l'intersection si dispo

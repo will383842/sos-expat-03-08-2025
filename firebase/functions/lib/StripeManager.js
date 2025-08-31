@@ -84,7 +84,7 @@ class StripeManager {
         if (detected)
             this.mode = detected;
         this.stripe = new stripe_1.default(secretKey, {
-            apiVersion: '2023-10-16',
+            apiVersion: '2023-10-16'
         });
     }
     /**
@@ -148,7 +148,7 @@ class StripeManager {
                 commission,
                 providerAmount: data.providerAmount,
                 calculatedTotal,
-                difference: delta,
+                difference: delta
             });
             if (delta > 1) {
                 throw new Error(`Incohérence montants: ${amount}€ != ${calculatedTotal}€`);
@@ -185,7 +185,7 @@ class StripeManager {
                 commissionAmountCents,
                 providerEuros: data.providerAmount,
                 providerAmountCents,
-                mode: this.mode,
+                mode: this.mode
             });
             const paymentIntent = await this.stripe.paymentIntents.create({
                 amount: amountCents,
@@ -195,27 +195,27 @@ class StripeManager {
                 metadata: Object.assign(Object.assign({ clientId: data.clientId, providerId: data.providerId, serviceType: data.serviceType, providerType: data.providerType, commissionAmountCents: String(commissionAmountCents), providerAmountCents: String(providerAmountCents), commissionAmountEuros: commissionEuros.toFixed(2), providerAmountEuros: data.providerAmount.toFixed(2), environment: process.env.NODE_ENV || 'development', mode: this.mode }, (data.callSessionId ? { callSessionId: data.callSessionId } : {})), (data.metadata || {})),
                 description: `Service ${data.serviceType} - ${data.providerType} - ${data.amount} ${currency.toUpperCase()}`,
                 statement_descriptor_suffix: 'SOS EXPAT',
-                receipt_email: await this.getClientEmail(data.clientId),
+                receipt_email: await this.getClientEmail(data.clientId)
             });
             console.log('PaymentIntent Stripe créé:', {
                 id: paymentIntent.id,
                 amount: paymentIntent.amount,
                 amountInEuros: paymentIntent.amount / 100,
                 status: paymentIntent.status,
-                mode: this.mode,
+                mode: this.mode
             });
             await this.savePaymentRecord(paymentIntent, Object.assign(Object.assign({}, data), { commissionAmount: commissionEuros }), { amountCents, commissionAmountCents, providerAmountCents, currency });
             return {
                 success: true,
                 paymentIntentId: paymentIntent.id,
-                clientSecret: paymentIntent.client_secret || undefined,
+                clientSecret: paymentIntent.client_secret || undefined
             };
         }
         catch (error) {
             await (0, logError_1.logError)('StripeManager:createPaymentIntent', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Erreur inconnue',
+                error: error instanceof Error ? error.message : 'Erreur inconnue'
             };
         }
     }
@@ -233,13 +233,13 @@ class StripeManager {
                 status: captured.status,
                 capturedAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                sessionId: sessionId || null,
+                sessionId: sessionId || null
             });
             console.log('Paiement capturé:', {
                 id: paymentIntentId,
                 amount: captured.amount,
                 status: captured.status,
-                mode: this.mode,
+                mode: this.mode
             });
             return { success: true, paymentIntentId: captured.id };
         }
@@ -247,7 +247,7 @@ class StripeManager {
             await (0, logError_1.logError)('StripeManager:capturePayment', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Erreur lors de la capture',
+                error: error instanceof Error ? error.message : 'Erreur lors de la capture'
             };
         }
     }
@@ -263,8 +263,8 @@ class StripeManager {
                 metadata: {
                     sessionId: sessionId || '',
                     refundReason: reason,
-                    mode: this.mode,
-                },
+                    mode: this.mode
+                }
             };
             if (amount !== undefined)
                 refundData.amount = (0, exports.toCents)(amount);
@@ -275,14 +275,14 @@ class StripeManager {
                 refundReason: reason,
                 refundedAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                sessionId: sessionId || null,
+                sessionId: sessionId || null
             });
             console.log('Paiement remboursé:', {
                 paymentIntentId,
                 refundId: refund.id,
                 amount: refund.amount,
                 reason,
-                mode: this.mode,
+                mode: this.mode
             });
             return { success: true, paymentIntentId };
         }
@@ -290,7 +290,7 @@ class StripeManager {
             await (0, logError_1.logError)('StripeManager:refundPayment', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : 'Erreur lors du remboursement',
+                error: error instanceof Error ? error.message : 'Erreur lors du remboursement'
             };
         }
     }
@@ -300,20 +300,20 @@ class StripeManager {
             if (!this.stripe)
                 throw new Error('Stripe client not initialized');
             const canceled = await this.stripe.paymentIntents.cancel(paymentIntentId, {
-                cancellation_reason: reason,
+                cancellation_reason: reason
             });
             await this.db.collection('payments').doc(paymentIntentId).update({
                 status: canceled.status,
                 cancelReason: reason,
                 canceledAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                sessionId: sessionId || null,
+                sessionId: sessionId || null
             });
             console.log('Paiement annulé:', {
                 id: paymentIntentId,
                 status: canceled.status,
                 reason,
-                mode: this.mode,
+                mode: this.mode
             });
             return { success: true, paymentIntentId: canceled.id };
         }
@@ -321,7 +321,7 @@ class StripeManager {
             await (0, logError_1.logError)('StripeManager:cancelPayment', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : "Erreur lors de l'annulation",
+                error: error instanceof Error ? error.message : "Erreur lors de l'annulation"
             };
         }
     }
@@ -342,7 +342,7 @@ class StripeManager {
                 totalCommission: 0,
                 totalProvider: 0,
                 count: 0,
-                byStatus: {},
+                byStatus: {}
             };
             snapshot.forEach((doc) => {
                 const data = doc.data();
@@ -362,7 +362,7 @@ class StripeManager {
                 totalCommission: 0,
                 totalProvider: 0,
                 count: 0,
-                byStatus: {},
+                byStatus: {}
             };
         }
     }
@@ -387,7 +387,7 @@ class StripeManager {
             console.log('🔍 Vérification anti-doublons:', {
                 clientId: clientId.substring(0, 8) + '...',
                 providerId: providerId.substring(0, 8) + '...',
-                sessionId: sessionId ? sessionId.substring(0, 8) + '...' : '—',
+                sessionId: sessionId ? sessionId.substring(0, 8) + '...' : '—'
             });
             let query = this.db
                 .collection('payments')
@@ -455,7 +455,7 @@ class StripeManager {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             metadata: dataEuros.metadata || {},
             environment: process.env.NODE_ENV || 'development',
-            mode: this.mode,
+            mode: this.mode
         };
         if (dataEuros.callSessionId && dataEuros.callSessionId.trim() !== '') {
             paymentRecord.callSessionId = dataEuros.callSessionId;
@@ -466,7 +466,7 @@ class StripeManager {
             amountCents: cents.amountCents,
             amountEuros: dataEuros.amount,
             mode: this.mode,
-            hasCallSessionId: !!paymentRecord.callSessionId,
+            hasCallSessionId: !!paymentRecord.callSessionId
         });
     }
 }

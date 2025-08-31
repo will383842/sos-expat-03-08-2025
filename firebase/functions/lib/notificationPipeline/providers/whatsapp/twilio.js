@@ -8,7 +8,7 @@ async function sendWhatsApp(to, text) {
     const res = await client.messages.create({
         to: "whatsapp:" + to,
         from,
-        body: text,
+        body: text
     });
     return res.sid;
 }

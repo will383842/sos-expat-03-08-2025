@@ -6,7 +6,7 @@ async function sendPush(token, title, body, data) {
     await firebase_1.messaging.send({
         token,
         notification: { title, body },
-        data,
+        data
     });
 }
 //# sourceMappingURL=fcm.js.map

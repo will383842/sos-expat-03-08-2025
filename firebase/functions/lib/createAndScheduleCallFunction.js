@@ -48,7 +48,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             delayMinutes: ((_k = request.data) === null || _k === void 0 ? void 0 : _k.delayMinutes) || 5
         });
         const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, delayMinutes = 5, // ✅ Garde pour compatibilité mais ne sera plus utilisé
-        clientLanguages, providerLanguages, clientWhatsapp, } = request.data;
+        clientLanguages, providerLanguages, clientWhatsapp } = request.data;
         // ✅ Évite l'avertissement TypeScript 6133 (variable assigned but never used)
         void delayMinutes;
         // ✅ VALIDATION CHAMP PAR CHAMP avec messages d'erreur spécifiques
@@ -238,7 +238,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
                 hasProviderPhone: !!((_v = request.data) === null || _v === void 0 ? void 0 : _v.providerPhone),
                 hasClientPhone: !!((_w = request.data) === null || _w === void 0 ? void 0 : _w.clientPhone),
                 providerPhoneLength: ((_y = (_x = request.data) === null || _x === void 0 ? void 0 : _x.providerPhone) === null || _y === void 0 ? void 0 : _y.length) || 0,
-                clientPhoneLength: ((_0 = (_z = request.data) === null || _z === void 0 ? void 0 : _z.clientPhone) === null || _0 === void 0 ? void 0 : _0.length) || 0,
+                clientPhoneLength: ((_0 = (_z = request.data) === null || _z === void 0 ? void 0 : _z.clientPhone) === null || _0 === void 0 ? void 0 : _0.length) || 0
             },
             userAuth: ((_2 = (_1 = request.auth) === null || _1 === void 0 ? void 0 : _1.uid) === null || _2 === void 0 ? void 0 : _2.substring(0, 8)) + '...' || 'not-authenticated',
             timestamp: new Date().toISOString(),

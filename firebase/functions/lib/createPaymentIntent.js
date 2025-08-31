@@ -59,7 +59,6 @@ const _FUNCTION_CONFIG = {
 };
 // =========================================
 // ðŸ”‘ Secrets / Params (NE MET JAMAIS TES CLÃ‰S EN DUR)
-// - Secrets: Google Secret Manager
 // - Params: Config paramÃ©trable (notamment STRIPE_MODE)
 // =========================================
 const STRIPE_SECRET_KEY_TEST = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_TEST'); // sk_test_***
@@ -87,7 +86,7 @@ const SECURITY_LIMITS = {
     RATE_LIMIT: {
         MAX_REQUESTS: isDevelopment ? 1000 : isProduction ? 25 : 100,
         WINDOW_MS: isDevelopment ? 2 * 60 * 1000 : isProduction ? 8 * 60 * 1000 : 5 * 60 * 1000,
-        GLOBAL_MAX: isDevelopment ? 10000 : isProduction ? 1000 : 2000,
+        GLOBAL_MAX: isDevelopment ? 10000 : isProduction ? 1000 : 2000
     },
     AMOUNT_LIMITS: {
         MIN_EUR: 5,
@@ -95,18 +94,18 @@ const SECURITY_LIMITS = {
         MAX_DAILY_EUR: 2000,
         MIN_USD: 6,
         MAX_USD: 600,
-        MAX_DAILY_USD: 2400,
+        MAX_DAILY_USD: 2400
     },
     VALIDATION: {
         MAX_METADATA_SIZE: isDevelopment ? 10000 : isProduction ? 3000 : 5000,
         MAX_DESCRIPTION_LENGTH: isDevelopment ? 5000 : isProduction ? 1500 : 2000,
         AMOUNT_COHERENCE_TOLERANCE: isDevelopment ? 0.5 : isProduction ? 0.05 : 0.1,
         ALLOWED_CURRENCIES: ['eur', 'usd'],
-        ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'],
+        ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call']
     },
     DUPLICATES: {
-        WINDOW_MS: isDevelopment ? 30 * 1000 : isProduction ? 5 * 60 * 1000 : 2 * 60 * 1000,
-    },
+        WINDOW_MS: isDevelopment ? 30 * 1000 : isProduction ? 5 * 60 * 1000 : 2 * 60 * 1000
+    }
 };
 // =========================================
 // ðŸ›¡ï¸ UTILITAIRES SÃ‰CURITÃ‰
@@ -144,13 +143,13 @@ function checkRateLimit(userId) {
     }
     const currentLimit = rateLimitStore.get(key) || {
         count: 0,
-        resetTime: now + SECURITY_LIMITS.RATE_LIMIT.WINDOW_MS,
+        resetTime: now + SECURITY_LIMITS.RATE_LIMIT.WINDOW_MS
     };
     if (currentLimit.count >= SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS) {
         logSecurityEvent('rate_limit_exceeded', {
             userId,
             count: currentLimit.count,
-            limit: SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS,
+            limit: SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS
         });
         return { allowed: false, resetTime: currentLimit.resetTime };
     }
@@ -175,7 +174,7 @@ async function validateBusinessLogic(data, currency, db) {
             logSecurityEvent('business_validation_dev_mode', {
                 providerId: data.providerId,
                 amount: data.amount,
-                currency,
+                currency
             });
             return { valid: true };
         }
@@ -191,7 +190,7 @@ async function validateBusinessLogic(data, currency, db) {
                 difference,
                 tolerance,
                 serviceType: data.serviceType,
-                currency,
+                currency
             });
             if (isProduction && difference > 100) {
                 return { valid: false, error: 'Montant trÃ¨s Ã©loignÃ© du tarif standard' };
@@ -213,13 +212,13 @@ async function validateAmountSecurity(amount, currency, userId, db) {
     if (amount < limits.min) {
         return {
             valid: false,
-            error: `Montant minimum de ${limits.min}${currency === 'eur' ? 'â‚¬' : '$'} requis`,
+            error: `Montant minimum de ${limits.min}${currency === 'eur' ? 'â‚¬' : '$'} requis`
         };
     }
     if (amount > limits.max) {
         return {
             valid: false,
-            error: `Montant maximum de ${limits.max}${currency === 'eur' ? 'â‚¬' : '$'} dÃ©passÃ©`,
+            error: `Montant maximum de ${limits.max}${currency === 'eur' ? 'â‚¬' : '$'} dÃ©passÃ©`
         };
     }
     if (!isDevelopment) {
@@ -233,7 +232,7 @@ async function validateAmountSecurity(amount, currency, userId, db) {
             await (0, logError_1.logError)('validateAmountSecurity:dailyLimit', error);
             logSecurityEvent('daily_limit_check_error', {
                 errorMessage: error instanceof Error ? error.message : String(error),
-                name: error instanceof Error ? error.name : undefined,
+                name: error instanceof Error ? error.name : undefined
             });
         }
     }
@@ -263,7 +262,7 @@ async function checkDuplicatePayments(clientId, providerId, amountInMainUnit, cu
             amountInMainUnit,
             currency,
             windowMs,
-            hasDuplicate,
+            hasDuplicate
         });
         return hasDuplicate;
     }
@@ -283,13 +282,13 @@ function validateAmountCoherence(totalAmount, commissionAmount, providerAmount) 
         providerAmount,
         totalCalculated,
         difference,
-        tolerance,
+        tolerance
     });
     if (difference > tolerance) {
         return {
             valid: false,
             error: `IncohÃ©rence montants: ${difference.toFixed(2)} d'Ã©cart (tolÃ©rance: ${tolerance.toFixed(2)})`,
-            difference,
+            difference
         };
     }
     return { valid: true, difference };
@@ -326,7 +325,7 @@ function sanitizeAndConvertInput(data) {
             ? Object.fromEntries(Object.entries(data.metadata)
                 .filter(([key, value]) => key.length <= maxMetaKeyLength && value.length <= maxMetaValueLength)
                 .slice(0, isDevelopment ? 20 : 10))
-            : {},
+            : {}
     };
 }
 // =========================================
@@ -340,7 +339,6 @@ exports.createPaymentIntent = (0, https_1.onCall)({
     minInstances: 0,
     maxInstances: 3,
     // pas de cpu: 0.25/0.5 si concurrency > 1 ; ici on garde 1
-    secrets: [STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE], // seuls les "secrets" vont ici
 }, async (request) => {
     var _a, _b, _c, _d, _e;
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -352,7 +350,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             stripeMode: STRIPE_MODE.value() || 'test',
             isDevelopment,
             isProduction,
-            bypassMode: BYPASS_MODE,
+            bypassMode: BYPASS_MODE
         });
         // 1) AUTH
         if (!request.auth) {
@@ -382,7 +380,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
         // 4) SANITIZE + CONVERT
         const sanitizedData = sanitizeAndConvertInput(request.data);
         // 5) VALIDATIONS - EXTRACTION DES VARIABLES
-        const { amountInMainUnit, amountInCents, commissionAmountInMainUnit, commissionAmountInCents, providerAmountInMainUnit, providerAmountInCents, currency, serviceType, providerId, clientId, clientEmail, providerName, description, callSessionId, metadata, } = sanitizedData;
+        const { amountInMainUnit, amountInCents, commissionAmountInMainUnit, commissionAmountInCents, providerAmountInMainUnit, providerAmountInCents, currency, serviceType, providerId, clientId, clientEmail, providerName, description, callSessionId, metadata } = sanitizedData;
         if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
             throw new https_1.HttpsError('invalid-argument', 'Type de service invalide');
         }
@@ -436,7 +434,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             commissionAmount: commissionAmountInMainUnit,
             providerAmount: providerAmountInMainUnit,
             callSessionId,
-            metadata: Object.assign({ clientEmail: clientEmail || '', providerName: providerName || '', description: description || `Service ${serviceType}`, requestId, environment: process.env.NODE_ENV || 'development', originalTotal: amountInMainUnit.toString(), originalCommission: commissionAmountInMainUnit.toString(), originalProviderAmount: providerAmountInMainUnit.toString(), originalCurrency: currency, stripeMode: STRIPE_MODE.value() || 'test' }, metadata),
+            metadata: Object.assign({ clientEmail: clientEmail || '', providerName: providerName || '', description: description || `Service ${serviceType}`, requestId, environment: process.env.NODE_ENV || 'development', originalTotal: amountInMainUnit.toString(), originalCommission: commissionAmountInMainUnit.toString(), originalProviderAmount: providerAmountInMainUnit.toString(), originalCurrency: currency, stripeMode: STRIPE_MODE.value() || 'test' }, metadata)
         };
         const result = await StripeManager_1.stripeManager.createPaymentIntent(stripePayload, stripeSecretKey);
         if (!(result === null || result === void 0 ? void 0 : result.success)) {
@@ -446,7 +444,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
                 serviceType,
                 amountInMainUnit,
                 amountInCents,
-                error: result === null || result === void 0 ? void 0 : result.error,
+                error: result === null || result === void 0 ? void 0 : result.error
             });
             throw new https_1.HttpsError('internal', 'Erreur lors de la crÃ©ation du paiement. Veuillez rÃ©essayer.');
         }
@@ -466,8 +464,8 @@ exports.createPaymentIntent = (0, https_1.onCall)({
                         amountInCents,
                         commissionAmountInCents,
                         providerAmountInCents,
-                        requestId,
-                    },
+                        requestId
+                    }
                 }, db);
             }
             catch (auditError) {
@@ -478,7 +476,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             id: result.paymentIntentId,
             total: (0, paymentValidators_1.formatAmount)(amountInMainUnit, currency),
             commission: (0, paymentValidators_1.formatAmount)(commissionAmountInMainUnit, currency),
-            provider: (0, paymentValidators_1.formatAmount)(providerAmountInMainUnit, currency),
+            provider: (0, paymentValidators_1.formatAmount)(providerAmountInMainUnit, currency)
         });
         // RÃ©ponse de base
         const baseResponse = {
@@ -489,7 +487,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             currency,
             serviceType,
             status: 'requires_payment_method',
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         };
         // RÃ©cupÃ©ration sÃ©curisÃ©e de l'account ID Stripe
         let accountId;
@@ -517,11 +515,11 @@ exports.createPaymentIntent = (0, https_1.onCall)({
                 serviceType: (_b = request.data) === null || _b === void 0 ? void 0 : _b.serviceType,
                 currency: ((_c = request.data) === null || _c === void 0 ? void 0 : _c.currency) || 'eur',
                 hasAuth: !!request.auth,
-                hasCommission: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.commissionAmount) !== undefined,
+                hasCommission: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.commissionAmount) !== undefined
             },
             userAuth: ((_e = request.auth) === null || _e === void 0 ? void 0 : _e.uid) || 'not-authenticated',
             environment: process.env.NODE_ENV,
-            stripeMode: STRIPE_MODE.value() || 'test',
+            stripeMode: STRIPE_MODE.value() || 'test'
         };
         await (0, logError_1.logError)('createPaymentIntent:error', errorData);
         if (error instanceof https_1.HttpsError)
@@ -531,7 +529,7 @@ exports.createPaymentIntent = (0, https_1.onCall)({
             error: "Une erreur inattendue s'est produite. Veuillez rÃ©essayer.",
             code: 'INTERNAL_ERROR',
             timestamp: new Date().toISOString(),
-            requestId,
+            requestId
         };
         throw new https_1.HttpsError('internal', errorResponse.error, errorResponse);
     }
@@ -540,8 +538,6 @@ exports.createPaymentIntent = (0, https_1.onCall)({
  * âœ… RÃ©cap dÃ©ploiement / config
  *
  * 1) Stocke tes deux clÃ©s dans Secret Manager :
- *    firebase functions:secrets:set STRIPE_SECRET_KEY_TEST
- *    firebase functions:secrets:set STRIPE_SECRET_KEY_LIVE
  *
  * 2) Ajoute le param STRIPE_MODE (config param, pas un secret) :
  *    firebase functions:config:set params_STRIPE_MODE="test"

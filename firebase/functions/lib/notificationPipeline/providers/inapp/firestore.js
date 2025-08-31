@@ -9,7 +9,7 @@ async function sendInApp(uid, title, body, data) {
         body,
         data: data || {},
         createdAt: new Date(),
-        read: false,
+        read: false
     });
 }
 //# sourceMappingURL=firestore.js.map

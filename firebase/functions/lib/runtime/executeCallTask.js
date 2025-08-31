@@ -154,20 +154,14 @@ async function runExecuteCallTask(req, res) {
         return;
     }
 }
-// --- Fonction Firebase v2 avec parallélisme optimisé ---
+// --- Fonction Firebase v2 avec configuration optimisée ---
 exports.executeCallTask = (0, https_1.onRequest)({
     region: "europe-west1",
     memory: "512MiB",
-    cpu: 0.5, // 0.5 vCPU par instance
-    maxInstances: 20, // Pour viser ~20 appels en parallèle (0.5 vCPU * 20 = 10 vCPU max)
-    minInstances: 1, // Garde au moins 1 instance active pour réduire le cold start
-    concurrency: 1, // OBLIGATOIRE car cpu < 1 (une seule requête par instance)
-    timeoutSeconds: 120,
-    secrets: [
-        exports.TASKS_AUTH_SECRET,
-        exports.TWILIO_ACCOUNT_SID,
-        exports.TWILIO_AUTH_TOKEN,
-        exports.TWILIO_PHONE_NUMBER,
-    ],
+    cpu: 0.25, // réduit la pression CPU
+    maxInstances: 10, // limite le fan-out
+    minInstances: 0, // pas de réservation permanente
+    concurrency: 1, // OK avec cpu < 1
+    timeoutSeconds: 120
 }, (req, res) => runExecuteCallTask(req, res));
 //# sourceMappingURL=executeCallTask.js.map

@@ -33,67 +33,174 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.admin_templates_seed = void 0;
-// src/admin/callables.ts
+exports.admin_templates_seed = exports.admin_testSend = exports.admin_routing_upsert = exports.admin_routing_get = exports.admin_templates_upsert = exports.admin_templates_get = exports.admin_templates_list = void 0;
+// firebase/functions/src/admin/callables.ts
 const https_1 = require("firebase-functions/v2/https");
-const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
+const app_1 = require("firebase-admin/app");
+if (!(0, app_1.getApps)().length)
+    (0, app_1.initializeApp)();
+/** Autorise UNIQUEMENT les comptes avec claim { admin: true } */
+function assertAdmin(ctx) {
+    var _a, _b;
+    const uid = (_a = ctx === null || ctx === void 0 ? void 0 : ctx.auth) === null || _a === void 0 ? void 0 : _a.uid;
+    const claims = (_b = ctx === null || ctx === void 0 ? void 0 : ctx.auth) === null || _b === void 0 ? void 0 : _b.token;
+    if (!uid)
+        throw new https_1.HttpsError("unauthenticated", "Auth requise.");
+    if (!(claims === null || claims === void 0 ? void 0 : claims.admin))
+        throw new https_1.HttpsError("permission-denied", "Réservé aux admins.");
+}
+/** 1) LISTE les IDs d'événements pour un locale donné */
+exports.admin_templates_list = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    assertAdmin(req);
+    const { locale } = req.data || {};
+    if (!locale || !["fr-FR", "en"].includes(locale)) {
+        throw new https_1.HttpsError("invalid-argument", "locale doit être 'fr-FR' ou 'en'.");
+    }
+    const db = (0, firestore_1.getFirestore)();
+    const snap = await db.collection(`message_templates/${locale}/items`).select().get();
+    const eventIds = snap.docs.map((d) => d.id).sort();
+    return { eventIds };
+});
+/** 2) GET: récupère un template pour (locale, eventId) */
+exports.admin_templates_get = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    assertAdmin(req);
+    const { locale, eventId } = req.data || {};
+    if (!locale || !eventId) {
+        throw new https_1.HttpsError("invalid-argument", "locale et eventId sont requis.");
+    }
+    const db = (0, firestore_1.getFirestore)();
+    const ref = db.doc(`message_templates/${locale}/items/${eventId}`);
+    const doc = await ref.get();
+    if (!doc.exists)
+        return { exists: false };
+    return { exists: true, data: doc.data() };
+});
+/** 3) UPSERT: crée/merge un template (locale, eventId) */
+exports.admin_templates_upsert = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    assertAdmin(req);
+    const { locale, eventId, payload } = req.data || {};
+    if (!locale || !eventId || !payload) {
+        throw new https_1.HttpsError("invalid-argument", "locale, eventId, payload requis.");
+    }
+    if (payload.email && (!payload.email.subject || !payload.email.html)) {
+        throw new https_1.HttpsError("invalid-argument", "email.subject et email.html sont requis quand email est fourni.");
+    }
+    const db = (0, firestore_1.getFirestore)();
+    const ref = db.doc(`message_templates/${locale}/items/${eventId}`);
+    await ref.set(payload, { merge: true });
+    return { ok: true };
+});
+/** 4) ROUTING GET: lit le doc unique message_routing/config */
+exports.admin_routing_get = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    assertAdmin(req);
+    const db = (0, firestore_1.getFirestore)();
+    const ref = db.doc("message_routing/config");
+    const doc = await ref.get();
+    if (!doc.exists)
+        return { exists: false, data: { events: {} } };
+    return { exists: true, data: doc.data() };
+});
+/** 5) ROUTING UPSERT: merge une entrée de routing pour un eventId */
+exports.admin_routing_upsert = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    assertAdmin(req);
+    const { eventId, channels, rate_limit_h, delays } = req.data || {};
+    if (!eventId || !Array.isArray(channels) || channels.length === 0) {
+        throw new https_1.HttpsError("invalid-argument", "eventId et channels (non vide) requis.");
+    }
+    const entry = {
+        channels,
+        rate_limit_h: Number(rate_limit_h) || 0,
+        delays: delays || {}
+    };
+    const db = (0, firestore_1.getFirestore)();
+    await db.doc("message_routing/config").set({ events: { [eventId]: entry } }, { merge: true });
+    return { ok: true };
+});
+/** 6) TEST SEND: crée un doc message_events de test que le worker va traiter */
+exports.admin_testSend = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    var _a;
+    assertAdmin(req);
+    const { locale, eventId, to, context } = req.data || {};
+    if (!eventId)
+        throw new https_1.HttpsError("invalid-argument", "eventId requis.");
+    const loc = (locale && String(locale).toLowerCase().startsWith("fr")) ? "fr-FR" : "en";
+    // Construit un contexte minimal avec l'email destination attendu par le provider email
+    const ctx = Object.assign(Object.assign({}, context), { user: Object.assign({ email: to || ((_a = context === null || context === void 0 ? void 0 : context.user) === null || _a === void 0 ? void 0 : _a.email) || "test@example.com", preferredLanguage: loc }, context === null || context === void 0 ? void 0 : context.user) });
+    const db = (0, firestore_1.getFirestore)();
+    await db.collection("message_events").add({
+        eventId,
+        uid: (context === null || context === void 0 ? void 0 : context.uid) || "ADMIN_TEST",
+        locale: loc,
+        context: ctx,
+        createdAt: new Date().toISOString(),
+        source: "admin_testSend"
+    });
+    return { ok: true };
+});
+// ---- SEED DES TEMPLATES & ROUTING ----
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
-// ⚠️ Pas de setGlobalOptions ici (il est unique dans src/index.ts)
-if (!admin.apps.length) {
-    admin.initializeApp();
-}
-const db = (0, firestore_1.getFirestore)();
-exports.admin_templates_seed = (0, https_1.onCall)(async (_req) => {
-    var _a, _b;
-    const dir = path.join(__dirname, "..", "assets");
-    // Vérification basique de présence des fichiers
-    const routingPath = path.join(dir, "sos-expat-message-routing.json");
-    const frPath = path.join(dir, "sos-expat-message-templates-fr.json");
-    const enPath = path.join(dir, "sos-expat-message-templates-en.json");
-    if (![routingPath, frPath, enPath].every((p) => fs.existsSync(p))) {
-        throw new Error(`Fichiers manquants dans /assets. Requis: 
-- ${path.basename(routingPath)}
-- ${path.basename(frPath)}
-- ${path.basename(enPath)}`);
+exports.admin_templates_seed = (0, https_1.onCall)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    timeoutSeconds: 60
+}, async (req) => {
+    assertAdmin(req); // réutilise la même fonction assertAdmin de ce fichier
+    const db = (0, firestore_1.getFirestore)();
+    // charge les JSON depuis src/assets
+    const assetsDir = path.join(__dirname, "..", "assets");
+    const fr = JSON.parse(fs.readFileSync(path.join(assetsDir, "sos-expat-message-templates-fr.json"), "utf8"));
+    const en = JSON.parse(fs.readFileSync(path.join(assetsDir, "sos-expat-message-templates-en.json"), "utf8"));
+    const routing = JSON.parse(fs.readFileSync(path.join(assetsDir, "sos-expat-message-routing.json"), "utf8"));
+    // upsert routing
+    await db.doc("message_routing/config").set(routing, { merge: true });
+    // upsert templates FR
+    for (const [eventId, payload] of Object.entries(fr.items || {})) {
+        await db.doc(`message_templates/fr-FR/items/${eventId}`).set(payload, { merge: true });
     }
-    const routing = JSON.parse(fs.readFileSync(routingPath, "utf8"));
-    const fr = JSON.parse(fs.readFileSync(frPath, "utf8"));
-    const en = JSON.parse(fs.readFileSync(enPath, "utf8"));
-    // ROUTING
-    await db
-        .collection("message_routing")
-        .doc("config")
-        .set({
-        version: (_a = routing.version) !== null && _a !== void 0 ? _a : 1,
-        routing: (_b = routing.routing) !== null && _b !== void 0 ? _b : routing,
-        updatedAt: firestore_1.FieldValue.serverTimestamp(),
-    }, { merge: true });
-    const writeLocale = async (locale, payload) => {
-        var _a;
-        const root = db.collection("message_templates").doc(locale);
-        // _meta/defaults
-        if (!Array.isArray(payload) && payload.defaults) {
-            await root
-                .collection("_meta")
-                .doc("defaults")
-                .set(Object.assign(Object.assign({}, payload.defaults), { updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
-        }
-        const list = Array.isArray(payload)
-            ? payload
-            : ((_a = payload.templates) !== null && _a !== void 0 ? _a : []);
-        // Écriture en lot (batch) pour performance
-        const batch = db.batch();
-        for (const t of list) {
-            if (!(t === null || t === void 0 ? void 0 : t.id))
-                continue;
-            batch.set(root.collection("items").doc(String(t.id)), Object.assign(Object.assign({}, t), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
-        }
-        await batch.commit();
-    };
-    await writeLocale("fr-FR", fr);
-    await writeLocale("en", en);
-    return { ok: true };
+    // upsert templates EN
+    for (const [eventId, payload] of Object.entries(en.items || {})) {
+        await db.doc(`message_templates/en/items/${eventId}`).set(payload, { merge: true });
+    }
+    return { ok: true, frCount: Object.keys(fr.items || {}).length, enCount: Object.keys(en.items || {}).length };
 });
 //# sourceMappingURL=callables.js.map

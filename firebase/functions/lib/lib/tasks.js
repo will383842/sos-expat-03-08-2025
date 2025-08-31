@@ -40,7 +40,7 @@ function getTasksConfig() {
         location: CLOUD_TASKS_LOCATION.value() || "europe-west1",
         queueName: CLOUD_TASKS_QUEUE.value() || "call-scheduler-queue",
         callbackBaseUrl: getFunctionsBaseUrl(), // sans slash final
-        functionName: "executeCallTask",
+        functionName: "executeCallTask"
     };
 }
 // ------------------------------------------------------
@@ -63,7 +63,6 @@ function getTasksClient() {
  * @returns taskId créé
  *
  * IMPORTANT :
- * - La fonction APPELANTE (ex: stripeWebhook) doit déclarer `secrets: [TASKS_AUTH_SECRET]`
  *   afin que TASKS_AUTH_SECRET.value() soit accessible à l'exécution.
  */
 async function scheduleCallTask(callSessionId, delaySeconds) {
@@ -82,12 +81,12 @@ async function scheduleCallTask(callSessionId, delaySeconds) {
         const payload = {
             callSessionId,
             scheduledAt: new Date().toISOString(),
-            taskId,
+            taskId
         };
         const task = {
             name: `${queuePath}/tasks/${taskId}`,
             scheduleTime: {
-                seconds: Math.floor(scheduleTime.getTime() / 1000),
+                seconds: Math.floor(scheduleTime.getTime() / 1000)
             },
             httpRequest: {
                 httpMethod: "POST",
@@ -95,10 +94,10 @@ async function scheduleCallTask(callSessionId, delaySeconds) {
                 headers: {
                     "Content-Type": "application/json",
                     // ⚠️ Utilise le secret paramétré (Firebase v2)
-                    "X-Task-Auth": TASKS_AUTH_SECRET.value(),
+                    "X-Task-Auth": TASKS_AUTH_SECRET.value()
                 },
-                body: Buffer.from(JSON.stringify(payload)),
-            },
+                body: Buffer.from(JSON.stringify(payload))
+            }
         };
         console.log(`📋 [CloudTasks] Création tâche ${taskId} (queue=${cfg.queueName}, region=${cfg.location}) → ${delaySeconds}s`);
         const [response] = await client.createTask({ parent: queuePath, task });
@@ -144,7 +143,7 @@ async function listPendingTasks(maxResults = 100) {
         console.log(`📋 [CloudTasks] Liste des tâches en attente (queue=${cfg.queueName})`);
         const [tasks] = await client.listTasks({
             parent: queuePath,
-            pageSize: maxResults,
+            pageSize: maxResults
         });
         const pending = tasks
             .filter((task) => { var _a; return task.scheduleTime && ((_a = task.httpRequest) === null || _a === void 0 ? void 0 : _a.body); })
@@ -156,7 +155,7 @@ async function listPendingTasks(maxResults = 100) {
                     taskId: payload.taskId || "unknown",
                     callSessionId: payload.callSessionId || "unknown",
                     scheduleTime,
-                    name: task.name || "unknown",
+                    name: task.name || "unknown"
                 };
             }
             catch (e) {
@@ -208,7 +207,7 @@ async function getQueueStats() {
             pendingTasks: pending.length,
             queueName: cfg.queueName,
             location: cfg.location,
-            oldestTaskAge,
+            oldestTaskAge
         };
     }
     catch (error) {
@@ -217,7 +216,7 @@ async function getQueueStats() {
         return {
             pendingTasks: 0,
             queueName: cfg.queueName,
-            location: cfg.location,
+            location: cfg.location
         };
     }
 }
@@ -254,17 +253,17 @@ async function createTestTask(payload, delaySeconds = 5) {
         const task = {
             name: `${queuePath}/tasks/${taskId}`,
             scheduleTime: {
-                seconds: Math.floor(scheduleTime.getTime() / 1000),
+                seconds: Math.floor(scheduleTime.getTime() / 1000)
             },
             httpRequest: {
                 httpMethod: "POST",
                 url: callbackUrl,
                 headers: {
                     "Content-Type": "application/json",
-                    "X-Task-Auth": TASKS_AUTH_SECRET.value(),
+                    "X-Task-Auth": TASKS_AUTH_SECRET.value()
                 },
-                body: Buffer.from(JSON.stringify(Object.assign(Object.assign({}, payload), { taskId }))),
-            },
+                body: Buffer.from(JSON.stringify(Object.assign(Object.assign({}, payload), { taskId })))
+            }
         };
         const [response] = await client.createTask({ parent: queuePath, task });
         console.log(`✅ [CloudTasks] Tâche de test créée: ${response.name}`);

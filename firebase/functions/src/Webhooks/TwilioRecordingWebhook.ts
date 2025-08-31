@@ -4,7 +4,7 @@ import { twilioCallManager } from '../TwilioCallManager';
 import { logCallRecord } from '../utils/logs/logCallRecord';
 import { logError } from '../utils/logs/logError';
 import { Request, Response } from 'express';
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
+
 
 interface TwilioRecordingWebhookBody {
   RecordingSid: string;
@@ -28,13 +28,14 @@ interface TwilioRecordingWebhookBody {
  * Gère: completed, failed, absent
  */
 export const TwilioRecordingWebhook = onRequest(
-  { region: 'europe-west1',
-  memory: '256MiB',
-  cpu: 0.25,
-  maxInstances: 3,
-  minInstances: 0,
-  concurrency: 1,
-   secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1
+  },
   async (req: Request, res: Response) => {
     try {
       const body: TwilioRecordingWebhookBody = req.body;
@@ -327,7 +328,7 @@ export async function getSessionRecordings(sessionId: string) {
 }
 
 /**
- * Alias d’export pour compatibilité avec les imports en lowercase.
+ * Alias d'export pour compatibilité avec les imports en lowercase.
  * Permet: import { twilioRecordingWebhook } from './TwilioRecordingWebhook'
  */
 export { TwilioRecordingWebhook as twilioRecordingWebhook };

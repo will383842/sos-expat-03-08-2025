@@ -61,7 +61,7 @@ exports.api = (0, https_1.onRequest)({
         'http://127.0.0.1:5000', // Hosting emulator
         'https://sos-urgently-ac307.web.app', // Firebase Hosting prod
         'https://sos-expat.com' // Domaine custom prod
-    ],
+    ]
 }, async (req, res) => {
     var _a, _b, _c, _d, _e, _f;
     try {
@@ -69,7 +69,7 @@ exports.api = (0, https_1.onRequest)({
         console.log('🔍 API Request:', {
             method: req.method,
             path,
-            originalUrl: req.originalUrl,
+            originalUrl: req.originalUrl
         });
         // =============================
         // 📊 /admin/financial-stats
@@ -83,13 +83,13 @@ exports.api = (0, https_1.onRequest)({
                 const prevEnd = admin.firestore.Timestamp.fromDate(new Date(now - 30 * 864e5));
                 // Stats 30 derniers jours
                 const curr = await StripeManager_1.stripeManager.getPaymentStatistics({
-                    startDate: asDate(d30),
+                    startDate: asDate(d30)
                 });
                 console.log('✅ Stats courantes récupérées:', curr);
                 // Période précédente
                 const prev = await StripeManager_1.stripeManager.getPaymentStatistics({
                     startDate: asDate(prevStart),
-                    endDate: asDate(prevEnd),
+                    endDate: asDate(prevEnd)
                 });
                 console.log('✅ Stats précédentes récupérées:', prev);
                 // "Transactions actives"
@@ -118,13 +118,13 @@ exports.api = (0, https_1.onRequest)({
                         revenue: pctChange(monthlyRevenue, prev.totalAmount || 0),
                         commissions: pctChange(totalCommissions, prev.totalCommission || 0),
                         transactions: pctChange(activeTransactions, 0),
-                        conversion: pctChange(conversionRate, 0),
+                        conversion: pctChange(conversionRate, 0)
                     },
                     debug: {
                         currentStats: curr,
                         previousStats: prev,
-                        pendingCount: pendingSnap.size,
-                    },
+                        pendingCount: pendingSnap.size
+                    }
                 };
                 console.log('📊 Réponse financial-stats:', response);
                 res.json(response);
@@ -136,7 +136,7 @@ exports.api = (0, https_1.onRequest)({
                     error: 'Erreur récupération statistiques',
                     details: statsError instanceof Error
                         ? statsError.message
-                        : String(statsError),
+                        : String(statsError)
                 });
                 return;
             }
@@ -169,7 +169,7 @@ exports.api = (0, https_1.onRequest)({
                     commissions: fmt(((_c = lastPayment === null || lastPayment === void 0 ? void 0 : lastPayment.docs[0]) === null || _c === void 0 ? void 0 : _c.get('updatedAt')) ||
                         ((_d = lastPayment === null || lastPayment === void 0 ? void 0 : lastPayment.docs[0]) === null || _d === void 0 ? void 0 : _d.get('createdAt'))),
                     analytics: fmt(((_e = lastAnalytics === null || lastAnalytics === void 0 ? void 0 : lastAnalytics.docs[0]) === null || _e === void 0 ? void 0 : _e.get('updatedAt')) ||
-                        ((_f = lastAnalytics === null || lastAnalytics === void 0 ? void 0 : lastAnalytics.docs[0]) === null || _f === void 0 ? void 0 : _f.get('createdAt'))),
+                        ((_f = lastAnalytics === null || lastAnalytics === void 0 ? void 0 : lastAnalytics.docs[0]) === null || _f === void 0 ? void 0 : _f.get('createdAt')))
                 };
                 console.log('🕐 Réponse last-modifications:', response);
                 res.json(response);
@@ -181,7 +181,7 @@ exports.api = (0, https_1.onRequest)({
                     error: 'Erreur récupération modifications',
                     details: modifError instanceof Error
                         ? modifError.message
-                        : String(modifError),
+                        : String(modifError)
                 });
                 return;
             }
@@ -200,7 +200,7 @@ exports.api = (0, https_1.onRequest)({
                     database: latency < 250 ? 'optimal' : latency < 1000 ? 'slow' : 'error',
                     cache: 'inactive',
                     lastCheck: new Date().toISOString(),
-                    latency: `${latency}ms`,
+                    latency: `${latency}ms`
                 };
                 console.log('⚙️ Réponse system-status:', response);
                 res.json(response);
@@ -212,7 +212,7 @@ exports.api = (0, https_1.onRequest)({
                     error: 'Erreur vérification status',
                     details: statusError instanceof Error
                         ? statusError.message
-                        : String(statusError),
+                        : String(statusError)
                 });
                 return;
             }
@@ -230,7 +230,7 @@ exports.api = (0, https_1.onRequest)({
                     '/admin/financial-stats',
                     '/admin/last-modifications',
                     '/admin/system-status',
-                ],
+                ]
             });
             return;
         }
@@ -245,7 +245,7 @@ exports.api = (0, https_1.onRequest)({
                 '/admin/financial-stats',
                 '/admin/last-modifications',
                 '/admin/system-status',
-            ],
+            ]
         });
         return;
     }
@@ -253,7 +253,7 @@ exports.api = (0, https_1.onRequest)({
         console.error('💥 Erreur globale API:', e);
         res.status(500).json({
             error: e instanceof Error ? e.message : 'Internal error',
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
         });
         return;
     }

@@ -1,0 +1,275 @@
+[debug] [2025-08-31T05:02:17.003Z] ----------------------------------------------------------------------
+[debug] [2025-08-31T05:02:17.006Z] Command:       C:\nvm4w\nodejs\node.exe C:\Users\willi\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js functions:shell
+[debug] [2025-08-31T05:02:17.007Z] CLI Version:   14.15.1
+[debug] [2025-08-31T05:02:17.007Z] Platform:      win32
+[debug] [2025-08-31T05:02:17.007Z] Node Version:  v20.17.0
+[debug] [2025-08-31T05:02:17.007Z] Time:          Sun Aug 31 2025 07:02:17 GMT+0200 (heure d’été d’Europe centrale)
+[debug] [2025-08-31T05:02:17.008Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-08-31T05:02:17.262Z] Field "/functions" in "firebase.json" is possibly invalid: must be object
+[debug] [2025-08-31T05:02:17.262Z] Object "/functions/0" in "firebase.json" has unknown property: {"additionalProperty":"region"}
+[debug] [2025-08-31T05:02:17.262Z] Field "/functions" in "firebase.json" is possibly invalid: must match a schema in anyOf
+[debug] [2025-08-31T05:02:17.268Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-31T05:02:17.269Z] > authorizing via signed-in user (williamsjullin@gmail.com)
+[debug] [2025-08-31T05:02:17.269Z] [iam] checking project sos-urgently-ac307 for permissions ["firebase.projects.get"]
+[debug] [2025-08-31T05:02:17.270Z] Checked if tokens are valid: true, expires at: 1756619532854
+[debug] [2025-08-31T05:02:17.271Z] Checked if tokens are valid: true, expires at: 1756619532854
+[debug] [2025-08-31T05:02:17.272Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/sos-urgently-ac307:testIamPermissions [none]
+[debug] [2025-08-31T05:02:17.272Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/sos-urgently-ac307:testIamPermissions x-goog-quota-user=projects/sos-urgently-ac307
+[debug] [2025-08-31T05:02:17.272Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/sos-urgently-ac307:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-08-31T05:02:17.967Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/sos-urgently-ac307:testIamPermissions 200
+[debug] [2025-08-31T05:02:17.967Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/sos-urgently-ac307:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-08-31T05:02:17.968Z] Found locator with mismatched version, ignoring: {"version":"14.12.0","origins":["http://127.0.0.1:4402","http://[::1]:4402"]}
+[debug] [2025-08-31T05:02:17.973Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-08-31T05:02:17.999Z] defaultcredentials: writing to file C:\Users\willi\AppData\Roaming\firebase\williamsjullin_gmail_com_application_default_credentials.json
+[debug] [2025-08-31T05:02:18.001Z] DEBUG: Setting GAC to C:\Users\willi\AppData\Roaming\firebase\williamsjullin_gmail_com_application_default_credentials.json
+[debug] [2025-08-31T05:02:18.002Z] Checked if tokens are valid: true, expires at: 1756619532854
+[debug] [2025-08-31T05:02:18.002Z] Checked if tokens are valid: true, expires at: 1756619532854
+[debug] [2025-08-31T05:02:18.002Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/sos-urgently-ac307/adminSdkConfig [none]
+[debug] [2025-08-31T05:02:18.471Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/sos-urgently-ac307/adminSdkConfig 200
+[debug] [2025-08-31T05:02:18.471Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/sos-urgently-ac307/adminSdkConfig {"projectId":"sos-urgently-ac307","storageBucket":"sos-urgently-ac307.firebasestorage.app"}
+[debug] [2025-08-31T05:02:18.483Z] [functions] Watching "C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions" for Cloud Functions...
+[debug] [2025-08-31T05:02:18.487Z] Validating nodejs source
+[debug] [2025-08-31T05:02:19.603Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "build": "tsc -p .",
+    "deploy": "firebase deploy --only functions",
+    "test:production": "node testProduction.js"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "@google-cloud/tasks": "^6.2.0",
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.4.0",
+    "nodemailer": "^6.9.8",
+    "stripe": "^14.25.0",
+    "twilio": "^4.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/nodemailer": "^6.4.17",
+    "dotenv-cli": "^10.0.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
+[debug] [2025-08-31T05:02:19.603Z] Building nodejs source
+[debug] [2025-08-31T05:02:19.604Z] Failed to find version of module node: reached end of search path C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\node_modules
+[info] +  functions: Using node@20 from host. 
+[info] i  functions: Loaded environment variables from .env.sos-urgently-ac307. 
+[debug] [2025-08-31T05:02:19.610Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-08-31T05:02:19.631Z] Found firebase-functions binary at 'C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8412
+
+[info] 🚀 [ULTRA DEBUG] Logger initialisé avec session: session_1756616540456_97620u4ps
+
+[info] 🔧 [ULTRA DEBUG] Mode local détecté - Firestore logs désactivés
+
+[info] 🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] Import de firebase-functions/v2
+
+[info] 🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] DATA: {
+  "module": "firebase-functions/v2",
+  "from": "index.ts",
+  "timestamp": 1756616540457
+}
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] STACK: Error
+    at UltraDebugLogger.trace (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:209:23)
+    at UltraDebugLogger.traceImport (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:247:14)
+    at traceGlobalImport (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:367:25)
+    at Object.<anonymous> (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\index.js:47:42)
+    at Module._compile (node:internal/modules/cjs/loader:1469:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1548:10)
+    at Module.load (node:internal/modules/cjs/loader:1288:32)
+    at Module._load (node:internal/modules/cjs/loader:1104:12)
+    at Module.require (node:internal/modules/cjs/loader:1311:19)
+    at require (node:internal/modules/helpers:179:18)
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "54MB",
+    "heapTotal": "19MB",
+    "heapUsed": "11MB",
+    "external": "2MB"
+  }
+}
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] Import de firebase-admin
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] DATA: {
+  "module": "firebase-admin",
+  "from": "index.ts",
+  "timestamp": 1756616540460
+}
+
+[info] 🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] STACK: Error
+    at UltraDebugLogger.trace (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:209:23)
+    at UltraDebugLogger.traceImport (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:247:14)
+    at traceGlobalImport (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:367:25)
+    at Object.<anonymous> (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\index.js:48:42)
+    at Module._compile (node:internal/modules/cjs/loader:1469:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1548:10)
+    at Module.load (node:internal/modules/cjs/loader:1288:32)
+    at Module._load (node:internal/modules/cjs/loader:1104:12)
+    at Module.require (node:internal/modules/cjs/loader:1311:19)
+    at require (node:internal/modules/helpers:179:18)
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "54MB",
+    "heapTotal": "19MB",
+    "heapUsed": "11MB",
+    "external": "2MB"
+  }
+}
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] Import de stripe
+
+[info] 🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] DATA: {
+  "module": "stripe",
+  "from": "index.ts",
+  "timestamp": 1756616540461
+}
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] STACK: Error
+    at UltraDebugLogger.trace (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:209:23)
+    at UltraDebugLogger.traceImport (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:247:14)
+    at traceGlobalImport (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\utils\ultraDebugLogger.js:367:25)
+    at Object.<anonymous> (C:\Users\willi\Downloads\Plateforme web SOS Expat\firebase\functions\lib\index.js:49:42)
+    at Module._compile (node:internal/modules/cjs/loader:1469:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1548:10)
+    at Module.load (node:internal/modules/cjs/loader:1288:32)
+    at Module._load (node:internal/modules/cjs/loader:1104:12)
+    at Module.require (node:internal/modules/cjs/loader:1311:19)
+    at require (node:internal/modules/helpers:179:18)
+🔎 [ULTRA DEBUG] [TRACE] [MODULE_IMPORT] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "54MB",
+    "heapTotal": "19MB",
+    "heapUsed": "11MB",
+    "external": "2MB"
+  }
+}
+📝 [ULTRA DEBUG] [INFO] [INDEX_INIT] Démarrage de l'initialisation du fichier index.ts
+
+[info] 📝 [ULTRA DEBUG] [INFO] [INDEX_INIT] DATA: {
+  "timestamp": 1756616540462,
+  "nodeVersion": "v20.17.0",
+  "environment": "development"
+}
+📝 [ULTRA DEBUG] [INFO] [INDEX_INIT] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "54MB",
+    "heapTotal": "19MB",
+    "heapUsed": "11MB",
+    "external": "2MB"
+  }
+}
+[ULTRA DEBUG] (local) skip Firestore log
+
+[info] 🔍 [ULTRA DEBUG] [DEBUG] [IMPORTS] Imports principaux chargés avec succès
+
+[info] 🔍 [ULTRA DEBUG] [DEBUG] [IMPORTS] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "92MB",
+    "heapTotal": "62MB",
+    "heapUsed": "38MB",
+    "external": "3MB"
+  }
+}
+🔍 [ULTRA DEBUG] [DEBUG] [TYPES] Interfaces et types définis
+🔍 [ULTRA DEBUG] [DEBUG] [TYPES] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "92MB",
+    "heapTotal": "62MB",
+    "heapUsed": "38MB",
+    "external": "3MB"
+  }
+}
+📝 [ULTRA DEBUG] [INFO] [EXPORTS] Début du chargement des exports directs
+📝 [ULTRA DEBUG] [INFO] [EXPORTS] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "92MB",
+    "heapTotal": "62MB",
+    "heapUsed": "38MB",
+    "external": "3MB"
+  }
+}
+[ULTRA DEBUG] (local) skip Firestore log
+
+[error] {"severity":"WARNING","message":"params.STRIPE_MODE.value() invoked during function deployment, instead of during runtime."}
+
+[info] ðŸŒ Environment: development, Production: false, Bypass: false, StripeMode: (unset)
+
+[error] {"severity":"WARNING","message":"This is usually a mistake. In configs, use Params directly without calling .value()."}
+{"severity":"WARNING","message":"example: { memory: memoryParam } not { memory: memoryParam.value() }"}
+
+[info] 📝 [ULTRA DEBUG] [INFO] [EXPORTS] Exports directs configurés
+
+[info] 📝 [ULTRA DEBUG] [INFO] [EXPORTS] CONTEXT: {
+  "environment": "unknown",
+  "nodeVersion": "v20.17.0",
+  "processId": 8904,
+  "memoryUsage": {
+    "rss": "95MB",
+    "heapTotal": "62MB",
+    "heapUsed": "40MB",
+    "external": "3MB"
+  }
+}
+[ULTRA DEBUG] (local) skip Firestore log
+
+[debug] [2025-08-31T05:02:21.520Z] Got response from /__/functions.yaml {"endpoints":{"createAndScheduleCallHTTPS":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"createAndScheduleCallHTTPS"},"createAndScheduleCall":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"createAndScheduleCall"},"createPaymentIntent":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"labels":{},"callableTrigger":{},"entryPoint":"createPaymentIntent"},"api":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"unifiedWebhook":{"availableMemoryMb":256,"timeoutSeconds":null,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"httpsTrigger":{},"entryPoint":"unifiedWebhook"},"initializeMessageTemplates":{"availableMemoryMb":256,"timeoutSeconds":120,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"initializeMessageTemplates"},"notifyAfterPayment":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"notifyAfterPayment"},"executeCallTask":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"labels":{},"httpsTrigger":{},"entryPoint":"executeCallTask"},"adminUpdateStatus":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"adminUpdateStatus"},"adminSoftDeleteUser":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"adminSoftDeleteUser"},"adminBulkUpdateStatus":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"adminBulkUpdateStatus"},"stripeWebhook":{"availableMemoryMb":512,"timeoutSeconds":30,"minInstances":0,"maxInstances":5,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"labels":{},"httpsTrigger":{},"entryPoint":"stripeWebhook"},"scheduledFirestoreExport":{"availableMemoryMb":256,"timeoutSeconds":null,"minInstances":0,"maxInstances":1,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"scheduleTrigger":{"schedule":"0 2 * * *","retryConfig":{},"timeZone":"Europe/Paris"},"entryPoint":"scheduledFirestoreExport"},"scheduledCleanup":{"availableMemoryMb":256,"timeoutSeconds":null,"minInstances":0,"maxInstances":1,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"scheduleTrigger":{"schedule":"0 3 * * 0","retryConfig":{},"timeZone":"Europe/Paris"},"entryPoint":"scheduledCleanup"},"generateSystemDebugReport":{"availableMemoryMb":256,"timeoutSeconds":120,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"generateSystemDebugReport"},"getSystemHealthStatus":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"getSystemHealthStatus"},"getUltraDebugLogs":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"getUltraDebugLogs"},"testCloudTasksConnection":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"testCloudTasksConnection"},"getCloudTasksQueueStats":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"getCloudTasksQueueStats"},"manuallyTriggerCallExecution":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":3,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.25,"labels":{},"callableTrigger":{},"entryPoint":"manuallyTriggerCallExecution"},"testWebhook":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":1,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"httpsTrigger":{},"entryPoint":"testWebhook"},"onMessageEventCreate":{"availableMemoryMb":512,"timeoutSeconds":120,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"TWILIO_WHATSAPP_NUMBER"}],"labels":{},"eventTrigger":{"eventType":"google.cloud.firestore.document.v1.created","eventFilters":{"database":"(default)","namespace":"(default)"},"eventFilterPathPatterns":{"document":"message_events/{id}"},"retry":false},"entryPoint":"onMessageEventCreate"},"admin_templates_list":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_templates_list"},"admin_templates_get":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_templates_get"},"admin_templates_upsert":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_templates_upsert"},"admin_routing_get":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_routing_get"},"admin_routing_upsert":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_routing_upsert"},"admin_testSend":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_testSend"},"admin_templates_seed":{"availableMemoryMb":256,"timeoutSeconds":60,"minInstances":0,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["europe-west1"],"secretEnvironmentVariables":[{"key":"EMAIL_USER"},{"key":"EMAIL_PASS"},{"key":"TWILIO_ACCOUNT_SID"},{"key":"TWILIO_AUTH_TOKEN"},{"key":"TWILIO_PHONE_NUMBER"},{"key":"STRIPE_SECRET_KEY_TEST"},{"key":"STRIPE_SECRET_KEY_LIVE"},{"key":"TASKS_AUTH_SECRET"}],"cpu":0.1,"labels":{},"callableTrigger":{},"entryPoint":"admin_templates_seed"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{},"params":[{"name":"CLOUD_TASKS_QUEUE","type":"string","default":"call-scheduler-queue"},{"type":"secret","name":"TASKS_AUTH_SECRET"},{"type":"secret","name":"STRIPE_WEBHOOK_SECRET_TEST"},{"type":"secret","name":"STRIPE_WEBHOOK_SECRET_LIVE"},{"type":"secret","name":"STRIPE_SECRET_KEY_TEST"},{"type":"secret","name":"STRIPE_SECRET_KEY_LIVE"},{"name":"STRIPE_MODE","type":"string"},{"name":"CLOUD_TASKS_LOCATION","type":"string","default":"europe-west1"},{"name":"FUNCTIONS_BASE_URL","type":"string"},{"type":"secret","name":"EMAIL_USER"},{"type":"secret","name":"EMAIL_PASS"},{"type":"secret","name":"TWILIO_ACCOUNT_SID"},{"type":"secret","name":"TWILIO_AUTH_TOKEN"},{"type":"secret","name":"TWILIO_PHONE_NUMBER"},{"type":"secret","name":"TWILIO_WHATSAPP_NUMBER"}]}
+[debug] [2025-08-31T05:02:31.610Z] [functions] Loaded functions definitions from source: createAndScheduleCallHTTPS, createAndScheduleCall, createPaymentIntent, api, unifiedWebhook, initializeMessageTemplates, notifyAfterPayment, adminUpdateStatus, adminSoftDeleteUser, adminBulkUpdateStatus, stripeWebhook, scheduledFirestoreExport, scheduledCleanup, generateSystemDebugReport, getSystemHealthStatus, getUltraDebugLogs, testCloudTasksConnection, getCloudTasksQueueStats, manuallyTriggerCallExecution, testWebhook, onMessageEventCreate, admin_templates_list, admin_templates_get, admin_templates_upsert, admin_routing_get, admin_routing_upsert, admin_testSend, admin_templates_seed, executeCallTask.
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-createAndScheduleCallHTTPS]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/createAndScheduleCallHTTPS).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-createAndScheduleCall]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/createAndScheduleCall).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-createPaymentIntent]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/createPaymentIntent).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-api]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/api).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-unifiedWebhook]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/unifiedWebhook).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-initializeMessageTemplates]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/initializeMessageTemplates).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-notifyAfterPayment]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/notifyAfterPayment).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-adminUpdateStatus]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/adminUpdateStatus).
+[debug] [2025-08-31T05:02:31.611Z] [functions[europe-west1-adminSoftDeleteUser]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/adminSoftDeleteUser).
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-adminBulkUpdateStatus]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/adminBulkUpdateStatus).
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-stripeWebhook]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/stripeWebhook).
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-scheduledFirestoreExport]] function ignored because the pubsub emulator does not exist or is not running.
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-scheduledCleanup]] function ignored because the pubsub emulator does not exist or is not running.
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-generateSystemDebugReport]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/generateSystemDebugReport).
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-getSystemHealthStatus]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/getSystemHealthStatus).
+[debug] [2025-08-31T05:02:31.612Z] [functions[europe-west1-getUltraDebugLogs]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/getUltraDebugLogs).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-testCloudTasksConnection]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/testCloudTasksConnection).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-getCloudTasksQueueStats]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/getCloudTasksQueueStats).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-manuallyTriggerCallExecution]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/manuallyTriggerCallExecution).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-testWebhook]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/testWebhook).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-onMessageEventCreate]] function ignored because the firestore emulator does not exist or is not running.
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_templates_list]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_templates_list).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_templates_get]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_templates_get).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_templates_upsert]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_templates_upsert).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_routing_get]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_routing_get).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_routing_upsert]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_routing_upsert).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_testSend]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_testSend).
+[debug] [2025-08-31T05:02:31.613Z] [functions[europe-west1-admin_templates_seed]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/europe-west1/admin_templates_seed).
+[debug] [2025-08-31T05:02:31.614Z] [functions[us-central1-executeCallTask]] http function initialized (http://127.0.0.1:5001/sos-urgently-ac307/us-central1/executeCallTask).
+[info] i  functions: Loaded functions: createAndScheduleCallHTTPS, createAndScheduleCall, createPaymentIntent, api, unifiedWebhook, initializeMessageTemplates, notifyAfterPayment, adminUpdateStatus, adminSoftDeleteUser, adminBulkUpdateStatus, stripeWebhook, scheduledFirestoreExport, scheduledCleanup, generateSystemDebugReport, getSystemHealthStatus, getUltraDebugLogs, testCloudTasksConnection, getCloudTasksQueueStats, manuallyTriggerCallExecution, testWebhook, onMessageEventCreate, admin_templates_list, admin_templates_get, admin_templates_upsert, admin_routing_get, admin_routing_upsert, admin_testSend, admin_templates_seed, executeCallTask 
+[warn] !  functions: The following emulators are not running, calls to these services will affect production: firestore, database, pubsub, storage, eventarc, tasks 

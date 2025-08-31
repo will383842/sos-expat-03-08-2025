@@ -1,6 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
 import { twilioCallWebhook, twilioConferenceWebhook, twilioRecordingWebhook } from '../Webhooks/twilioWebhooks';
 
 export const unifiedWebhook = onRequest(
@@ -10,9 +9,7 @@ export const unifiedWebhook = onRequest(
     cpu: 0.25,
     maxInstances: 3,
     minInstances: 0,
-    concurrency: 1,
-    secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]
-  },
+    concurrency: 1},
   async (req: Request, res: Response) => {
     const path = (req.path || '').toLowerCase();
     const body = (req as any).body || {};

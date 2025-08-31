@@ -5,7 +5,7 @@ import { logError } from '../utils/logs/logError';
 import { Response } from 'express';
 import * as admin from 'firebase-admin';
 import { Request } from 'firebase-functions/v2/https';
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
+
 
 interface TwilioCallWebhookBody {
   CallSid: string;
@@ -26,13 +26,14 @@ interface TwilioCallWebhookBody {
  * Compatible avec le système TwilioCallManager moderne
  */
 export const twilioCallWebhook = onRequest(
-  {  region: 'europe-west1',
-  memory: '256MiB',
-  cpu: 0.25,
-  maxInstances: 3,
-  minInstances: 0,
-  concurrency: 1,
-   secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1
+  },
   async (req: Request, res: Response) => {
     try {
       const body: TwilioCallWebhookBody = req.body;
@@ -272,13 +273,14 @@ async function handleCallFailed(
  * Webhook pour les événements de conférence (délégué au système moderne)
  */
 export const twilioConferenceWebhook = onRequest(
-  {  region: 'europe-west1',
-  memory: '256MiB',
-  cpu: 0.25,
-  maxInstances: 3,
-  minInstances: 0,
-  concurrency: 1,
-   secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1
+  },
   async (req: Request, res: Response) => {
     // Rediriger vers le webhook de conférence moderne
     const { twilioConferenceWebhook: modernWebhook } = await import('./TwilioConferenceWebhook');
@@ -290,13 +292,14 @@ export const twilioConferenceWebhook = onRequest(
  * Webhook pour les événements d'enregistrement (délégué au système moderne)
  */
 export const twilioRecordingWebhook = onRequest(
-  {  region: 'europe-west1',
-  memory: '256MiB',
-  cpu: 0.25,
-  maxInstances: 3,
-  minInstances: 0,
-  concurrency: 1,
-   secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1
+  },
   async (req: Request, res: Response) => {
     // Rediriger vers le webhook d'enregistrement moderne
     const { twilioRecordingWebhook: modernWebhook } = await import('./TwilioRecordingWebhook');

@@ -40,18 +40,18 @@ const admin = __importStar(require("firebase-admin"));
 const TwilioCallManager_1 = require("../TwilioCallManager");
 const logCallRecord_1 = require("../utils/logs/logCallRecord");
 const logError_1 = require("../utils/logs/logError");
-const twilio_1 = require("../lib/twilio");
 /**
  * Webhook pour les événements d'enregistrement Twilio
  * Gère: completed, failed, absent
  */
-exports.TwilioRecordingWebhook = (0, https_1.onRequest)({ region: 'europe-west1',
+exports.TwilioRecordingWebhook = (0, https_1.onRequest)({
+    region: 'europe-west1',
     memory: '256MiB',
     cpu: 0.25,
     maxInstances: 3,
     minInstances: 0,
-    concurrency: 1,
-    secrets: [twilio_1.TWILIO_ACCOUNT_SID, twilio_1.TWILIO_AUTH_TOKEN, twilio_1.TWILIO_PHONE_NUMBER] }, async (req, res) => {
+    concurrency: 1
+}, async (req, res) => {
     try {
         const body = req.body;
         console.log('🎬 Recording Webhook reçu:', {

@@ -15,7 +15,7 @@ const CPU_OPTIMIZED_CONFIG = {
     timeoutSeconds: 30,
     maxInstances: 3,
     minInstances: 0,
-    concurrency: 1,
+    concurrency: 1
 };
 const db = (0, firestore_1.getFirestore)();
 // ✅ Fonction interne (pour usage depuis d'autres Cloud Functions comme les webhooks)
@@ -32,7 +32,7 @@ async function notifyAfterPaymentInternal(callId) {
         return;
     const messagePayload = {
         title: callData.title,
-        language: Array.isArray(callData.clientLanguages) ? callData.clientLanguages[0] : 'fr',
+        language: Array.isArray(callData.clientLanguages) ? callData.clientLanguages[0] : 'fr'
     };
     try {
         // Envoi des notifications au prestataire

@@ -44,7 +44,7 @@ const SCHEDULER_CONFIG = {
     RETRY_ATTEMPTS: 3,
     RETRY_DELAY_MS: 5000,
     HEALTH_CHECK_INTERVAL: 60000, // 1 minute
-    MAX_PENDING_SESSIONS: 100,
+    MAX_PENDING_SESSIONS: 100
 };
 /**
  * 🔧 REFACTORISÉ: Classe pour gérer uniquement les sessions d'appel (plus de planification en mémoire)
@@ -57,7 +57,7 @@ class CallSchedulerManager {
             currentlyPending: 0,
             completedToday: 0,
             failedToday: 0,
-            averageWaitTime: 0,
+            averageWaitTime: 0
         };
         this.isInitialized = false;
         // 🔧 FIX: Ne pas initialiser immédiatement - attendre le premier appel
@@ -217,7 +217,7 @@ class CallSchedulerManager {
             await (0, logCallRecord_1.logCallRecord)({
                 callId: callSessionId,
                 status: 'sequence_failed_all_retries',
-                retryCount: SCHEDULER_CONFIG.RETRY_ATTEMPTS,
+                retryCount: SCHEDULER_CONFIG.RETRY_ATTEMPTS
             });
         }
         catch (updateError) {
@@ -237,7 +237,7 @@ class CallSchedulerManager {
             await (0, logCallRecord_1.logCallRecord)({
                 callId: callSessionId,
                 status: `call_cancelled_${reason}`,
-                retryCount: 0,
+                retryCount: 0
             });
             console.log(`✅ Appel annulé: ${callSessionId}, raison: ${reason}`);
         }
@@ -399,7 +399,7 @@ const createCallSession = async (params) => {
             amount: params.amount, // ✅ euros
             requestId: params.requestId,
             clientLanguages: params.clientLanguages,
-            providerLanguages: params.providerLanguages,
+            providerLanguages: params.providerLanguages
         });
         await (0, logCallRecord_1.logCallRecord)({
             callId: sessionId,
@@ -417,8 +417,8 @@ const createCallSession = async (params) => {
                 currency: params.currency,
                 amountCents: params.amountCents,
                 platformAmountCents: params.platformAmountCents,
-                platformFeePercent: params.platformFeePercent,
-            },
+                platformFeePercent: params.platformFeePercent
+            }
         });
         console.log(`✅ Session d'appel créée (sans planification): ${sessionId} (montant gardé en euros)`);
         return callSession;
@@ -451,7 +451,7 @@ const cleanupOldSessions = async (olderThanDays = 30) => {
         const result = await twilioCallManager.cleanupOldSessions({
             olderThanDays,
             keepCompletedDays: 7, // Garder les complétées 7 jours
-            batchSize: 50,
+            batchSize: 50
         });
         console.log(`✅ Nettoyage terminé: ${result.deleted} supprimées, ${result.errors} erreurs`);
     }
@@ -501,8 +501,8 @@ const getCallStatistics = async (periodDays = 7) => {
                 averageDuration: callStats.averageDuration,
                 successRate: callStats.successRate,
                 totalRevenueEuros,
-                averageAmountEuros,
-            },
+                averageAmountEuros
+            }
         };
     }
     catch (error) {

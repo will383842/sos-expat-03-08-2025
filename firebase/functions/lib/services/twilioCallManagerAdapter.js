@@ -107,7 +107,7 @@ async function beginOutboundCallForSession(callSessionId) {
  * ✅ Version de compatibilité avec l'ancienne signature
  * Accepte les paramètres twilio et fromNumber mais ne les utilise pas
  */
-async function beginOutboundCallForSessionLegacy({ callSessionId, }) {
+async function beginOutboundCallForSessionLegacy({ callSessionId }) {
     // Déléguer à la fonction principale
     return beginOutboundCallForSession(callSessionId);
 }

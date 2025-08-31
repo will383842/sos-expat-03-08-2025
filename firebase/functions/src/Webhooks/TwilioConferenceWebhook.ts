@@ -4,7 +4,7 @@ import { logCallRecord } from '../utils/logs/logCallRecord';
 import { logError } from '../utils/logs/logError';
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } from '../lib/twilio';
+
 
 interface TwilioConferenceWebhookBody {
   ConferenceSid: string;
@@ -34,13 +34,14 @@ interface TwilioConferenceWebhookBody {
  * Gère: start, end, join, leave, mute, hold
  */
 export const twilioConferenceWebhook = onRequest(
-  { region: 'europe-west1',
-  memory: '256MiB',
-  cpu: 0.25,
-  maxInstances: 3,
-  minInstances: 0,
-  concurrency: 1,
-   secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    cpu: 0.25,
+    maxInstances: 3,
+    minInstances: 0,
+    concurrency: 1
+  },
   async (req: Request, res: Response) => {
     try {
       const body: TwilioConferenceWebhookBody = req.body;
@@ -114,8 +115,7 @@ async function handleConferenceStart(sessionId: string, body: TwilioConferenceWe
     
     await twilioCallManager.updateConferenceInfo(sessionId, {
       sid: body.ConferenceSid,
-      startedAt: admin.firestore.Timestamp.fromDate(new Date()),
-    });
+      startedAt: admin.firestore.Timestamp.fromDate(new Date())});
 
     await twilioCallManager.updateCallSessionStatus(sessionId, 'active');
 

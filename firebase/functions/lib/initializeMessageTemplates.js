@@ -44,7 +44,7 @@ const CPU_OPTIMIZED_CONFIG = {
     timeoutSeconds: 120,
     maxInstances: 3,
     minInstances: 0,
-    concurrency: 1,
+    concurrency: 1
 };
 // ⚠️ TOUS LES TEMPLATES ORIGINAUX GARDÉS (pas de suppression fonctionnelle)
 const defaultTemplates = [

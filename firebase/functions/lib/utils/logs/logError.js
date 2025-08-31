@@ -15,7 +15,7 @@ function safeStringify(obj) {
             if (value instanceof Error) {
                 return {
                     name: value.name,
-                    message: value.message,
+                    message: value.message
                 };
             }
             return value;

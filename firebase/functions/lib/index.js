@@ -33,14 +33,16 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onMessageEventCreate = exports.admin_templates_seed = exports.ultraLogger = exports.testWebhook = exports.manuallyTriggerCallExecution = exports.getCloudTasksQueueStats = exports.testCloudTasksConnection = exports.getUltraDebugLogs = exports.getSystemHealthStatus = exports.generateSystemDebugReport = exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.adminBulkUpdateStatus = exports.adminSoftDeleteUser = exports.adminUpdateStatus = exports.executeCallTask = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.unifiedWebhook = exports.api = exports.createPaymentIntent = exports.createAndScheduleCall = exports.createAndScheduleCallHTTPS = exports.TASKS_AUTH_SECRET = exports.STRIPE_WEBHOOK_SECRET_LIVE = exports.STRIPE_WEBHOOK_SECRET_TEST = exports.STRIPE_SECRET_KEY_LIVE = exports.STRIPE_SECRET_KEY_TEST = exports.STRIPE_MODE = exports.EMAIL_PASS = exports.EMAIL_USER = void 0;
+exports.testWebhook = exports.manuallyTriggerCallExecution = exports.getCloudTasksQueueStats = exports.testCloudTasksConnection = exports.getUltraDebugLogs = exports.getSystemHealthStatus = exports.generateSystemDebugReport = exports.scheduledCleanup = exports.scheduledFirestoreExport = exports.stripeWebhook = exports.adminBulkUpdateStatus = exports.adminSoftDeleteUser = exports.adminUpdateStatus = exports.executeCallTask = exports.notifyAfterPayment = exports.initializeMessageTemplates = exports.unifiedWebhook = exports.api = exports.createPaymentIntent = exports.createAndScheduleCall = exports.createAndScheduleCallHTTPS = exports.STRIPE_WEBHOOK_SECRET_LIVE = exports.STRIPE_WEBHOOK_SECRET_TEST = exports.STRIPE_MODE = exports.TASKS_AUTH_SECRET = exports.STRIPE_SECRET_KEY_LIVE = exports.STRIPE_SECRET_KEY_TEST = exports.TWILIO_PHONE_NUMBER = exports.TWILIO_AUTH_TOKEN = exports.TWILIO_ACCOUNT_SID = exports.EMAIL_PASS = exports.EMAIL_USER = void 0;
 // ====== ULTRA DEBUG INITIALIZATION ======
 const ultraDebugLogger_1 = require("./utils/ultraDebugLogger");
-Object.defineProperty(exports, "ultraLogger", { enumerable: true, get: function () { return ultraDebugLogger_1.ultraLogger; } });
 // Tracer tous les imports principaux
 (0, ultraDebugLogger_1.traceGlobalImport)('firebase-functions/v2', 'index.ts');
 (0, ultraDebugLogger_1.traceGlobalImport)('firebase-admin', 'index.ts');
@@ -54,29 +56,41 @@ const emergencyConfig = {
     minInstances: 0,
     concurrency: 1
 };
-const _criticalConfig = {
-    region: "europe-west1",
-    memory: "512MiB",
-    cpu: 0.5,
-    maxInstances: 5,
-    minInstances: 1,
-    concurrency: 3
-};
 ultraDebugLogger_1.ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index.ts', {
     timestamp: Date.now(),
     nodeVersion: process.version,
     environment: process.env.NODE_ENV || 'development'
 });
-// ====== CONFIGURATION GLOBALE ======
+// ====== CONFIGURATION GLOBALE CENTRALISÉE ======
 const v2_1 = require("firebase-functions/v2");
 const params_1 = require("firebase-functions/params");
-// ⬇️ Secrets email : définis ici UNE SEULE FOIS
+// 🔐 Déclarations **UNIQUEMENT** des secrets que tu utilises réellement
 exports.EMAIL_USER = (0, params_1.defineSecret)("EMAIL_USER");
 exports.EMAIL_PASS = (0, params_1.defineSecret)("EMAIL_PASS");
-// ⬇️ Un seul setGlobalOptions dans tout le repo
+// 👉 Si tu veux vraiment un from explicite, garde cette ligne; sinon supprime-la et oublie EMAIL_FROM partout
+// export const EMAIL_FROM = defineSecret("EMAIL_FROM");
+// Twilio (utilisé par tes webhooks) — garde-les si utilisés, sinon commente
+exports.TWILIO_ACCOUNT_SID = (0, params_1.defineSecret)("TWILIO_ACCOUNT_SID");
+exports.TWILIO_AUTH_TOKEN = (0, params_1.defineSecret)("TWILIO_AUTH_TOKEN");
+exports.TWILIO_PHONE_NUMBER = (0, params_1.defineSecret)("TWILIO_PHONE_NUMBER");
+// Stripe (ton code createPaymentIntent l'utilise)
+exports.STRIPE_SECRET_KEY_TEST = (0, params_1.defineSecret)("STRIPE_SECRET_KEY_TEST");
+exports.STRIPE_SECRET_KEY_LIVE = (0, params_1.defineSecret)("STRIPE_SECRET_KEY_LIVE");
+// Cloud Tasks auth (si executeCallTask l'utilise)
+exports.TASKS_AUTH_SECRET = (0, params_1.defineSecret)("TASKS_AUTH_SECRET");
+// ✅ Centralise la **liste globale**, en filtrant toute valeur falsy (évite 'undefined')
+const GLOBAL_SECRETS = [
+    exports.EMAIL_USER, exports.EMAIL_PASS,
+    // EMAIL_FROM, // décommente si tu l'utilises vraiment
+    exports.TWILIO_ACCOUNT_SID, exports.TWILIO_AUTH_TOKEN, exports.TWILIO_PHONE_NUMBER,
+    exports.STRIPE_SECRET_KEY_TEST, exports.STRIPE_SECRET_KEY_LIVE,
+    exports.TASKS_AUTH_SECRET,
+].filter(Boolean);
+// ⚠️ cast 'as any' pour accepter eventarc si tes types ne sont pas à jour
 (0, v2_1.setGlobalOptions)({
     region: "europe-west1",
-    secrets: ([exports.EMAIL_USER, exports.EMAIL_PASS])
+    eventarc: { location: "europe-west1" },
+    secrets: GLOBAL_SECRETS
 });
 // ====== IMPORTS PRINCIPAUX ======
 const https_1 = require("firebase-functions/v2/https");
@@ -91,24 +105,19 @@ Object.defineProperty(exports, "createAndScheduleCallHTTPS", { enumerable: true,
 Object.defineProperty(exports, "createAndScheduleCall", { enumerable: true, get: function () { return createAndScheduleCallFunction_1.createAndScheduleCallHTTPS; } });
 const executeCallTask_1 = require("./runtime/executeCallTask");
 ultraDebugLogger_1.ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
-// ====== PARAMS & SECRETS (TEST vs LIVE) ======
+// ====== PARAMS & SECRETS ADDITIONNELS ======
 // 👉 STRIPE_MODE est un PARAMÈTRE (pas un secret) pour éviter le conflit secret/env
 exports.STRIPE_MODE = (0, params_1.defineString)('STRIPE_MODE'); // 'test' | 'live'
-// Clés Stripe (secrets)
-exports.STRIPE_SECRET_KEY_TEST = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_TEST');
-exports.STRIPE_SECRET_KEY_LIVE = (0, params_1.defineSecret)('STRIPE_SECRET_KEY_LIVE');
-// Webhook secrets Stripe (secrets)
+// Webhook secrets Stripe spécifiques TEST/LIVE
 exports.STRIPE_WEBHOOK_SECRET_TEST = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET_TEST');
 exports.STRIPE_WEBHOOK_SECRET_LIVE = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET_LIVE');
-// Secret partagé pour authentifier les Cloud Tasks → /executeCallTask
-exports.TASKS_AUTH_SECRET = (0, params_1.defineSecret)('TASKS_AUTH_SECRET');
 // Helpers de sélection de secrets selon le mode (évalués à l'exécution uniquement)
 function isLive() {
     // ⚠️ N'appelez pas .value() en top-level : ces helpers sont utilisés UNIQUEMENT dans les handlers
     return (exports.STRIPE_MODE.value() || 'test').toLowerCase() === 'live';
 }
 function getStripeSecretKey() {
-    // Les secrets sont injectés en variables d'environnement dans les fonctions qui les déclarent dans `secrets:[...]`
+    // Les secrets sont injectés en variables d'environnement dans les fonctions qui les déclarent dans ``
     return isLive()
         ? (process.env.STRIPE_SECRET_KEY_LIVE || '')
         : (process.env.STRIPE_SECRET_KEY_TEST || '');
@@ -145,7 +154,7 @@ const initializeFirebase = (0, ultraDebugLogger_1.traceFunction)(() => {
             }
             catch (settingsError) {
                 ultraDebugLogger_1.ultraLogger.warn('FIREBASE_INIT', 'Firestore déjà configuré (normal)', {
-                    error: settingsError instanceof Error ? settingsError.message : String(settingsError),
+                    error: settingsError instanceof Error ? settingsError.message : String(settingsError)
                 });
             }
             const initTime = Date.now() - startTime;
@@ -154,21 +163,21 @@ const initializeFirebase = (0, ultraDebugLogger_1.traceFunction)(() => {
                 initializationTime: `${initTime}ms`,
                 projectId: admin.app().options.projectId,
                 databaseURL: admin.app().options.databaseURL,
-                storageBucket: admin.app().options.storageBucket,
+                storageBucket: admin.app().options.storageBucket
             });
         }
         catch (error) {
             initializationError = error instanceof Error ? error : new Error(String(error));
             ultraDebugLogger_1.ultraLogger.error('FIREBASE_INIT', 'Erreur critique lors de l\'initialisation Firebase', {
                 error: initializationError.message,
-                stack: initializationError.stack,
+                stack: initializationError.stack
             }, initializationError);
             throw initializationError;
         }
     }
     else if (initializationError) {
         ultraDebugLogger_1.ultraLogger.error('FIREBASE_INIT', 'Tentative d\'utilisation après erreur d\'initialisation', {
-            previousError: initializationError.message,
+            previousError: initializationError.message
         });
         throw initializationError;
     }
@@ -198,7 +207,7 @@ function createDebugMetadata(functionName, userId) {
         userId,
         functionName,
         startTime: Date.now(),
-        environment: process.env.NODE_ENV || 'development',
+        environment: process.env.NODE_ENV || 'development'
     };
 }
 function logFunctionStart(metadata, data) {
@@ -207,7 +216,7 @@ function logFunctionStart(metadata, data) {
         requestId: metadata.requestId,
         userId: metadata.userId,
         data: data ? JSON.stringify(data, null, 2) : undefined,
-        memoryUsage: process.memoryUsage(),
+        memoryUsage: process.memoryUsage()
     });
 }
 function logFunctionEnd(metadata, result, error) {
@@ -220,7 +229,7 @@ function logFunctionEnd(metadata, result, error) {
             executionTime: `${executionTime}ms`,
             error: error.message,
             stack: error.stack,
-            memoryUsage: process.memoryUsage(),
+            memoryUsage: process.memoryUsage()
         }, error);
     }
     else {
@@ -230,7 +239,7 @@ function logFunctionEnd(metadata, result, error) {
             userId: metadata.userId,
             executionTime: `${executionTime}ms`,
             result: result ? JSON.stringify(result, null, 2) : undefined,
-            memoryUsage: process.memoryUsage(),
+            memoryUsage: process.memoryUsage()
         });
     }
 }
@@ -242,7 +251,7 @@ function wrapCallableFunction(functionName, originalFunction) {
         logFunctionStart(metadata, {
             hasAuth: !!request.auth,
             authUid: (_b = request.auth) === null || _b === void 0 ? void 0 : _b.uid,
-            requestData: request.data,
+            requestData: request.data
         });
         try {
             const result = await originalFunction(request);
@@ -265,7 +274,7 @@ function wrapHttpFunction(functionName, originalFunction) {
             url: req.url,
             headers: req.headers,
             query: req.query,
-            body: req.body,
+            body: req.body
         });
         try {
             await originalFunction(req, res);
@@ -291,15 +300,17 @@ var initializeMessageTemplates_1 = require("./initializeMessageTemplates");
 Object.defineProperty(exports, "initializeMessageTemplates", { enumerable: true, get: function () { return initializeMessageTemplates_1.initializeMessageTemplates; } });
 var notifyAfterPayment_1 = require("./notifications/notifyAfterPayment");
 Object.defineProperty(exports, "notifyAfterPayment", { enumerable: true, get: function () { return notifyAfterPayment_1.notifyAfterPayment; } });
+// ⬇️ EXPORTS AJOUTÉS - modules manquants
+__exportStar(require("./notificationPipeline/worker"), exports);
+__exportStar(require("./admin/callables"), exports);
 ultraDebugLogger_1.ultraLogger.info('EXPORTS', 'Exports directs configurés');
 // ========================================
 // 🦾 ENDPOINT CLOUD TASKS : exécuter l'appel (US-CENTRAL1 rectifié)
 // ========================================
 exports.executeCallTask = (0, https_1.onRequest)({
     region: "us-central1",
-    secrets: [exports.TASKS_AUTH_SECRET],
     timeoutSeconds: 60,
-    memory: "256MiB",
+    memory: "256MiB"
 }, (req, res) => (0, executeCallTask_1.runExecuteCallTask)(req, res));
 // ========================================
 // FONCTIONS ADMIN ULTRA-DÉBUGGÉES (V2)
@@ -309,12 +320,12 @@ exports.adminUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign({}, 
     const database = initializeFirebase();
     ultraDebugLogger_1.ultraLogger.debug('ADMIN_UPDATE_STATUS', 'Vérification des permissions admin', {
         hasAuth: !!request.auth,
-        userRole: (_b = (_a = request.auth) === null || _a === void 0 ? void 0 : _a.token) === null || _b === void 0 ? void 0 : _b.role,
+        userRole: (_b = (_a = request.auth) === null || _a === void 0 ? void 0 : _a.token) === null || _b === void 0 ? void 0 : _b.role
     });
     if (!request.auth || ((_c = request.auth.token) === null || _c === void 0 ? void 0 : _c.role) !== 'admin') {
         ultraDebugLogger_1.ultraLogger.warn('ADMIN_UPDATE_STATUS', 'Accès refusé - permissions admin requises', {
             userId: (_d = request.auth) === null || _d === void 0 ? void 0 : _d.uid,
-            userRole: (_f = (_e = request.auth) === null || _e === void 0 ? void 0 : _e.token) === null || _f === void 0 ? void 0 : _f.role,
+            userRole: (_f = (_e = request.auth) === null || _e === void 0 ? void 0 : _e.token) === null || _f === void 0 ? void 0 : _f.role
         });
         throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
@@ -323,11 +334,11 @@ exports.adminUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign({}, 
         targetUserId: userId,
         newStatus: status,
         reason,
-        adminId: request.auth.uid,
+        adminId: request.auth.uid
     });
     await database.collection('users').doc(userId).update({
         status,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     await database.collection('adminLogs').add({
         action: 'updateStatus',
@@ -335,11 +346,11 @@ exports.adminUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign({}, 
         status,
         reason: reason || null,
         adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
+        ts: admin.firestore.FieldValue.serverTimestamp()
     });
     ultraDebugLogger_1.ultraLogger.info('ADMIN_UPDATE_STATUS', 'Statut utilisateur mis à jour avec succès', {
         targetUserId: userId,
-        newStatus: status,
+        newStatus: status
     });
     return { ok: true };
 }));
@@ -348,7 +359,7 @@ exports.adminSoftDeleteUser = (0, https_1.onCall)(Object.assign(Object.assign({}
     const database = initializeFirebase();
     if (!request.auth || ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
         ultraDebugLogger_1.ultraLogger.warn('ADMIN_SOFT_DELETE', 'Accès refusé', {
-            userId: (_b = request.auth) === null || _b === void 0 ? void 0 : _b.uid,
+            userId: (_b = request.auth) === null || _b === void 0 ? void 0 : _b.uid
         });
         throw new https_1.HttpsError('permission-denied', 'Admin access required');
     }
@@ -356,20 +367,20 @@ exports.adminSoftDeleteUser = (0, https_1.onCall)(Object.assign(Object.assign({}
     ultraDebugLogger_1.ultraLogger.info('ADMIN_SOFT_DELETE', 'Suppression soft de l\'utilisateur', {
         targetUserId: userId,
         reason,
-        adminId: request.auth.uid,
+        adminId: request.auth.uid
     });
     await database.collection('users').doc(userId).update({
         isDeleted: true,
         deletedAt: admin.firestore.FieldValue.serverTimestamp(),
         deletedBy: request.auth.uid,
-        deletedReason: reason || null,
+        deletedReason: reason || null
     });
     await database.collection('adminLogs').add({
         action: 'softDelete',
         userId,
         reason: reason || null,
         adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
+        ts: admin.firestore.FieldValue.serverTimestamp()
     });
     return { ok: true };
 }));
@@ -385,12 +396,12 @@ exports.adminBulkUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign(
         newStatus: status,
         reason,
         adminId: request.auth.uid,
-        batchSize: ids.length,
+        batchSize: ids.length
     });
     const batch = database.batch();
     ids.forEach((id) => batch.update(database.collection('users').doc(id), {
         status,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }));
     await batch.commit();
     await database.collection('adminLogs').add({
@@ -399,7 +410,7 @@ exports.adminBulkUpdateStatus = (0, https_1.onCall)(Object.assign(Object.assign(
         status,
         reason: reason || null,
         adminId: request.auth.uid,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
+        ts: admin.firestore.FieldValue.serverTimestamp()
     });
     return { ok: true };
 }));
@@ -415,19 +426,19 @@ const getStripe = (0, ultraDebugLogger_1.traceFunction)(() => {
             stripeSecretKey = getStripeSecretKey();
             ultraDebugLogger_1.ultraLogger.debug('STRIPE_INIT', 'Clé Stripe récupérée via Secret Manager', {
                 mode: isLive() ? 'live' : 'test',
-                keyPrefix: (stripeSecretKey === null || stripeSecretKey === void 0 ? void 0 : stripeSecretKey.slice(0, 7)) + '...',
+                keyPrefix: (stripeSecretKey === null || stripeSecretKey === void 0 ? void 0 : stripeSecretKey.slice(0, 7)) + '...'
             });
         }
         catch (secretError) {
             ultraDebugLogger_1.ultraLogger.error('STRIPE_INIT', 'Secret Stripe non configuré', {
-                error: secretError instanceof Error ? secretError.message : String(secretError),
+                error: secretError instanceof Error ? secretError.message : String(secretError)
             });
             return null;
         }
         if (stripeSecretKey && stripeSecretKey.startsWith('sk_')) {
             try {
                 stripe = new stripe_1.default(stripeSecretKey, {
-                    apiVersion: '2023-10-16',
+                    apiVersion: '2023-10-16'
                 });
                 ultraDebugLogger_1.ultraLogger.info('STRIPE_INIT', 'Stripe configuré avec succès', { mode: isLive() ? 'live' : 'test' });
             }
@@ -449,15 +460,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({
     concurrency: 1,
     timeoutSeconds: 30,
     minInstances: 0, // ou 1 si tu veux éviter le cold start
-    maxInstances: 5,
-    // ⛔️Ne PAS inclure STRIPE_MODE ici (c'est un param, pas un secret)
-    secrets: [
-        exports.STRIPE_SECRET_KEY_TEST,
-        exports.STRIPE_SECRET_KEY_LIVE,
-        exports.STRIPE_WEBHOOK_SECRET_TEST,
-        exports.STRIPE_WEBHOOK_SECRET_LIVE,
-        exports.TASKS_AUTH_SECRET
-    ],
+    maxInstances: 5
 }, wrapHttpFunction('stripeWebhook', async (req, res) => {
     var _a, _b;
     const signature = req.headers['stripe-signature'];
@@ -465,7 +468,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({
         hasSignature: !!signature,
         method: req.method,
         contentType: req.headers['content-type'],
-        mode: isLive() ? 'live' : 'test',
+        mode: isLive() ? 'live' : 'test'
     });
     if (!signature) {
         ultraDebugLogger_1.ultraLogger.warn('STRIPE_WEBHOOK', 'Signature Stripe manquante');
@@ -495,7 +498,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({
         ultraDebugLogger_1.ultraLogger.info('STRIPE_WEBHOOK', 'Événement Stripe validé', {
             eventType: event.type,
             eventId: event.id,
-            objectId,
+            objectId
         });
         switch (event.type) {
             case 'payment_intent.created':
@@ -521,12 +524,12 @@ exports.stripeWebhook = (0, https_1.onRequest)({
                         delaySeconds: 300,
                         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                         checkoutSessionId: cs.id,
-                        paymentIntentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : undefined,
+                        paymentIntentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : undefined
                     }, { merge: true });
                     await (0, tasks_1.scheduleCallTask)(callSessionId, 300);
                     ultraDebugLogger_1.ultraLogger.info('CHECKOUT_COMPLETED', 'Task planifiée à +300s', {
                         callSessionId,
-                        delaySeconds: 300,
+                        delaySeconds: 300
                     });
                 }
                 break;
@@ -548,7 +551,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({
                 break;
             default:
                 ultraDebugLogger_1.ultraLogger.debug('STRIPE_WEBHOOK', "Type d'événement non géré", {
-                    eventType: event.type,
+                    eventType: event.type
                 });
         }
         res.json({ received: true });
@@ -556,7 +559,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({
     catch (webhookError) {
         ultraDebugLogger_1.ultraLogger.error('STRIPE_WEBHOOK', 'Erreur traitement webhook', {
             error: webhookError instanceof Error ? webhookError.message : String(webhookError),
-            stack: webhookError instanceof Error ? webhookError.stack : undefined,
+            stack: webhookError instanceof Error ? webhookError.stack : undefined
         }, webhookError instanceof Error ? webhookError : undefined);
         const errorMessage = webhookError instanceof Error ? webhookError.message : 'Unknown error';
         res.status(400).send(`Webhook Error: ${errorMessage}`);
@@ -569,7 +572,7 @@ const handlePaymentIntentSucceeded = (0, ultraDebugLogger_1.traceFunction)(async
         ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Paiement réussi', {
             paymentIntentId: paymentIntent.id,
             amount: paymentIntent.amount,
-            currency: paymentIntent.currency,
+            currency: paymentIntent.currency
         });
         const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
         const paymentsSnapshot = await paymentsQuery.get();
@@ -579,13 +582,13 @@ const handlePaymentIntentSucceeded = (0, ultraDebugLogger_1.traceFunction)(async
                 status: 'captured',
                 currency: (_a = paymentIntent.currency) !== null && _a !== void 0 ? _a : 'eur',
                 capturedAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
             ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Base de données mise à jour');
         }
         if ((_b = paymentIntent.metadata) === null || _b === void 0 ? void 0 : _b.callSessionId) {
             ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Déclenchement des notifications post-paiement', {
-                callSessionId: paymentIntent.metadata.callSessionId,
+                callSessionId: paymentIntent.metadata.callSessionId
             });
             const callSessionId = paymentIntent.metadata.callSessionId;
             await database
@@ -596,12 +599,12 @@ const handlePaymentIntentSucceeded = (0, ultraDebugLogger_1.traceFunction)(async
                 scheduledAt: admin.firestore.FieldValue.serverTimestamp(),
                 delaySeconds: 300,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                paymentIntentId: paymentIntent.id,
+                paymentIntentId: paymentIntent.id
             }, { merge: true });
             await (0, tasks_1.scheduleCallTask)(callSessionId, 300);
             ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Cloud Task créée pour appel à +300s', {
                 callSessionId,
-                delaySeconds: 300,
+                delaySeconds: 300
             });
         }
         return true;
@@ -609,7 +612,7 @@ const handlePaymentIntentSucceeded = (0, ultraDebugLogger_1.traceFunction)(async
     catch (succeededError) {
         ultraDebugLogger_1.ultraLogger.error('STRIPE_PAYMENT_SUCCEEDED', 'Erreur traitement paiement réussi', {
             paymentIntentId: paymentIntent.id,
-            error: succeededError instanceof Error ? succeededError.message : String(succeededError),
+            error: succeededError instanceof Error ? succeededError.message : String(succeededError)
         }, succeededError instanceof Error ? succeededError : undefined);
         return false;
     }
@@ -619,7 +622,7 @@ const handlePaymentIntentFailed = (0, ultraDebugLogger_1.traceFunction)(async (p
     try {
         ultraDebugLogger_1.ultraLogger.warn('STRIPE_PAYMENT_FAILED', 'Paiement échoué', {
             paymentIntentId: paymentIntent.id,
-            errorMessage: (_a = paymentIntent.last_payment_error) === null || _a === void 0 ? void 0 : _a.message,
+            errorMessage: (_a = paymentIntent.last_payment_error) === null || _a === void 0 ? void 0 : _a.message
         });
         const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
         const paymentsSnapshot = await paymentsQuery.get();
@@ -629,20 +632,20 @@ const handlePaymentIntentFailed = (0, ultraDebugLogger_1.traceFunction)(async (p
                 status: 'failed',
                 currency: (_b = paymentIntent.currency) !== null && _b !== void 0 ? _b : 'eur',
                 failureReason: ((_c = paymentIntent.last_payment_error) === null || _c === void 0 ? void 0 : _c.message) || 'Unknown error',
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
         }
         if ((_d = paymentIntent.metadata) === null || _d === void 0 ? void 0 : _d.callSessionId) {
             try {
                 ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_FAILED', 'Annulation appel programmé', {
-                    callSessionId: paymentIntent.metadata.callSessionId,
+                    callSessionId: paymentIntent.metadata.callSessionId
                 });
                 const { cancelScheduledCall } = await Promise.resolve().then(() => __importStar(require('./callScheduler')));
                 await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_failed');
             }
             catch (importError) {
                 ultraDebugLogger_1.ultraLogger.warn('STRIPE_PAYMENT_FAILED', "Impossible d'importer cancelScheduledCall", {
-                    error: importError instanceof Error ? importError.message : String(importError),
+                    error: importError instanceof Error ? importError.message : String(importError)
                 });
             }
         }
@@ -650,7 +653,7 @@ const handlePaymentIntentFailed = (0, ultraDebugLogger_1.traceFunction)(async (p
     }
     catch (failedError) {
         ultraDebugLogger_1.ultraLogger.error('STRIPE_PAYMENT_FAILED', 'Erreur traitement échec paiement', {
-            error: failedError instanceof Error ? failedError.message : String(failedError),
+            error: failedError instanceof Error ? failedError.message : String(failedError)
         }, failedError instanceof Error ? failedError : undefined);
         return false;
     }
@@ -660,7 +663,7 @@ const handlePaymentIntentCanceled = (0, ultraDebugLogger_1.traceFunction)(async 
     try {
         ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_CANCELED', 'Paiement annulé', {
             paymentIntentId: paymentIntent.id,
-            cancellationReason: paymentIntent.cancellation_reason,
+            cancellationReason: paymentIntent.cancellation_reason
         });
         const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
         const paymentsSnapshot = await paymentsQuery.get();
@@ -670,20 +673,20 @@ const handlePaymentIntentCanceled = (0, ultraDebugLogger_1.traceFunction)(async 
                 status: 'canceled',
                 currency: (_a = paymentIntent.currency) !== null && _a !== void 0 ? _a : 'eur',
                 canceledAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
         }
         if ((_b = paymentIntent.metadata) === null || _b === void 0 ? void 0 : _b.callSessionId) {
             try {
                 ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_CANCELED', 'Annulation appel programmé', {
-                    callSessionId: paymentIntent.metadata.callSessionId,
+                    callSessionId: paymentIntent.metadata.callSessionId
                 });
                 const { cancelScheduledCall } = await Promise.resolve().then(() => __importStar(require('./callScheduler')));
                 await cancelScheduledCall(paymentIntent.metadata.callSessionId, 'payment_canceled');
             }
             catch (importError) {
                 ultraDebugLogger_1.ultraLogger.warn('STRIPE_PAYMENT_CANCELED', "Impossible d'importer cancelScheduledCall", {
-                    error: importError instanceof Error ? importError.message : String(importError),
+                    error: importError instanceof Error ? importError.message : String(importError)
                 });
             }
         }
@@ -691,7 +694,7 @@ const handlePaymentIntentCanceled = (0, ultraDebugLogger_1.traceFunction)(async 
     }
     catch (canceledError) {
         ultraDebugLogger_1.ultraLogger.error('STRIPE_PAYMENT_CANCELED', 'Erreur traitement annulation paiement', {
-            error: canceledError instanceof Error ? canceledError.message : String(canceledError),
+            error: canceledError instanceof Error ? canceledError.message : String(canceledError)
         }, canceledError instanceof Error ? canceledError : undefined);
         return false;
     }
@@ -701,7 +704,7 @@ const handlePaymentIntentRequiresAction = (0, ultraDebugLogger_1.traceFunction)(
     try {
         ultraDebugLogger_1.ultraLogger.info('STRIPE_PAYMENT_REQUIRES_ACTION', 'Paiement nécessite une action', {
             paymentIntentId: paymentIntent.id,
-            nextAction: (_a = paymentIntent.next_action) === null || _a === void 0 ? void 0 : _a.type,
+            nextAction: (_a = paymentIntent.next_action) === null || _a === void 0 ? void 0 : _a.type
         });
         const paymentsQuery = database.collection('payments').where('stripePaymentIntentId', '==', paymentIntent.id);
         const paymentsSnapshot = await paymentsQuery.get();
@@ -710,14 +713,14 @@ const handlePaymentIntentRequiresAction = (0, ultraDebugLogger_1.traceFunction)(
             await paymentDoc.ref.update({
                 status: 'requires_action',
                 currency: (_b = paymentIntent.currency) !== null && _b !== void 0 ? _b : 'eur',
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
         }
         return true;
     }
     catch (actionError) {
         ultraDebugLogger_1.ultraLogger.error('STRIPE_PAYMENT_REQUIRES_ACTION', 'Erreur traitement action requise', {
-            error: actionError instanceof Error ? actionError.message : String(actionError),
+            error: actionError instanceof Error ? actionError.message : String(actionError)
         }, actionError instanceof Error ? actionError : undefined);
         return false;
     }
@@ -734,7 +737,7 @@ exports.scheduledFirestoreExport = (0, scheduler_1.onSchedule)({
     minInstances: 0,
     concurrency: 1,
     schedule: '0 2 * * *',
-    timeZone: 'Europe/Paris',
+    timeZone: 'Europe/Paris'
 }, async () => {
     const metadata = createDebugMetadata('scheduledFirestoreExport');
     logFunctionStart(metadata);
@@ -747,35 +750,35 @@ exports.scheduledFirestoreExport = (0, scheduler_1.onSchedule)({
         ultraDebugLogger_1.ultraLogger.debug('SCHEDULED_BACKUP', 'Configuration sauvegarde', {
             projectId,
             bucketName,
-            timestamp,
+            timestamp
         });
         const firestoreClient = new admin.firestore.v1.FirestoreAdminClient();
         const firestoreExportName = `firestore-export-${timestamp}`;
         const firestoreExportPath = `gs://${bucketName}/${firestoreExportName}`;
         ultraDebugLogger_1.ultraLogger.info('SCHEDULED_BACKUP', 'Lancement export Firestore', {
-            exportPath: firestoreExportPath,
+            exportPath: firestoreExportPath
         });
         const [firestoreOperation] = await firestoreClient.exportDocuments({
             name: `projects/${projectId}/databases/(default)`,
             outputUriPrefix: firestoreExportPath,
-            collectionIds: [],
+            collectionIds: []
         });
         ultraDebugLogger_1.ultraLogger.info('SCHEDULED_BACKUP', 'Export Firestore démarré', {
-            operationName: firestoreOperation.name,
+            operationName: firestoreOperation.name
         });
         await database.collection('logs').doc('backups').collection('entries').add({
             type: 'scheduled_backup',
             firestoreExportPath,
             operationName: firestoreOperation.name,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'completed',
+            status: 'completed'
         });
         logFunctionEnd(metadata, { success: true, exportPath: firestoreExportPath });
     }
     catch (exportError) {
         ultraDebugLogger_1.ultraLogger.error('SCHEDULED_BACKUP', 'Erreur sauvegarde automatique', {
             error: exportError instanceof Error ? exportError.message : String(exportError),
-            stack: exportError instanceof Error ? exportError.stack : undefined,
+            stack: exportError instanceof Error ? exportError.stack : undefined
         }, exportError instanceof Error ? exportError : undefined);
         const errorMessage = exportError instanceof Error ? exportError.message : 'Unknown error';
         const database = initializeFirebase();
@@ -783,7 +786,7 @@ exports.scheduledFirestoreExport = (0, scheduler_1.onSchedule)({
             type: 'scheduled_backup',
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
             status: 'failed',
-            error: errorMessage,
+            error: errorMessage
         });
         logFunctionEnd(metadata, undefined, exportError instanceof Error ? exportError : new Error(String(exportError)));
     }
@@ -796,7 +799,7 @@ exports.scheduledCleanup = (0, scheduler_1.onSchedule)({
     minInstances: 0,
     concurrency: 1,
     schedule: '0 3 * * 0',
-    timeZone: 'Europe/Paris',
+    timeZone: 'Europe/Paris'
 }, async () => {
     const metadata = createDebugMetadata('scheduledCleanup');
     logFunctionStart(metadata);
@@ -806,29 +809,29 @@ exports.scheduledCleanup = (0, scheduler_1.onSchedule)({
         ultraDebugLogger_1.ultraLogger.debug('SCHEDULED_CLEANUP', 'Configuration nettoyage', {
             olderThanDays: 90,
             keepCompletedDays: 30,
-            batchSize: 100,
+            batchSize: 100
         });
         const cleanupResult = await twilioCallManager.cleanupOldSessions({
             olderThanDays: 90,
             keepCompletedDays: 30,
-            batchSize: 100,
+            batchSize: 100
         });
         ultraDebugLogger_1.ultraLogger.info('SCHEDULED_CLEANUP', 'Nettoyage terminé', {
             deleted: cleanupResult.deleted,
-            errors: cleanupResult.errors,
+            errors: cleanupResult.errors
         });
         const database = initializeFirebase();
         await database.collection('logs').doc('cleanup').collection('entries').add({
             type: 'scheduled_cleanup',
             result: cleanupResult,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
         logFunctionEnd(metadata, cleanupResult);
     }
     catch (cleanupError) {
         ultraDebugLogger_1.ultraLogger.error('SCHEDULED_CLEANUP', 'Erreur nettoyage périodique', {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-            stack: cleanupError instanceof Error ? cleanupError.stack : undefined,
+            stack: cleanupError instanceof Error ? cleanupError.stack : undefined
         }, cleanupError instanceof Error ? cleanupError : undefined);
         const errorMessage = cleanupError instanceof Error ? cleanupError.message : 'Unknown error';
         const database = initializeFirebase();
@@ -836,7 +839,7 @@ exports.scheduledCleanup = (0, scheduler_1.onSchedule)({
             type: 'scheduled_cleanup',
             status: 'failed',
             error: errorMessage,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
         logFunctionEnd(metadata, undefined, cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
     }
@@ -866,14 +869,14 @@ exports.generateSystemDebugReport = (0, https_1.onCall)(Object.assign(Object.ass
                 FUNCTION_NAME: process.env.FUNCTION_NAME,
                 FUNCTION_REGION: process.env.FUNCTION_REGION,
                 GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
-                NODE_ENV: process.env.NODE_ENV,
-            },
+                NODE_ENV: process.env.NODE_ENV
+            }
         };
         const managersState = {
             stripeManagerInstance: !!stripeManagerInstance,
             twilioCallManagerInstance: !!twilioCallManagerInstance,
             messageManagerInstance: !!messageManagerInstance,
-            firebaseInitialized: isFirebaseInitialized,
+            firebaseInitialized: isFirebaseInitialized
         };
         const recentErrorsQuery = await database
             .collection('ultra_debug_logs')
@@ -888,13 +891,13 @@ exports.generateSystemDebugReport = (0, https_1.onCall)(Object.assign(Object.ass
             managersState,
             recentErrors: recentErrors.length,
             recentErrorDetails: recentErrors.slice(0, 10),
-            ultraDebugReport: JSON.parse(ultraDebugReport),
+            ultraDebugReport: JSON.parse(ultraDebugReport)
         };
         const reportId = `debug_report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await database.collection('debug_reports').doc(reportId).set(Object.assign(Object.assign({}, fullReport), { generatedBy: request.auth.uid, generatedAt: admin.firestore.FieldValue.serverTimestamp() }));
         ultraDebugLogger_1.ultraLogger.info('SYSTEM_DEBUG_REPORT', 'Rapport de debug généré et sauvegardé', {
             reportId,
-            errorsCount: recentErrors.length,
+            errorsCount: recentErrors.length
         });
         return {
             success: true,
@@ -903,9 +906,9 @@ exports.generateSystemDebugReport = (0, https_1.onCall)(Object.assign(Object.ass
                 systemUptime: systemInfo.uptime,
                 recentErrorsCount: recentErrors.length,
                 managersLoaded: Object.values(managersState).filter(Boolean).length,
-                memoryUsage: systemInfo.memoryUsage.heapUsed,
+                memoryUsage: systemInfo.memoryUsage.heapUsed
             },
-            downloadUrl: `/admin/debug-reports/${reportId}`,
+            downloadUrl: `/admin/debug-reports/${reportId}`
         };
     }
     catch (error) {
@@ -942,7 +945,7 @@ exports.getSystemHealthStatus = (0, https_1.onCall)(Object.assign(Object.assign(
         catch (stripeError) {
             stripeStatus = 'error';
             ultraDebugLogger_1.ultraLogger.warn('SYSTEM_HEALTH_CHECK', 'Erreur test Stripe', {
-                error: stripeError instanceof Error ? stripeError.message : String(stripeError),
+                error: stripeError instanceof Error ? stripeError.message : String(stripeError)
             });
         }
         const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -952,7 +955,7 @@ exports.getSystemHealthStatus = (0, https_1.onCall)(Object.assign(Object.assign(
             WARN: 0,
             INFO: 0,
             DEBUG: 0,
-            TRACE: 0,
+            TRACE: 0
         };
         recentLogsQuery.docs.forEach((doc) => {
             const data = doc.data();
@@ -968,28 +971,28 @@ exports.getSystemHealthStatus = (0, https_1.onCall)(Object.assign(Object.assign(
                 firebase: {
                     status: 'healthy',
                     latency: firestoreLatency,
-                    initialized: isFirebaseInitialized,
+                    initialized: isFirebaseInitialized
                 },
                 stripe: {
                     status: stripeStatus,
-                    latency: stripeLatency,
-                },
+                    latency: stripeLatency
+                }
             },
             managers: {
                 stripeManager: !!stripeManagerInstance,
                 twilioCallManager: !!twilioCallManagerInstance,
-                messageManager: !!messageManagerInstance,
+                messageManager: !!messageManagerInstance
             },
             system: {
                 uptime: process.uptime(),
                 memoryUsage: process.memoryUsage(),
                 nodeVersion: process.version,
-                environment: process.env.NODE_ENV || 'development',
+                environment: process.env.NODE_ENV || 'development'
             },
             metrics: {
                 last24h: logsByLevel,
-                responseTime: totalResponseTime,
-            },
+                responseTime: totalResponseTime
+            }
         };
         if (firestoreLatency > 1000 || stripeStatus === 'error') {
             healthStatus.status = 'degraded';
@@ -1000,7 +1003,7 @@ exports.getSystemHealthStatus = (0, https_1.onCall)(Object.assign(Object.assign(
         ultraDebugLogger_1.ultraLogger.debug('SYSTEM_HEALTH_CHECK', 'État système vérifié', {
             status: healthStatus.status,
             responseTime: totalResponseTime,
-            errorsLast24h: logsByLevel.ERROR,
+            errorsLast24h: logsByLevel.ERROR
         });
         return healthStatus;
     }
@@ -1009,7 +1012,7 @@ exports.getSystemHealthStatus = (0, https_1.onCall)(Object.assign(Object.assign(
         return {
             timestamp: new Date().toISOString(),
             status: 'error',
-            error: error instanceof Error ? error.message : String(error),
+            error: error instanceof Error ? error.message : String(error)
         };
     }
 }));
@@ -1034,7 +1037,7 @@ exports.getUltraDebugLogs = (0, https_1.onCall)(Object.assign(Object.assign({}, 
             success: true,
             logs,
             count: logs.length,
-            filtered: !!level,
+            filtered: !!level
         };
     }
     catch (error) {
@@ -1057,14 +1060,14 @@ exports.testCloudTasksConnection = (0, https_1.onCall)(Object.assign(Object.assi
         const taskId = await createTestTask(testPayload, 10); // 10 secondes de délai
         ultraDebugLogger_1.ultraLogger.info('TEST_CLOUD_TASKS', 'Tâche de test créée avec succès', {
             taskId,
-            delaySeconds: 10,
+            delaySeconds: 10
         });
         return {
             success: true,
             taskId,
             message: 'Tâche de test créée, elle s\'exécutera dans 10 secondes',
             testPayload,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
         };
     }
     catch (error) {
@@ -1087,13 +1090,13 @@ exports.getCloudTasksQueueStats = (0, https_1.onCall)(Object.assign(Object.assig
         ultraDebugLogger_1.ultraLogger.info('QUEUE_STATS', 'Statistiques récupérées', {
             pendingTasksCount: stats.pendingTasks,
             queueName: stats.queueName,
-            location: stats.location,
+            location: stats.location
         });
         return {
             success: true,
             stats,
             pendingTasksSample: pendingTasks,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
         };
     }
     catch (error) {
@@ -1113,7 +1116,7 @@ exports.manuallyTriggerCallExecution = (0, https_1.onCall)(Object.assign(Object.
     try {
         ultraDebugLogger_1.ultraLogger.info('MANUAL_CALL_TRIGGER', 'Déclenchement manuel d\'appel', {
             callSessionId,
-            triggeredBy: request.auth.uid,
+            triggeredBy: request.auth.uid
         });
         // Vérifier que la session existe
         const database = initializeFirebase();
@@ -1125,7 +1128,7 @@ exports.manuallyTriggerCallExecution = (0, https_1.onCall)(Object.assign(Object.
         ultraDebugLogger_1.ultraLogger.info('MANUAL_CALL_TRIGGER', 'Session trouvée', {
             callSessionId,
             currentStatus: sessionData === null || sessionData === void 0 ? void 0 : sessionData.status,
-            paymentStatus: (_b = sessionData === null || sessionData === void 0 ? void 0 : sessionData.payment) === null || _b === void 0 ? void 0 : _b.status,
+            paymentStatus: (_b = sessionData === null || sessionData === void 0 ? void 0 : sessionData.payment) === null || _b === void 0 ? void 0 : _b.status
         });
         // Utiliser directement le TwilioCallManager
         const { TwilioCallManager } = await Promise.resolve().then(() => __importStar(require('./TwilioCallManager')));
@@ -1135,7 +1138,7 @@ exports.manuallyTriggerCallExecution = (0, https_1.onCall)(Object.assign(Object.
         });
         ultraDebugLogger_1.ultraLogger.info('MANUAL_CALL_TRIGGER', 'Appel déclenché avec succès', {
             callSessionId,
-            resultStatus: result === null || result === void 0 ? void 0 : result.status,
+            resultStatus: result === null || result === void 0 ? void 0 : result.status
         });
         return {
             success: true,
@@ -1143,14 +1146,14 @@ exports.manuallyTriggerCallExecution = (0, https_1.onCall)(Object.assign(Object.
             result,
             triggeredBy: request.auth.uid,
             timestamp: new Date().toISOString(),
-            message: 'Appel déclenché manuellement avec succès',
+            message: 'Appel déclenché manuellement avec succès'
         };
     }
     catch (error) {
         ultraDebugLogger_1.ultraLogger.error('MANUAL_CALL_TRIGGER', 'Erreur déclenchement manuel d\'appel', {
             callSessionId,
             error: error instanceof Error ? error.message : String(error),
-            triggeredBy: request.auth.uid,
+            triggeredBy: request.auth.uid
         }, error instanceof Error ? error : undefined);
         throw new https_1.HttpsError('internal', `Erreur déclenchement appel: ${error instanceof Error ? error.message : error}`);
     }
@@ -1158,62 +1161,20 @@ exports.manuallyTriggerCallExecution = (0, https_1.onCall)(Object.assign(Object.
 // ========================================
 // WEBHOOK DE TEST POUR CLOUD TASKS
 // ========================================
-exports.testWebhook = (0, https_1.onRequest)(Object.assign(Object.assign({}, emergencyConfig), { timeoutSeconds: 30, secrets: [exports.TASKS_AUTH_SECRET] }), wrapHttpFunction('testWebhook', async (req, res) => {
+exports.testWebhook = (0, https_1.onRequest)({
+    region: "europe-west1",
+    memory: "256MiB",
+    cpu: 0.1,
+    minInstances: 0,
+    concurrency: 1,
+    timeoutSeconds: 60
+}, wrapHttpFunction('testWebhook', async (req, res) => {
+    var _a;
     try {
-        // Vérification de l'authentification Cloud Tasks
-        const authHeader = req.get('X-Task-Auth') || '';
-        const expectedAuth = process.env.TASKS_AUTH_SECRET || '';
-        if (authHeader !== expectedAuth) {
-            ultraDebugLogger_1.ultraLogger.warn('TEST_WEBHOOK', 'Authentification échouée', {
-                hasAuthHeader: !!authHeader,
-                expectedAuthSet: !!expectedAuth,
-            });
-            res.status(401).send('Unauthorized');
-            return;
-        }
-        const payload = req.body || {};
-        ultraDebugLogger_1.ultraLogger.info('TEST_WEBHOOK', 'Webhook de test reçu et authentifié', {
-            method: req.method,
-            payload: JSON.stringify(payload, null, 2),
-            timestamp: new Date().toISOString(),
-            userAgent: req.get('User-Agent') || 'unknown',
-        });
-        // Simuler un traitement
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const response = {
-            success: true,
-            message: 'Webhook de test traité avec succès',
-            receivedPayload: payload,
-            processedAt: new Date().toISOString(),
-            processingTimeMs: 1000,
-        };
-        ultraDebugLogger_1.ultraLogger.info('TEST_WEBHOOK', 'Traitement terminé', response);
-        res.status(200).json(response);
+        res.status(200).json({ ok: true, now: new Date().toISOString() });
     }
-    catch (error) {
-        ultraDebugLogger_1.ultraLogger.error('TEST_WEBHOOK', 'Erreur traitement webhook de test', {
-            error: error instanceof Error ? error.message : String(error),
-            body: req.body,
-        }, error instanceof Error ? error : undefined);
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-            timestamp: new Date().toISOString(),
-        });
+    catch (e) {
+        res.status(500).json({ ok: false, error: String((_a = e === null || e === void 0 ? void 0 : e.message) !== null && _a !== void 0 ? _a : e) });
     }
 }));
-// ========================================
-// INITIALISATION FINALE ET LOGS DE DÉMARRAGE
-// ========================================
-ultraDebugLogger_1.ultraLogger.info('INDEX_COMPLETE', 'Fichier index.ts chargé avec succès', {
-    totalFunctions: 22, // ajuster si nécessaire
-    environment: process.env.NODE_ENV || 'development',
-    memoryUsage: process.memoryUsage(),
-});
-ultraDebugLogger_1.ultraLogger.info('INDEX_EXPORTS_COMPLETE', 'Toutes les fonctions exportées et configurées avec ultra debug');
-var callables_1 = require("./admin/callables");
-Object.defineProperty(exports, "admin_templates_seed", { enumerable: true, get: function () { return callables_1.admin_templates_seed; } });
-var worker_1 = require("./notificationPipeline/worker");
-Object.defineProperty(exports, "onMessageEventCreate", { enumerable: true, get: function () { return worker_1.onMessageEventCreate; } });
-void _criticalConfig;
 //# sourceMappingURL=index.js.map

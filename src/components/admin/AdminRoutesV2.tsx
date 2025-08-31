@@ -2,6 +2,7 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import AdminLayout from "@/components/admin/AdminLayout";
 
 // ===== COMPOSANT DE CHARGEMENT =====
 const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Chargement..." }) => (
@@ -17,7 +18,7 @@ const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Chargement.
 const AdminNotFound: React.FC = () => (
   <div className="p-6">
     <h1 className="text-2xl font-semibold mb-2">Page admin introuvable</h1>
-    <p className="text-sm opacity-80">La page demandée n’existe pas.</p>
+    <p className="text-sm opacity-80">La page demandée n'existe pas.</p>
     <div className="mt-4">
       <a href="/admin/dashboard" className="text-red-600 underline">Retour au dashboard</a>
     </div>
@@ -165,20 +166,21 @@ const AdminEmails = lazy(() => import("../../pages/admin/AdminEmails"));
 // ===== COMPOSANT PRINCIPAL =====
 const AdminRoutesV2: React.FC = () => {
   return (
-    <Suspense fallback={<LoadingSpinner message="Chargement de la page d'administration..." />}>
-      <Routes>
+    <Routes>
+      {/* ===== 🔐 AUTHENTIFICATION (hors layout) ===== */}
+      <Route
+        path="login"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement de la connexion admin..." />}>
+            <AdminLogin />
+          </Suspense>
+        }
+      />
+
+      {/* ===== TOUTES LES AUTRES ROUTES DANS LE LAYOUT ===== */}
+      <Route path="" element={<AdminLayout />}>
         {/* ===== INDEX : /admin ===== */}
         <Route index element={<Navigate to="dashboard" replace />} />
-
-        {/* ===== 🔐 AUTHENTIFICATION ===== */}
-        <Route
-          path="login"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la connexion admin..." />}>
-              <AdminLogin />
-            </Suspense>
-          }
-        />
 
         {/* ===== 📊 DASHBOARD ===== */}
         <Route
@@ -639,8 +641,8 @@ const AdminRoutesV2: React.FC = () => {
 
         {/* ===== CATCH-ALL : vraie 404 admin (ou remets un redirect si tu préfères) ===== */}
         <Route path="*" element={<AdminNotFound />} />
-      </Routes>
-    </Suspense>
+      </Route>
+    </Routes>
   );
 };
 

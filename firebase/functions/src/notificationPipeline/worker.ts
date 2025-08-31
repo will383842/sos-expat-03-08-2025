@@ -1,5 +1,3 @@
-// firebase/functions/src/notificationPipeline/worker.ts
-
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
@@ -15,14 +13,14 @@ const TWILIO_WHATSAPP_NUMBER = defineSecret("TWILIO_WHATSAPP_NUMBER");
 
 // 📤 IMPORTS DES MODULES
 import { getTemplate } from "./templates";
-import { getRouting } from "./routing";
+import { getRouting, isRateLimited } from "./routing";
 import { render } from "./render";
-import { Channel, TemplatesByEvent, RoutingConfig, RoutingPerEvent } from "./types";
+import { Channel, TemplatesByEvent, RoutingPerEvent } from "./types";
 
 // IMPORTS DES PROVIDERS
-import { sendZoho as sendZohoEmail } from "./providers/email/zohoSmtp";
-import { sendSms as sendTwilioSms } from "./providers/sms/twilioSms";
-import { sendWhatsApp as sendTwilioWhatsApp } from "./providers/whatsapp/twilio";
+import { sendZoho } from "./providers/email/zohoSmtp";
+import { sendSms } from "./providers/sms/twilioSms";
+import { sendWhatsApp } from "./providers/whatsapp/twilio";
 import { sendPush } from "./providers/push/fcm";
 import { writeInApp } from "./providers/inapp/firestore";
 
@@ -33,8 +31,6 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // ----- Types de base
-type Channel = "email" | "sms" | "whatsapp" | "push" | "inapp";
-
 type MessageEvent = {
   eventId: string;
   templateId?: string;
@@ -62,9 +58,6 @@ type MessageEvent = {
   uid?: string;
 };
 
-// ----- Rate limiting (utilise la fonction du routing.ts)
-import { isRateLimited } from "./routing";
-
 // ----- Helpers pour sélection des canaux
 function hasContact(channel: Channel, ctx: any): boolean {
   if (channel === "email") return !!(ctx?.user?.email || ctx?.to?.email);
@@ -76,28 +69,26 @@ function hasContact(channel: Channel, ctx: any): boolean {
 }
 
 function channelsToAttempt(
-  routing: RoutingPerEvent,
+  strategy: "parallel" | "fallback",
+  order: Channel[] | undefined,
+  routeChannels: RoutingPerEvent["channels"],
   tmpl: TemplatesByEvent,
   ctx: any
 ): Channel[] {
-  const all: Channel[] = ["email", "sms", "whatsapp", "push", "inapp"];
-  
-  // Filtre les canaux : enabled dans routing ET template, et contact disponible
+  const all: Channel[] = ["email", "push", "sms", "whatsapp", "inapp"];
   const base = all.filter(c => 
-    routing.channels[c]?.enabled && 
+    routeChannels[c]?.enabled && 
     tmpl[c]?.enabled && 
     hasContact(c, ctx)
   );
   
-  if (routing.strategy === "parallel") return base;
-  
-  // Pour fallback, respecter l'ordre défini
-  const ord = (routing.order ?? all).filter(c => base.includes(c));
+  if (strategy === "parallel") return base;
+  const ord = (order ?? all).filter(c => base.includes(c));
   return ord;
 }
 
 // ----- Envoi unitaire par canal
-async function sendOne(channel: Channel, tmpl: TemplatesByEvent, ctx: any, evt: MessageEvent) {
+async function sendOne(channel: Channel, provider: string, tmpl: TemplatesByEvent, ctx: any, evt: MessageEvent) {
   if (channel === "email") {
     const to = ctx?.user?.email || evt.to?.email;
     if (!to || !tmpl.email?.enabled) throw new Error("Missing email destination or disabled template");
@@ -106,7 +97,8 @@ async function sendOne(channel: Channel, tmpl: TemplatesByEvent, ctx: any, evt: 
     const html = render(tmpl.email.html || "", { ...ctx, ...evt.vars });
     const text = tmpl.email.text ? render(tmpl.email.text, { ...ctx, ...evt.vars }) : undefined;
     
-    return await sendZohoEmail(to, subject, html, text || html);
+    const messageId = await sendZoho(to, subject, html, text || html);
+    return { messageId };
   }
   
   if (channel === "sms") {
@@ -114,7 +106,8 @@ async function sendOne(channel: Channel, tmpl: TemplatesByEvent, ctx: any, evt: 
     if (!to || !tmpl.sms?.enabled) throw new Error("Missing SMS destination or disabled template");
     
     const body = render(tmpl.sms.text || "", { ...ctx, ...evt.vars });
-    return await sendTwilioSms(to, body);
+    const sid = await sendSms(to, body);
+    return { sid };
   }
   
   if (channel === "whatsapp") {
@@ -123,11 +116,13 @@ async function sendOne(channel: Channel, tmpl: TemplatesByEvent, ctx: any, evt: 
     
     // Pour WhatsApp, on peut utiliser soit le templateName soit un message direct
     if (tmpl.whatsapp.templateName) {
-      const params = tmpl.whatsapp.params?.map(p => render(p, { ...ctx, ...evt.vars })) || [];
-      return await sendTwilioWhatsApp(to, "", tmpl.whatsapp.templateName, params);
+      const params = tmpl.whatsapp.params?.map(p => render(String(p), { ...ctx, ...evt.vars })) || [];
+      const sid = await sendWhatsApp(to, ""); // Template WhatsApp géré par Twilio
+      return { sid };
     } else {
       const body = render(tmpl.whatsapp.templateName || "", { ...ctx, ...evt.vars });
-      return await sendTwilioWhatsApp(to, body);
+      const sid = await sendWhatsApp(to, body);
+      return { sid };
     }
   }
   
@@ -139,8 +134,8 @@ async function sendOne(channel: Channel, tmpl: TemplatesByEvent, ctx: any, evt: 
     const body = render(tmpl.push.body || "", { ...ctx, ...evt.vars });
     const data = tmpl.push.deeplink ? { deeplink: tmpl.push.deeplink } : {};
     
-    await sendPush(token, title, body, data);
-    return { messageId: `fcm_${Date.now()}` }; // Votre sendPush ne retourne rien
+    await sendPush(token, title, body, data as Record<string, string>);
+    return { messageId: `fcm_${Date.now()}` };
   }
   
   if (channel === "inapp") {
@@ -164,26 +159,27 @@ function deliveryDocId(evt: MessageEvent, channel: Channel, to: string | null): 
 }
 
 async function logDelivery(params: {
-  evt: MessageEvent;
+  eventId: string;
   channel: Channel;
-  status: "sent" | "failed" | "queued";
-  provider?: string;
-  providerMessageId?: string;
+  status: "sent" | "failed";
+  provider: string;
+  messageId?: string;
+  sid?: string;
   error?: string;
   to?: string;
+  uid?: string;
 }) {
-  const { evt, channel, status, provider, providerMessageId, error, to } = params;
-  const docId = deliveryDocId(evt, channel, to || null);
-  const ref = db.collection("message_deliveries").doc(docId);
-
+  const { eventId, channel, status, provider, messageId, sid, error, to, uid } = params;
+  const docId = deliveryDocId({ eventId } as MessageEvent, channel, to || null);
+  
   const data: any = {
-    eventId: evt.eventId || null,
-    uid: evt.context?.user?.uid || evt.uid || null,
+    eventId,
+    uid: uid || null,
     channel,
-    provider: provider || null,
+    provider,
     to: to || null,
     status,
-    providerMessageId: providerMessageId || null,
+    providerMessageId: messageId || sid || null,
     error: error || null,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   };
@@ -192,22 +188,9 @@ async function logDelivery(params: {
     data.sentAt = admin.firestore.FieldValue.serverTimestamp();
   } else if (status === "failed") {
     data.failedAt = admin.firestore.FieldValue.serverTimestamp();
-  } else if (status === "queued") {
-    data.createdAt = admin.firestore.FieldValue.serverTimestamp();
   }
 
-  // Vérifier si déjà envoyé pour éviter les doublons
-  const existing = await ref.get();
-  if (existing.exists) {
-    const existingStatus = existing.get("status");
-    if (existingStatus === "sent" && status !== "sent") {
-      console.log(`[${channel}] Skipping, already sent for ${docId}`);
-      return { ref, skipped: true };
-    }
-  }
-
-  await ref.set(data, { merge: true });
-  return { ref, skipped: false };
+  await db.collection("message_deliveries").doc(docId).set(data, { merge: true });
 }
 
 // ----- Interrupteur global
@@ -216,7 +199,7 @@ async function isMessagingEnabled(): Promise<boolean> {
   return !!(snap.exists && snap.get("enabled"));
 }
 
-// ----- Worker principal avec nouvelle logique multi-canal
+// ----- Worker principal
 export const onMessageEventCreate = onDocumentCreated(
   { 
     region: "europe-west1", 
@@ -260,8 +243,9 @@ export const onMessageEventCreate = onDocumentCreated(
     const uidForLimit = evt?.uid || evt?.context?.user?.uid || "unknown";
     
     // Vérifier rate limit global s'il existe
-    if (routing?.rate_limit_h && routing.rate_limit_h > 0) {
-      const isLimited = await isRateLimited(uidForLimit, evt.eventId, routing.rate_limit_h);
+    const globalRateLimit = Math.max(...Object.values(routing.channels).map(c => c.rateLimitH));
+    if (globalRateLimit > 0) {
+      const isLimited = await isRateLimited(uidForLimit, evt.eventId, globalRateLimit);
       if (isLimited) {
         console.log(`🚫 Rate-limited: ${uidForLimit} for ${evt.eventId}`);
         return;
@@ -270,7 +254,13 @@ export const onMessageEventCreate = onDocumentCreated(
 
     // 5) Sélection des canaux à tenter
     const context = { ...evt.context, locale: lang, to: evt.to };
-    const channelsToTry = channelsToAttempt(routing, templates, { ...context, user: context.user });
+    const channelsToTry = channelsToAttempt(
+      routing.strategy, 
+      routing.order, 
+      routing.channels, 
+      templates, 
+      { ...context, user: context.user }
+    );
 
     console.log(`📋 Channels to attempt: ${channelsToTry.join(", ")} (strategy: ${routing.strategy})`);
 
@@ -285,27 +275,30 @@ export const onMessageEventCreate = onDocumentCreated(
       await Promise.all(channelsToTry.map(async (channel) => {
         try {
           console.log(`🚀 [${channel}] Starting parallel send...`);
-          const result = await sendOne(channel, templates, context, evt);
+          const result = await sendOne(channel, routing.channels[channel].provider, templates, context, evt);
           
           await logDelivery({ 
-            evt, 
+            eventId: evt.eventId, 
             channel, 
             status: "sent", 
-            provider: routing.channels[channel]?.provider || "default",
-            providerMessageId: (result as any)?.messageId || (result as any)?.sid || null,
-            to: getDestinationForChannel(channel, context, evt)
+            provider: routing.channels[channel].provider,
+            messageId: (result as any)?.messageId,
+            sid: (result as any)?.sid,
+            to: getDestinationForChannel(channel, context, evt),
+            uid: uidForLimit
           });
           
           console.log(`✅ [${channel}] Sent successfully`);
         } catch (e: any) {
           console.error(`❌ [${channel}] Send failed:`, e.message);
           await logDelivery({ 
-            evt, 
+            eventId: evt.eventId, 
             channel, 
             status: "failed", 
-            provider: routing.channels[channel]?.provider || "default",
+            provider: routing.channels[channel].provider,
             error: e?.message || "Unknown error",
-            to: getDestinationForChannel(channel, context, evt)
+            to: getDestinationForChannel(channel, context, evt),
+            uid: uidForLimit
           });
         }
       }));
@@ -317,15 +310,17 @@ export const onMessageEventCreate = onDocumentCreated(
         
         try {
           console.log(`🚀 [${channel}] Starting fallback send...`);
-          const result = await sendOne(channel, templates, context, evt);
+          const result = await sendOne(channel, routing.channels[channel].provider, templates, context, evt);
           
           await logDelivery({ 
-            evt, 
+            eventId: evt.eventId, 
             channel, 
             status: "sent", 
-            provider: routing.channels[channel]?.provider || "default",
-            providerMessageId: (result as any)?.messageId || (result as any)?.sid || null,
-            to: getDestinationForChannel(channel, context, evt)
+            provider: routing.channels[channel].provider,
+            messageId: (result as any)?.messageId,
+            sid: (result as any)?.sid,
+            to: getDestinationForChannel(channel, context, evt),
+            uid: uidForLimit
           });
           
           console.log(`✅ [${channel}] Sent successfully - stopping fallback chain`);
@@ -333,12 +328,13 @@ export const onMessageEventCreate = onDocumentCreated(
         } catch (e: any) {
           console.error(`❌ [${channel}] Send failed, trying next:`, e.message);
           await logDelivery({ 
-            evt, 
+            eventId: evt.eventId, 
             channel, 
             status: "failed", 
-            provider: routing.channels[channel]?.provider || "default",
+            provider: routing.channels[channel].provider,
             error: e?.message || "Unknown error",
-            to: getDestinationForChannel(channel, context, evt)
+            to: getDestinationForChannel(channel, context, evt),
+            uid: uidForLimit
           });
         }
       }

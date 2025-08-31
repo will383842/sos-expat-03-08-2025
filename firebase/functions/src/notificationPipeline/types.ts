@@ -8,13 +8,25 @@ export type TemplateInApp = { enabled: boolean; title: string; body: string };
 
 export type TemplatesByEvent = {
   _meta?: { updatedAt?: string; updatedBy?: string };
-  email?: TemplateEmail; sms?: TemplateSms; whatsapp?: TemplateWA; push?: TemplatePush; inapp?: TemplateInApp;
+  email?: TemplateEmail; 
+  sms?: TemplateSms; 
+  whatsapp?: TemplateWA; 
+  push?: TemplatePush; 
+  inapp?: TemplateInApp;
 };
 
-export type ChannelConfig = { enabled: boolean; provider: string; rateLimitH: number; retries: number; delaySec: number };
+export type ChannelConfig = { 
+  enabled: boolean; 
+  provider: string; 
+  rateLimitH: number; 
+  retries: number; 
+  delaySec: number 
+};
+
 export type RoutingPerEvent = {
   strategy: "parallel" | "fallback";
-  order?: Channel[];                               // utilisé si fallback
+  order?: Channel[];
   channels: Record<Channel, ChannelConfig>;
 };
+
 export type RoutingConfig = Record<string, RoutingPerEvent>;

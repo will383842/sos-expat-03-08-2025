@@ -1,5 +1,6 @@
+// src/pages/SuccessPayment.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams, Link } from 'react-router-dom';
 import { 
   Phone, CheckCircle, Scale, Users, Star, Clock, Shield, 
   ArrowRight, Zap, User, Briefcase, AlertCircle, RefreshCw 
@@ -8,10 +9,39 @@ import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import ReviewModal from '../components/review/ReviewModal';
 
-// 🔁 Firestore (lecture seule côté client)
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+// 🔁 Firestore
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 
+/* =========================
+   Types pour l'order / coupon / metadata
+   ========================= */
+type Currency = 'eur' | 'usd';
+
+interface OrderCoupon {
+  code?: string;
+  discountAmount?: number | string;
+}
+
+interface OrderMetadata {
+  price_origin?: 'override' | 'standard' | string;
+  override_label?: string;
+  // Pour le calcul d'économies
+  original_standard_amount?: number | string; // ex: 100
+  effective_base_amount?: number | string;    // ex: 39 (après override)
+}
+
+interface OrderDoc {
+  id?: string;
+  amount?: number | string; // total payé
+  currency?: Currency;
+  coupon?: OrderCoupon | null;
+  metadata?: OrderMetadata | null;
+}
+
+/* =========================
+   Types / constantes “service appel”
+   ========================= */
 interface ProviderInfo {
   id: string;
   name: string;
@@ -35,7 +65,10 @@ const COMMISSION_RATES = {
   expat: 5
 } as const;
 
-const PaymentSuccess: React.FC = () => {
+/* =========================
+   Page principale
+   ========================= */
+const SuccessPayment: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useApp();
@@ -46,13 +79,16 @@ const PaymentSuccess: React.FC = () => {
   const callId = searchParams.get('callId') || `call_${Date.now()}`;
   const paymentIntentId = searchParams.get('paymentIntentId');
 
-  // UI state
+  // >>> orderId pour le bloc “total payé + économies”
+  const { orderId } = useParams<{ orderId: string }>();
+
+  // UI state (appel)
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [callState, setCallState] = useState<CallState>(
     callStatus === 'failed' ? 'failed' : 'connecting'
   );
   const [timeRemaining, setTimeRemaining] = useState(0);
-  const [countdownToCall, setCountdownToCall] = useState(300); // 5 minutes countdown
+  const [countdownToCall, setCountdownToCall] = useState(300); // 5 minutes
   const [paymentTimestamp, setPaymentTimestamp] = useState<number | null>(null);
 
   // Service data
@@ -66,7 +102,9 @@ const PaymentSuccess: React.FC = () => {
     [paidServiceType, providerRole]
   );
 
-  // ----- Helpers pour récupérer le provider depuis le storage (fallback) -----
+  /* =========================
+     Helpers provider depuis storage
+     ========================= */
   const getProviderFromStorage = useCallback((): ProviderInfo | null => {
     try {
       const savedProvider = sessionStorage.getItem('selectedProvider');
@@ -113,7 +151,9 @@ const PaymentSuccess: React.FC = () => {
     return null;
   }, [providerId]);
 
-  // ----- Init des infos service (montant/durée) depuis URL ou storage -----
+  /* =========================
+     Init infos service (montant/durée) via URL ou storage
+     ========================= */
   const initializeServiceData = useCallback(() => {
     const urlAmount = searchParams.get('amount');
     const urlServiceType = searchParams.get('serviceType') || searchParams.get('service');
@@ -155,135 +195,126 @@ const PaymentSuccess: React.FC = () => {
     }
   }, [searchParams, providerId, getProviderFromStorage]);
 
-  // ----- Init et récupération du timestamp de paiement -----
+  /* =========================
+     Timestamp de paiement (PaymentIntent) - inchangé
+     ========================= */
   useEffect(() => {
     if (!paymentIntentId) return;
 
-    // 1. Chercher d'abord dans sessionStorage (plus fiable pour cette session)
     const sessionKey = `payment_timestamp_${paymentIntentId}`;
     try {
       const savedTimestamp = sessionStorage.getItem(sessionKey);
       if (savedTimestamp) {
         const timestamp = parseInt(savedTimestamp);
         setPaymentTimestamp(timestamp);
-        console.log(`✅ Timestamp de paiement récupéré: ${new Date(timestamp).toLocaleString()}`);
         return;
       }
     } catch {}
 
-    // 2. Sinon, chercher dans Firestore
     const fetchPaymentTimestamp = async () => {
       try {
-        const paymentDoc = await (await import('firebase/firestore')).getDoc(
-          (await import('firebase/firestore')).doc(db, 'payments', paymentIntentId)
-        );
-        
+        const paymentDoc = await getDoc(doc(db, 'payments', paymentIntentId));
         if (paymentDoc.exists()) {
-          const data = paymentDoc.data();
+          const data: any = paymentDoc.data();
           let timestamp: number | null = null;
 
-          // Essayer différents champs possibles pour le timestamp
           if (data.paymentSuccessTimestamp) {
-            timestamp = data.paymentSuccessTimestamp.toDate?.() ? data.paymentSuccessTimestamp.toDate().getTime() : data.paymentSuccessTimestamp;
+            timestamp = data.paymentSuccessTimestamp.toDate?.()
+              ? data.paymentSuccessTimestamp.toDate().getTime()
+              : data.paymentSuccessTimestamp;
           } else if (data.updatedAt) {
-            timestamp = data.updatedAt.toDate?.() ? data.updatedAt.toDate().getTime() : data.updatedAt;
+            timestamp = data.updatedAt.toDate?.()
+              ? data.updatedAt.toDate().getTime()
+              : data.updatedAt;
           } else if (data.createdAt) {
-            timestamp = data.createdAt.toDate?.() ? data.createdAt.toDate().getTime() : data.createdAt;
+            timestamp = data.createdAt.toDate?.()
+              ? data.createdAt.toDate().getTime()
+              : data.createdAt;
           }
 
           if (timestamp) {
             setPaymentTimestamp(timestamp);
-            // Sauvegarder en session pour les prochains chargements
-            sessionStorage.setItem(sessionKey, timestamp.toString());
-            console.log(`✅ Timestamp de paiement récupéré depuis Firestore: ${new Date(timestamp).toLocaleString()}`);
+            sessionStorage.setItem(sessionKey, String(timestamp));
           } else {
-            // Si pas de timestamp trouvé, utiliser maintenant comme fallback
             const now = Date.now();
             setPaymentTimestamp(now);
-            sessionStorage.setItem(sessionKey, now.toString());
-            console.log(`⚠️ Pas de timestamp trouvé, utilisation de maintenant: ${new Date(now).toLocaleString()}`);
+            sessionStorage.setItem(sessionKey, String(now));
           }
         } else {
-          // Document de paiement non trouvé, utiliser maintenant
           const now = Date.now();
           setPaymentTimestamp(now);
-          sessionStorage.setItem(sessionKey, now.toString());
-          console.log(`⚠️ Document de paiement non trouvé, utilisation de maintenant: ${new Date(now).toLocaleString()}`);
+          sessionStorage.setItem(sessionKey, String(now));
         }
       } catch (error) {
         console.error('Erreur lors de la récupération du timestamp:', error);
-        // En cas d'erreur, utiliser maintenant
         const now = Date.now();
         setPaymentTimestamp(now);
-        sessionStorage.setItem(sessionKey, now.toString());
+        sessionStorage.setItem(sessionKey, String(now));
       }
     };
 
     fetchPaymentTimestamp();
   }, [paymentIntentId]);
 
-  // ----- Calcul du compte à rebours basé sur le timestamp de paiement -----
+  /* =========================
+     Compte à rebours “ready_to_ring”
+     ========================= */
   useEffect(() => {
     if (!paymentTimestamp || callState !== 'connecting') return;
 
     const updateCountdown = () => {
       const now = Date.now();
       const elapsedSeconds = Math.floor((now - paymentTimestamp) / 1000);
-      const totalCountdownSeconds = 300; // 5 minutes
+      const totalCountdownSeconds = 300; // 5 min
       const remainingSeconds = Math.max(0, totalCountdownSeconds - elapsedSeconds);
 
       setCountdownToCall(remainingSeconds);
 
-      // Passage automatique à "ready_to_ring" quand le compte à rebours atteint 0
       if (remainingSeconds === 0 && callState === 'connecting') {
         setCallState('ready_to_ring');
       }
     };
 
-    // Mise à jour immédiate
     updateCountdown();
-
-    // Mise à jour toutes les secondes
     const interval = setInterval(updateCountdown, 1000);
-
     return () => clearInterval(interval);
   }, [paymentTimestamp, callState]);
 
-  // ----- Timer d'affichage local pendant l'état "in_progress" -----
+  /* =========================
+     Timer local en “in_progress”
+     ========================= */
   useEffect(() => {
     if (callState !== 'in_progress' || timeRemaining <= 0) return;
 
     const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeRemaining(prev => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     return () => clearInterval(timer);
   }, [callState, timeRemaining]);
 
-  // ----- Init des données -----
+  /* =========================
+     Init données
+     ========================= */
   useEffect(() => {
     initializeServiceData();
   }, [initializeServiceData]);
 
-  // ----- Écoute Firestore : état de l'appel -----
+  /* =========================
+     Écoute Firestore : état de l'appel
+     ========================= */
   useEffect(() => {
     if (!callId) return;
 
     const ref = doc(db, 'calls', callId);
     const unsub = onSnapshot(ref, snap => {
-      const data = snap.data();
+      const data = snap.data() as any;
       if (!data) return;
 
-      // Statuts poussés par la Cloud Function (webhook Twilio)
       switch (data.status) {
         case 'scheduled':
           if (callState === 'connecting') {
-            // Keep countdown state
+            // keep “connecting”
           } else {
             setCallState('connecting');
           }
@@ -301,7 +332,6 @@ const PaymentSuccess: React.FC = () => {
           break;
       }
 
-      // Ouvrir l'avis seulement après complétion
       if (data.status === 'completed' && !showReviewModal) {
         setTimeout(() => setShowReviewModal(true), 1500);
       }
@@ -310,14 +340,16 @@ const PaymentSuccess: React.FC = () => {
     return () => unsub();
   }, [callId, showReviewModal, callState]);
 
-  // ----- Utils -----
+  /* =========================
+     Utils
+     ========================= */
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  // ----- i18n avec ton fun & cool -----
+  // i18n léger
   const t = useMemo(
     () => ({
       serviceNotFound: language === 'fr' ? 'Oups, service introuvable 🤔' : 'Oops, service not found 🤔',
@@ -372,8 +404,50 @@ const PaymentSuccess: React.FC = () => {
     [language]
   );
 
-  // ----- Early return si pas d'infos service -----
+  /* =========================
+     >>> PARTIE “ORDER” pour Total payé + Économies
+     ========================= */
+  const [order, setOrder] = useState<OrderDoc | null>(null);
+  const [orderLoading, setOrderLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!orderId) {
+      setOrderLoading(false);
+      return;
+    }
+    const ref = doc(db, 'orders', orderId);
+    setOrderLoading(true);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        setOrderLoading(false);
+        if (snap.exists()) {
+          setOrder({ id: snap.id, ...(snap.data() as OrderDoc) });
+        } else {
+          setOrder(null);
+        }
+      },
+      () => setOrderLoading(false)
+    );
+    return () => unsub();
+  }, [orderId]);
+
+  // Devise / symbole (pour le bloc order)
+  const orderCurrency: Currency = (order?.currency as Currency) ?? 'eur';
+  const C = orderCurrency === 'eur' ? '€' : '$';
+
+  // Helpers numériques pour bloc order
+  const toNum = (v: unknown): number => {
+    const n = Number(v ?? 0);
+    return Number.isFinite(n) ? n : 0;
+    };
+  const fmt = (n: number) => n.toFixed(2);
+
+  /* =========================
+     Rendu
+     ========================= */
   if (!paidAmount && !paidServiceType) {
+    // Garde-fou si jamais pas d'info service (cohérent avec ton ancien rendu)
     return (
       <Layout>
         <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -388,7 +462,6 @@ const PaymentSuccess: React.FC = () => {
     );
   }
 
-  // ----- Rendu principal selon l'état -----
   return (
     <Layout>
       <div className="min-h-screen bg-gray-950">
@@ -397,21 +470,21 @@ const PaymentSuccess: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
           <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-blue-500/10" />
           
-          {/* Particules d'arrière-plan animées */}
+          {/* Particules */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-full blur-3xl animate-pulse" />
             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
           </div>
 
           <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
-            {/* Badge de statut avec plus de fun */}
+            {/* Badge statut */}
             <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full pl-6 pr-6 py-3 border border-white/20 mb-8">
               <CheckCircle className="w-5 h-5 text-green-400" />
               <span className="text-white font-semibold">{t.paymentSuccessful}</span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             </div>
 
-            {/* Affichage du timestamp de paiement avec style fun */}
+            {/* Timestamp paiement si présent */}
             {paymentTimestamp && (
               <div className="mb-6 text-center">
                 <div className="inline-flex items-center space-x-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
@@ -423,7 +496,7 @@ const PaymentSuccess: React.FC = () => {
               </div>
             )}
 
-            {/* Indicateur de chargement fun */}
+            {/* Loading timestamp */}
             {!paymentTimestamp && callState === 'connecting' && (
               <div className="mb-6 text-center">
                 <div className="inline-flex items-center space-x-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
@@ -433,7 +506,7 @@ const PaymentSuccess: React.FC = () => {
               </div>
             )}
 
-            {/* État de l'appel */}
+            {/* États */}
             {callState === 'connecting' && (
               <>
                 <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
@@ -442,7 +515,6 @@ const PaymentSuccess: React.FC = () => {
                   </span>
                 </h1>
                 
-                {/* Compte à rebours principal */}
                 <div className="mb-8">
                   {paymentTimestamp ? (
                     <>
@@ -456,7 +528,6 @@ const PaymentSuccess: React.FC = () => {
                       <p className="text-xl text-gray-300 max-w-2xl mx-auto">
                         {t.connecting}
                       </p>
-                      {/* Message encourageant supplémentaire */}
                       <div className="mt-4 inline-flex items-center space-x-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2">
                         <span className="text-white/70 text-sm">{t.almostThere}</span>
                       </div>
@@ -490,7 +561,6 @@ const PaymentSuccess: React.FC = () => {
                   <p className="text-xl text-gray-300 max-w-2xl mx-auto">
                     {t.readyToRingDesc}
                   </p>
-                  {/* Message fun supplémentaire */}
                   <div className="mt-4 inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-400/20">
                     <span className="text-green-300 text-sm font-medium">{t.expertComing}</span>
                   </div>
@@ -514,7 +584,6 @@ const PaymentSuccess: React.FC = () => {
                     {formatTime(timeRemaining)}
                   </div>
                   <p className="text-xl text-gray-300">{t.timeRemaining}</p>
-                  {/* Badge fun */}
                   <div className="mt-4 inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-400/20">
                     <span className="text-green-300 text-sm font-medium">{t.youRock}</span>
                   </div>
@@ -537,7 +606,6 @@ const PaymentSuccess: React.FC = () => {
                   <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-6">
                     {t.thankYou}
                   </p>
-                  {/* Badge de félicitations */}
                   <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-yellow-400/10 to-orange-400/10 backdrop-blur-sm rounded-full px-6 py-3 border border-yellow-400/20">
                     <span className="text-yellow-300 text-lg font-bold">{t.superFast}</span>
                   </div>
@@ -560,20 +628,140 @@ const PaymentSuccess: React.FC = () => {
                   <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-6">
                     {t.expertNoAnswer}
                   </p>
-                <button
-                  onClick={() => navigate('/prestataires')}
-                  className="bg-gradient-to-r from-red-600 to-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  {t.chooseAnother} 🔄
-                </button>
+                  <button
+                    onClick={() => navigate('/prestataires')}
+                    className="bg-gradient-to-r from-red-600 to-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    {t.chooseAnother} 🔄
+                  </button>
                 </div>
               </>
             )}
           </div>
         </section>
 
-        {/* Section Détails du service */}
+        {/* =========================
+            SECTION RÉCAP “TOTAL PAYÉ + ÉCONOMIES”
+            ========================= */}
+        <section className="pb-4 bg-gray-950">
+          <div className="max-w-4xl mx-auto px-6">
+            <div className="rounded-2xl border border-green-300/30 bg-green-50/90 p-4 md:p-5">
+              {/* État de chargement de l'order */}
+              {orderLoading && (
+                <div className="space-y-2">
+                  <div className="h-5 w-48 bg-green-200/70 animate-pulse rounded" />
+                  <div className="h-4 w-64 bg-green-200/50 animate-pulse rounded" />
+                </div>
+              )}
+
+              {/* Order absent */}
+              {!orderLoading && !order && (
+                <div className="text-green-900/80 text-sm">
+                  Impossible de récupérer la commande
+                  {orderId ? ` (${orderId})` : ''}. Vérifie le lien ou réessaie plus tard.
+                </div>
+              )}
+
+              {/* Bloc récap (si order) */}
+              {!!order && (
+                <div className="space-y-1">
+                  {/* Total payé */}
+                  <div className="flex justify-between">
+                    <span className="text-green-900/80">Total payé</span>
+                    <span className="font-bold text-green-900">
+                      {C}{fmt(toNum(order.amount))}
+                    </span>
+                  </div>
+
+                  {/* Badge override */}
+                  {order?.metadata?.price_origin === 'override' &&
+                    !!order?.metadata?.override_label && (
+                      <div className="text-sm text-green-700">
+                        Tarif spécial appliqué : {order.metadata!.override_label}
+                      </div>
+                  )}
+
+                  {/* Remise coupon */}
+                  {toNum(order?.coupon?.discountAmount) > 0 && (
+                    <div className="text-sm text-green-700">
+                      Code {order?.coupon?.code} : -{C}{fmt(toNum(order?.coupon?.discountAmount))}
+                    </div>
+                  )}
+
+                  {/* Économies (si metadata dispo) */}
+                  {(() => {
+                    const original = toNum(order?.metadata?.original_standard_amount || 0);   // ex: 100
+                    const effectiveBase = toNum(order?.metadata?.effective_base_amount || 0); // ex: 39 (après override)
+                    const paid = toNum(order?.amount || 0);                                   // ex: 31.20 (après coupon)
+                    const savedFromOverride = Math.max(0, original - effectiveBase);
+                    const savedFromCoupon   = Math.max(0, effectiveBase - paid);
+                    const totalSaved        = Math.max(0, original - paid);
+                    if (!original || totalSaved <= 0) return null;
+                    return (
+                      <div className="text-sm text-emerald-700">
+                        Vous avez économisé {C}{fmt(totalSaved)}
+                        {savedFromOverride>0 && ` (dont ${C}${fmt(savedFromOverride)} via le tarif spécial)`}
+                        {savedFromCoupon>0 && ` (dont ${C}${fmt(savedFromCoupon)} via le code ${order?.coupon?.code ?? ''})`}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Détails “debug” optionnels */}
+            {!!order && (
+              <details className="mt-3 rounded-lg border border-white/10 bg-white/5 p-4 text-white/80">
+                <summary className="cursor-pointer select-none text-sm">Détails de la commande</summary>
+                <div className="mt-3 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Devise</span>
+                    <span className="font-medium uppercase">{orderCurrency}</span>
+                  </div>
+                  {order?.metadata?.price_origin && (
+                    <div className="flex justify-between">
+                      <span>Origine du prix</span>
+                      <span className="font-medium">{order.metadata!.price_origin}</span>
+                    </div>
+                  )}
+                  {order?.metadata?.override_label && (
+                    <div className="flex justify-between">
+                      <span>Libellé override</span>
+                      <span className="font-medium">{order.metadata!.override_label}</span>
+                    </div>
+                  )}
+                  {typeof order?.metadata?.original_standard_amount !== 'undefined' && (
+                    <div className="flex justify-between">
+                      <span>Prix standard d’origine</span>
+                      <span className="font-medium">
+                        {C}{fmt(toNum(order?.metadata?.original_standard_amount))}
+                      </span>
+                    </div>
+                  )}
+                  {typeof order?.metadata?.effective_base_amount !== 'undefined' && (
+                    <div className="flex justify-between">
+                      <span>Base effective (après override)</span>
+                      <span className="font-medium">
+                        {C}{fmt(toNum(order?.metadata?.effective_base_amount))}
+                      </span>
+                    </div>
+                  )}
+                  {order?.coupon?.code && (
+                    <div className="flex justify-between">
+                      <span>Coupon</span>
+                      <span className="font-medium">
+                        {order.coupon.code} (-{C}{fmt(toNum(order?.coupon?.discountAmount))})
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
+          </div>
+        </section>
+
+        {/* Section Détails du service (ton bloc existant conservé) */}
         <section className="py-16 bg-gradient-to-b from-white to-gray-50">
           <div className="max-w-4xl mx-auto px-6">
             <div className="bg-white rounded-3xl border border-gray-200 p-8 shadow-lg">
@@ -630,7 +818,7 @@ const PaymentSuccess: React.FC = () => {
                 </div>
               </div>
 
-              {/* Garanties avec style fun */}
+              {/* Garanties */}
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <div className="text-center mb-4">
                   <span className="text-sm font-semibold text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
@@ -658,6 +846,13 @@ const PaymentSuccess: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Raccourcis utiles */}
+            <div className="mt-6 flex items-center gap-3 text-sm text-gray-600">
+              <Link to="/dashboard" className="underline hover:text-gray-800">Espace client</Link>
+              <span>•</span>
+              <Link to="/" className="underline hover:text-gray-800">Accueil</Link>
             </div>
           </div>
         </section>
@@ -712,4 +907,4 @@ const PaymentSuccess: React.FC = () => {
   );
 };
 
-export default PaymentSuccess;
+export default SuccessPayment;

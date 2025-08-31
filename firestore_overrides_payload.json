@@ -1,0 +1,142 @@
+{
+  "fields": {
+    "overrides": {
+      "mapValue": {
+        "fields": {
+          "lawyer": {
+            "mapValue": {
+              "fields": {
+                "usd": {
+                  "mapValue": {
+                    "fields": {
+                      "endsAt": {
+                        "timestampValue": "2025-09-30T23:59:59Z"
+                      },
+                      "connectionFeeAmount": {
+                        "integerValue": "19"
+                      },
+                      "strikeTargets": {
+                        "stringValue": "default"
+                      },
+                      "label": {
+                        "stringValue": "Back to School (Lawyer USD)"
+                      },
+                      "totalAmount": {
+                        "integerValue": "39"
+                      },
+                      "enabled": {
+                        "booleanValue": true
+                      },
+                      "startsAt": {
+                        "timestampValue": "2025-09-01T00:00:00Z"
+                      },
+                      "stackableWithCoupons": {
+                        "booleanValue": true
+                      }
+                    }
+                  }
+                },
+                "eur": {
+                  "mapValue": {
+                    "fields": {
+                      "endsAt": {
+                        "timestampValue": "2025-09-30T23:59:59Z"
+                      },
+                      "connectionFeeAmount": {
+                        "integerValue": "19"
+                      },
+                      "strikeTargets": {
+                        "stringValue": "default"
+                      },
+                      "label": {
+                        "stringValue": "Promo rentrée (Lawyer EUR)"
+                      },
+                      "totalAmount": {
+                        "integerValue": "39"
+                      },
+                      "enabled": {
+                        "booleanValue": true
+                      },
+                      "startsAt": {
+                        "timestampValue": "2025-09-01T00:00:00Z"
+                      },
+                      "stackableWithCoupons": {
+                        "booleanValue": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "expat": {
+            "mapValue": {
+              "fields": {
+                "usd": {
+                  "mapValue": {
+                    "fields": {
+                      "endsAt": {
+                        "timestampValue": "2025-09-30T23:59:59Z"
+                      },
+                      "connectionFeeAmount": {
+                        "integerValue": "19"
+                      },
+                      "strikeTargets": {
+                        "stringValue": "default"
+                      },
+                      "label": {
+                        "stringValue": "Back to School (Expat USD)"
+                      },
+                      "totalAmount": {
+                        "integerValue": "49"
+                      },
+                      "enabled": {
+                        "booleanValue": true
+                      },
+                      "startsAt": {
+                        "timestampValue": "2025-09-01T00:00:00Z"
+                      },
+                      "stackableWithCoupons": {
+                        "booleanValue": true
+                      }
+                    }
+                  }
+                },
+                "eur": {
+                  "mapValue": {
+                    "fields": {
+                      "endsAt": {
+                        "timestampValue": "2025-09-30T23:59:59Z"
+                      },
+                      "connectionFeeAmount": {
+                        "integerValue": "19"
+                      },
+                      "strikeTargets": {
+                        "stringValue": "default"
+                      },
+                      "label": {
+                        "stringValue": "Promo rentrée (Expat EUR)"
+                      },
+                      "totalAmount": {
+                        "integerValue": "49"
+                      },
+                      "enabled": {
+                        "booleanValue": true
+                      },
+                      "startsAt": {
+                        "timestampValue": "2025-09-01T00:00:00Z"
+                      },
+                      "stackableWithCoupons": {
+                        "booleanValue": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

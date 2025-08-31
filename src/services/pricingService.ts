@@ -7,6 +7,21 @@ import { useEffect, useState } from "react";
 export type Currency = "eur" | "usd";
 export type ServiceType = "lawyer" | "expat";
 
+// === ADD: overrides types
+export type StrikeTarget = "provider" | "default" | "both";
+
+export interface PriceOverride {
+  enabled: boolean;
+  totalAmount: number;
+  connectionFeeAmount: number;
+  label?: string;
+  startsAt?: number | { seconds: number };
+  endsAt?: number | { seconds: number };
+  strikeTargets?: StrikeTarget;
+  stackableWithCoupons?: boolean;
+}
+// === END
+
 export interface ServiceConfig {
   /** Total payé par le client (unités de devise, ex: 50.00) */
   totalAmount: number;
@@ -23,12 +38,21 @@ export interface ServiceConfig {
 export interface PricingConfig {
   lawyer: { eur: ServiceConfig; usd: ServiceConfig };
   expat: { eur: ServiceConfig; usd: ServiceConfig };
+  // 👇 NEW
+  overrides?: {
+    lawyer?: Partial<Record<Currency, PriceOverride>>;
+    expat?: Partial<Record<Currency, PriceOverride>>;
+  };
 }
 
 /** Firestore: structure attendue */
 export interface FirestorePricingDoc {
   lawyer?: { eur?: Partial<ServiceConfig & { platformFeePercent?: number }>; usd?: Partial<ServiceConfig & { platformFeePercent?: number }> };
   expat?: { eur?: Partial<ServiceConfig & { platformFeePercent?: number }>; usd?: Partial<ServiceConfig & { platformFeePercent?: number }> };
+  overrides?: {
+    lawyer?: Partial<Record<Currency, PriceOverride>>;
+    expat?: Partial<Record<Currency, PriceOverride>>;
+  };
 }
 
 /** Source de vérité Firestore */
@@ -52,7 +76,7 @@ const DEFAULT_FALLBACK: PricingConfig = {
   },
 };
 
-/** Utilitaire pour construire un ServiceConfig à partir d’un prix de base + % fee */
+/** Utilitaire pour construire un ServiceConfig à partir d'un prix de base + % fee */
 function makeConfigFromBase(params: {
   base: number; // total payé par le client
   feePercent: number; // ex: 20 (= 20%)
@@ -76,7 +100,7 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-/** Validation stricte d’un ServiceConfig */
+/** Validation stricte d'un ServiceConfig */
 function isValidServiceConfig(c: unknown): c is ServiceConfig {
   if (!c || typeof c !== "object") return false;
   const cfg = c as ServiceConfig;
@@ -93,7 +117,7 @@ function isValidServiceConfig(c: unknown): c is ServiceConfig {
   );
 }
 
-/** Validation stricte d’un PricingConfig complet */
+/** Validation stricte d'un PricingConfig complet */
 function isValidPricingConfig(cfg: unknown): cfg is PricingConfig {
   if (!cfg || typeof cfg !== "object") return false;
   const c = cfg as PricingConfig;
@@ -186,6 +210,8 @@ function normalizeFirestoreDocument(raw: FirestorePricingDoc): PricingConfig {
       eur: fromNode(raw?.expat?.eur, "expat", "eur", defaultDurations.expat),
       usd: fromNode(raw?.expat?.usd, "expat", "usd", defaultDurations.expat),
     },
+    // 👇 Préservation des overrides depuis Firestore
+    overrides: raw?.overrides,
   };
 }
 
@@ -221,7 +247,7 @@ export function usePricingConfig() {
   return { pricing, loading, error, reload };
 }
 
-/** Utilitaire simple pour récupérer le pricing d’un service+devise */
+/** Utilitaire simple pour récupérer le pricing d'un service+devise */
 export async function getServicePricing(
   serviceType: ServiceType,
   currency: Currency = "eur"
@@ -263,3 +289,37 @@ export function detectUserCurrency(): Currency {
     return "eur";
   }
 }
+
+// === ADD: helpers override
+function toMillis(v?: number | { seconds: number }): number | undefined {
+  if (typeof v === "number") return v;
+  if (v && typeof (v as any).seconds === "number") return (v as any).seconds * 1000;
+  return undefined;
+}
+
+/** Retourne le prix effectif (override si actif) + le standard pour l'affichage barré */
+export function getEffectivePrice(
+  cfg: PricingConfig,
+  service: ServiceType,
+  currency: Currency
+) {
+  const standard = cfg[service][currency];
+  const ov = cfg.overrides?.[service]?.[currency];
+  const now = Date.now();
+  const active =
+    !!ov?.enabled &&
+    (!toMillis(ov.startsAt) || now >= toMillis(ov.startsAt)!) &&
+    (!toMillis(ov.endsAt) || now <= toMillis(ov.endsAt)!);
+
+  const price = active
+    ? {
+        ...standard,
+        totalAmount: ov!.totalAmount,
+        connectionFeeAmount: ov!.connectionFeeAmount,
+        providerAmount: Math.max(0, ov!.totalAmount - ov!.connectionFeeAmount),
+      }
+    : standard;
+
+  return { price, standard, override: active ? ov! : null };
+}
+// === END

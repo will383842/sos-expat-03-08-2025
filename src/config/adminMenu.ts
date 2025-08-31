@@ -335,6 +335,13 @@ export const adminMenuTree: AdminMenuItem[] = [
         description: 'Modèles d\'emails et SMS'
       },
       {
+        id: 'promo-codes',
+        label: 'Codes promo',
+        path: '/admin/coupons',
+        icon: Percent,
+        description: 'Créer, activer, suivre les coupons'
+      },
+      {
         id: 'messages-realtime',
         label: 'Messages temps réel',
         path: '/admin/comms/messages',

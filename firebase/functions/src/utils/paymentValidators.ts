@@ -142,6 +142,25 @@ export async function getPricingConfig(
         pricingCacheExpiry = now + CACHE_DURATION;
 
         const adminConfig = adminPricing?.[type]?.[currency];
+        
+        // === GESTION DES OVERRIDES ACTIFS ===
+        const ov = adminPricing?.overrides?.[type]?.[currency];
+        const toMillis = (v: any) => (typeof v === 'number' ? v : (v?.seconds ? v.seconds * 1000 : undefined));
+        const active = !!ov?.enabled
+          && (!toMillis(ov?.startsAt) || now >= toMillis(ov?.startsAt)!)
+          && (!toMillis(ov?.endsAt) || now <= toMillis(ov?.endsAt)!);
+
+        if (active) {
+          return {
+            totalAmount: ov.totalAmount,
+            connectionFeeAmount: ov.connectionFeeAmount || 0,
+            providerAmount: Math.max(0, ov.totalAmount - (ov.connectionFeeAmount || 0)),
+            duration: adminConfig?.duration ?? DEFAULT_PRICING_CONFIG[type][currency].duration,
+            currency
+          };
+        }
+        // === FIN GESTION DES OVERRIDES ===
+
         if (adminConfig && typeof adminConfig.totalAmount === 'number') {
           return {
             totalAmount: adminConfig.totalAmount,

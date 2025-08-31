@@ -2,7 +2,6 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import AdminLayout from "@/components/admin/AdminLayout";
 
 // ===== COMPOSANT DE CHARGEMENT =====
 const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Chargement..." }) => (
@@ -177,471 +176,433 @@ const AdminRoutesV2: React.FC = () => {
         }
       />
 
-      {/* ===== TOUTES LES AUTRES ROUTES DANS LE LAYOUT ===== */}
-      <Route path="" element={<AdminLayout />}>
-        {/* ===== INDEX : /admin ===== */}
-        <Route index element={<Navigate to="dashboard" replace />} />
+      {/* ===== Toutes les autres routes (CHAQUE PAGE rend son layout) ===== */}
+      {/* Index /admin → /admin/dashboard */}
+      <Route index element={<Navigate to="dashboard" replace />} />
 
-        {/* ===== 📊 DASHBOARD ===== */}
-        <Route
-          path="dashboard"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement du tableau de bord..." />}>
-              <AdminDashboard />
-            </Suspense>
-          }
-        />
+      {/* 📊 DASHBOARD */}
+      <Route
+        path="dashboard"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement du tableau de bord..." />}>
+            <AdminDashboard />
+          </Suspense>
+        }
+      />
 
-        {/* ===== 👥 UTILISATEURS & PRESTATAIRES ===== */}
-        <Route
-          path="users/clients"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des clients..." />}>
-              <AdminClients />
-            </Suspense>
-          }
-        />
-        <Route
-          path="users/providers/lawyers"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des avocats..." />}>
-              <AdminLawyers />
-            </Suspense>
-          }
-        />
-        <Route
-          path="users/providers/expats"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des expatriés..." />}>
-              <AdminExpats />
-            </Suspense>
-          }
-        />
-        <Route
-          path="aaaprofiles"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des profils de test..." />}>
-              <AdminAaaProfiles />
-            </Suspense>
-          }
-        />
-        <Route
-          path="approvals/lawyers"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des validations d'avocats..." />}>
-              <AdminLawyerApprovals />
-            </Suspense>
-          }
-        />
-        <Route
-          path="kyc/providers"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement du KYC prestataires..." />}>
-              <AdminKYCProviders />
-            </Suspense>
-          }
-        />
-        <Route
-          path="reviews"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des avis..." />}>
-              <AdminReviews />
-            </Suspense>
-          }
-        />
+      {/* 👥 UTILISATEURS & PRESTATAIRES */}
+      <Route
+        path="users/clients"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des clients..." />}>
+            <AdminClients />
+          </Suspense>
+        }
+      />
+      <Route
+        path="users/providers/lawyers"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des avocats..." />}>
+            <AdminLawyers />
+          </Suspense>
+        }
+      />
+      <Route
+        path="users/providers/expats"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des expatriés..." />}>
+            <AdminExpats />
+          </Suspense>
+        }
+      />
+      <Route
+        path="aaaprofiles"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des profils de test..." />}>
+            <AdminAaaProfiles />
+          </Suspense>
+        }
+      />
+      <Route
+        path="approvals/lawyers"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des validations d'avocats..." />}>
+            <AdminLawyerApprovals />
+          </Suspense>
+        }
+      />
+      <Route
+        path="kyc/providers"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement du KYC prestataires..." />}>
+            <AdminKYCProviders />
+          </Suspense>
+        }
+      />
+      <Route
+        path="reviews"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des avis..." />}>
+            <AdminReviews />
+          </Suspense>
+        }
+      />
 
-        {/* ===== ROUTES DE COMPATIBILITÉ ANCIENNES ===== */}
-        <Route path="users/list" element={<Navigate to="../users/clients" replace />} />
-        <Route path="users/providers" element={<Navigate to="../users/providers/lawyers" replace />} />
-        <Route path="approvals" element={<Navigate to="../approvals/lawyers" replace />} />
+      {/* Compat anciennes */}
+      <Route path="users/list" element={<Navigate to="../users/clients" replace />} />
+      <Route path="users/providers" element={<Navigate to="../users/providers/lawyers" replace />} />
+      <Route path="approvals" element={<Navigate to="../approvals/lawyers" replace />} />
 
-        {/* ===== 💰 FINANCES & FACTURATION ===== */}
-        <Route
-          path="finance/payments"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des paiements..." />}>
-              <AdminPayments />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/invoices"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des factures..." />}>
-              <AdminInvoices />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/taxes"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la gestion TVA..." />}>
-              <AdminFinanceTaxes />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/taxes/by-country"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la TVA par pays..." />}>
-              <AdminFinanceTaxesByCountry />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/reconciliation"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des rapprochements..." />}>
-              <AdminFinanceReconciliation />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/disputes"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des litiges..." />}>
-              <AdminFinanceDisputes />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/refunds"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des remboursements..." />}>
-              <AdminFinanceRefunds />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/payouts"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des payouts..." />}>
-              <AdminFinancePayouts />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/exports"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
-              <AdminFinanceExports />
-            </Suspense>
-          }
-        />
-        <Route
-          path="finance/ledger"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement du grand livre..." />}>
-              <AdminFinanceLedger />
-            </Suspense>
-          }
-        />
+      {/* 💰 FINANCES */}
+      <Route
+        path="finance/payments"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des paiements..." />}>
+            <AdminPayments />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/invoices"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des factures..." />}>
+            <AdminInvoices />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/taxes"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement de la gestion TVA..." />}>
+            <AdminFinanceTaxes />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/taxes/by-country"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement de la TVA par pays..." />}>
+            <AdminFinanceTaxesByCountry />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/reconciliation"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des rapprochements..." />}>
+            <AdminFinanceReconciliation />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/disputes"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des litiges..." />}>
+            <AdminFinanceDisputes />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/refunds"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des remboursements..." />}>
+            <AdminFinanceRefunds />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/payouts"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des payouts..." />}>
+            <AdminFinancePayouts />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/exports"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
+            <AdminFinanceExports />
+          </Suspense>
+        }
+      />
+      <Route
+        path="finance/ledger"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement du grand livre..." />}>
+            <AdminFinanceLedger />
+          </Suspense>
+        }
+      />
 
-        {/* ===== 📞 APPELS & PLANIFICATION ===== */}
-        <Route
-          path="calls"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement du monitoring des appels..." />}>
-              <AdminCalls />
-            </Suspense>
-          }
-        />
-        <Route
-          path="calls/sessions"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des sessions..." />}>
-              <AdminCallsSessions />
-            </Suspense>
-          }
-        />
+      {/* 📞 APPELS */}
+      <Route
+        path="calls"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement du monitoring des appels..." />}>
+            <AdminCalls />
+          </Suspense>
+        }
+      />
+      <Route
+        path="calls/sessions"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des sessions..." />}>
+            <AdminCallsSessions />
+          </Suspense>
+        }
+      />
 
-        {/* ===== 💌 COMMUNICATIONS ===== */}
-        <Route
-          path="comms/campaigns"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des campagnes..." />}>
-              <AdminCommsCampaigns />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/automations"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des automations..." />}>
-              <AdminCommsAutomations />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/segments"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des segments..." />}>
-              <AdminCommsSegments />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/templates"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des templates..." />}>
-              <AdminCommsTemplates />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/deliverability"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la délivrabilité..." />}>
-              <AdminCommsDeliverability />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/suppression"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des listes de suppression..." />}>
-              <AdminCommsSuppression />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/ab"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des tests A/B..." />}>
-              <AdminCommsABTests />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/messages"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des messages..." />}>
-              <AdminClientMessages />
-            </Suspense>
-          }
-        />
-        <Route
-          path="comms/notifications"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des notifications..." />}>
-              <AdminNotifications />
-            </Suspense>
-          }
-        />
+      {/* 💌 COMMUNICATIONS */}
+      <Route
+        path="comms/campaigns"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des campagnes..." />}>
+            <AdminCommsCampaigns />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/automations"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des automations..." />}>
+            <AdminCommsAutomations />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/segments"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des segments..." />}>
+            <AdminCommsSegments />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/templates"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des templates..." />}>
+            <AdminCommsTemplates />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/deliverability"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement de la délivrabilité..." />}>
+            <AdminCommsDeliverability />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/suppression"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des listes de suppression..." />}>
+            <AdminCommsSuppression />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/ab"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des tests A/B..." />}>
+            <AdminCommsABTests />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/messages"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des messages..." />}>
+            <AdminClientMessages />
+          </Suspense>
+        }
+      />
+      <Route
+        path="comms/notifications"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des notifications..." />}>
+            <AdminNotifications />
+          </Suspense>
+        }
+      />
 
-        {/* ===== 🤝 AFFILIATION & AMBASSADEURS ===== */}
-        <Route
-          path="affiliates"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des affiliés..." />}>
-              <AdminAffiliates />
-            </Suspense>
-          }
-        />
-        <Route
-          path="affiliates/commissions"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des règles de commission..." />}>
-              <AdminCommissionRules />
-            </Suspense>
-          }
-        />
-        <Route
-          path="affiliates/payouts"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des payouts affiliés..." />}>
-              <AdminAffiliatePayouts />
-            </Suspense>
-          }
-        />
-        <Route
-          path="ambassadors"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des ambassadeurs..." />}>
-              <AdminAmbassadors />
-            </Suspense>
-          }
-        />
+      {/* 🤝 AFFILIATION & AMBASSADEURS */}
+      <Route
+        path="affiliates"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des affiliés..." />}>
+            <AdminAffiliates />
+          </Suspense>
+        }
+      />
+      <Route
+        path="affiliates/commissions"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des règles de commission..." />}>
+            <AdminCommissionRules />
+          </Suspense>
+        }
+      />
+      <Route
+        path="affiliates/payouts"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des payouts affiliés..." />}>
+            <AdminAffiliatePayouts />
+          </Suspense>
+        }
+      />
+      <Route
+        path="ambassadors"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des ambassadeurs..." />}>
+            <AdminAmbassadors />
+          </Suspense>
+        }
+      />
 
-        {/* ===== 🏢 ENTREPRISES (B2B) ===== */}
-        <Route
-          path="b2b/accounts"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des comptes B2B..." />}>
-              <AdminB2BAccounts />
-            </Suspense>
-          }
-        />
-        <Route
-          path="b2b/members"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des membres B2B..." />}>
-              <AdminB2BMembers />
-            </Suspense>
-          }
-        />
-        <Route
-          path="b2b/pricing"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des tarifs B2B..." />}>
-              <AdminB2BPricing />
-            </Suspense>
-          }
-        />
-        <Route
-          path="b2b/billing"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la facturation B2B..." />}>
-              <AdminB2BBilling />
-            </Suspense>
-          }
-        />
-        <Route
-          path="b2b/invoices"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des factures B2B..." />}>
-              <AdminB2BInvoices />
-            </Suspense>
-          }
-        />
-        <Route
-          path="b2b/reports"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des rapports B2B..." />}>
-              <AdminB2BReports />
-            </Suspense>
-          }
-        />
+      {/* 🏢 B2B */}
+      <Route
+        path="b2b/accounts"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des comptes B2B..." />}>
+            <AdminB2BAccounts />
+          </Suspense>
+        }
+      />
+      <Route
+        path="b2b/members"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des membres B2B..." />}>
+            <AdminB2BMembers />
+          </Suspense>
+        }
+      />
+      <Route
+        path="b2b/pricing"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des tarifs B2B..." />}>
+            <AdminB2BPricing />
+          </Suspense>
+        }
+      />
+      <Route
+        path="b2b/billing"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement de la facturation B2B..." />}>
+            <AdminB2BBilling />
+          </Suspense>
+        }
+      />
+      <Route
+        path="b2b/invoices"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des factures B2B..." />}>
+            <AdminB2BInvoices />
+          </Suspense>
+        }
+      />
+      <Route
+        path="b2b/reports"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des rapports B2B..." />}>
+            <AdminB2BReports />
+          </Suspense>
+        }
+      />
 
-        {/* ===== ⚙️ CONFIGURATION & OUTILS ===== */}
-        <Route
-          path="pricing"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des tarifs..." />}>
-              <AdminPricing />
-            </Suspense>
-          }
-        />
-        <Route
-          path="countries"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des pays..." />}>
-              <AdminCountries />
-            </Suspense>
-          }
-        />
-        <Route
-          path="documents"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des documents légaux..." />}>
-              <AdminLegalDocuments />
-            </Suspense>
-          }
-        />
-        <Route
-          path="backups"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des sauvegardes..." />}>
-              <AdminBackups />
-            </Suspense>
-          }
-        />
-        <Route
-          path="settings"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des paramètres..." />}>
-              <AdminSettings />
-            </Suspense>
-          }
-        />
+      {/* ⚙️ CONFIG & OUTILS */}
+      <Route
+        path="pricing"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des tarifs..." />}>
+            <AdminPricing />
+          </Suspense>
+        }
+      />
+      <Route
+        path="countries"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des pays..." />}>
+            <AdminCountries />
+          </Suspense>
+        }
+      />
+      <Route
+        path="documents"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des documents légaux..." />}>
+            <AdminLegalDocuments />
+          </Suspense>
+        }
+      />
+      <Route
+        path="backups"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des sauvegardes..." />}>
+            <AdminBackups />
+          </Suspense>
+        }
+      />
+      <Route
+        path="settings"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des paramètres..." />}>
+            <AdminSettings />
+          </Suspense>
+        }
+      />
 
-        {/* ===== 📊 RAPPORTS & ANALYTICS ===== */}
-        <Route
-          path="reports/financial"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des rapports financiers..." />}>
-              <AdminFinancialReports />
-            </Suspense>
-          }
-        />
-        <Route
-          path="reports/users"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des analytics utilisateurs..." />}>
-              <AdminUserAnalytics />
-            </Suspense>
-          }
-        />
-        <Route
-          path="reports/performance"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des performances..." />}>
-              <AdminPlatformPerformance />
-            </Suspense>
-          }
-        />
-        <Route
-          path="reports/exports"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
-              <AdminDataExports />
-            </Suspense>
-          }
-        />
+      {/* 📊 RAPPORTS & ANALYTICS */}
+      <Route
+        path="reports/financial"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des rapports financiers..." />}>
+            <AdminFinancialReports />
+          </Suspense>
+        }
+      />
+      <Route
+        path="reports/users"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des analytics utilisateurs..." />}>
+            <AdminUserAnalytics />
+          </Suspense>
+        }
+      />
+      <Route
+        path="reports/performance"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des performances..." />}>
+            <AdminPlatformPerformance />
+          </Suspense>
+        }
+      />
+      <Route
+        path="reports/exports"
+        element={
+          <Suspense fallback={<LoadingSpinner message="Chargement des exports..." />}>
+            <AdminDataExports />
+          </Suspense>
+        }
+      />
 
-        {/* ===== ROUTES HISTORIQUES / LEGACY (relatives) ===== */}
-        <Route path="users" element={<Navigate to="users/clients" replace />} />
-        <Route path="providers" element={<Navigate to="users/providers/lawyers" replace />} />
-        <Route path="payments" element={<Navigate to="finance/payments" replace />} />
-        <Route path="invoices" element={<Navigate to="finance/invoices" replace />} />
-        <Route path="notifications" element={<Navigate to="comms/notifications" replace />} />
-        <Route path="messages" element={<Navigate to="comms/messages" replace />} />
+      {/* Routes historiques / alias */}
+      <Route path="users" element={<Navigate to="users/clients" replace />} />
+      <Route path="providers" element={<Navigate to="users/providers/lawyers" replace />} />
+      <Route path="payments" element={<Navigate to="finance/payments" replace />} />
+      <Route path="invoices" element={<Navigate to="finance/invoices" replace />} />
+      <Route path="notifications" element={<Navigate to="comms/notifications" replace />} />
+      <Route path="messages" element={<Navigate to="comms/messages" replace />} />
+      <Route path="dashboard/global" element={<Navigate to="../dashboard" replace />} />
+      <Route path="dashboard/alerts" element={<Navigate to="../reports/performance" replace />} />
+      <Route path="dashboard/reports" element={<Navigate to="../reports/financial" replace />} />
+      <Route path="finance" element={<Navigate to="finance/payments" replace />} />
+      <Route path="users/all" element={<Navigate to="users/clients" replace />} />
+      <Route path="comms" element={<Navigate to="comms/campaigns" replace />} />
 
-        {/* ===== ROUTES SUPPLÉMENTAIRES ===== */}
-        <Route
-          path="promo-codes"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des codes promo..." />}>
-              <AdminPromoCodes />
-            </Suspense>
-          }
-        />
-        <Route
-          path="documents-old"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des documents..." />}>
-              <AdminDocuments />
-            </Suspense>
-          }
-        />
-        <Route
-          path="contact-messages"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement des messages de contact..." />}>
-              <AdminContactMessages />
-            </Suspense>
-          }
-        />
-        <Route
-          path="emails"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Chargement de la gestion des emails..." />}>
-              <AdminEmails />
-            </Suspense>
-          }
-        />
-
-        {/* ===== ROUTES ALIAS (relatives) ===== */}
-        <Route path="dashboard/global" element={<Navigate to="../dashboard" replace />} />
-        <Route path="dashboard/alerts" element={<Navigate to="../reports/performance" replace />} />
-        <Route path="dashboard/reports" element={<Navigate to="../reports/financial" replace />} />
-        <Route path="finance" element={<Navigate to="finance/payments" replace />} />
-        <Route path="users/all" element={<Navigate to="users/clients" replace />} />
-        <Route path="comms" element={<Navigate to="comms/campaigns" replace />} />
-
-        {/* ===== CATCH-ALL : vraie 404 admin (ou remets un redirect si tu préfères) ===== */}
-        <Route path="*" element={<AdminNotFound />} />
-      </Route>
+      {/* 404 admin */}
+      <Route path="*" element={<AdminNotFound />} />
     </Routes>
   );
 };

@@ -1,7 +1,17 @@
-import React, { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
-import type { ErrorInfo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Shield, LogOut, Menu, X, Home, AlertTriangle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import { Link, useNavigate, Outlet, useOutlet } from 'react-router-dom';
+import {
+  Shield,
+  LogOut,
+  Menu,
+  X,
+  Home,
+  AlertTriangle,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
 import { adminMenuTree } from '../../config/adminMenu';
 import SidebarItem from './sidebar/SidebarItem';
@@ -21,11 +31,12 @@ interface AdminUser {
 }
 
 interface AdminLayoutProps {
-  children: ReactNode;
+  children?: ReactNode; // <- important pour le mode "chaque page wrappe"
 }
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
+  const outlet = useOutlet(); // <- défini si le layout est monté via <Route element=...>
   const { user, logout } = useAuth() as { user: AdminUser | null; logout: () => Promise<void> };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -34,23 +45,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [updateSuccess, setUpdateSuccess] = useState<boolean | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Détection mobile/desktop avec JavaScript - PAS CSS !
+  // Détection mobile/desktop
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Sauvegarder la préférence de largeur de sidebar dans localStorage
+  // Préférence de sidebar
   useEffect(() => {
     const saved = localStorage.getItem('admin-sidebar-open');
-    if (saved !== null) {
-      setIsSidebarOpen(JSON.parse(saved));
-    }
+    if (saved !== null) setIsSidebarOpen(JSON.parse(saved));
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -102,7 +108,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const toggleSidebar = useCallback(() => {
     const newState = !isSidebarOpen;
     setIsSidebarOpen(newState);
-    // Sauvegarder la préférence
     localStorage.setItem('admin-sidebar-open', JSON.stringify(newState));
   }, [isSidebarOpen]);
 
@@ -162,7 +167,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       }}
     >
       <div className="h-screen flex overflow-hidden bg-gray-100">
-        
         {/* MOBILE SIDEBAR */}
         {isMobile && isMobileSidebarOpen && (
           <div className="fixed inset-0 flex z-40">
@@ -199,10 +203,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       disabled={isUpdatingProfiles}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      <RefreshCw
-                        size={16}
-                        className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
-                      />
+                      <RefreshCw size={16} className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`} />
                       Mettre à jour les profils
                     </Button>
 
@@ -213,9 +214,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         }`}
                         role="alert"
                       >
-                        {updateSuccess
-                          ? 'Profils mis à jour avec succès'
-                          : 'Erreur lors de la mise à jour des profils'}
+                        {updateSuccess ? 'Profils mis à jour avec succès' : 'Erreur lors de la mise à jour des profils'}
                       </div>
                     )}
                   </div>
@@ -252,11 +251,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 aria-label={isSidebarOpen ? 'Réduire la sidebar' : 'Étendre la sidebar'}
                 title={isSidebarOpen ? 'Réduire la sidebar' : 'Étendre la sidebar'}
               >
-                {isSidebarOpen ? (
-                  <ChevronLeft className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
+                {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
 
               <div className="flex flex-col h-0 flex-1 bg-gray-900">
@@ -283,10 +278,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                           disabled={isUpdatingProfiles}
                           className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm"
                         >
-                          <RefreshCw
-                            size={14}
-                            className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`}
-                          />
+                          <RefreshCw size={14} className={`mr-2 ${isUpdatingProfiles ? 'animate-spin' : ''}`} />
                           Mettre à jour les profils
                         </Button>
 
@@ -297,9 +289,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             }`}
                             role="alert"
                           >
-                            {updateSuccess
-                              ? 'Profils mis à jour avec succès'
-                              : 'Erreur lors de la mise à jour des profils'}
+                            {updateSuccess ? 'Profils mis à jour avec succès' : 'Erreur lors de la mise à jour des profils'}
                           </div>
                         )}
                       </div>
@@ -338,11 +328,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             )}
             <div className="flex-1 px-4 flex justify-between items-center">
               <nav className="flex items-center text-sm">
-                <Link
-                  to="/"
-                  className="text-gray-500 hover:text-gray-700 p-1 -m-1 rounded-md"
-                  aria-label="Retour à l'accueil"
-                >
+                <Link to="/" className="text-gray-500 hover:text-gray-700 p-1 -m-1 rounded-md" aria-label="Retour à l'accueil">
                   <Home className="h-5 w-5" />
                 </Link>
                 <span className="mx-2 text-gray-400">/</span>
@@ -360,7 +346,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </header>
 
           <main className="flex-1 relative overflow-y-auto focus:outline-none" role="main">
-            {children}
+            {/* Outlet si monté par le routeur, sinon les children passés par la page */}
+            {outlet ?? children}
           </main>
         </div>
       </div>

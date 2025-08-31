@@ -20,7 +20,7 @@ import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { validateCoupon } from '../utils/coupon';
-import { usePricingConfig, detectUserCurrency } from '../services/pricingService';
+import { usePricingConfig, detectUserCurrency, getEffectivePrice } from '../services/pricingService';
 
 interface PromoCode {
   id: string;
@@ -55,6 +55,7 @@ interface DynamicService {
   isActive: boolean;
   connectionFee: number;
   providerAmount: number;
+  effectivePrice?: any; // Pour stocker les infos getEffectivePrice
 }
 
 const PROMO_STORAGE_KEY = 'activePromoCode';
@@ -267,44 +268,57 @@ const Pricing: React.FC = () => {
     [language]
   );
 
-  // 🔥 SERVICES DYNAMIQUES depuis admin config
+  // 🔥 Calcul prix effectifs avec override
+  const effectivePrices = useMemo(() => {
+    if (!pricing) return { lawyer: null, expat: null };
+    
+    return {
+      lawyer: getEffectivePrice(pricing as any, 'lawyer', selectedCurrency),
+      expat: getEffectivePrice(pricing as any, 'expat', selectedCurrency)
+    };
+  }, [pricing, selectedCurrency]);
+
+  // 🔥 SERVICES DYNAMIQUES depuis admin config avec prix effectifs
   const dynamicServices = useMemo<DynamicService[]>(() => {
-    if (!pricing) return [];
+    if (!pricing || !effectivePrices.lawyer || !effectivePrices.expat) return [];
+    
     return [
       {
         id: 'expat_call',
         type: 'expat_call',
         title: currentText.expatTitle,
-        price: pricing.expat[selectedCurrency].totalAmount,
-        duration: pricing.expat[selectedCurrency].duration,
+        price: effectivePrices.expat.price.totalAmount,
+        duration: effectivePrices.expat.price.duration,
         currency: selectedCurrency,
         description:
           language === 'fr'
             ? "Obtenez des conseils pratiques d'un expatrié expérimenté dans votre pays de destination."
             : 'Get practical advice from an experienced expat in your destination country.',
         isActive: true,
-        connectionFee: pricing.expat[selectedCurrency].connectionFeeAmount,
-        providerAmount: pricing.expat[selectedCurrency].providerAmount
+        connectionFee: effectivePrices.expat.price.connectionFeeAmount,
+        providerAmount: effectivePrices.expat.price.providerAmount,
+        effectivePrice: effectivePrices.expat
       },
       {
         id: 'lawyer_call',
         type: 'lawyer_call',
         title: currentText.lawyerTitle,
-        price: pricing.lawyer[selectedCurrency].totalAmount,
-        duration: pricing.lawyer[selectedCurrency].duration,
+        price: effectivePrices.lawyer.price.totalAmount,
+        duration: effectivePrices.lawyer.price.duration,
         currency: selectedCurrency,
         description:
           language === 'fr'
             ? "Consultez un avocat qualifié pour toutes vos questions juridiques liées à l'expatriation."
             : 'Consult a qualified lawyer for all your legal questions related to expatriation.',
         isActive: true,
-        connectionFee: pricing.lawyer[selectedCurrency].connectionFeeAmount,
-        providerAmount: pricing.lawyer[selectedCurrency].providerAmount
+        connectionFee: effectivePrices.lawyer.price.connectionFeeAmount,
+        providerAmount: effectivePrices.lawyer.price.providerAmount,
+        effectivePrice: effectivePrices.lawyer
       }
     ];
-  }, [pricing, selectedCurrency, currentText, language]);
+  }, [pricing, effectivePrices, selectedCurrency, currentText, language]);
 
-  // Remplacer calculateDiscountedPrice
+  // Remplacer calculateDiscountedPrice pour gérer les prix effectifs + promo
   const calculateDiscountedPrice = useCallback(
     (service: DynamicService): number => {
       if (!activePromo || !activePromo.services.includes(service.type)) {
@@ -519,7 +533,8 @@ const Pricing: React.FC = () => {
                     const isLawyer = service.type === 'lawyer_call';
                     const originalPrice = service.price;
                     const discountedPrice = calculateDiscountedPrice(service);
-                    const hasDiscount = !!activePromo && activePromo.services.includes(service.type);
+                    const hasPromoDiscount = !!activePromo && activePromo.services.includes(service.type);
+                    const hasOverride = service.effectivePrice?.override;
 
                     return (
                       <article
@@ -557,25 +572,55 @@ const Pricing: React.FC = () => {
                           {/* Description */}
                           <p className="text-gray-700 mb-8 leading-relaxed text-lg">{service.description}</p>
 
-                          {/* 🔥 PRIX DYNAMIQUE */}
+                          {/* 🔥 PRIX DYNAMIQUE AVEC OVERRIDE + PROMO */}
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-8">
                             <div className="flex items-end gap-3">
-                              {hasDiscount ? (
-                                <div className="flex items-end gap-3">
-                                  <span className="text-gray-500 line-through text-2xl">
-                                    {currencySymbol}
-                                    {originalPrice}
-                                  </span>
-                                  <span className="text-5xl font-black text-red-600 leading-none">
-                                    {currencySymbol}
-                                    {Math.round(discountedPrice)}
-                                  </span>
+                              {/* Cas 1: Override présent (prix admin réduit) */}
+                              {hasOverride ? (
+                                <div className="flex flex-col">
+                                  <div className="flex items-end gap-3">
+                                    <span className="text-gray-500 line-through text-2xl">
+                                      {currencySymbol}
+                                      {service.effectivePrice.standard.totalAmount}
+                                    </span>
+                                    <span className="text-5xl font-black text-red-600 leading-none">
+                                      {currencySymbol}
+                                      {Math.round(hasPromoDiscount ? discountedPrice : originalPrice)}
+                                    </span>
+                                  </div>
+                                  {service.effectivePrice.override.label && (
+                                    <span className="mt-2 text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 self-start">
+                                      {service.effectivePrice.override.label}
+                                    </span>
+                                  )}
+                                  {/* Si promo EN PLUS de l'override */}
+                                  {hasPromoDiscount && (
+                                    <span className="mt-1 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 self-start">
+                                      + Code promo appliqué
+                                    </span>
+                                  )}
                                 </div>
                               ) : (
-                                <span className="text-5xl font-black text-gray-900 leading-none">
-                                  {currencySymbol}
-                                  {originalPrice}
-                                </span>
+                                /* Cas 2: Pas d'override, logique promo classique */
+                                <div className="flex items-end gap-3">
+                                  {hasPromoDiscount ? (
+                                    <>
+                                      <span className="text-gray-500 line-through text-2xl">
+                                        {currencySymbol}
+                                        {originalPrice}
+                                      </span>
+                                      <span className="text-5xl font-black text-red-600 leading-none">
+                                        {currencySymbol}
+                                        {Math.round(discountedPrice)}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-5xl font-black text-gray-900 leading-none">
+                                      {currencySymbol}
+                                      {originalPrice}
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                             <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-900 text-white font-semibold">

@@ -45,8 +45,8 @@ import SEOHead from '../components/layout/SEOHead';
 import { Review } from '../types';
 import { formatLanguages } from '@/i18n';
 
-// 👉 Updated imports for pricing with override support
-import { usePricingConfig, getEffectivePrice } from '../services/pricingService';
+// 👉 Pricing admin (source de vérité)
+import { usePricingConfig } from '../services/pricingService';
 
 /* ===================================================================== */
 
@@ -189,7 +189,7 @@ interface SosProfile {
   experienceDescription?: string | LocalizedText; motivation?: string | LocalizedText; bio?: string | LocalizedText;
   profilePhoto?: string; photoURL?: string; avatar?: string; rating: number; reviewCount: number; yearsOfExperience: number; yearsAsExpat?: number;
   isOnline?: boolean; isActive: boolean; isApproved: boolean; isVerified: boolean; isVisibleOnMap?: boolean;
-  currency?: 'eur' | 'usd'; // Added currency field
+  // ❌ Supprimé: price?: number; duration?: number; (plus d'override provider)
   education?: Education | Education[] | LocalizedText; certifications?: Certification | Certification[] | LocalizedText;
   lawSchool?: string | LocalizedText; graduationYear?: number; responseTime?: string; successRate?: number; totalCalls?: number; successfulCalls?: number;
   totalResponses?: number; totalResponseTime?: number; avgResponseTimeMs?: number; createdAt?: TSLike; updatedAt?: TSLike; lastSeen?: TSLike;
@@ -246,6 +246,27 @@ const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
   return fmt.format(d);
 };
 
+/* ======= Helpers prix avec Intl.NumberFormat ======= */
+const formatEUR = (value?: number) => {
+  if (typeof value !== 'number') return '—';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
+const formatUSD = (value?: number) => {
+  if (typeof value !== 'number') return '$—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
 // Component
 const ProviderProfile: React.FC = () => {
   const params = useParams<RouteParams>();
@@ -264,8 +285,8 @@ const ProviderProfile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // 👉 Updated pricing logic with override support
-  const pricing = usePricingConfig(); // Real-time pricing config using onSnapshot
+  // 👉 Pricing admin (page AdminPricing -> doc "admin_config/pricing")
+  const { pricing } = usePricingConfig();
 
   // Reviews
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -276,15 +297,17 @@ const ProviderProfile: React.FC = () => {
   // Online status
   const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({ isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0 });
 
-  // ======= Effective pricing calculation with override support =======
-  const serviceType: 'lawyer' | 'expat' = provider?.type === 'lawyer' ? 'lawyer' : 'expat';
-  const currency: 'eur' | 'usd' = provider?.currency ?? 'eur';
-  const currencySymbol = currency === 'eur' ? '€' : '$';
-
-  const effectivePrice = useMemo(
-    () => (pricing ? getEffectivePrice(pricing, serviceType, currency) : null),
-    [pricing, serviceType, currency]
-  );
+  // ======= Prix depuis Admin uniquement (EUR principal + équivalent USD) =======
+  const serviceTypeForPricing: 'lawyer' | 'expat' | undefined = provider?.type;
+  const bookingPrice = useMemo(() => {
+    if (!pricing || !serviceTypeForPricing) return null;
+    const cfg = pricing[serviceTypeForPricing];
+    return {
+      eur: cfg.eur.totalAmount,
+      usd: cfg.usd.totalAmount,
+      duration: cfg.eur.duration, // durée admin
+    };
+  }, [pricing, serviceTypeForPricing]);
 
   // Reviews loader
   const realLoadReviews = useCallback(async (providerId: string): Promise<Review[]> => {
@@ -345,7 +368,6 @@ const ProviderProfile: React.FC = () => {
               id: snap.id,
               uid: normalized.uid || snap.id,
               type: (data?.type as 'lawyer' | 'expat') || 'expat',
-              currency: (data?.currency as 'eur' | 'usd') || 'eur', // Include currency
             } as SosProfile;
 
             built.description = pickDescription(built, preferredLangKey);
@@ -374,7 +396,6 @@ const ProviderProfile: React.FC = () => {
                 id: found.id,
                 uid: normalized.uid || found.id,
                 type: (data?.type as 'lawyer' | 'expat') || 'expat',
-                currency: (data?.currency as 'eur' | 'usd') || 'eur',
               } as SosProfile;
 
               built.description = pickDescription(built, preferredLangKey);
@@ -412,7 +433,6 @@ const ProviderProfile: React.FC = () => {
                   id: match.id,
                   uid: normalized.uid || match.id,
                   type: (data?.type as 'lawyer' | 'expat') || 'expat',
-                  currency: (data?.currency as 'eur' | 'usd') || 'eur',
                 } as SosProfile;
 
                 built.description = pickDescription(built, preferredLangKey);
@@ -443,7 +463,6 @@ const ProviderProfile: React.FC = () => {
                 id: m.id,
                 uid: normalized.uid || m.id,
                 type: (data?.type as 'lawyer' | 'expat') || 'expat',
-                currency: (data?.currency as 'eur' | 'usd') || 'eur',
               } as SosProfile;
 
               built.description = pickDescription(built, preferredLangKey);
@@ -487,7 +506,7 @@ const ProviderProfile: React.FC = () => {
               reviewCount: Number(navData.reviewCount) || 0,
               yearsOfExperience: Number(navData.yearsOfExperience) || 0,
               yearsAsExpat: Number(navData.yearsAsExpat) || 0,
-              currency: 'eur', // Default for state fallback
+              // ❌ Plus de prix/durée override provider — uniquement admin
               isOnline: !!navData.isOnline,
               isActive: true,
               isApproved: !!navData.isApproved,
@@ -940,7 +959,7 @@ const ProviderProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* ✅ Updated Booking card - Pricing with override support */}
+              {/* ✅ Booking card - Prix uniquement depuis Admin (EUR principal + équivalent USD) */}
               <aside className="lg:col-span-1">
                 <div className="group relative bg-white rounded-3xl shadow-2xl p-6 border border-gray-200 transition-all hover:scale-[1.01]">
                   <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-red-500/5 to-orange-500/5 group-hover:from-red-500/10 group-hover:to-orange-500/10 transition-opacity" />
@@ -953,33 +972,22 @@ const ProviderProfile: React.FC = () => {
                         <span>Appel en ~5 min</span>
                       </div>
 
-                      {/* ✅ Updated pricing display with override support */}
-                      <div className="mt-4">
-                        {effectivePrice?.override ? (
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="line-through text-gray-500 text-xl">
-                                {currencySymbol}{effectivePrice.standard.totalAmount.toFixed(2)}
-                              </span>
-                              <span className="text-3xl sm:text-4xl font-black text-gray-900">
-                                {currencySymbol}{effectivePrice.price.totalAmount.toFixed(2)}
-                              </span>
-                            </div>
-                            {effectivePrice.override.label && (
-                              <span className="text-xs px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold border border-red-200">
-                                {effectivePrice.override.label}
-                              </span>
-                            )}
-                          </div>
+                      {/* ✅ Prix uniquement depuis admin_config/pricing */}
+                      <div className="mt-4 text-3xl sm:text-4xl font-black text-gray-900">
+                        {bookingPrice ? (
+                          <>
+                            <span className="bg-clip-text">
+                              {formatEUR(bookingPrice.eur)}
+                            </span>{' '}
+                            <span className="text-gray-600">({formatUSD(bookingPrice.usd)})</span>
+                          </>
                         ) : (
-                          <div className="text-3xl sm:text-4xl font-black text-gray-900">
-                            {currencySymbol}{(effectivePrice?.price.totalAmount ?? 0).toFixed(2)}
-                          </div>
+                          '—'
                         )}
-                        
-                        <div className="text-gray-600 mt-2">
-                          {effectivePrice?.price.duration ? `${effectivePrice.price.duration} ${t('minutes')}` : '—'}
-                        </div>
+                      </div>
+
+                      <div className="text-gray-600">
+                        {bookingPrice?.duration ? `${bookingPrice.duration} ${t('minutes')}` : '—'}
                       </div>
                     </div>
 

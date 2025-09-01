@@ -52,7 +52,7 @@ service cloud.firestore {
     match /users/{userId} {
       // Lecture uniquement par soi-même (ou admin/dev)
       allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin() || isDev();
-      allow create: if (isAuthenticated() && request.auth.uid == userId && creatingOwnDoc()) || isAdmin() || isDev();
+      allow create: if (isAuthenticated() && request.auth.uid == userId) || isAdmin() || isDev();
       allow update: if (
         isAuthenticated() && request.auth.uid == userId && (emailSelfSynced() || presenceKeysOnly() || !hasSensitiveChanges())
       ) || isAdmin() || isDev();
@@ -61,14 +61,26 @@ service cloud.firestore {
 
     // ====================== SOS_PROFILES ======================
     match /sos_profiles/{profileId} {
-      // OPTION SÛRE (recommandée) : décommenter la ligne suivante
-      // allow read: if resource.data.isVisible == true && resource.data.isApproved == true;
-      // OPTION ACTUELLE (permissive) :
-      allow read: if true;
+      // 🔐 Lecture publique autorisée uniquement pour :
+      // - type = 'lawyer' (ET isApproved == true)
+      // - OU type = 'expat'
+      // - ET pas banni / pas admin
+      allow read: if
+        (
+          resource.data.type == 'lawyer' ||
+          resource.data.type == 'expat'
+        ) &&
+        resource.data.isBanned != true &&
+        resource.data.isAdmin != true &&
+        !(resource.data.role == 'admin') &&
+        (
+          (resource.data.type == 'lawyer' && resource.data.isApproved == true) ||
+          (resource.data.type == 'expat')
+        );
+        // 👉 Si tu veux aussi requérir la visibilité, ajoute :
+        // && resource.data.isVisible == true
 
-      allow create: if (isAuthenticated()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.type in ['lawyer','expat']) || isAdmin() || isDev();
+      allow create: if (isAuthenticated() && request.resource.data.type in ['lawyer','expat']) || isAdmin() || isDev();
 
       function sosSensitive() {
         return affectedKeys().hasAny(['uid','role','type','isAdmin','isApproved','isBanned']);

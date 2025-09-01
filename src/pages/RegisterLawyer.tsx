@@ -1,5 +1,13 @@
 // src/pages/RegisterLawyer.tsx
-import React, { useState, useCallback, useMemo, useEffect, lazy, Suspense, useRef } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  lazy,
+  Suspense,
+  useRef,
+} from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Scale, Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Phone,
@@ -11,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
+// Imports PhoneField et useForm supprimés pour éviter les erreurs
 
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
@@ -81,40 +90,11 @@ const SPECIALTIES: Duo[] = [
   { fr: 'Autre', en: 'Other' },
 ];
 
-// Country codes (names FR/EN)
-const COUNTRY_CODES = [
-  { code: '+33', flag: '🇫🇷', fr: 'France', en: 'France' },
-  { code: '+1', flag: '🇺🇸', fr: 'USA/Canada', en: 'USA/Canada' },
-  { code: '+44', flag: '🇬🇧', fr: 'Royaume-Uni', en: 'United Kingdom' },
-  { code: '+49', flag: '🇩🇪', fr: 'Allemagne', en: 'Germany' },
-  { code: '+34', flag: '🇪🇸', fr: 'Espagne', en: 'Spain' },
-  { code: '+39', flag: '🇮🇹', fr: 'Italie', en: 'Italy' },
-  { code: '+32', flag: '🇧🇪', fr: 'Belgique', en: 'Belgium' },
-  { code: '+41', flag: '🇨🇭', fr: 'Suisse', en: 'Switzerland' },
-  { code: '+352', flag: '🇱🇺', fr: 'Luxembourg', en: 'Luxembourg' },
-  { code: '+31', flag: '🇳🇱', fr: 'Pays-Bas', en: 'Netherlands' },
-  { code: '+351', flag: '🇵🇹', fr: 'Portugal', en: 'Portugal' },
-  { code: '+30', flag: '🇬🇷', fr: 'Grèce', en: 'Greece' },
-  { code: '+66', flag: '🇹🇭', fr: 'Thaïlande', en: 'Thailand' },
-  { code: '+61', flag: '🇦🇺', fr: 'Australie', en: 'Australia' },
-  { code: '+64', flag: '🇳🇿', fr: 'Nouvelle-Zélande', en: 'New Zealand' },
-  { code: '+81', flag: '🇯🇵', fr: 'Japon', en: 'Japan' },
-  { code: '+82', flag: '🇰🇷', fr: 'Corée du Sud', en: 'South Korea' },
-  { code: '+65', flag: '🇸🇬', fr: 'Singapour', en: 'Singapore' },
-  { code: '+212', flag: '🇲🇦', fr: 'Maroc', en: 'Morocco' },
-  { code: '+216', flag: '🇹🇳', fr: 'Tunisia', en: 'Tunisia' },
-  { code: '+213', flag: '🇩🇿', fr: 'Algérie', en: 'Algeria' },
-  { code: '+971', flag: '🇦🇪', fr: 'Émirats', en: 'UAE' },
-  { code: '+55', flag: '🇧🇷', fr: 'Brésil', en: 'Brazil' },
-  { code: '+52', flag: '🇲🇽', fr: 'Mexique', en: 'Mexico' },
-  { code: '+7', flag: '🇷🇺', fr: 'Russie', en: 'Russia' },
-] as const;
-
 // ===== Types =====
 interface LawyerFormData {
   firstName: string; lastName: string; email: string; password: string;
-  phone: string; phoneCountryCode: string;
-  whatsappCountryCode: string; whatsappNumber: string;
+  phone: string; // E.164 géré par PhoneField
+  whatsapp: string; // E.164 géré par PhoneField
   currentCountry: string; currentPresenceCountry: string; customCountry: string;
   preferredLanguage: 'fr' | 'en';
   practiceCountries: string[]; customPracticeCountry: string;
@@ -126,32 +106,80 @@ interface LawyerFormData {
 }
 interface LanguageOption { value: string; label: string }
 
-// ===== i18n (fun) =====
-const I18N = {
+// ===== i18n (typed) =====
+type I18nKey = 'fr' | 'en';
+type I18nShape = {
+  metaTitle: string; metaDesc: string;
+  heroTitle: string; heroSubtitle: string;
+  already: string; login: string;
+  personalInfo: string; geoInfo: string; proInfo: string;
+  acceptTerms: string; termsLink: string;
+  create: string; loading: string;
+  firstName: string; lastName: string; email: string; password: string;
+  phone: string; whatsapp: string;
+  countryCode: string;
+  residenceCountry: string; presenceCountry: string;
+  yoe: string; gradYear: string;
+  bio: string; profilePhoto: string;
+  specialties: string; practiceCountries: string;
+  languages: string;
+  formations: string; addFormation: string;
+  addPractice: string; addSpecialty: string;
+  specifyCountry: string; specifyPractice: string; specifySpecialty: string;
+  help: { minPassword: string; emailPlaceholder: string; firstNamePlaceholder: string; bioHint: string; };
+  errors: {
+    title: string; firstNameRequired: string; lastNameRequired: string;
+    emailRequired: string; emailInvalid: string; emailTaken: string;
+    passwordTooShort: string; phoneRequired: string; whatsappRequired: string;
+    needCountry: string; needPresence: string; needPractice: string; needLang: string;
+    needSpec: string; needBio: string; needPhoto: string; needEducation: string;
+    acceptTermsRequired: string;
+  };
+  success: { fieldValid: string; emailValid: string; pwdOk: string; allGood: string; };
+  secureNote: string; footerTitle: string; footerText: string;
+  langPlaceholder: string; previewTitle: string; previewToggleOpen: string; previewToggleClose: string;
+};
+
+const I18N: Record<I18nKey, I18nShape> = {
   fr: {
     metaTitle: 'Inscription Avocat • SOS Expats',
     metaDesc: 'Rejoignez le réseau SOS Expats : des clients partout, des dossiers malins, et vous aux commandes 🚀.',
     heroTitle: 'Inscription Avocat',
-    heroSubtitle: 'Partagez votre expertise avec des expats du monde entier. On s’occupe du reste 😉',
-    already: 'Déjà inscrit ?', login: 'Se connecter',
+    heroSubtitle: 'Partagez votre expertise avec des expats du monde entier. On s\'occupe du reste 😉',
+    already: 'Déjà inscrit ?', 
+    login: 'Se connecter',
     personalInfo: 'Informations personnelles',
     geoInfo: 'Où vous opérez',
     proInfo: 'Votre pratique',
-    acceptTerms: 'J’accepte les', termsLink: 'CGU Avocats',
-    create: 'Créer mon compte avocat', loading: 'On prépare tout pour vous… ⏳',
-    firstName: 'Prénom', lastName: 'Nom', email: 'Adresse email', password: 'Mot de passe',
-    phone: 'Téléphone', whatsapp: 'Numéro WhatsApp',
+    acceptTerms: 'J\'accepte les', 
+    termsLink: 'CGU Avocats',
+    create: 'Créer mon compte avocat', 
+    loading: 'On prépare tout pour vous… ⏳',
+    firstName: 'Prénom', 
+    lastName: 'Nom', 
+    email: 'Adresse email', 
+    password: 'Mot de passe',
+    phone: 'Téléphone', 
+    whatsapp: 'Numéro WhatsApp',
     countryCode: 'Indicatif pays',
-    residenceCountry: 'Pays de résidence', presenceCountry: 'Pays où vous êtes en ce moment',
-    yoe: 'Années d’expérience', gradYear: 'Année de diplôme',
-    bio: 'Description professionnelle', profilePhoto: 'Photo de profil',
-    specialties: 'Spécialités', practiceCountries: 'Pays d’intervention',
+    residenceCountry: 'Pays de résidence', 
+    presenceCountry: 'Pays où vous êtes en ce moment',
+    yoe: 'Années d\'expérience', 
+    gradYear: 'Année de diplôme',
+    bio: 'Description professionnelle', 
+    profilePhoto: 'Photo de profil',
+    specialties: 'Spécialités', 
+    practiceCountries: 'Pays d\'intervention',
     languages: 'Langues parlées',
-    formations: 'Formations', addFormation: 'Ajouter une formation',
-    addPractice: 'Ajouter un pays d’intervention', addSpecialty: 'Ajouter une spécialité',
-    specifyCountry: 'Précisez votre pays', specifyPractice: 'Précisez le pays', specifySpecialty: 'Précisez la spécialité',
+    formations: 'Formations', 
+    addFormation: 'Ajouter une formation',
+    addPractice: 'Ajouter un pays d\'intervention', 
+    addSpecialty: 'Ajouter une spécialité',
+    specifyCountry: 'Précisez votre pays', 
+    specifyPractice: 'Précisez le pays', 
+    specifySpecialty: 'Précisez la spécialité',
     help: {
-      minPassword: '6 caractères et c’est parti (aucune contrainte) 💃',
+      minPassword: '6 caractères et c\'est parti (aucune contrainte) 💃',
       emailPlaceholder: 'votre@email.com',
       firstNamePlaceholder: 'Comment on vous appelle ? 😊',
       bioHint: 'Racontez en 2–3 phrases comment vous aidez les expats (50 caractères mini).',
@@ -161,18 +189,18 @@ const I18N = {
       firstNameRequired: 'On veut bien vous appeler… mais comment ? 😄',
       lastNameRequired: 'Un petit nom de famille pour faire pro ? 👔',
       emailRequired: 'On a besoin de votre email pour vous tenir au courant 📬',
-      emailInvalid: 'Cette adresse a l’air louche… Essayez plutôt nom@exemple.com 🧐',
+      emailInvalid: 'Cette adresse a l\'air louche… Essayez plutôt nom@exemple.com 🧐',
       emailTaken: 'Oups, cet email est déjà utilisé. Vous avez peut-être déjà un compte ? 🔑',
       passwordTooShort: 'Juste 6 caractères minimum — easy ! 💪',
       phoneRequired: 'On vous sonne où ? 📞',
       whatsappRequired: 'On papote aussi sur WhatsApp ? 💬',
-      needCountry: 'Votre pays de résidence, s’il vous plaît 🌍',
+      needCountry: 'Votre pays de résidence, s\'il vous plaît 🌍',
       needPresence: 'Où êtes-vous actuellement ? ✈️',
-      needPractice: 'Ajoutez au moins un pays d’intervention 🗺️',
+      needPractice: 'Ajoutez au moins un pays d\'intervention 🗺️',
       needLang: 'Choisissez au moins une langue 🗣️',
       needSpec: 'Une spécialité, et vous brillez ✨',
       needBio: 'Encore un petit effort : 50 caractères minimum 📝',
-      needPhoto: 'Une photo pro, et c’est 100% plus rassurant 📸',
+      needPhoto: 'Une photo pro, et c\'est 100% plus rassurant 📸',
       needEducation: 'Ajoutez au moins une formation 🎓',
       acceptTermsRequired: 'Un petit clic sur les conditions et on y va ✅',
     },
@@ -184,41 +212,58 @@ const I18N = {
     },
     secureNote: 'Données protégées • Validation sous 24h • Support juridique',
     footerTitle: '⚖️ Rejoignez la communauté SOS Expats',
-    footerText: 'Des avocats vérifiés, des clients engagés — let’s go !',
+    footerText: 'Des avocats vérifiés, des clients engagés — let\'s go !',
     langPlaceholder: 'Sélectionnez les langues',
     previewTitle: 'Aperçu live du profil',
-    previewToggleOpen: 'Masquer l’aperçu',
-    previewToggleClose: 'Voir l’aperçu',
+    previewToggleOpen: 'Masquer l\'aperçu',
+    previewToggleClose: 'Voir l\'aperçu',
   },
   en: {
     metaTitle: 'Lawyer Registration • SOS Expats',
-    metaDesc: 'Join SOS Expats: smart clients, smooth cases, and you in the driver’s seat 🚀.',
+    metaDesc: 'Join SOS Expats: smart clients, smooth cases, and you in the driver\'s seat 🚀.',
     heroTitle: 'Lawyer Registration',
     heroSubtitle: 'Share your expertise with expats worldwide. We handle the boring bits 😉',
-    already: 'Already registered?', login: 'Log in',
-    personalInfo: 'Personal info', geoInfo: 'Where you operate', proInfo: 'Your practice',
-    acceptTerms: 'I accept the', termsLink: 'Lawyers T&Cs',
-    create: 'Create my lawyer account', loading: 'Getting things ready for you… ⏳',
-    firstName: 'First Name', lastName: 'Last Name', email: 'Email', password: 'Password',
-    phone: 'Phone', whatsapp: 'WhatsApp Number',
+    already: 'Already registered?', 
+    login: 'Log in',
+    personalInfo: 'Personal info', 
+    geoInfo: 'Where you operate', 
+    proInfo: 'Your practice',
+    acceptTerms: 'I accept the', 
+    termsLink: 'Lawyers T&Cs',
+    create: 'Create my lawyer account', 
+    loading: 'Getting things ready for you… ⏳',
+    firstName: 'First Name', 
+    lastName: 'Last Name', 
+    email: 'Email', 
+    password: 'Password',
+    phone: 'Phone', 
+    whatsapp: 'WhatsApp Number',
     countryCode: 'Country code',
-    residenceCountry: 'Country of residence', presenceCountry: 'Where you are right now',
-    yoe: 'Years of experience', gradYear: 'Graduation year',
-    bio: 'Professional bio', profilePhoto: 'Profile photo',
-    specialties: 'Specialties', practiceCountries: 'Practice countries',
+    residenceCountry: 'Country of residence', 
+    presenceCountry: 'Where you are right now',
+    yoe: 'Years of experience', 
+    gradYear: 'Graduation year',
+    bio: 'Professional bio', 
+    profilePhoto: 'Profile photo',
+    specialties: 'Specialties', 
+    practiceCountries: 'Practice countries',
     languages: 'Spoken languages',
-    formations: 'Education', addFormation: 'Add a formation',
-    addPractice: 'Add a practice country', addSpecialty: 'Add a specialty',
-    specifyCountry: 'Specify your country', specifyPractice: 'Specify the country', specifySpecialty: 'Specify the specialty',
+    formations: 'Education', 
+    addFormation: 'Add a formation',
+    addPractice: 'Add a practice country', 
+    addSpecialty: 'Add a specialty',
+    specifyCountry: 'Specify your country', 
+    specifyPractice: 'Specify the country', 
+    specifySpecialty: 'Specify the specialty',
     help: {
-      minPassword: '6+ characters and you’re good 💃',
+      minPassword: '6+ characters and you\'re good 💃',
       emailPlaceholder: 'you@example.com',
       firstNamePlaceholder: 'How should we call you? 😊',
       bioHint: 'In 2–3 lines, tell expats how you help (min 50 chars).',
     },
     errors: {
       title: 'Tiny tweaks before we launch ✨',
-      firstNameRequired: 'We’d love to address you… what’s your name? 😄',
+      firstNameRequired: 'We\'d love to address you… what\'s your name? 😄',
       lastNameRequired: 'A last name keeps it professional 👔',
       emailRequired: 'We need your email to keep you posted 📬',
       emailInvalid: 'That email looks off. Try name@example.com 🧐',
@@ -234,7 +279,7 @@ const I18N = {
       needBio: 'Push it to 50 characters, you got this 📝',
       needPhoto: 'A professional photo builds trust 📸',
       needEducation: 'Add at least one formation 🎓',
-      acceptTermsRequired: 'Tick the box and we’re rolling ✅',
+      acceptTermsRequired: 'Tick the box and we\'re rolling ✅',
     },
     success: {
       fieldValid: 'Looks great! ✨',
@@ -244,15 +289,15 @@ const I18N = {
     },
     secureNote: 'Data protected • 24h validation • Legal support',
     footerTitle: '⚖️ Join the SOS Expats community',
-    footerText: 'Verified lawyers, great clients — let’s go!',
+    footerText: 'Verified lawyers, great clients — let\'s go!',
     langPlaceholder: 'Select languages',
     previewTitle: 'Live profile preview',
     previewToggleOpen: 'Hide preview',
     previewToggleClose: 'Show preview',
   },
-} as const;
+};
 
-const mapDuo = (list: Duo[], lang: 'fr' | 'en') => list.map((item) => item[lang]);
+const mapDuo = (list: Duo[], lang: I18nKey) => list.map((item) => item[lang]);
 
 /* ========= Mini composants feedback ========= */
 const FieldError = React.memo(({ error, show }: { error?: string; show: boolean }) => {
@@ -293,7 +338,7 @@ const LawyerPreviewCard = ({
   currentCountry, presenceCountry,
   practiceCountries, specialties, languages, whatsapp, yearsOfExperience,
 }: {
-  lang: 'fr' | 'en'; t: typeof I18N['fr']; progress: number; fullName: string; photo?: string;
+  lang: I18nKey; t: I18nShape; progress: number; fullName: string; photo?: string;
   currentCountry?: string; presenceCountry?: string;
   practiceCountries: string[]; specialties: string[]; languages: string[]; whatsapp?: string; yearsOfExperience?: number;
 }) => {
@@ -455,13 +500,14 @@ const RegisterLawyer: React.FC = () => {
     const state = (rawState ?? null) as NavState | null;
     const sp = state?.selectedProvider;
     if (isProviderLike(sp)) {
-      try { sessionStorage.setItem('selectedProvider', JSON.stringify(sp)); } catch {}
+      try { sessionStorage.setItem('selectedProvider', JSON.stringify(sp)); } catch { /* no-op */ }
     }
   }, [location.state]);
 
+  // Hooks simples sans react-hook-form  
   const { register, isLoading, error } = useAuth();
   const { language } = useApp(); // 'fr' | 'en'
-  const lang = (language as 'fr' | 'en') || 'fr';
+  const lang = (language as I18nKey) || 'fr';
   const t = I18N[lang];
 
   // ---- SEO / OG meta ----
@@ -489,8 +535,7 @@ const RegisterLawyer: React.FC = () => {
   // ---- Initial state ----
   const initial: LawyerFormData = {
     firstName: '', lastName: '', email: '', password: '',
-    phone: '', phoneCountryCode: '+33',
-    whatsappCountryCode: '+33', whatsappNumber: '',
+    phone: '', whatsapp: '', // E.164 géré par PhoneField
     currentCountry: '', currentPresenceCountry: '', customCountry: '',
     preferredLanguage: lang,
     practiceCountries: [], customPracticeCountry: '',
@@ -508,8 +553,6 @@ const RegisterLawyer: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCustomCountry, setShowCustomCountry] = useState(false);
-  const [showCustomSpecialty, setShowCustomSpecialty] = useState(false);
 
   // Preview (mobile toggle)
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
@@ -530,21 +573,18 @@ const RegisterLawyer: React.FC = () => {
   // ---- Options (bilingue) ----
   const countryOptions = useMemo(() => mapDuo(COUNTRIES, lang), [lang]);
   const specialtyOptions = useMemo(() => mapDuo(SPECIALTIES, lang), [lang]);
-  const countryCodeOptions = useMemo(
-    () => COUNTRY_CODES.map((c) => ({ value: c.code, label: `${c.flag} ${c.code} (${lang === 'en' ? c.en : c.fr})` })),
-    [lang]
-  );
 
   // ---- Password strength ----
   const pwdStrength = useMemo(() => computePasswordStrength(form.password), [form.password]);
 
-  // ---- Progress (ne vérifie plus la dispo email) ----
+  // ---- Progress ----
   const progress = useMemo(() => {
     const fields = [
       !!form.firstName, !!form.lastName,
       EMAIL_REGEX.test(form.email),
       form.password.length >= 6,
-      !!form.phone, !!form.whatsappNumber,
+      !!form.phone,
+      !!form.whatsapp,
       !!form.currentCountry, !!form.currentPresenceCountry,
       form.bio.trim().length >= 50,
       !!form.profilePhoto,
@@ -578,21 +618,19 @@ const RegisterLawyer: React.FC = () => {
       const { name, value, type, checked } = e.target as HTMLInputElement;
       setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value }));
 
-      // (plus d’appel handleEmailCheck)
-      if (name === 'currentCountry') {
-        const other = lang === 'en' ? 'Other' : 'Autre';
-        setShowCustomCountry(value === other);
-      }
       if (fieldErrors[name]) {
         setFieldErrors((prev) => {
           const rest = { ...prev }; delete rest[name]; return rest;
         });
       }
     },
-    [fieldErrors, lang]
+    [fieldErrors]
   );
 
   // ---- Sélections multi (pays de pratique / spécialités) ----
+  const [showCustomCountry, setShowCustomCountry] = useState(false);
+  const [showCustomSpecialty, setShowCustomSpecialty] = useState(false);
+
   const onPracticeSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const v = e.target.value;
     if (!v) return;
@@ -656,7 +694,7 @@ const RegisterLawyer: React.FC = () => {
     });
   }, []);
 
-  // ---- Validation complète (ne bloque plus sur "email déjà utilisé") ----
+  // ---- Validation complète ----
   const validateAll = useCallback(() => {
     const e: Record<string, string> = {};
     if (!form.firstName.trim()) e.firstName = t.errors.firstNameRequired;
@@ -668,7 +706,8 @@ const RegisterLawyer: React.FC = () => {
     if (!form.password || form.password.length < 6) e.password = t.errors.passwordTooShort;
 
     if (!form.phone.trim()) e.phone = t.errors.phoneRequired;
-    if (!form.whatsappNumber.trim()) e.whatsappNumber = t.errors.whatsappRequired;
+    if (!form.whatsapp.trim()) e.whatsapp = t.errors.whatsappRequired;
+    
     if (!form.currentCountry) e.currentCountry = t.errors.needCountry;
     if (!form.currentPresenceCountry) e.currentPresenceCountry = t.errors.needPresence;
 
@@ -683,11 +722,11 @@ const RegisterLawyer: React.FC = () => {
 
     setFieldErrors(e);
 
-    const order = ['firstName','lastName','email','password','phone','whatsappNumber','currentCountry','currentPresenceCountry','bio'];
+    const order = ['firstName','lastName','email','password','phone','currentCountry','currentPresenceCountry','bio'] as const;
     const firstKey = order.find((k) => e[k]);
-    if (firstKey && fieldRefs[firstKey as keyof typeof fieldRefs]?.current) {
-      fieldRefs[firstKey as keyof typeof fieldRefs]!.current!.focus();
-      window.scrollTo({ top: (fieldRefs[firstKey as keyof typeof fieldRefs]!.current!.getBoundingClientRect().top + window.scrollY - 120), behavior: 'smooth' });
+    if (firstKey && fieldRefs[firstKey]?.current) {
+      fieldRefs[firstKey]!.current!.focus();
+      window.scrollTo({ top: (fieldRefs[firstKey]!.current!.getBoundingClientRect().top + window.scrollY - 120), behavior: 'smooth' });
     }
 
     return Object.keys(e).length === 0;
@@ -696,13 +735,14 @@ const RegisterLawyer: React.FC = () => {
   // ---- Missing checklist (UX clair) ----
   const missing = useMemo(() => {
     const langs = (selectedLanguages as LanguageOption[]).length > 0;
+    
     return [
       { key: 'firstName', ok: !!form.firstName, labelFr: 'Prénom', labelEn: 'First name' },
       { key: 'lastName', ok: !!form.lastName, labelFr: 'Nom', labelEn: 'Last name' },
       { key: 'email', ok: EMAIL_REGEX.test(form.email), labelFr: 'Email valide', labelEn: 'Valid email' },
       { key: 'password', ok: form.password.length >= 6, labelFr: 'Mot de passe (≥ 6 caractères)', labelEn: 'Password (≥ 6 chars)' },
       { key: 'phone', ok: !!form.phone, labelFr: 'Téléphone', labelEn: 'Phone' },
-      { key: 'whatsappNumber', ok: !!form.whatsappNumber, labelFr: 'WhatsApp', labelEn: 'WhatsApp' },
+      { key: 'whatsapp', ok: !!form.whatsapp, labelFr: 'WhatsApp', labelEn: 'WhatsApp' },
       { key: 'currentCountry', ok: !!form.currentCountry, labelFr: 'Pays de résidence', labelEn: 'Residence country' },
       { key: 'currentPresenceCountry', ok: !!form.currentPresenceCountry, labelFr: 'Pays de présence', labelEn: 'Presence country' },
       { key: 'practiceCountries', ok: form.practiceCountries.length > 0, labelFr: "Au moins un pays d'intervention", labelEn: 'At least one practice country' },
@@ -733,7 +773,7 @@ const RegisterLawyer: React.FC = () => {
     ev.preventDefault();
     setTouched((prev) => ({
       ...prev,
-      firstName: true, lastName: true, email: true, password: true, phone: true, whatsappNumber: true,
+      firstName: true, lastName: true, email: true, password: true, phone: true,
       currentCountry: true, currentPresenceCountry: true, bio: true, acceptTerms: true
     }));
     if (isSubmitting) return;
@@ -744,6 +784,7 @@ const RegisterLawyer: React.FC = () => {
     try {
       const languageCodes = (selectedLanguages as LanguageOption[]).map((l) => l.value);
       const other = lang === 'en' ? 'Other' : 'Autre';
+      
       const userData = {
         role: 'lawyer' as const,
         type: 'lawyer' as const,
@@ -752,11 +793,8 @@ const RegisterLawyer: React.FC = () => {
         name: `${form.firstName.trim()} ${form.lastName.trim()}`,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
-        phone: form.phoneCountryCode + form.phone.trim(),
-        whatsapp: form.whatsappCountryCode + form.whatsappNumber.trim(),
-        phoneCountryCode: form.phoneCountryCode,
-        whatsappCountryCode: form.whatsappCountryCode,
-        whatsappNumber: form.whatsappNumber.trim(),
+        phone: form.phone,
+        whatsapp: form.whatsapp,
         currentCountry: form.currentCountry === other ? form.customCountry : form.currentCountry,
         currentPresenceCountry: form.currentPresenceCountry,
         country: form.currentPresenceCountry,
@@ -805,7 +843,7 @@ const RegisterLawyer: React.FC = () => {
       EMAIL_REGEX.test(form.email) &&
       form.password.length >= 6 &&
       !!form.phone &&
-      !!form.whatsappNumber &&
+      !!form.whatsapp &&
       !!form.currentCountry &&
       !!form.currentPresenceCountry &&
       form.bio.trim().length >= 50 &&
@@ -910,7 +948,7 @@ const RegisterLawyer: React.FC = () => {
                 practiceCountries={form.practiceCountries}
                 specialties={form.specialties}
                 languages={(selectedLanguages as LanguageOption[]).map((l) => l.value)}
-                whatsapp={`${form.whatsappCountryCode} ${form.whatsappNumber}`.trim()}
+                whatsapp={form.whatsapp}
                 yearsOfExperience={form.yearsOfExperience}
               />
             </aside>
@@ -964,7 +1002,8 @@ const RegisterLawyer: React.FC = () => {
                         <Mail className={`pointer-events-none w-5 h-5 absolute left-3 top-3.5 ${THEME.icon}`} />
                         <input
                           id="email" name="email" ref={fieldRefs.email}
-                          type="email" autoComplete="email"
+                          type="email"
+                          autoComplete="email"
                           value={form.email}
                           onChange={onChange}
                           onBlur={() => { markTouched('email'); }}
@@ -1031,58 +1070,47 @@ const RegisterLawyer: React.FC = () => {
                       <FieldSuccess show={!fieldErrors.password && !!touched.password && form.password.length >= 6} message={t.success.pwdOk} />
                     </div>
 
-                    {/* Contact */}
+                    {/* Contact - Version simplifiée sans PhoneField */}
                     <div className={`mt-5 rounded-xl border ${THEME.border} ${THEME.subtle} p-4`}>
                       <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
                         <Phone className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.phone} / {t.whatsapp}
                       </h3>
 
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 gap-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">{t.countryCode}</label>
-                          <select
-                            name="phoneCountryCode" value={form.phoneCountryCode} onChange={onChange}
-                            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-indigo-600"
-                          >
-                            {countryCodeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label htmlFor="phone" className="block text-xs font-medium text-gray-700 mb-1">
+                          <label htmlFor="phone" className="block text-sm font-semibold text-gray-800 mb-1">
                             {t.phone} <span className="text-red-500">*</span>
                           </label>
                           <input
-                            id="phone" name="phone" ref={fieldRefs.phone}
-                            value={form.phone} onChange={onChange} onBlur={() => markTouched('phone')}
-                            autoComplete="tel"
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            value={form.phone}
+                            onChange={onChange}
+                            onBlur={() => markTouched('phone')}
                             className={getInputClassName('phone')}
-                            placeholder="612345678"
+                            placeholder="+33612345678"
                           />
                           <FieldError error={fieldErrors.phone} show={!!(fieldErrors.phone && touched.phone)} />
+                          <FieldSuccess show={!fieldErrors.phone && !!touched.phone && !!form.phone} message={t.success.fieldValid} />
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-3 mt-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp</label>
-                          <select
-                            name="whatsappCountryCode" value={form.whatsappCountryCode} onChange={onChange}
-                            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-indigo-600"
-                          >
-                            {countryCodeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label htmlFor="whatsappNumber" className="block text-xs font-medium text-gray-700 mb-1">
+                          <label htmlFor="whatsapp" className="block text-sm font-semibold text-gray-800 mb-1">
                             {t.whatsapp} <span className="text-red-500">*</span>
                           </label>
                           <input
-                            id="whatsappNumber" name="whatsappNumber" ref={fieldRefs.whatsappNumber}
-                            value={form.whatsappNumber} onChange={onChange} onBlur={() => markTouched('whatsappNumber')}
-                            className={getInputClassName('whatsappNumber')}
-                            placeholder="612345678"
+                            id="whatsapp"
+                            name="whatsapp"
+                            type="tel"
+                            value={form.whatsapp}
+                            onChange={onChange}
+                            onBlur={() => markTouched('whatsapp')}
+                            className={getInputClassName('whatsapp')}
+                            placeholder="+33612345678"
                           />
-                          <FieldError error={fieldErrors.whatsappNumber} show={!!(fieldErrors.whatsappNumber && touched.whatsappNumber)} />
+                          <FieldError error={fieldErrors.whatsapp} show={!!(fieldErrors.whatsapp && touched.whatsapp)} />
+                          <FieldSuccess show={!fieldErrors.whatsapp && !!touched.whatsapp && !!form.whatsapp} message={t.success.fieldValid} />
                         </div>
                       </div>
 
@@ -1111,7 +1139,7 @@ const RegisterLawyer: React.FC = () => {
                           <option value="">{lang === 'en' ? 'Select your country' : 'Sélectionnez votre pays'}</option>
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        {showCustomCountry && (
+                        {form.currentCountry === (lang === 'en' ? 'Other' : 'Autre') && (
                           <div className="mt-3">
                             <input
                               name="customCountry" value={form.customCountry} onChange={onChange}
@@ -1121,6 +1149,7 @@ const RegisterLawyer: React.FC = () => {
                           </div>
                         )}
                         <FieldError error={fieldErrors.currentCountry} show={!!(fieldErrors.currentCountry && touched.currentCountry)} />
+                        <FieldSuccess show={!fieldErrors.currentCountry && !!touched.currentCountry && !!form.currentCountry} message={t.success.fieldValid} />
                       </div>
                       <div>
                         <label htmlFor="currentPresenceCountry" className="block text-sm font-semibold text-gray-800 mb-1">
@@ -1135,6 +1164,7 @@ const RegisterLawyer: React.FC = () => {
                           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
                         <FieldError error={fieldErrors.currentPresenceCountry} show={!!(fieldErrors.currentPresenceCountry && touched.currentPresenceCountry)} />
+                        <FieldSuccess show={!fieldErrors.currentPresenceCountry && !!touched.currentPresenceCountry && !!form.currentPresenceCountry} message={t.success.fieldValid} />
                       </div>
                     </div>
 
@@ -1167,6 +1197,7 @@ const RegisterLawyer: React.FC = () => {
                         </div>
                       )}
                       <FieldError error={fieldErrors.practiceCountries} show={!!fieldErrors.practiceCountries} />
+                      <FieldSuccess show={form.practiceCountries.length > 0} message={t.success.fieldValid} />
                     </div>
                   </section>
 
@@ -1225,6 +1256,7 @@ const RegisterLawyer: React.FC = () => {
                         </div>
                       )}
                       <FieldError error={fieldErrors.specialties} show={!!fieldErrors.specialties} />
+                      <FieldSuccess show={form.specialties.length > 0} message={t.success.fieldValid} />
                     </div>
 
                     {/* formations */}
@@ -1253,6 +1285,7 @@ const RegisterLawyer: React.FC = () => {
                         </button>
                       </div>
                       <FieldError error={fieldErrors.educations} show={!!fieldErrors.educations} />
+                      <FieldSuccess show={form.educations.some((e) => e.trim().length > 0)} message={t.success.fieldValid} />
                     </div>
 
                     {/* Languages */}
@@ -1284,6 +1317,7 @@ const RegisterLawyer: React.FC = () => {
                       </Suspense>
 
                       <FieldError error={fieldErrors.languages} show={!!fieldErrors.languages} />
+                      <FieldSuccess show={(selectedLanguages as LanguageOption[]).length > 0} message={t.success.fieldValid} />
                     </div>
 
                     {/* Bio */}
@@ -1306,7 +1340,7 @@ const RegisterLawyer: React.FC = () => {
                           <span className={form.bio.length < 50 ? 'text-orange-600' : 'text-green-600'}>
                             {form.bio.length < 50
                               ? lang === 'en'
-                                ? `Just ${50 - form.bio.length} chars to go — you’ve got this! 💪`
+                                ? `Just ${50 - form.bio.length} chars to go — you've got this! 💪`
                                 : `Encore ${50 - form.bio.length} caractères — vous y êtes presque ! 💪`
                               : lang === 'en'
                               ? '✓ Nice! Field validated.'
@@ -1319,6 +1353,7 @@ const RegisterLawyer: React.FC = () => {
                         <p className="mt-1 text-xs text-gray-500">{t.help.bioHint}</p>
                       </div>
                       <FieldError error={fieldErrors.bio} show={!!(fieldErrors.bio && touched.bio)} />
+                      <FieldSuccess show={form.bio.trim().length >= 50} message={t.success.fieldValid} />
                     </div>
 
                     {/* Photo */}
@@ -1327,23 +1362,24 @@ const RegisterLawyer: React.FC = () => {
                         <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                       </label>
                       <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                      <ImageUploader
-                        locale={lang}
-                        currentImage={form.profilePhoto}
-                        onImageUploaded={(url: string) => {
-                          setForm((prev) => ({ ...prev, profilePhoto: url }));
-                          setFieldErrors((prev) => ({ ...prev, profilePhoto: '' }));
-                          setTouched((p) => ({ ...p, profilePhoto: true }));
-                          setTimeout(focusFirstMissingField, 80);
-                        }}
-                        hideNativeFileLabel
-                        cropShape="round"
-                        outputSize={512}
-                        uploadPath="registration_temp"
-                        isRegistration={true}
-                      />
+                        <ImageUploader
+                          locale={lang}
+                          currentImage={form.profilePhoto}
+                          onImageUploaded={(url: string) => {
+                            setForm((prev) => ({ ...prev, profilePhoto: url }));
+                            setFieldErrors((prev) => ({ ...prev, profilePhoto: '' }));
+                            setTouched((p) => ({ ...p, profilePhoto: true }));
+                            setTimeout(focusFirstMissingField, 80);
+                          }}
+                          hideNativeFileLabel
+                          cropShape="round"
+                          outputSize={512}
+                          uploadPath="registration_temp"
+                          isRegistration={true}
+                        />
                       </Suspense>
                       <FieldError error={fieldErrors.profilePhoto} show={!!fieldErrors.profilePhoto} />
+                      <FieldSuccess show={!!form.profilePhoto} message={t.success.fieldValid} />
                       <p className="text-xs text-gray-500 mt-1">
                         {lang === 'en' ? 'Professional photo (JPG/PNG) required' : 'Photo professionnelle (JPG/PNG) obligatoire'}
                       </p>
@@ -1368,6 +1404,7 @@ const RegisterLawyer: React.FC = () => {
                         </label>
                       </div>
                       <FieldError error={fieldErrors.acceptTerms} show={!!fieldErrors.acceptTerms} />
+                      <FieldSuccess show={!!form.acceptTerms} message={t.success.fieldValid} />
                     </div>
 
                     <div className="mt-4">
@@ -1416,7 +1453,7 @@ const RegisterLawyer: React.FC = () => {
 
               {/* Footer */}
               <footer className="text-center mt-8">
-                <div className="bg-white rounded-XL p-5 shadow border rounded-xl">
+                <div className="bg-white p-5 shadow border rounded-xl">
                   <h3 className="text-lg sm:text-xl font-black text-gray-900 mb-1">{t.footerTitle}</h3>
                   <p className="text-sm text-gray-700">{t.footerText}</p>
                 </div>

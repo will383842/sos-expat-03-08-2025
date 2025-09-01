@@ -32,6 +32,10 @@ export default defineConfig(({ mode }) => {
       ],
     },
     server: {
+      cors: {
+        origin: true,
+        credentials: true,
+      },
       proxy: {
         '/api': {
           target,

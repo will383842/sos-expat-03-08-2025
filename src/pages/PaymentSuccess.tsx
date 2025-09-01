@@ -11,7 +11,7 @@ import ReviewModal from '../components/review/ReviewModal';
 
 // 🔁 Firestore
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { db } from '@/services/firebase';
+import { db } from '../config/firebase';
 
 /* =========================
    Types pour l'order / coupon / metadata

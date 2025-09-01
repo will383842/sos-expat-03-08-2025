@@ -2,8 +2,8 @@
 import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
-  Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Phone,
-  CheckCircle, Users, Camera, X, ArrowRight, Info, MapPin, MessageCircle
+  Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Phone as PhoneIcon,
+  CheckCircle, Users, Camera, X, ArrowRight, Info, MapPin
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
@@ -11,6 +11,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
+
+// 🔌 Champ téléphone normalisé (E.164)
+import PhoneField from '@/components/PhoneField';
+import { useForm } from 'react-hook-form';
 
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
@@ -117,41 +121,11 @@ const HELP_TYPES: Duo[] = [
   { fr: 'Autre', en: 'Other' },
 ];
 
-// Country codes (names FR/EN)
-const COUNTRY_CODES = [
-  { code: '+33', flag: '🇫🇷', fr: 'France', en: 'France' },
-  { code: '+1', flag: '🇺🇸', fr: 'USA/Canada', en: 'USA/Canada' },
-  { code: '+44', flag: '🇬🇧', fr: 'Royaume-Uni', en: 'United Kingdom' },
-  { code: '+49', flag: '🇩🇪', fr: 'Allemagne', en: 'Germany' },
-  { code: '+34', flag: '🇪🇸', fr: 'Espagne', en: 'Spain' },
-  { code: '+39', flag: '🇮🇹', fr: 'Italie', en: 'Italy' },
-  { code: '+32', flag: '🇧🇪', fr: 'Belgique', en: 'Belgium' },
-  { code: '+41', flag: '🇨🇭', fr: 'Suisse', en: 'Switzerland' },
-  { code: '+352', flag: '🇱🇺', fr: 'Luxembourg', en: 'Luxembourg' },
-  { code: '+31', flag: '🇳🇱', fr: 'Pays-Bas', en: 'Netherlands' },
-  { code: '+43', flag: '🇦🇹', fr: 'Autriche', en: 'Austria' },
-  { code: '+351', flag: '🇵🇹', fr: 'Portugal', en: 'Portugal' },
-  { code: '+30', flag: '🇬🇷', fr: 'Grèce', en: 'Greece' },
-  { code: '+66', flag: '🇹🇭', fr: 'Thaïlande', en: 'Thailand' },
-  { code: '+61', flag: '🇦🇺', fr: 'Australie', en: 'Australia' },
-  { code: '+64', flag: '🇳🇿', fr: 'Nouvelle-Zélande', en: 'New Zealand' },
-  { code: '+81', flag: '🇯🇵', fr: 'Japon', en: 'Japan' },
-  { code: '+82', flag: '🇰🇷', fr: 'Corée du Sud', en: 'South Korea' },
-  { code: '+65', flag: '🇸🇬', fr: 'Singapour', en: 'Singapore' },
-  { code: '+212', flag: '🇲🇦', fr: 'Maroc', en: 'Morocco' },
-  { code: '+216', flag: '🇹🇳', fr: 'Tunisie', en: 'Tunisia' },
-  { code: '+213', flag: '🇩🇿', fr: 'Algérie', en: 'Algeria' },
-  { code: '+971', flag: '🇦🇪', fr: 'Émirats', en: 'UAE' },
-  { code: '+55', flag: '🇧🇷', fr: 'Brésil', en: 'Brazil' },
-  { code: '+52', flag: '🇲🇽', fr: 'Mexique', en: 'Mexico' },
-  { code: '+7', flag: '🇷🇺', fr: 'Russie', en: 'Russia' },
-] as const;
-
 // ===== Types =====
 interface LanguageOption { value: string; label: string }
 interface ExpatFormData {
   firstName: string; lastName: string; email: string; password: string;
-  phone: string; phoneCountryCode: string; whatsappCountryCode: string; whatsappNumber: string;
+  phone: string; // E.164 (via PhoneField)
   currentCountry: string; currentPresenceCountry: string; interventionCountry: string;
   preferredLanguage: 'fr' | 'en';
   helpTypes: string[]; customHelpType: string;
@@ -171,7 +145,7 @@ const I18N = {
     geoInfo: 'Où vous êtes & expérience',
     helpInfo: "Comment vous aimez aider ?",
     firstName: 'Prénom', lastName: 'Nom', email: 'Adresse email', password: 'Mot de passe',
-    phone: 'Téléphone', whatsapp: 'Numéro WhatsApp',
+    phone: 'Téléphone',
     countryCode: 'Indicatif pays',
     residenceCountry: 'Pays de résidence',
     presenceCountry: 'Pays où vous êtes en ce moment',
@@ -195,7 +169,6 @@ const I18N = {
       emailTaken: 'Oups, cet email est déjà pris. Vous avez peut-être déjà un compte ? 🔑',
       passwordTooShort: '6 caractères minimum — easy ! 💪',
       phoneRequired: 'Quel numéro on compose ? 📞',
-      whatsappRequired: 'Votre WhatsApp pour papoter vite fait ? 💬',
       needCountry: 'Votre pays de résidence, s’il vous plaît 🌍',
       needPresence: 'Où êtes-vous en ce moment ? ✈️',
       needIntervention: "Choisissez un pays d'intervention 🗺️",
@@ -232,7 +205,7 @@ const I18N = {
     geoInfo: 'Where you are & experience',
     helpInfo: 'How do you like to help?',
     firstName: 'First name', lastName: 'Last name', email: 'Email', password: 'Password',
-    phone: 'Phone', whatsapp: 'WhatsApp number',
+    phone: 'Phone',
     countryCode: 'Country code',
     residenceCountry: 'Country of residence',
     presenceCountry: 'Where you are right now',
@@ -256,7 +229,6 @@ const I18N = {
       emailTaken: 'This email is already in use. Maybe you already have an account? 🔑',
       passwordTooShort: 'At least 6 characters — easy! 💪',
       phoneRequired: 'What number should we call? 📞',
-      whatsappRequired: 'WhatsApp number, pretty please? 💬',
       needCountry: 'Your residence country, please 🌍',
       needPresence: 'Where are you at the moment? ✈️',
       needIntervention: 'Pick a main intervention country 🗺️',
@@ -367,7 +339,7 @@ const Avatar = ({ src, name }: { src?: string; name: string }) => {
 
 // ===== Live Preview =====
 const PreviewCard = ({
-  lang, t, progress, fullName, photo, currentCountry, presenceCountry, interventionCountry, yearsAsExpat, languages, helpTypes, whatsapp,
+  lang, t, progress, fullName, photo, currentCountry, presenceCountry, interventionCountry, yearsAsExpat, languages, helpTypes,
 }: {
   lang: 'fr' | 'en';
   t: typeof I18N['fr'];
@@ -380,7 +352,6 @@ const PreviewCard = ({
   yearsAsExpat?: number;
   languages: string[];
   helpTypes: string[];
-  whatsapp?: string;
 }) => {
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-5">
@@ -458,13 +429,6 @@ const PreviewCard = ({
               </span>
             ))}
           </div>
-        </div>
-      )}
-
-      {whatsapp && (
-        <div className="mt-4 flex items-center gap-2 text-sm text-gray-700">
-          <MessageCircle className="w-4 h-4 text-emerald-600" />
-          <span className="truncate">{whatsapp}</span>
         </div>
       )}
 
@@ -574,7 +538,7 @@ const RegisterExpat: React.FC = () => {
   // ---- Initial state ----
   const initial: ExpatFormData = {
     firstName: '', lastName: '', email: '', password: '',
-    phone: '', phoneCountryCode: '+33', whatsappCountryCode: '+33', whatsappNumber: '',
+    phone: '', // E.164 (via PhoneField)
     currentCountry: '', currentPresenceCountry: '', interventionCountry: '',
     preferredLanguage: lang,
     helpTypes: [], customHelpType: '',
@@ -592,13 +556,19 @@ const RegisterExpat: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
 
+  // react-hook-form pour le téléphone uniquement (normalisation E.164 par PhoneField)
+  const { control, getValues, watch } = useForm<{ phone: string }>({
+    defaultValues: { phone: '' },
+    mode: 'onBlur',
+  });
+  const watchedPhone = watch('phone'); // e164 si valide
+
   // Refs pour scroll/jump
   const refFirstName = useRef<HTMLDivElement | null>(null);
   const refLastName = useRef<HTMLDivElement | null>(null);
   const refEmail = useRef<HTMLDivElement | null>(null);
   const refPwd = useRef<HTMLDivElement | null>(null);
   const refPhone = useRef<HTMLDivElement | null>(null);
-  const refWhats = useRef<HTMLDivElement | null>(null);
   const refCountry = useRef<HTMLDivElement | null>(null);
   const refPresence = useRef<HTMLDivElement | null>(null);
   const refInterv = useRef<HTMLDivElement | null>(null);
@@ -612,10 +582,6 @@ const RegisterExpat: React.FC = () => {
   // ---- Options ----
   const countryOptions = useMemo(() => mapDuo(COUNTRIES, lang), [lang]);
   const helpTypeOptions = useMemo(() => mapDuo(HELP_TYPES, lang), [lang]);
-  const countryCodeOptions = useMemo(
-    () => COUNTRY_CODES.map((c) => ({ value: c.code, label: `${c.flag} ${c.code} (${lang === 'en' ? c.en : c.fr})` })),
-    [lang]
-  );
 
   // ---- Password strength ----
   const pwdStrength = useMemo(() => computePasswordStrength(form.password), [form.password]);
@@ -626,8 +592,7 @@ const RegisterExpat: React.FC = () => {
     lastName: !!form.lastName.trim(),
     email: EMAIL_REGEX.test(form.email), // ✅ format uniquement
     password: form.password.length >= 6,
-    phone: !!form.phone.trim(),
-    whatsappNumber: !!form.whatsappNumber.trim(),
+    phone: !!(watchedPhone && watchedPhone.startsWith('+') && watchedPhone.length >= 10), // E.164 détecté
     currentCountry: !!form.currentCountry,
     currentPresenceCountry: !!form.currentPresenceCountry,
     interventionCountry: !!form.interventionCountry,
@@ -637,7 +602,7 @@ const RegisterExpat: React.FC = () => {
     languages: (selectedLanguages as LanguageOption[]).length > 0,
     helpTypes: form.helpTypes.length > 0,
     acceptTerms: form.acceptTerms,
-  }), [form, selectedLanguages]);
+  }), [form, selectedLanguages, watchedPhone]);
 
   // ---- Progress (sans emailStatus) ----
   const progress = useMemo(() => {
@@ -646,8 +611,7 @@ const RegisterExpat: React.FC = () => {
       !!form.lastName.trim(),
       EMAIL_REGEX.test(form.email),
       form.password.length >= 6,
-      !!form.phone.trim(),
-      !!form.whatsappNumber.trim(),
+      !!(watchedPhone && watchedPhone.startsWith('+')),
       !!form.currentCountry,
       !!form.currentPresenceCountry,
       !!form.interventionCountry,
@@ -660,7 +624,7 @@ const RegisterExpat: React.FC = () => {
     ];
     const done = fields.filter(Boolean).length;
     return Math.round((done / fields.length) * 100);
-  }, [form, selectedLanguages]);
+  }, [form, selectedLanguages, watchedPhone]);
 
   // ---- Handlers ----
   const onChange = useCallback(
@@ -720,10 +684,9 @@ const RegisterExpat: React.FC = () => {
     if (!valid.lastName) e.lastName = t.errors.lastNameRequired;
     if (!form.email.trim()) e.email = t.errors.emailRequired;
     else if (!EMAIL_REGEX.test(form.email)) e.email = t.errors.emailInvalid;
-    // ⚠️ On ne bloque pas sur l’unicité (Firebase fera foi au submit)
+    // ⚠️ Unicité: on laisse Firebase gérer
     if (!valid.password) e.password = t.errors.passwordTooShort;
     if (!valid.phone) e.phone = t.errors.phoneRequired;
-    if (!valid.whatsappNumber) e.whatsappNumber = t.errors.whatsappRequired;
     if (!valid.currentCountry) e.currentCountry = t.errors.needCountry;
     if (!valid.currentPresenceCountry) e.currentPresenceCountry = t.errors.needPresence;
     if (!valid.interventionCountry) e.interventionCountry = t.errors.needIntervention;
@@ -750,7 +713,6 @@ const RegisterExpat: React.FC = () => {
       [!valid.email, refEmail],
       [!valid.password, refPwd],
       [!valid.phone, refPhone],
-      [!valid.whatsappNumber, refWhats],
       [!valid.currentCountry, refCountry],
       [!valid.currentPresenceCountry, refPresence],
       [!valid.interventionCountry, refInterv],
@@ -780,18 +742,16 @@ const RegisterExpat: React.FC = () => {
       }
       try {
         const languageCodes = (selectedLanguages as LanguageOption[]).map((l) => l.value);
+        const e164Phone = getValues('phone') || ''; // déjà normalisé par PhoneField
+
         const userData = {
           role: 'expat' as const,
           type: 'expat' as const,
           email: form.email.trim().toLowerCase(),
-          fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
+          fullName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
-          phone: form.phoneCountryCode + form.phone.trim(),
-          whatsapp: form.whatsappCountryCode + form.whatsappNumber.trim(),
-          phoneCountryCode: form.phoneCountryCode,
-          whatsappCountryCode: form.whatsappCountryCode,
-          whatsappNumber: form.whatsappNumber.trim(),
+          phone: e164Phone, // ✅ E.164
           currentCountry: form.currentCountry,
           currentPresenceCountry: form.currentPresenceCountry,
           country: form.currentPresenceCountry,
@@ -824,7 +784,7 @@ const RegisterExpat: React.FC = () => {
         setIsSubmitting(false);
       }
     },
-    [isSubmitting, validate, register, form, selectedLanguages, navigate, redirect, t, scrollToFirstIncomplete]
+    [isSubmitting, validate, register, form, selectedLanguages, navigate, redirect, t, scrollToFirstIncomplete, getValues]
   );
 
   // ---- Can submit ----
@@ -843,6 +803,7 @@ const RegisterExpat: React.FC = () => {
       valid.currentPresenceCountry &&
       valid.interventionCountry &&
       valid.yearsAsExpat &&
+      valid.phone &&
       !isLoading &&
       !isSubmitting &&
       !Object.keys(fieldErrors).length,
@@ -856,8 +817,7 @@ const RegisterExpat: React.FC = () => {
       { key: 'lastName', label: lang === 'en' ? 'Last name' : 'Nom', ok: valid.lastName, ref: refLastName },
       { key: 'email', label: lang === 'en' ? 'Valid email' : 'Email valide', ok: valid.email, ref: refEmail },
       { key: 'password', label: lang === 'en' ? 'Password (≥ 6 chars)' : 'Mot de passe (≥ 6 caractères)', ok: valid.password, ref: refPwd },
-      { key: 'phone', label: lang === 'en' ? 'Phone' : 'Téléphone', ok: valid.phone, ref: refPhone },
-      { key: 'whatsappNumber', label: 'WhatsApp', ok: valid.whatsappNumber, ref: refWhats },
+      { key: 'phone', label: lang === 'en' ? 'Phone (E.164)' : 'Téléphone (E.164)', ok: valid.phone, ref: refPhone },
       { key: 'currentCountry', label: lang === 'en' ? 'Country of residence' : 'Pays de résidence', ok: valid.currentCountry, ref: refCountry },
       { key: 'currentPresenceCountry', label: lang === 'en' ? 'Presence country' : 'Pays de présence', ok: valid.currentPresenceCountry, ref: refPresence },
       { key: 'interventionCountry', label: lang === 'en' ? 'Main intervention country' : "Pays d'intervention", ok: valid.interventionCountry, ref: refInterv },
@@ -965,7 +925,6 @@ const RegisterExpat: React.FC = () => {
                 yearsAsExpat={form.yearsAsExpat}
                 languages={(selectedLanguages as LanguageOption[]).map((l) => l.value)}
                 helpTypes={form.helpTypes}
-                whatsapp={`${form.whatsappCountryCode} ${form.whatsappNumber}`.trim()}
               />
             </aside>
 
@@ -1043,7 +1002,7 @@ const RegisterExpat: React.FC = () => {
                           name="password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={onChange}
                           onKeyUp={(e) => setCapsPassword(e.getModifierState('CapsLock'))}
                           autoComplete="new-password"
-                          aria-describedby="pwd-hint pwd-meter"
+                          aria-describedby="pwd-meter"
                           className={`w-full pl-10 pr-12 py-3 border-2 rounded-xl bg-gray-50 hover:bg-white ${THEME.ring} focus:bg-white transition ${fieldErrors.password ? 'border-red-500 bg-red-50' : valid.password ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                           placeholder={t.help.minPassword}
                         />
@@ -1068,62 +1027,31 @@ const RegisterExpat: React.FC = () => {
                       <FieldSuccess show={valid.password}>{lang === 'en' ? 'Nice password! 🔒' : 'Mot de passe OK ! 🔒'}</FieldSuccess>
                     </div>
 
-                    {/* Contact */}
+                    {/* Contact (Téléphone E.164) */}
                     <div className={`mt-5 rounded-xl border ${THEME.border} ${THEME.subtle} p-4`} ref={refPhone}>
                       <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
-                        <Phone className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.phone} / {t.whatsapp}
+                        <PhoneIcon className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.phone}
                       </h3>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">{t.countryCode}</label>
-                          <select
-                            name="phoneCountryCode" value={form.phoneCountryCode} onChange={onChange}
-                            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-emerald-600"
-                          >
-                            {countryCodeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            {t.phone} <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            name="phone" value={form.phone} onChange={onChange} autoComplete="tel"
-                            className={`w-full px-4 py-2.5 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.phone ? 'border-red-500 bg-red-50' : valid.phone ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
-                            placeholder="612345678"
-                          />
-                          <FieldSuccess show={valid.phone}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
-                          <p className="text-xs text-gray-500 mt-1">{lang === 'en' ? 'No spam, ever. 📵' : 'Aucun spam, promis. 📵'}</p>
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-3 mt-3" ref={refWhats}>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp</label>
-                          <select
-                            name="whatsappCountryCode" value={form.whatsappCountryCode} onChange={onChange}
-                            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:border-emerald-600"
-                          >
-                            {countryCodeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            {t.whatsapp} <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            name="whatsappNumber" value={form.whatsappNumber} onChange={onChange}
-                            className={`w-full px-4 py-2.5 border-2 rounded-xl bg-white ${THEME.ring} ${fieldErrors.whatsappNumber ? 'border-red-500 bg-red-50' : valid.whatsappNumber ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
-                            placeholder="612345678"
-                          />
-                          <FieldSuccess show={valid.whatsappNumber}>{lang === 'en' ? 'Perfect! ✨' : 'Parfait ! ✨'}</FieldSuccess>
-                        </div>
-                      </div>
+                      {/* Champ unique normalisé */}
+                      <PhoneField
+                        name="phone"
+                        control={control}
+                        label={lang === 'en' ? 'Phone (international format)' : 'Téléphone (format international)'}
+                        required
+                        defaultCountry="FR"
+                        placeholder="+33612345678"
+                      />
+
+                      <FieldSuccess show={valid.phone}>
+                        {lang === 'en' ? 'Phone number valid (E.164) 🔒' : 'Numéro valide (E.164) 🔒'}
+                      </FieldSuccess>
+
                       <p className="mt-3 text-xs text-gray-600 flex items-center">
                         <Info className="w-3.5 h-3.5 mr-1" />
                         {lang === 'en'
-                          ? 'We use your contact only to connect you with people who need help. No spam.'
-                          : 'Vos coordonnées servent uniquement à vous mettre en relation avec des personnes à aider. Pas de spam.'}
+                          ? 'We only use your phone to connect you with people who need help. No spam.'
+                          : 'Votre numéro sert uniquement à des mises en relation. Aucun spam.'}
                       </p>
                     </div>
                   </section>
@@ -1263,19 +1191,19 @@ const RegisterExpat: React.FC = () => {
                         <Camera className={`w-4 h-4 mr-2 ${THEME.icon}`} /> {t.profilePhoto} <span className="text-red-500 ml-1">*</span>
                       </label>
                       <Suspense fallback={<div className="py-6"><div className="h-24 bg-gray-100 animate-pulse rounded-xl" /></div>}>
-                      <ImageUploader
-                        locale={lang}
-                        currentImage={form.profilePhoto}
-                        onImageUploaded={(url: string) => {
-                          setForm((prev) => ({ ...prev, profilePhoto: url }));
-                          setTimeout(() => { scrollToFirstIncomplete(); }, 150);
-                        }}
-                        hideNativeFileLabel
-                        cropShape="round"
-                        outputSize={512}
-                        uploadPath="registration_temp"
-                        isRegistration={true}
-                      />
+                        <ImageUploader
+                          locale={lang}
+                          currentImage={form.profilePhoto}
+                          onImageUploaded={(url: string) => {
+                            setForm((prev) => ({ ...prev, profilePhoto: url }));
+                            setTimeout(() => { scrollToFirstIncomplete(); }, 150);
+                          }}
+                          hideNativeFileLabel
+                          cropShape="round"
+                          outputSize={512}
+                          uploadPath="registration_temp"
+                          isRegistration={true}
+                        />
                       </Suspense>
                       {fieldErrors.profilePhoto && <p className="text-sm text-red-600 mt-2">{fieldErrors.profilePhoto}</p>}
                       <p className="text-xs text-gray-500 mt-1">

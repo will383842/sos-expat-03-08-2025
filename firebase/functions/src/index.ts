@@ -18,8 +18,6 @@ const emergencyConfig = {
   concurrency: 1
 };
 
-
-
 ultraLogger.info('INDEX_INIT', 'Démarrage de l\'initialisation du fichier index.ts', {
   timestamp: Date.now(),
   nodeVersion: process.version,
@@ -76,6 +74,7 @@ import { scheduleCallTask } from './lib/tasks';
 // ====== IMPORTS DES MODULES PRINCIPAUX (RECTIFIÉS) ======
 import { createAndScheduleCallHTTPS } from "./createAndScheduleCallFunction";
 import { runExecuteCallTask } from "./runtime/executeCallTask";
+import { messageManager } from './MessageManager';
 
 ultraLogger.debug('IMPORTS', 'Imports principaux chargés avec succès');
 
@@ -359,13 +358,18 @@ export * from "./admin/callables";
 ultraLogger.info('EXPORTS', 'Exports directs configurés');
 
 // ========================================
-// 🦾 ENDPOINT CLOUD TASKS : exécuter l'appel (US-CENTRAL1 rectifié)
+// 🦾 ENDPOINT CLOUD TASKS : exécuter l'appel - 🔧 FIX: ALIGNÉ SUR EUROPE-WEST1
 // ========================================
 export const executeCallTask = onRequest(
   {
-    region: "us-central1",
-    timeoutSeconds: 60,
-    memory: "256MiB"},
+    region: "europe-west1", // 🔧 FIX CRITIQUE: Changé de us-central1 à europe-west1
+    timeoutSeconds: 120,     // ✅ Aligné sur executeCallTask.ts
+    memory: "512MiB",        // ✅ Aligné sur executeCallTask.ts
+    cpu: 0.25,               // ✅ Aligné sur executeCallTask.ts
+    maxInstances: 10,        // ✅ Aligné sur executeCallTask.ts
+    minInstances: 0,         // ✅ Aligné sur executeCallTask.ts
+    concurrency: 1           // ✅ Aligné sur executeCallTask.ts
+  },
   (req, res) => runExecuteCallTask(req as any, res as any)
 );
 
@@ -541,6 +545,73 @@ const getStripe = traceFunction((): Stripe | null => {
   return stripe;
 }, 'getStripe', 'INDEX');
 
+// ====== HELPER POUR ENVOI AUTOMATIQUE DES MESSAGES ======
+const sendPaymentNotifications = traceFunction(async (callSessionId: string, database: admin.firestore.Firestore) => {
+  try {
+    ultraLogger.info('PAYMENT_NOTIFICATIONS', 'Envoi des notifications post-paiement', { callSessionId });
+
+    const snap = await database.collection('call_sessions').doc(callSessionId).get();
+    if (!snap.exists) {
+      ultraLogger.warn('PAYMENT_NOTIFICATIONS', 'Session introuvable', { callSessionId });
+      return;
+    }
+
+    const cs: any = snap.data();
+
+    const providerPhone = cs?.participants?.provider?.phone ?? cs?.providerPhone ?? '';
+    const clientPhone = cs?.participants?.client?.phone ?? cs?.clientPhone ?? '';
+    const language = cs?.metadata?.clientLanguages?.[0] ?? 'fr';
+    const title = cs?.metadata?.title ?? cs?.title ?? 'Consultation';
+
+    ultraLogger.debug('PAYMENT_NOTIFICATIONS', 'Données extraites', {
+      callSessionId,
+      providerPhone: providerPhone ? `${providerPhone.slice(0, 4)}...` : 'none',
+      clientPhone: clientPhone ? `${clientPhone.slice(0, 4)}...` : 'none',
+      language,
+      title
+    });
+
+    const notifications = await Promise.allSettled([
+      providerPhone
+        ? messageManager.sendSmartMessage({
+            to: providerPhone,
+            templateId: 'provider_notification'
+            variables: { requestTitle: title, language }
+          })
+        : Promise.resolve({ skipped: 'no_provider_phone' }),
+      clientPhone
+        ? messageManager.sendSmartMessage({
+            to: clientPhone,
+            templateId: 'client_notification'
+            variables: { requestTitle: title, language }
+          })
+        : Promise.resolve({ skipped: 'no_client_phone' })
+    ]);
+
+    const results = notifications.map((result, index) => ({
+      target: index === 0 ? 'provider' : 'client',
+      status: result.status,
+      ...(result.status === 'fulfilled' ? { result: result.value } : { error: result.reason })
+    }));
+
+    ultraLogger.info('PAYMENT_NOTIFICATIONS', 'Notifications envoyées', {
+      callSessionId,
+      results
+    });
+
+  } catch (error) {
+    ultraLogger.error(
+      'PAYMENT_NOTIFICATIONS',
+      'Erreur envoi notifications',
+      {
+        callSessionId,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      error instanceof Error ? error : undefined
+    );
+  }
+}, 'sendPaymentNotifications', 'STRIPE_WEBHOOKS');
+
 // ====== WEBHOOK STRIPE ULTRA-DÉBUGGÉ ======
 export const stripeWebhook = onRequest(
   {
@@ -548,7 +619,7 @@ export const stripeWebhook = onRequest(
     memory: "512MiB",
     concurrency: 1,
     timeoutSeconds: 30,
-    minInstances: 0, // ou 1 si tu veux éviter le cold start
+    minInstances: 0,
     maxInstances: 5
   },
   wrapHttpFunction('stripeWebhook', async (req: FirebaseRequest, res: Response) => {
@@ -585,7 +656,7 @@ export const stripeWebhook = onRequest(
       const event = stripeInstance.webhooks.constructEvent(
         rawBody.toString(),
         signature as string,
-        getStripeWebhookSecret() // ✅ choix TEST/LIVE ici
+        getStripeWebhookSecret()
       );
 
       const objectId = (() => {
@@ -635,6 +706,9 @@ export const stripeWebhook = onRequest(
             ultraLogger.info('CHECKOUT_COMPLETED', 'Task planifiée à +300s', {
               callSessionId,
               delaySeconds: 300});
+
+            // 🔔 ENVOI AUTOMATIQUE DES NOTIFICATIONS
+            await sendPaymentNotifications(callSessionId, database);
           }
           break;
         }
@@ -727,6 +801,9 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
       ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Cloud Task créée pour appel à +300s', {
         callSessionId,
         delaySeconds: 300});
+
+      // 🔔 ENVOI AUTOMATIQUE DES NOTIFICATIONS
+      await sendPaymentNotifications(callSessionId, database);
     }
 
     return true;
@@ -864,7 +941,6 @@ const handlePaymentIntentRequiresAction = traceFunction(async (paymentIntent: St
 // ========================================
 export const scheduledFirestoreExport = onSchedule(
   {
-    // ultra sobre pour passer le quota CPU au déploiement
     region: "europe-west1",
     memory: "256MiB",
     cpu: 0.25,
@@ -1268,7 +1344,7 @@ export const testCloudTasksConnection = onCall(
       const { createTestTask } = await import('./lib/tasks');
       const testPayload = request.data?.testPayload || { test: 'cloud_tasks_connection' };
 
-      const taskId = await createTestTask(testPayload, 10); // 10 secondes de délai
+      const taskId = await createTestTask(testPayload, 10);
 
       ultraLogger.info('TEST_CLOUD_TASKS', 'Tâche de test créée avec succès', {
         taskId,
@@ -1310,7 +1386,7 @@ export const getCloudTasksQueueStats = onCall(
 
       const [stats, pendingTasks] = await Promise.all([
         getQueueStats(),
-        listPendingTasks(20), // Limite à 20 tâches pour l'aperçu
+        listPendingTasks(20),
       ]);
 
       ultraLogger.info('QUEUE_STATS', 'Statistiques récupérées', {
@@ -1357,7 +1433,6 @@ export const manuallyTriggerCallExecution = onCall(
         callSessionId,
         triggeredBy: request.auth.uid});
 
-      // Vérifier que la session existe
       const database = initializeFirebase();
       const sessionDoc = await database.collection('call_sessions').doc(callSessionId).get();
 
@@ -1372,12 +1447,11 @@ export const manuallyTriggerCallExecution = onCall(
         currentStatus: sessionData?.status,
         paymentStatus: (sessionData as any)?.payment?.status});
 
-      // Utiliser directement le TwilioCallManager
       const { TwilioCallManager } = await import('./TwilioCallManager');
 
       const result = await (TwilioCallManager as any).startOutboundCall({
         sessionId: callSessionId,
-        delayMinutes: 0, // Immédiat
+        delayMinutes: 0,
       });
 
       ultraLogger.info('MANUAL_CALL_TRIGGER', 'Appel déclenché avec succès', {

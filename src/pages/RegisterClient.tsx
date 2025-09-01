@@ -1,6 +1,7 @@
 // =============================================================================
 // FICHIER: src/pages/RegisterClient.tsx
 // Version: sans check d’unicité email + libellés plus fun 😄
+// Ajouts: import PhoneField + intégration après l’email (avec react-hook-form)
 // =============================================================================
 
 import React, {
@@ -32,6 +33,10 @@ import { useApp } from '../contexts/AppContext';
 import { serverTimestamp, FieldValue } from 'firebase/firestore';
 import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
+
+// ✅ Ajouts pour PhoneField
+import PhoneField from '@/components/PhoneField';
+import { useForm } from 'react-hook-form';
 
 // ==========================
 // Lazy
@@ -475,6 +480,11 @@ const RegisterClient: React.FC = () => {
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect') || '/dashboard';
 
+  // ✅ control pour PhoneField (react-hook-form)
+  const { control } = useForm<{ clientPhone: string; providerPhone: string }>({
+    defaultValues: { clientPhone: '', providerPhone: '' },
+  });
+
   // Conserver le provider si on arrive depuis "Réservez maintenant"
   useEffect(() => {
     const rawState: unknown = location.state;
@@ -484,7 +494,6 @@ const RegisterClient: React.FC = () => {
       try {
         sessionStorage.setItem('selectedProvider', JSON.stringify(sp));
       } catch (err) {
-        // ignore sessionStorage issues (private mode / quota)
         if (import.meta.env.DEV) console.debug('sessionStorage error:', err);
       }
     }
@@ -612,7 +621,7 @@ const RegisterClient: React.FC = () => {
   }, []);
 
   // ==========================
-  // Validation champs (sans vérification d'unicité email)
+  // Validation champs
   // ==========================
   const validateField = useCallback(
     (fieldName: string, value: string | string[] | boolean) => {
@@ -640,7 +649,7 @@ const RegisterClient: React.FC = () => {
             errors.email = t.errors.emailInvalid;
             validation.email = false;
           } else {
-            validation.email = true; // ✅ Plus d'unicité ici
+            validation.email = true; // ✅ pas d’unicité ici
           }
           break;
 
@@ -1038,6 +1047,24 @@ const RegisterClient: React.FC = () => {
                     <FieldSuccess
                       show={fieldValidation.email && touched.email && !fieldErrors.email}
                       message={t.success.emailValid}
+                    />
+                  </div>
+
+                  {/* ✅ Téléphones */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <PhoneField
+                      name="clientPhone"
+                      control={control}
+                      label="Téléphone"
+                      required
+                      defaultCountry="FR"
+                    />
+                    <PhoneField
+                      name="providerPhone"
+                      control={control}
+                      label="Téléphone prestataire"
+                      required
+                      defaultCountry="FR"
                     />
                   </div>
 

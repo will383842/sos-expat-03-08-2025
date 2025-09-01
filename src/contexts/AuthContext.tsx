@@ -226,13 +226,67 @@ const processProfilePhoto = async (
 };
 
 /* =========================================================
-   Création / lecture du user Firestore (helpers conservés)
+   Création / lecture du user Firestore
    ========================================================= */
-// ... toutes les autres fonctions createUserDocumentInFirestore, createSOSProfile, etc. inchangées
+
+/**
+ * Fonction pour créer un document utilisateur dans Firestore
+ */
+const createUserDocumentInFirestore = async (
+  firebaseUser: FirebaseUser, 
+  additionalData: Partial<User> = {}
+): Promise<void> => {
+  if (!firebaseUser) return;
+
+  const userRef = doc(db, 'users', firebaseUser.uid);
+  
+  try {
+    await setDoc(userRef, {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || null,
+      emailLower: (firebaseUser.email || '').toLowerCase(),
+      displayName: firebaseUser.displayName || null,
+      photoURL: firebaseUser.photoURL || null,
+      profilePhoto: firebaseUser.photoURL || '/default-avatar.png',
+      avatar: firebaseUser.photoURL || '/default-avatar.png',
+      isVerified: firebaseUser.emailVerified,
+      isVerifiedEmail: firebaseUser.emailVerified,
+      isActive: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      lastLoginAt: serverTimestamp(),
+      ...additionalData,
+    });
+
+    // Si c'est un lawyer ou expat, créer aussi le profil SOS
+    if (additionalData.role === 'lawyer' || additionalData.role === 'expat') {
+      const sosRef = doc(db, 'sos_profiles', firebaseUser.uid);
+      await setDoc(sosRef, {
+        id: firebaseUser.uid,
+        fullName: additionalData.fullName || `${additionalData.firstName || ''} ${additionalData.lastName || ''}`.trim(),
+        email: firebaseUser.email || null,
+        profilePhoto: firebaseUser.photoURL || '/default-avatar.png',
+        rating: 5,
+        reviewCount: 0,
+        isActive: true,
+        isOnline: false,
+        availability: 'unavailable',
+        isVisible: true,
+        isVisibleOnMap: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        ...additionalData,
+      });
+    }
+  } catch (error) {
+    console.error('Erreur création document utilisateur:', error);
+    throw error;
+  }
+};
 
 /**
  * getUserDocument : version existante conservée (utile à refreshUser),
- * mais ⚠️ la lecture initiale ne s’appuie PLUS dessus — elle passe par le flux 2 temps plus bas.
+ * mais ⚠️ la lecture initiale ne s'appuie PLUS dessus — elle passe par le flux 2 temps plus bas.
  */
 const getUserDocument = async (firebaseUser: FirebaseUser): Promise<User | null> => {
   const refUser = doc(db, 'users', firebaseUser.uid);
@@ -359,7 +413,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
   /** ================================
-   * 1) Écouter l’auth et stocker l’utilisateur
+   * 1) Écouter l'auth et stocker l'utilisateur
    * ================================ */
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
@@ -383,14 +437,14 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   // Flag déconnexion pour éviter les réinjections via snapshot
   const signingOutRef = useRef<boolean>(false);
 
-  // onAuthStateChanged → ne fait que stocker l’utilisateur auth
+  // onAuthStateChanged → ne fait que stocker l'utilisateur auth
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setIsLoading(true);
       setAuthUser(u);
       setFirebaseUser(u ?? null);
       if (!u) {
-        // Pas d’utilisateur → on nettoie l’état applicatif
+        // Pas d'utilisateur → on nettoie l'état applicatif
         setUser(null);
         signingOutRef.current = false;
         setIsLoading(false);
@@ -408,7 +462,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   const firstSnapArrived = useRef(false);
 
   useEffect(() => {
-    if (!authUser) return;               // attendre l’auth
+    if (!authUser) return;               // attendre l'auth
     if (subscribed.current) return;      // éviter double abonnement en StrictMode
     subscribed.current = true;
     firstSnapArrived.current = false;

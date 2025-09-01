@@ -2,6 +2,7 @@
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { createCallSession } from './callScheduler';
 import { logError } from './utils/logs/logError';
+import * as admin from 'firebase-admin';
 
 // ✅ Interface corrigée pour correspondre exactement aux données frontend
 interface CreateCallRequest {
@@ -17,6 +18,18 @@ interface CreateCallRequest {
   clientLanguages?: string[];
   providerLanguages?: string[];
   clientWhatsapp?: string;
+}
+
+/**
+ * Valide et retourne un numéro de téléphone au format E164
+ * @param phone Le numéro de téléphone à valider
+ * @param who Indique si c'est le numéro du provider ou du client (pour les messages d'erreur)
+ * @returns Le numéro validé
+ * @throws Error si le numéro n'est pas valide
+ */
+export function assertE164(phone: string, who: 'provider' | 'client') {
+  if (!/^\+[1-9]\d{8,14}$/.test(phone || '')) throw new Error(`Invalid ${who} phone: ${phone}`);
+  return phone;
 }
 
 /**
@@ -200,35 +213,29 @@ export const createAndScheduleCallHTTPS = onCall(
       console.log(`✅ [${requestId}] Montant validé: ${amount}€`);
 
       // ========================================
-      // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE
+      // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE AVEC assertE164
       // ========================================
-      const phoneRegex = /^\+[1-9]\d{8,14}$/;
-      
-      if (!phoneRegex.test(providerPhone)) {
-        console.error(`❌ [${requestId}] Numéro prestataire invalide:`, providerPhone);
+      try {
+        // Utilisation de la nouvelle fonction assertE164 pour valider les numéros
+        const validatedProviderPhone = assertE164(providerPhone, 'provider');
+        const validatedClientPhone = assertE164(clientPhone, 'client');
+
+        if (validatedProviderPhone === validatedClientPhone) {
+          console.error(`❌ [${requestId}] Numéros identiques:`, { providerPhone: validatedProviderPhone, clientPhone: validatedClientPhone });
+          throw new HttpsError(
+            'invalid-argument',
+            'Les numéros du prestataire et du client doivent être différents.'
+          );
+        }
+
+        console.log(`✅ [${requestId}] Numéros de téléphone validés avec assertE164`);
+      } catch (phoneError) {
+        console.error(`❌ [${requestId}] Erreur validation numéro:`, phoneError);
         throw new HttpsError(
           'invalid-argument',
-          'Numéro de téléphone prestataire invalide. Format requis: +33XXXXXXXXX'
+          phoneError instanceof Error ? phoneError.message : 'Numéro de téléphone invalide. Format requis: +33XXXXXXXXX'
         );
       }
-
-      if (!phoneRegex.test(clientPhone)) {
-        console.error(`❌ [${requestId}] Numéro client invalide:`, clientPhone);
-        throw new HttpsError(
-          'invalid-argument',
-          'Numéro de téléphone client invalide. Format requis: +33XXXXXXXXX'
-        );
-      }
-
-      if (providerPhone === clientPhone) {
-        console.error(`❌ [${requestId}] Numéros identiques:`, { providerPhone, clientPhone });
-        throw new HttpsError(
-          'invalid-argument',
-          'Les numéros du prestataire et du client doivent être différents.'
-        );
-      }
-
-      console.log(`✅ [${requestId}] Numéros de téléphone validés`);
 
       // ========================================
       // 7. VALIDATION DU PAYMENT INTENT
@@ -268,11 +275,40 @@ export const createAndScheduleCallHTTPS = onCall(
         providerLanguages: providerLanguages || ['fr']
       });
 
+      console.log(`✅ [${requestId}] Session d'appel créée avec succès - ID: ${callSession.id}`);
+
+      // ========================================
+      // 9. ÉCRITURE VERS LA COLLECTION PAYMENTS
+      // ========================================
+      try {
+        console.log(`💾 [${requestId}] Écriture vers collection payments - PaymentIntent: ${paymentIntentId}`);
+        
+        await admin.firestore()
+          .collection('payments')
+          .doc(paymentIntentId) // l'ID du PaymentIntent passé par le front
+          .set({ 
+            callSessionId: callSession.id, 
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            // Ajout d'informations contextuelles utiles
+            amount: amount,
+            serviceType: serviceType,
+            clientId: clientId,
+            providerId: providerId,
+            status: 'call_session_created',
+            requestId: requestId
+          }, { merge: true });
+
+        console.log(`✅ [${requestId}] Écriture payments réussie - Lien créé: ${paymentIntentId} → ${callSession.id}`);
+      } catch (paymentsError) {
+        console.error(`❌ [${requestId}] Erreur écriture payments:`, paymentsError);
+        // On ne fait pas échouer la fonction pour autant, juste un warning
+        console.warn(`⚠️ [${requestId}] Session créée mais lien payments échoué - webhook pourra toujours fonctionner`);
+      }
+
       // ✅ RECTIFICATION MAJEURE: Plus de planification ici
       // La planification sera désormais gérée par le webhook Stripe à payment_intent.succeeded
       // qui créera une Cloud Task programmée à +5 minutes
 
-      console.log(`✅ [${requestId}] Session d'appel créée avec succès - ID: ${callSession.id}`);
       console.log(`📅 [${requestId}] Status: ${callSession.status}`);
       console.log(`⏰ [${requestId}] Planification: Sera gérée par webhook Stripe à +5 min`);
 
@@ -280,7 +316,7 @@ export const createAndScheduleCallHTTPS = onCall(
       const theoreticalScheduledTime = new Date(Date.now() + (5 * 60 * 1000)); // +5 min fixe
 
       // ========================================
-      // 9. RÉPONSE DE SUCCÈS
+      // 10. RÉPONSE DE SUCCÈS
       // ========================================
       const response = {
         success: true,
@@ -317,7 +353,7 @@ export const createAndScheduleCallHTTPS = onCall(
 
     } catch (error: unknown) {
       // ========================================
-      // 10. GESTION D'ERREURS COMPLÈTE
+      // 11. GESTION D'ERREURS COMPLÈTE
       // ========================================
       const errorDetails = {
         requestId,

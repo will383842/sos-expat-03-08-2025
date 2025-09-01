@@ -1,3 +1,4 @@
+// CallCheckout.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +20,10 @@ import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
 import { detectUserCurrency, usePricingConfig } from '../services/pricingService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+
+// imports
+import PhoneField from '@/components/PhoneField';
+import { useForm } from 'react-hook-form';
 
 /* ------------------------------ Stripe init ------------------------------ */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
@@ -247,31 +252,11 @@ const useSEO = (meta: {
 /* ------------------------ Helpers: device & phone utils ------------------ */
 const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
 
-// E.164 normalizer (critique pour la CF)
+// E.164 normalizer
 const toE164 = (raw?: string) => {
   if (!raw) return '';
   const p = parsePhoneNumberFromString(raw);
   return p?.isValid() ? p.number : '';
-};
-
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(max-width: 640px), (pointer: coarse)');
-    const update = () => setIsMobile(!!mq.matches);
-    update();
-    if ('addEventListener' in mq) {
-      mq.addEventListener('change', update);
-      return () => mq.removeEventListener('change', update);
-    } else {
-      // @ts-expect-error legacy safari
-      mq.addListener(update);
-      // @ts-expect-error legacy safari
-      return () => mq.removeListener(update);
-    }
-  }, []);
-  return isMobile;
 };
 
 /* --------------------- Price tracing: hook & helpers --------------------- */
@@ -411,6 +396,10 @@ interface PaymentFormProps {
   isMobile: boolean;
 }
 
+type PhoneFormValues = {
+  clientPhone: string;
+};
+
 const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, service, adminPricing, onSuccess, onError, isProcessing, setIsProcessing, isMobile }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -428,6 +417,12 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState<(() => Promise<void>) | null>(null);
+
+  const { control, watch, setError } = useForm<PhoneFormValues>({
+    defaultValues: {
+      clientPhone: service?.clientPhone || '',
+    }
+  });
 
   const validatePaymentData = useCallback(() => {
     if (!stripe || !elements) throw new Error(t('err.invalidConfig'));
@@ -449,7 +444,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         clientId: user.uid!,
         clientEmail: user.email || '',
         clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        clientPhone: service.clientPhone,
+        clientPhone: watch('clientPhone'),
         clientWhatsapp: '',
         serviceType: service.serviceType,
         duration: adminPricing.duration,
@@ -465,7 +460,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
       try { await setDoc(doc(db, 'users', user.uid!, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
       try { await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
     },
-    [provider, service.clientPhone, service.serviceType, user, adminPricing, serviceCurrency]
+    [provider, user, adminPricing, serviceCurrency, service.serviceType, watch]
   );
 
   const actuallySubmitPayment = useCallback(async () => {
@@ -492,7 +487,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           providerType: provider.role || provider.type || 'expat',
           duration: String(adminPricing.duration),
           clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-          clientPhone: service.clientPhone,
+          clientPhone: watch('clientPhone'),
           clientWhatsapp: '',
           currency: serviceCurrency,
           timestamp: new Date().toISOString()
@@ -531,15 +526,31 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         throw new Error(`${t('err.unexpectedStatus')}: ${status}`);
       }
 
-      // ✅ ne pas bloquer l'UX
+      const clientPhoneE164 = toE164(user?.phone || '') || service.clientPhone;
+      // Utiliser le téléphone du provider depuis les données de session ou provider
+      const providerPhoneE164 = toE164(provider?.phoneNumber || provider?.phone || '');
+
+      // Debug : afficher les numéros récupérés
+      console.log('Debug phones:', {
+        clientPhoneE164,
+        providerPhoneE164,
+        userPhone: user?.phone,
+        serviceClientPhone: service.clientPhone,
+        providerPhone: provider?.phone,
+        providerPhoneNumber: provider?.phoneNumber
+      });
+
+      if (!/^\+[1-9]\d{8,14}$/.test(clientPhoneE164)) {
+        console.warn('Invalid client phone:', clientPhoneE164);
+        setError('clientPhone', { type: 'validate', message: t('err.invalidPhone') });
+      }
+
+      if (!/^\+[1-9]\d{8,14}$/.test(providerPhoneE164)) {
+        console.warn('Invalid provider phone:', providerPhoneE164);
+      }
+
       void persistPaymentDocs(paymentIntent.id);
 
-      const rawClientPhone   = service.clientPhone || user?.phone || '';
-      const rawProviderPhone = provider.phoneNumber || provider.phone || '';
-      const clientPhoneE164   = toE164(rawClientPhone);
-      const providerPhoneE164 = toE164(rawProviderPhone);
-
-      // ✅ naviguer immédiatement
       const gtag = getGtag();
       gtag?.('event', 'checkout_success', {
         service_type: service.serviceType,
@@ -552,10 +563,11 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
 
       onSuccess({ paymentIntentId: paymentIntent.id, call: 'skipped' });
 
-      // 🚀 planifier l'appel en tâche de fond (sans bloquer la navigation)
-      if (clientPhoneE164 && providerPhoneE164) {
+      // Planifier l'appel si les numéros sont valides
+      if (/^\+[1-9]\d{8,14}$/.test(clientPhoneE164) && /^\+[1-9]\d{8,14}$/.test(providerPhoneE164)) {
         const createAndScheduleCall: HttpsCallable<CreateAndScheduleCallData, { success: boolean; callId?: string }> =
           httpsCallable(functions, 'createAndScheduleCall');
+
         const callData: CreateAndScheduleCallData = {
           providerId: provider.id,
           clientId: user.uid!,
@@ -571,6 +583,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           clientLanguages: [language],
           providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
         };
+
         void (async () => {
           try {
             await createAndScheduleCall(callData);
@@ -596,13 +609,10 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
     adminPricing.providerAmount,
     stripeCurrency,
     service.serviceType,
-    provider.id,
+    provider,
     user.uid,
     user.email,
-    provider.fullName,
-    provider.name,
     language,
-    service.clientPhone,
     adminPricing.duration,
     serviceCurrency,
     isMobile,
@@ -610,20 +620,16 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
     stripe,
     onSuccess,
     onError,
-    provider.role,
-    provider.type,
-    provider.phoneNumber,
-    provider.phone,
-    user.firstName,
-    user.lastName,
     persistPaymentDocs,
+    setError,
+    watch,
+    t,
   ]);
 
   const handlePaymentSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
 
-    // Remplace confirm() bloquant par une modale non bloquante
     if (adminPricing.totalAmount > 100) {
       setPendingSubmit(() => actuallySubmitPayment);
       setShowConfirm(true);
@@ -730,7 +736,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
               <span className="text-gray-600">Expert</span>
               <div className="flex items-center space-x-2">
                 <img
-                  src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
+                  src={provider.avatar || (provider as any).profilePhoto || '/default-avatar.png'}
                   className="w-5 h-5 rounded-full object-cover"
                   onError={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
@@ -814,7 +820,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         </div>
       </form>
 
-      {/* Modale de confirmation non bloquante */}
+      {/* Modale de confirmation */}
       <ConfirmModal
         open={showConfirm}
         title={language === 'fr' ? 'Confirmer le paiement' : 'Confirm payment'}
@@ -858,9 +864,28 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isMobile = useIsMobile();
-  const { getTraceAttributes } = usePriceTracing();
 
+  const isMobile = (() => {
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+    useEffect(() => {
+      if (typeof window === 'undefined' || !window.matchMedia) return;
+      const mq = window.matchMedia('(max-width: 640px), (pointer: coarse)');
+      const update = () => setIsMobile(!!mq.matches);
+      update();
+      if ('addEventListener' in mq) {
+        mq.addEventListener('change', update);
+        return () => mq.removeEventListener('change', update);
+      } else {
+        // @ts-expect-error legacy safari
+        mq.addListener(update);
+        // @ts-expect-error legacy safari
+        return () => mq.removeListener(update);
+      }
+    }, []);
+    return isMobile;
+  })();
+
+  const { getTraceAttributes } = usePriceTracing();
   const { pricing, error: pricingError, loading: pricingLoading } = usePricingConfig() as {
     pricing?: { lawyer: Record<Currency, PricingEntryTrace>; expat: Record<Currency, PricingEntryTrace> };
     error?: unknown;
@@ -944,7 +969,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   }, [provider, adminPricing, providerRole, user?.phone, selectedCurrency, storedClientPhone]);
 
   const cardTraceAttrs = useMemo(
-    () => getTraceAttributes(providerRole || 'expat', selectedCurrency),
+    () => getTraceAttributes((providerRole || 'expat') as ServiceKind, selectedCurrency),
     [getTraceAttributes, providerRole, selectedCurrency]
   );
 
@@ -991,7 +1016,6 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     }
   }
 
-  // ✅ Mémoïse l'objet SEO pour éviter des recalculs inutiles
   const seoMeta = useMemo(() => ({
     title: t('meta.title'),
     description: t('meta.description'),
@@ -1093,7 +1117,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     );
   }
 
-  if (!provider || !adminPricing || !service) {
+  if (!provider) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
@@ -1121,7 +1145,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     );
   }
 
-  if (!user || !user.uid) {
+  if (!user || !user.uid || !adminPricing || !service) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 px-4">
@@ -1185,7 +1209,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">
                 <img
-                  src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
+                  src={provider.avatar || (provider as any).profilePhoto || '/default-avatar.png'}
                   alt={provider.fullName || provider.name || 'Expert'}
                   className="w-12 h-12 rounded-lg object-cover ring-2 ring-white shadow-sm"
                   onError={(e) => {
@@ -1207,7 +1231,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                   }>
                     {(provider.role || provider.type) === 'lawyer' ? (language === 'fr' ? 'Avocat' : 'Lawyer') : (language === 'fr' ? 'Expert' : 'Expert')}
                   </span>
-                  <span className="text-gray-600 text-xs">{provider?.country || 'FR'}</span>
+                  <span className="text-gray-600 text-xs">{(provider as any)?.country || 'FR'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                   <Clock size={12} aria-hidden="true" />
@@ -1217,17 +1241,13 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                 </div>
               </div>
 
-              <div
-                className="text-right flex-shrink-0"
-                {...cardTraceAttrs}
-              >
+              <div className="text-right flex-shrink-0" {...cardTraceAttrs}>
                 <div className="text-2xl font-black bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
                   {new Intl.NumberFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
-                  style: 'currency',
-                  currency: selectedCurrency.toUpperCase(),
-                  minimumFractionDigits: 2,
-                }).format(adminPricing.totalAmount)}
-
+                    style: 'currency',
+                    currency: selectedCurrency.toUpperCase(),
+                    minimumFractionDigits: 2,
+                  }).format(adminPricing.totalAmount)}
                 </div>
                 <div className="text-xs text-gray-500">{adminPricing.duration} min</div>
               </div>

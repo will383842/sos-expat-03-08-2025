@@ -34,6 +34,9 @@ interface Provider {
   readonly isApproved: boolean;
   readonly isVisible: boolean;
   readonly isActive: boolean;
+    readonly isBanned?: boolean;
+  readonly role?: string;
+  readonly isAdmin?: boolean;
   readonly createdAt?: number;
   readonly updatedAt?: number;
   readonly timezone?: string;
@@ -288,9 +291,12 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         reviewCount: Math.max(0, Number(data.reviewCount) || 0),
         yearsOfExperience: Math.max(0, Number(data.yearsOfExperience) || Number(data.yearsAsExpat) || 0),
         isOnline: Boolean(data.isOnline),
-        isApproved: data.isApproved !== false,
+        isApproved: data.isApproved === true,
         isVisible: data.isVisible !== false,
         isActive: data.isActive !== false,
+        isBanned: data.isBanned === true,
+        role: typeof data.role === 'string' ? String(data.role).toLowerCase() : undefined,
+        isAdmin: data.isAdmin === true,
         avatar: String(data.profilePhoto || data.photoURL || data.avatar || DEFAULT_AVATAR),
         description: String(data.bio || data.description || 
           (typeRaw === 'lawyer' 
@@ -336,7 +342,6 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
         firestoreQuery = query(
           collection(db, FIREBASE_COLLECTION),
           where('isApproved', '==', true),
-          where('isVisible', '==', true),
           where('isActive', '==', true),
           orderBy('isOnline', 'desc'),
           orderBy('rating', 'desc'),
@@ -398,7 +403,17 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
     }
     
     let filtered = [...providers];
-    
+    // Règle globale d’affichage (alignée Home & SOS Call)
+// - Avocats : isApproved === true obligatoire
+// - Expats : pas d’approval requis
+// - Exclus : admin + bannis + non visibles
+filtered = filtered.filter(p => {
+  const notAdmin = (p.role ?? '') !== 'admin' && p.isAdmin !== true;
+  const notBanned = p.isBanned !== true;
+  const visible = p.isVisible !== false;
+  const lawyerRule = p.type !== 'lawyer' || p.isApproved === true;
+  return notAdmin && notBanned && visible && lawyerRule;
+});
     // Base filters with AI-friendly logic
     if (filter === 'providers-only') {
       filtered = filtered.filter(provider => 
@@ -415,17 +430,17 @@ const ProfileCards: React.FC<ProfileCardsProps> = ({
       
       filtered = filtered.filter(provider => {
         const searchableContent = [
-          provider.name,
-          provider.fullName,
-          provider.firstName,
-          provider.lastName,
-          provider.country,
-          provider.description,
-          ...provider.languages,
-          ...provider.specialties,
-          ...(provider.certifications || []),
-          provider.type === 'lawyer' ? 'avocat juriste juridique droit' : 'expatrié expat immigration visa',
-        ].join(' ').toLowerCase();
+  provider.name,
+  provider.fullName,
+  provider.firstName,
+  provider.lastName,
+  provider.country,
+  provider.description,
+  ...provider.languages,
+  ...provider.specialties,
+  ...(provider.certifications || []),
+  provider.type === 'lawyer' ? 'avocat juriste juridique droit' : 'expatrié expat immigration visa',
+].join(' ').toLowerCase();
         
         // Multi-term search with relevance
         return searchTerms.every(term => 

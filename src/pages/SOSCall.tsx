@@ -6,8 +6,10 @@ import { db } from '../config/firebase';
 import Layout from '../components/layout/Layout';
 import SEOHead from '../components/layout/SEOHead';
 import { useApp } from '../contexts/AppContext';
-import { getCountryCoordinates } from '../utils/countryCoordinates';
 
+/* =========================
+   Types
+========================= */
 interface Provider {
   id: string;
   name: string;
@@ -23,13 +25,15 @@ interface Provider {
   isOnline: boolean;
   avatar: string;
   specialties: string[];
+  interventionCountries?: string[];
   description: string;
   duration?: number;
   isActive?: boolean;
   isVisible?: boolean;
   isApproved?: boolean;
-  hasValidCountry?: boolean;
   isBanned?: boolean;
+  role?: string;         // ajouté pour exclure admin
+  isAdmin?: boolean;     // ajouté pour exclure admin
 }
 
 interface RawProfile extends DocumentData {
@@ -50,15 +54,17 @@ interface RawProfile extends DocumentData {
   isVisible?: boolean;
   isApproved?: boolean;
   isBanned?: boolean;
+  role?: string;
+  isAdmin?: boolean;
   bio?: string;
   price?: number;
   duration?: number;
   profilePhoto?: string;
 }
 
-/* ----------------------------
+/* =========================
    Utils
------------------------------*/
+========================= */
 const slugify = (s: string) =>
   (s || '')
     .toString()
@@ -69,11 +75,9 @@ const slugify = (s: string) =>
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-const normalize = (s: string) =>
-  slugify(s).replace(/-/g, '');
+const normalize = (s: string) => slugify(s).replace(/-/g, '');
 
 const LANGUAGE_LABELS_FR: Record<string, string> = {
-  // ISO → Français
   af: 'Afrikaans', sq: 'Albanais', am: 'Amharique', ar: 'Arabe', hy: 'Arménien',
   az: 'Azéri', eu: 'Basque', be: 'Biélorusse', bn: 'Bengali', bs: 'Bosniaque',
   bg: 'Bulgare', my: 'Birman', ca: 'Catalan', zh: 'Chinois', 'zh-cn': 'Chinois', 'zh-tw': 'Chinois',
@@ -93,7 +97,6 @@ const LANGUAGE_LABELS_FR: Record<string, string> = {
 };
 
 const LANGUAGE_ALIASES: Record<string, string> = {
-  // Anglais/variantes → Français
   english: 'Anglais', french: 'Français', spanish: 'Espagnol', espanol: 'Espagnol',
   german: 'Allemand', deutsch: 'Allemand', italian: 'Italien', italiano: 'Italien',
   portuguese: 'Portugais', portugues: 'Portugais', russian: 'Russe', русский: 'Russe',
@@ -106,31 +109,26 @@ const getLanguageLabel = (language: string): string => {
   const raw = (language || '').trim();
   if (!raw) return '';
   const key = raw.toLowerCase();
-  // iso direct
   if (LANGUAGE_LABELS_FR[key]) return LANGUAGE_LABELS_FR[key];
-  // iso 2 lettres propres (ex: 'EN', 'Fr')
   const k2 = key.slice(0, 2);
   if (LANGUAGE_LABELS_FR[k2]) return LANGUAGE_LABELS_FR[k2];
-  // alias anglais/var
   if (LANGUAGE_ALIASES[key]) return LANGUAGE_ALIASES[key];
-  // déjà en français ? (capitalisation)
   const frenchGuess: Record<string, string> = {
-    'francais': 'Français', 'anglais': 'Anglais', 'espagnol': 'Espagnol', 'allemand': 'Allemand',
-    'italien': 'Italien', 'portugais': 'Portugais', 'russe': 'Russe', 'chinois': 'Chinois',
-    'japonais': 'Japonais', 'coréen': 'Coréen', 'arabe': 'Arabe', 'hindi': 'Hindi', 'thaï': 'Thaï',
-    'neerlandais': 'Néerlandais', 'néerlandais': 'Néerlandais', 'polonais': 'Polonais'
+    francais: 'Français', anglais: 'Anglais', espagnol: 'Espagnol', allemand: 'Allemand',
+    italien: 'Italien', portugais: 'Portugais', russe: 'Russe', chinois: 'Chinois',
+    japonais: 'Japonais', coréen: 'Coréen', arabe: 'Arabe', hindi: 'Hindi', 'thaï': 'Thaï',
+    neerlandais: 'Néerlandais', 'néerlandais': 'Néerlandais', polonais: 'Polonais'
   };
   const norm = normalize(raw);
   for (const [k, v] of Object.entries(frenchGuess)) {
     if (normalize(k) === norm) return v;
   }
-  // fallback: capitaliser
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 };
 
-/* ----------------------------
-   Filtres (options)
------------------------------*/
+/* =========================
+   Options filtres
+========================= */
 const countryOptions = [
   'Afghanistan','Afrique du Sud','Albanie','Algérie','Allemagne','Andorre','Angola',
   'Arabie Saoudite','Argentine','Arménie','Australie','Autriche','Azerbaïdjan',
@@ -173,9 +171,9 @@ const languageOptions = [
   'Swahili','Afrikaans','Azéri','Arménien','Géorgien','Khmer','Laotien','Mongol','Népalais','Singhalais',
 ];
 
-/* ----------------------------
+/* =========================
    Composant principal
------------------------------*/
+========================= */
 const SOSCall: React.FC = () => {
   const { language } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -194,7 +192,7 @@ const SOSCall: React.FC = () => {
   const [showCustomCountry, setShowCustomCountry] = useState<boolean>(false);
   const [showCustomLanguage, setShowCustomLanguage] = useState<boolean>(false);
 
-  // Statut (tous / en ligne / hors-ligne). On conserve onlineOnly pour compat logique.
+  // Statut
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [onlineOnly, setOnlineOnly] = useState<boolean>(false);
 
@@ -217,7 +215,7 @@ const SOSCall: React.FC = () => {
     }
   });
 
-  // Charger providers (logique identique avec DEBUG)
+  // Charger providers
   useEffect(() => {
     const typeParam = searchParams.get('type');
     if (typeParam === 'lawyer' || typeParam === 'expat') {
@@ -225,97 +223,17 @@ const SOSCall: React.FC = () => {
       setSearchParams({ type: typeParam });
     }
 
-    // 🔧 DÉBUT DEBUG SOSCall
-    console.log('\n🔍 DEBUG SOSCALL - DÉBUT');
-    
-    // Test requête simple AVANT la requête principale
-    const debugQueries = async () => {
-      try {
-        console.log('📡 SOSCall - Test requête basique...');
-        const simpleQuery = query(collection(db, 'sos_profiles'));
-        const simpleSnap = await getDocs(simpleQuery);
-        console.log(`📊 SOSCall - Tous les documents: ${simpleSnap.size}`);
-        
-        simpleSnap.docs.forEach((doc, i) => {
-          const data = doc.data();
-          console.log(`SOSCall Doc ${i+1}: ${doc.id}`, {
-            type: data.type,
-            isVisible: data.isVisible,
-            isActive: data.isActive,
-            isApproved: data.isApproved,
-            fullName: data.fullName
-          });
-        });
-
-        console.log('📡 SOSCall - Test avec filtres...');
-        const filteredQuery = query(
-          collection(db, 'sos_profiles'),
-          where('type', 'in', ['lawyer', 'expat']),
-          where('isVisible', '==', true),
-          limit(100)
-        );
-        const filteredSnap = await getDocs(filteredQuery);
-        console.log(`📊 SOSCall - Avec filtres: ${filteredSnap.size}`);
-        
-        filteredSnap.docs.forEach((doc, i) => {
-          const data = doc.data();
-          console.log(`SOSCall Filtered ${i+1}: ${doc.id}`, {
-            type: data.type,
-            isVisible: data.isVisible,
-            name: data.fullName
-          });
-        });
-
-        // 🔍 VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS dans SOSCall
-        console.log('\n🔍 SOSCall - VÉRIFICATION SPÉCIFIQUE DE VOS PROFILS');
-        const targetProfiles = ['expat2', 'expat3', 'avocat1']; // Adaptez les IDs
-        
-        for (const profileId of targetProfiles) {
-          try {
-            const docRef = doc(db, 'sos_profiles', profileId);
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              console.log(`✅ SOSCall - ${profileId} existe:`, {
-                type: data.type,
-                isVisible: data.isVisible,
-                isActive: data.isActive,
-                isApproved: data.isApproved,
-                typeCheck: ['lawyer', 'expat'].includes(data.type),
-                visibleCheck: data.isVisible === true,
-                passesFilters: data.isVisible === true && ['lawyer', 'expat'].includes(data.type)
-              });
-            } else {
-              console.log(`❌ SOSCall - ${profileId} N'EXISTE PAS`);
-            }
-          } catch (err) {
-            console.error(`💥 SOSCall - Erreur ${profileId}:`, err);
-          }
-        }
-        
-      } catch (error) {
-        console.error('🔍 Erreur debug SOSCall:', error);
-      }
-    };
-    
-    debugQueries();
-    // 🔧 FIN DEBUG SOSCall
-
+    // Requête TOLÉRANTE (pas de where isVisible === true)
     const sosProfilesQuery = query(
       collection(db, 'sos_profiles'),
       where('type', 'in', ['lawyer', 'expat']),
-      where('isVisible', '==', true),
       limit(100)
     );
 
     const unsubscribe = onSnapshot(
       sosProfilesQuery,
       (snapshot) => {
-        console.log(`🔍 SOSCall onSnapshot reçu: ${snapshot.size} documents`);
-        
         if (snapshot.empty) {
-          console.log('⚠️ SOSCall: Snapshot vide - Aucun document trouvé');
           setRealProviders([]);
           setFilteredProviders([]);
           setIsLoadingProviders(false);
@@ -324,40 +242,31 @@ const SOSCall: React.FC = () => {
 
         const allProfiles: Provider[] = [];
 
-        snapshot.docs.forEach((doc, index) => {
-          const data = doc.data() as RawProfile;
-          const docId = doc.id;
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as RawProfile;
 
-          console.log(`\n🔄 SOSCall TRAITEMENT ${docId} (${index + 1}/${snapshot.size}):`);
+          const fullName =
+            data.fullName ||
+            `${data.firstName || ''} ${data.lastName || ''}`.trim() ||
+            'Expert';
 
-          const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Expert';
-          const type: 'lawyer' | 'expat' = data.type === 'lawyer' ? 'lawyer' : 'expat';
+          const type: 'lawyer' | 'expat' =
+            data.type === 'lawyer' ? 'lawyer' : 'expat';
 
-          console.log(`1️⃣ SOSCall - Nom: "${fullName}", Type: "${type}"`);
+          // Pays : fallback "Monde", aucun contrôle coordonnée
+          const country =
+            data.currentPresenceCountry ||
+            data.country ||
+            'Monde';
 
-          const isApproved = data.isApproved !== false;
-          const isActive = data.isActive !== false;
-          const isOnline = data.isOnline === true;
-          const isVisible = data.isVisible !== false;
-
-          const presenceCountry = data.currentPresenceCountry || data.country || '';
-          const hasValidCountry = !!presenceCountry && getCountryCoordinates(presenceCountry) !== null;
-
-          console.log(`2️⃣ SOSCall - Validations:`, {
-            isApproved: `${data.isApproved} → ${isApproved}`,
-            isActive: `${data.isActive} → ${isActive}`,
-            isVisible: `${data.isVisible} → ${isVisible}`,
-            hasValidCountry,
-            presenceCountry
-          });
-
+          // Hydratation provider
           const provider: Provider = {
-            id: doc.id,
+            id: docSnap.id,
             name: fullName,
             firstName: data.firstName,
             lastName: data.lastName,
             type,
-            country: presenceCountry,
+            country,
             languages: Array.isArray(data.languages) && data.languages.length > 0 ? data.languages : ['fr'],
             specialties: Array.isArray(data.specialties) ? data.specialties : [],
             rating: typeof data.rating === 'number' ? data.rating : 4.5,
@@ -365,64 +274,40 @@ const SOSCall: React.FC = () => {
             yearsOfExperience:
               (typeof data.yearsOfExperience === 'number' ? data.yearsOfExperience : undefined) ??
               (typeof data.yearsAsExpat === 'number' ? data.yearsAsExpat : 0),
-            isOnline,
-            isActive,
-            isVisible,
-            isApproved,
-            hasValidCountry,
-            isBanned: !!data.isBanned,
+            isOnline: data.isOnline === true,
+            isActive: data.isActive !== false,
+            isVisible: data.isVisible !== false, // visible par défaut
+            isApproved: data.isApproved !== false, // tolérant par défaut
+            isBanned: data.isBanned === true,
+            role: typeof data.role === 'string' ? String(data.role).toLowerCase() : undefined,
+            isAdmin: data.isAdmin === true,
             description: typeof data.bio === 'string' ? data.bio : '',
             price: typeof data.price === 'number' ? data.price : (type === 'lawyer' ? 49 : 19),
             duration: data.duration,
             avatar:
               typeof data.profilePhoto === 'string' && data.profilePhoto.trim() !== ''
                 ? data.profilePhoto
-                : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&dpr=2',
+                : '/default-avatar.png',
           };
 
-          // 🔧 VALIDATION SOSCall avec logs détaillés
-          const validations = {
-            typeValid: provider.type === 'lawyer' || provider.type === 'expat',
-            notBanned: provider.isBanned !== true,
-            hasBasicInfo: provider.name && provider.name.trim() !== '',
-            hasCountry: provider.country && provider.country.trim() !== '',
-            isVisible: provider.isVisible !== false,
-            lawyerApproved: provider.type !== 'lawyer' || provider.isApproved !== false
-          };
+          // Règle d'affichage unifiée (Home/SOS)
+          const notAdmin = (provider.role ?? '') !== 'admin' && provider.isAdmin !== true;
+          const notBanned = provider.isBanned !== true;
+          const hasBasicInfo = provider.name.trim() !== '';
+          const hasCountry = provider.country.trim() !== '';
+          const visible = provider.isVisible !== false;
+          const lawyerApproved = provider.type !== 'lawyer' || provider.isApproved === true;
 
-          const shouldInclude = Object.values(validations).every(Boolean);
-
-          console.log(`3️⃣ SOSCall - Décision finale ${provider.name}:`, {
-            ...validations,
-            shouldInclude
-          });
+          const shouldInclude =
+            notAdmin && notBanned && hasBasicInfo && hasCountry && visible && lawyerApproved;
 
           if (shouldInclude) {
             allProfiles.push(provider);
-            console.log(`✅ SOSCall - ${provider.name} (${provider.type}) AJOUTÉ - Total: ${allProfiles.length}`);
-          } else {
-            console.log(`❌ SOSCall - ${provider.name} (${provider.type}) REJETÉ`);
           }
         });
 
-        console.log(`\n🏁 SOSCall RÉSULTAT FINAL: ${allProfiles.length} profils ajoutés`);
-        console.log('SOSCall Profils finaux:', allProfiles.map(p => ({ id: p.id, name: p.name, type: p.type })));
-
-        const onlyProviders = allProfiles.filter(
-          (p: Provider) => p.type === 'lawyer' || p.type === 'expat'
-        );
-
-        const activeProfiles = onlyProviders.filter((p: Provider) => {
-          const notBanned = p.isBanned !== true;
-          const hasBasicInfo = p.name && p.name.trim() !== '';
-          const hasCountry = p.country && p.country.trim() !== '';
-          const visible = p.isVisible !== false;
-          const lawyerApproved = p.type !== 'lawyer' || p.isApproved !== false;
-          return notBanned && hasBasicInfo && hasCountry && visible && lawyerApproved;
-        });
-
-        setRealProviders(activeProfiles);
-        setFilteredProviders(activeProfiles);
+        setRealProviders(allProfiles);
+        setFilteredProviders(allProfiles);
         setIsLoadingProviders(false);
       },
       (error) => {
@@ -444,7 +329,6 @@ const SOSCall: React.FC = () => {
       if (!custom) return true;
       return normalize(prov).includes(normalize(custom));
     }
-    // stricte + slug + includes
     if (prov === selected) return true;
     if (normalize(prov) === normalize(selected)) return true;
     return prov.toLowerCase().includes(selected.toLowerCase());
@@ -463,7 +347,7 @@ const SOSCall: React.FC = () => {
     return normalizedProv.some((v) => v === target);
   };
 
-  // Filtrage + tri (conserve la logique d'origine, ajoute statut étendu)
+  // Filtrage + tri
   useEffect(() => {
     if (realProviders.length === 0) {
       setFilteredProviders([]);
@@ -478,7 +362,7 @@ const SOSCall: React.FC = () => {
       const matchesStatus =
         statusFilter === 'all' ? true :
         statusFilter === 'online' ? provider.isOnline :
-        !provider.isOnline; // offline
+        !provider.isOnline;
 
       return matchesType && matchesCountry && matchesLanguage && matchesStatus;
     });
@@ -496,8 +380,8 @@ const SOSCall: React.FC = () => {
     });
 
     setFilteredProviders(next);
-    setPage(1); // UX: reset à la première page si filtres changent
-    setOnlineOnly(statusFilter === 'online'); // compat
+    setPage(1);
+    setOnlineOnly(statusFilter === 'online');
   }, [
     realProviders,
     selectedType,
@@ -569,7 +453,9 @@ const SOSCall: React.FC = () => {
     return { text: safe.substring(0, maxLength) + '...', isTruncated: true };
   };
 
-  // Rendu
+  /* =========================
+     Rendu
+  ========================= */
   return (
     <Layout>
       <SEOHead
@@ -690,7 +576,7 @@ const SOSCall: React.FC = () => {
                         onChange={(e) => handleCountryChange(e.target.value)}
                         className="
                           w-full px-3 py-2
-                          bg-white text-gray-900
+                          bg-white text-gray-9 00
                           border border-gray-300 rounded-xl
                           dark:bg-white/10 dark:text-white dark:border-white/20
                           focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent
@@ -760,7 +646,7 @@ const SOSCall: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Statut avec Wi-Fi */}
+                  {/* Statut */}
                   <div className="space-y-1 lg:col-span-2">
                     <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wide">
                       Statut
@@ -868,178 +754,268 @@ const SOSCall: React.FC = () => {
               </div>
             ) : filteredProviders.length > 0 ? (
               <>
-                {/* Grille 9 cartes/page */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {paginatedProviders.map((provider) => {
-                    const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 110);
-                    const langs = provider.languages
-                      .slice(0, 3)
-                      .map(getLanguageLabel);
+{/* Grille moderne 9 cartes/page avec i18n */}
+{(() => {
+  // Hook useApp pour récupérer la langue (comme dans Contact.tsx)
+  const { language } = useApp();
+  const lang = (language as 'fr' | 'en') || 'fr';
+  
+  // Configuration i18n avec le même pattern que Contact.tsx
+  const cardTranslations = {
+    fr: {
+      lawyer: 'Avocat',
+      expat: 'Expatrié',
+      languages: 'Langues',
+      about: 'À propos',
+      readMore: 'Lire plus',
+      online: 'En ligne',
+      offline: 'Hors ligne',
+      contactNow: 'Contacter maintenant',
+      viewProfile: 'Voir le profil',
+      years: 'ans',
+      rating: 'Note',
+      country: 'Pays',
+      experience: 'Années'
+    },
+    en: {
+      lawyer: 'Lawyer',
+      expat: 'Expat',
+      languages: 'Languages',
+      about: 'About',
+      readMore: 'Read more',
+      online: 'Online',
+      offline: 'Offline',
+      contactNow: 'Contact now',
+      viewProfile: 'View profile',
+      years: 'years',
+      rating: 'Rating',
+      country: 'Country',
+      experience: 'Years'
+    }
+  };
 
-                    return (
-                      <article
-                        key={provider.id}
-                        className={`group rounded-[28px] overflow-hidden transition-all duration-500 hover:-translate-y-2 cursor-pointer border-[3px] bg-white/5 backdrop-blur-md hover:shadow-2xl hover:shadow-black/40 ${
-                          provider.isOnline
-                            ? 'border-green-500/80 shadow-[0_0_60px_-25px_rgba(34,197,94,0.7)]'
-                            : 'border-red-500/80 shadow-[0_0_60px_-25px_rgba(239,68,68,0.7)]'
-                        }`}
-                        onClick={() => handleProviderClick(provider)}
-                        itemScope
-                        itemType="https://schema.org/Person"
-                      >
-                        <div className="relative aspect-[3/4] overflow-hidden">
-                          <img
-                            src={provider.avatar}
-                            alt={`${provider.name} - ${provider.type === 'lawyer' ? 'Avocat' : 'Expatrié'}`}
-                            className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
-                            itemProp="image"
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.currentTarget as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = '/default-avatar.png';
-                            }}
-                          />
+  const t = cardTranslations[lang];
 
-                          {/* gradient overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 group-hover:from-black/30 transition-all duration-500" />
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+      {paginatedProviders.map((provider) => {
+        const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 120);
+        const langs = provider.languages
+          .slice(0, 2)
+          .map(getLanguageLabel);
 
-                          {/* type badge */}
-                          <div className="absolute top-4 left-4">
-                            <div className="px-4 py-2 rounded-2xl text-sm font-bold backdrop-blur-xl border bg-white/10 text-white border-white/20">
-                              {provider.type === 'lawyer' ? '⚖️ Avocat' : '🌍 Expatrié'}
-                            </div>
-                          </div>
+        return (
+          <article
+            key={provider.id}
+            className={`group relative bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-xl rounded-3xl overflow-hidden transition-all duration-700 hover:scale-[1.02] cursor-pointer border border-slate-200 hover:border-slate-300 hover:shadow-2xl hover:shadow-slate-400/20 flex flex-col ${
+              provider.isOnline
+                ? 'ring-1 ring-emerald-400/40 shadow-emerald-500/10'
+                : 'ring-1 ring-red-400/40 shadow-red-500/10'
+            }`}
+            onClick={() => handleProviderClick(provider)}
+            itemScope
+            itemType="https://schema.org/Person"
+          >
+            {/* Status indicator */}
+            <div className="absolute top-6 right-6 z-10">
+              <div className={`w-4 h-4 rounded-full ${
+                provider.isOnline ? 'bg-emerald-400 shadow-emerald-400/50' : 'bg-red-400 shadow-red-400/50'
+              } shadow-lg animate-pulse`} />
+            </div>
 
-                          {/* rating */}
-                          <div className="absolute top-4 right-4 flex items-center gap-2">
-                            <button
-                              aria-label="Ajouter aux favoris"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFavorite(provider.id);
-                              }}
-                              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl backdrop-blur-xl border transition ${
-                                favorites.has(provider.id)
-                                  ? 'bg-red-500/20 border-red-400/40'
-                                  : 'bg-white/95 border-white shadow-xl'
-                              }`}
-                              title={favorites.has(provider.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                            >
-                              <Heart className={`w-5 h-5 ${favorites.has(provider.id) ? 'text-red-500' : 'text-gray-900'}`} />
-                            </button>
-
-                            <div className="bg-white/95 backdrop-blur-xl px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2">
-                              <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                              <span className="text-sm font-bold text-gray-900">{provider.rating.toFixed(1)}</span>
-                            </div>
-                          </div>
-
-                          {/* wifi status */}
-                          <div className="absolute bottom-4 right-4">
-                            <div className="flex items-center gap-2 bg-white/95 text-gray-900 rounded-2xl px-3 py-1.5 shadow-xl border border-white">
-                              {provider.isOnline ? <Wifi className="w-4 h-4 text-green-600" /> : <WifiOff className="w-4 h-4 text-red-600" />}
-                              <span className="text-xs font-semibold">{provider.isOnline ? 'En ligne' : 'Hors ligne'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-6 flex flex-col h-80 text-white">
-                          <div className="mb-4">
-                            <h3 className="text-xl font-extrabold mb-2 line-clamp-2 group-hover:text-red-300 transition-colors" itemProp="name">
-                              {provider.name}
-                            </h3>
-                            <div className="flex items-center justify-between text-sm text-gray-300">
-                              <span>{provider.yearsOfExperience} ans d'expérience</span>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-green-400" />
-                                <span className="font-medium">{provider.country}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4 flex-1">
-                            {/* langues */}
-                            <div>
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">
-                                  <span className="text-sm">🗣️</span>
-                                </div>
-                                <span className="text-sm font-semibold text-gray-200">Langues parlées</span>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {langs.map((lang, idx) => (
-                                  <span
-                                    key={`${provider.id}-lang-${idx}`}
-                                    className="px-3 py-1 bg-white/10 border border-white/15 text-gray-100 text-sm font-medium rounded-full"
-                                  >
-                                    {lang}
-                                  </span>
-                                ))}
-                                {provider.languages.length > 3 && (
-                                  <span className="px-3 py-1 bg-white/10 border border-white/15 text-gray-200 text-sm rounded-full">
-                                    +{provider.languages.length - 3}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* description */}
-                            {provider.description && (
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">
-                                    <span className="text-sm">📋</span>
-                                  </div>
-                                  <span className="text-sm font-semibold text-gray-200">Présentation</span>
-                                </div>
-                                <p className="text-sm text-gray-200/90 leading-relaxed" itemProp="description">
-                                  {truncatedDescription}
-                                </p>
-                                {isTruncated && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleProviderClick(provider);
-                                    }}
-                                    className="text-sm text-red-300 hover:text-red-200 font-semibold mt-1 hover:underline transition-colors inline-flex items-center gap-1"
-                                  >
-                                    Lire la suite
-                                    <span className="text-xs">→</span>
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="mt-auto pt-4">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleProviderClick(provider);
-                              }}
-                              className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform active:scale-[0.98] shadow-xl hover:shadow-2xl ${
-                                provider.type === 'lawyer'
-                                  ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
-                                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                              }`}
-                            >
-                              <span className="text-xl">👤</span>
-                              <span>Voir le profil</span>
-                            </button>
-                          </div>
-
-                          <div className="sr-only">
-                            <span itemProp="jobTitle">{provider.type === 'lawyer' ? 'Avocat' : 'Consultant expatriation'}</span>
-                            <span itemProp="workLocation">{provider.country}</span>
-                            <span itemProp="knowsLanguage">{provider.languages.map(getLanguageLabel).join(', ')}</span>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
+            {/* Header avec photo et infos principales */}
+            <div className="relative p-8 pb-6">
+              <div className="flex items-start gap-6">
+                {/* Avatar */}
+                <div className="relative shrink-0">
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden ring-2 ring-slate-200 group-hover:ring-slate-300 transition-all duration-500">
+                    <img
+                      src={provider.avatar}
+                      alt={`${provider.name} - ${provider.type === 'lawyer' ? t.lawyer : t.expat}`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      itemProp="image"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = '/default-avatar.png';
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Badge type */}
+                  <div className="absolute -bottom-3 -right-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl border-2 border-white shadow-lg ${
+                      provider.type === 'lawyer' 
+                        ? 'bg-gradient-to-br from-amber-400 to-orange-500' 
+                        : 'bg-gradient-to-br from-blue-400 to-indigo-500'
+                    }`}>
+                      {provider.type === 'lawyer' ? '⚖️' : '🌍'}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Infos principales */}
+                <div className="flex-1 min-w-0">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-1 line-clamp-1 group-hover:text-slate-900 transition-colors" itemProp="name">
+                      {provider.name}
+                    </h3>
+                    <p className="text-slate-600 text-sm font-medium">
+                      {provider.type === 'lawyer' ? t.lawyer : t.expat}
+                    </p>
+                  </div>
+
+                  {/* Métadonnées */}
+                  <div className="flex items-center gap-4 mt-4 text-sm text-slate-600">
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span className="font-semibold">{provider.rating.toFixed(1)}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>{provider.country}</span>
+                    </div>
+                    <div className="text-slate-500">
+                      {provider.yearsOfExperience} {t.years}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Séparateur */}
+            <div className="mx-8 h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
+
+            {/* Contenu principal */}
+            <div className="p-8 pt-6 space-y-6 flex-1 flex flex-col">
+              {/* Langues */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <span className="text-xs">🗣️</span>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">{t.languages}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {langs.map((lang, idx) => (
+                    <span
+                      key={`${provider.id}-lang-${idx}`}
+                      className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg"
+                    >
+                      {lang}
+                    </span>
+                  ))}
+                  {provider.languages.length > 2 && (
+                    <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 text-xs rounded-lg">
+                      +{provider.languages.length - 2}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Description */}
+              {provider.description && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <span className="text-xs">💬</span>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700">{t.about}</span>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed" itemProp="description">
+                    {truncatedDescription}
+                  </p>
+                  {isTruncated && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleProviderClick(provider);
+                      }}
+                      className="text-sm text-slate-700 hover:text-slate-900 font-medium mt-2 inline-flex items-center gap-1 transition-colors"
+                    >
+                      {t.readMore}
+                      <span className="text-xs">→</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer avec CTA repensé */}
+            <div className="p-8 pt-4 mt-auto space-y-3">
+              {/* Status en ligne compact */}
+              <div className="flex items-center justify-center gap-2 text-xs">
+                {provider.isOnline ? (
+                  <>
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      <span className="text-emerald-700 font-medium">{t.online}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-full">
+                      <div className="w-2 h-2 bg-red-400 rounded-full" />
+                      <span className="text-red-600">{t.offline}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* CTA moderne */}
+              <div className="space-y-2">
+                {provider.isOnline ? (
+                  /* CTA principal pour contact direct */
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProviderClick(provider);
+                    }}
+                    className="w-full group/cta relative overflow-hidden bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white py-4 px-6 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/cta:translate-x-full transition-transform duration-700 skew-x-12" />
+                    <div className="relative flex items-center justify-center gap-3">
+                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                        <span className="text-sm">💬</span>
+                      </div>
+                      <span>{t.contactNow}</span>
+                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    </div>
+                  </button>
+                ) : (
+                  /* CTA secondaire pour consultation profil */
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProviderClick(provider);
+                    }}
+                    className="w-full group/cta relative bg-slate-100 hover:bg-slate-200 border-2 border-slate-200 hover:border-slate-300 text-slate-700 py-4 px-6 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-[1.02]"
+                  >
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="w-6 h-6 bg-slate-300/50 rounded-full flex items-center justify-center group-hover/cta:bg-slate-400/50 transition-colors">
+                        <span className="text-sm">👤</span>
+                      </div>
+                      <span>{t.viewProfile}</span>
+                      <span className="text-slate-400 group-hover/cta:text-slate-600 transition-colors">→</span>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Métadonnées cachées pour SEO */}
+            <div className="sr-only">
+              <span itemProp="jobTitle">{provider.type === 'lawyer' ? t.lawyer : t.expat}</span>
+              <span itemProp="workLocation">{provider.country}</span>
+              <span itemProp="knowsLanguage">{provider.languages.map(getLanguageLabel).join(', ')}</span>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+})()}
 
                 {/* Pagination (bas) */}
                 <div className="flex items-center justify-between mt-6">
@@ -1081,7 +1057,7 @@ const SOSCall: React.FC = () => {
               </div>
             )}
 
-            {/* CTA alignée Home, 150+ pays */}
+            {/* CTA */}
             <section className="text-center mt-12 sm:mt-16">
               <div className="rounded-[28px] border border-white/10 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md p-8 sm:p-12">
                 <h3 className="text-2xl sm:text-3xl font-black text-white mb-3">
@@ -1106,9 +1082,9 @@ const SOSCall: React.FC = () => {
   );
 };
 
-/* ----------------------------
+/* =========================
    Pagination component
------------------------------*/
+========================= */
 const Pagination: React.FC<{
   page: number;
   totalPages: number;
@@ -1128,25 +1104,22 @@ const Pagination: React.FC<{
       if (pages[pages.length - 1] !== 'ellipsis') pages.push('ellipsis');
     };
 
-    const windowSize = 1; // autour de la page courante
+    const windowSize = 1;
     add(1);
     for (let i = page - windowSize; i <= page + windowSize; i++) {
       if (i > 1 && i < totalPages) add(i);
     }
     if (totalPages > 1) add(totalPages);
 
-    // dédoublonne et ordonne
     const sorted = Array.from(new Set(pages)).sort((a, b) =>
       typeof a === 'number' && typeof b === 'number' ? a - b : 0
     );
 
-    // insère ellipses
     const withEllipses: Array<number | 'ellipsis'> = [];
     for (let i = 0; i < sorted.length; i++) {
       const cur = sorted[i] as number;
       const prev = sorted[i - 1] as number | undefined;
       if (i > 0 && prev !== undefined && typeof prev === 'number' && cur - prev > 1) {
-        addEllipsis.call({}); // placeholder
         withEllipses.push('ellipsis');
       }
       withEllipses.push(cur);

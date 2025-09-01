@@ -1,3 +1,5 @@
+// BookingRequestRHF.tsx
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, {
   useState,
   useEffect,
@@ -21,6 +23,8 @@ import {
   Languages as LanguagesIcon,
   Sparkles,
 } from 'lucide-react';
+
+import { useForm, Controller, SubmitHandler } from 'react-hook-form';
 
 import Layout from '../components/layout/Layout';
 import Button from '../components/common/Button';
@@ -46,13 +50,16 @@ import {
 } from '../services/pricingService';
 
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
-// ✅ Service centralisé
 import { createBookingRequest } from '../services/booking';
+
+// ✅ votre composant RHF pour le téléphone
+import PhoneField from '@/components/PhoneField';
+
 /** ===== Types complémentaires ===== */
 type LangKey = keyof typeof I18N;
 type Language = { code: string; name: string };
 
-/** Props attendues par le composant MultiLanguageSelect (fortement typées) */
+/** Props attendues par le composant MultiLanguageSelect */
 type MultiLanguageOption = { value: string; label: string };
 type MultiLanguageSelectProps = {
   value: MultiLanguageOption[];
@@ -62,7 +69,6 @@ type MultiLanguageSelectProps = {
   locale: LangKey;
 };
 
-/** Lazy + typage explicite du composant (pas de `any`) */
 const MultiLanguageSelect =
   (lazy(() => import('../components/forms-data/MultiLanguageSelect')) as unknown) as React.LazyExoticComponent<
     React.ComponentType<MultiLanguageSelectProps>
@@ -92,14 +98,13 @@ const DEFAULT_SERVICE_FEES = {
   expat: { eur: 9, usd: 15 },
 } as const;
 
-/** ===== i18n (FR par défaut) ===== */
+/** ===== i18n (FR/EN) ===== */
 const I18N = {
   fr: {
     metaTitle: 'Demande de consultation • SOS Expats',
     metaDesc: 'Un formulaire fun, fluide et ultra clair pour booker votre appel 🚀',
     heroTitle: 'Décrivez votre demande',
-    heroSubtitle:
-      'Quelques infos et on s’occupe du reste — simple, friendly, cool ✨',
+    heroSubtitle: 'Quelques infos et on s’occupe du reste — simple, friendly, cool ✨',
     progress: 'Progression',
     personal: 'On fait connaissance',
     request: 'Votre demande',
@@ -109,17 +114,14 @@ const I18N = {
     checklistTitle: 'À compléter :',
     callTiming: 'Appel dans les 5 minutes après paiement',
     securePay: 'Paiement 100% sécurisé',
-    satisfied:
-      '💯 Satisfait ou remboursé : expert indisponible = remboursement automatique.',
+    satisfied: '💯 Satisfait ou remboursé : expert indisponible = remboursement automatique.',
     continuePay: 'Continuer vers le paiement',
     errorsTitle: 'Oups, quelques retouches et c’est parfait ✨',
     hints: {
       title: 'Plus votre titre est précis, mieux c’est !',
       desc: 'Contexte, objectif, délais… donnez-nous de la matière 🔎',
-      phone:
-        'Aucun spam — jamais. Seulement pour vous connecter à l’expert. 📵',
-      whatsapp:
-        'Optionnel mais pratique pour les mises à jour en temps réel. 💬',
+      phone: 'Aucun spam — jamais. Seulement pour vous connecter à l’expert. 📵',
+      whatsapp: 'Optionnel mais pratique pour les mises à jour en temps réel. 💬',
     },
     fields: {
       firstName: 'Prénom',
@@ -132,8 +134,7 @@ const I18N = {
       phone: 'Téléphone',
       whatsapp: 'Numéro WhatsApp (optionnel)',
       accept: 'J’accepte les ',
-      andConfirm:
-        ' et confirme que les informations fournies sont exactes.',
+      andConfirm: ' et confirme que les informations fournies sont exactes.',
     },
     placeholders: {
       firstName: 'Votre prénom',
@@ -166,16 +167,14 @@ const I18N = {
       compatible: 'Langues compatibles',
       incompatible: 'Langues non compatibles',
       communicationImpossible: 'Communication impossible',
-      needShared:
-        'Sélectionnez au moins une langue commune pour continuer.',
+      needShared: 'Sélectionnez au moins une langue commune pour continuer.',
     },
   },
   en: {
     metaTitle: 'Consultation Request • SOS Expats',
     metaDesc: 'A fun, fluid, ultra-clear booking form 🚀',
     heroTitle: 'Describe your request',
-    heroSubtitle:
-      'A few details and we’ll handle the rest — simple, friendly, cool ✨',
+    heroSubtitle: 'A few details and we’ll handle the rest — simple, friendly, cool ✨',
     progress: 'Progress',
     personal: 'Let’s get to know you',
     request: 'Your request',
@@ -319,20 +318,19 @@ interface BookingRequestData {
   providerPhone?: string;
 }
 
-/** --- Types pour formulaire --- */
+/** --- Types RHF --- */
 type BookingFormData = {
-  title: string;
-  description: string;
-  phoneCountryCode: string;
-  phoneNumber: string;
-  acceptTerms: boolean;
   firstName: string;
   lastName: string;
   nationality: string;
   currentCountry: string;
-  whatsappNumber: string;
-  whatsappCountryCode: string;
-  autrePays: string;
+  autrePays?: string;
+  title: string;
+  description: string;
+  clientPhone: string;      // géré via PhoneField (E.164)
+  whatsapp?: string;        // E.164 optionnel
+  acceptTerms: boolean;
+  clientLanguages: string[]; // codes (["fr","en"])
 };
 
 type FirestoreProviderDoc = Partial<Provider> & { id: string };
@@ -365,7 +363,6 @@ const SectionHeader = ({
   </div>
 );
 
-/** Retiré `providerName` (inutilisé) pour éviter no-unused-vars */
 const PreviewCard = ({
   title,
   country,
@@ -433,31 +430,19 @@ const PreviewCard = ({
   </div>
 );
 
-/** 📞 Codes & pays (utilisé pour déduire le pays par défaut) */
-const countryCodeOptions = [
-  { code: '+33', flag: '🇫🇷', country: 'FR' },
-  { code: '+1', flag: '🇺🇸', country: 'US' },
-  { code: '+44', flag: '🇬🇧', country: 'GB' },
-  { code: '+49', flag: '🇩🇪', country: 'DE' },
-  { code: '+34', flag: '🇪🇸', country: 'ES' },
-  { code: '+39', flag: '🇮🇹', country: 'IT' },
-  { code: '+66', flag: '🇹🇭', country: 'TH' },
-  { code: '+61', flag: '🇦🇺', country: 'AU' },
-  { code: '+81', flag: '🇯🇵', country: 'JP' },
-  { code: '+86', flag: '🇨🇳', country: 'CN' },
-];
-
-/** 🔧 util E.164 */
-const toE164 = (raw: string, defaultCountry?: string) => {
-  try {
-    const p = parsePhoneNumberFromString(raw, defaultCountry as any);
-    return p?.isValid() ? p.number : '';
-  } catch {
-    return '';
-  }
+/** 🔧 utils */
+const sanitizeText = (input: string, opts: { trim?: boolean } = {}): string => {
+  const out = input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+  return opts.trim ? out.trim() : out;
 };
+const sanitizeInput = (input: string): string => sanitizeText(input, { trim: true });
 
-/** ===== Page ===== */
+/** ===== Page (RHF) ===== */
 const BookingRequest: React.FC = () => {
   const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
@@ -466,37 +451,44 @@ const BookingRequest: React.FC = () => {
   const lang = (language as LangKey) || 'fr';
   const t = I18N[lang];
 
-  // Provider state
   const [provider, setProvider] = useState<Provider | null>(null);
   const [providerLoading, setProviderLoading] = useState<boolean>(true);
 
-  // PRICING depuis l'admin
   const { pricing } = usePricingConfig();
 
-  const [formData, setFormData] = useState<BookingFormData>({
-    title: '',
-    description: '',
-    phoneCountryCode: '+33',
-    phoneNumber: '',
-    acceptTerms: false,
-    firstName: '',
-    lastName: '',
-    nationality: '',
-    currentCountry: '',
-    whatsappNumber: '',
-    whatsappCountryCode: '+33',
-    autrePays: '',
+  // RHF
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors, isSubmitting },
+    trigger,
+  } = useForm<BookingFormData>({
+    mode: 'onChange',
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      nationality: '',
+      currentCountry: '',
+      autrePays: '',
+      title: '',
+      description: '',
+      clientPhone: '',
+      whatsapp: '',
+      acceptTerms: false,
+      clientLanguages: [],
+    },
   });
 
-  const [languagesSpoken, setLanguagesSpoken] = useState<Language[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [formError, setFormError] = useState('');
+  const watched = watch();
+  const [languagesSpoken, setLanguagesSpoken] = useState<Language[]>([]); // garde affichage + compat
   const [hasLanguageMatchRealTime, setHasLanguageMatchRealTime] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  // Refs pour scroll ciblé vers erreurs
+  // Refs pour scroll ciblé (en cas d'erreur globale)
   const refFirstName = useRef<HTMLDivElement | null>(null);
   const refLastName = useRef<HTMLDivElement | null>(null);
   const refNationality = useRef<HTMLDivElement | null>(null);
@@ -507,9 +499,9 @@ const BookingRequest: React.FC = () => {
   const refPhone = useRef<HTMLDivElement | null>(null);
   const refCGU = useRef<HTMLDivElement | null>(null);
 
-  const inputClass = (fieldName: string) =>
+  const inputClass = (hasErr?: boolean) =>
     `w-full px-3 py-3 border-2 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:outline-none transition-all duration-200 text-base ${
-      fieldErrors[fieldName]
+      hasErr
         ? 'border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-red-50'
         : 'border-gray-200 hover:border-gray-300 focus:border-red-600'
     }`;
@@ -613,127 +605,74 @@ const BookingRequest: React.FC = () => {
       setHasLanguageMatchRealTime(true);
       return;
     }
-    if (languagesSpoken.length === 0) {
-      setHasLanguageMatchRealTime(false);
-      return;
-    }
     const providerLanguages = provider.languages || provider.languagesSpoken || [];
     const clientCodes = languagesSpoken.map((l) => l.code);
     const hasMatch = providerLanguages.some((pl) => clientCodes.includes(pl));
     setHasLanguageMatchRealTime(hasMatch);
   }, [languagesSpoken, provider]);
 
-  /** 📞 E.164 live (pour la validation et l’aperçu) */
-  const selectedDial = useMemo(
-    () => countryCodeOptions.find(c => c.code === formData.phoneCountryCode) || countryCodeOptions[0],
-    [formData.phoneCountryCode]
-  );
-  const phoneRaw = useMemo(
-    () => `${formData.phoneCountryCode}${formData.phoneNumber.replace(/\s+/g, '')}`,
-    [formData.phoneCountryCode, formData.phoneNumber]
-  );
-  const phoneE164 = useMemo(() => toE164(phoneRaw, selectedDial.country), [phoneRaw, selectedDial.country]);
-
-  const whatsappRaw = useMemo(
-    () =>
-      formData.whatsappNumber
-        ? `${formData.whatsappCountryCode}${formData.whatsappNumber.replace(/\s+/g, '')}`
-        : '',
-    [formData.whatsappCountryCode, formData.whatsappNumber]
-  );
-  const whatsappE164 = useMemo(
-    () => (formData.whatsappNumber ? toE164(whatsappRaw) : ''),
-    [whatsappRaw, formData.whatsappNumber]
-  );
-
-  // Validation / progression
-  const valid = useMemo(
-    () => ({
-      firstName: !!formData.firstName.trim(),
-      lastName: !!formData.lastName.trim(),
-      title: formData.title.trim().length >= 10,
-      description: formData.description.trim().length >= 50,
-      nationality: !!formData.nationality.trim(),
-      currentCountry: !!formData.currentCountry.trim(),
-      autrePays: formData.currentCountry !== 'Autre' ? true : !!formData.autrePays.trim(),
-      langs: languagesSpoken.length > 0,
-      phone: !!phoneE164,                       // ✅ E.164 sinon invalide
-      accept: formData.acceptTerms,
-      sharedLang: hasLanguageMatchRealTime,
-    }),
-    [formData, languagesSpoken, hasLanguageMatchRealTime, phoneE164],
-  );
-
-  const formProgress = useMemo(() => {
-    const flags = Object.values(valid);
-    const done = flags.filter(Boolean).length;
-    return Math.round((done / flags.length) * 100);
-  }, [valid]);
-
-  // Redirection si provider introuvable une fois chargement terminé
-  useEffect(() => {
-    if (!authLoading && !providerLoading && !provider) navigate('/');
-  }, [provider, providerLoading, authLoading, navigate]);
-
-  if (providerLoading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-white">
-          <div className="flex items-center space-x-3 text-gray-700">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-700"></div>
-            <span>Chargement du prestataire…</span>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-  if (!provider) return null;
-
-  const isLawyer = provider.type === 'lawyer' || provider.role === 'lawyer';
+  // PRICING (ADMIN + fallback)
+  const isLawyer = provider?.type === 'lawyer' || provider?.role === 'lawyer';
   const role: ServiceType = isLawyer ? 'lawyer' : 'expat';
 
-  /** Prix affichés (ADMIN si dispo, sinon secours) */
   const eurAdmin = pricing?.[role]?.eur;
   const usdAdmin = pricing?.[role]?.usd;
 
   const displayEUR = eurAdmin?.totalAmount ?? FALLBACK_TOTALS[role].eur;
   const displayUSD = usdAdmin?.totalAmount ?? FALLBACK_TOTALS[role].usd;
   const displayDuration =
-    eurAdmin?.duration ?? usdAdmin?.duration ?? provider.duration ?? FALLBACK_TOTALS[role].duration;
+    eurAdmin?.duration ?? usdAdmin?.duration ?? provider?.duration ?? FALLBACK_TOTALS[role].duration;
 
-  const sanitizeText = (input: string, opts: { trim?: boolean } = {}): string => {
-    const out = input
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;');
-    return opts.trim ? out.trim() : out;
-  };
+  // Progression (RHF)
+  const validFlags: Record<string, boolean> = useMemo(() => {
+    const values = getValues();
+    const hasTitle = values.title.trim().length >= 10;
+    const hasDesc = values.description.trim().length >= 50;
+    const hasFirst = values.firstName.trim().length > 0;
+    const hasLast = values.lastName.trim().length > 0;
+    const hasNat = values.nationality.trim().length > 0;
+    const hasCountry = values.currentCountry.trim().length > 0;
+    const otherOk = values.currentCountry !== 'Autre' ? true : !!values.autrePays?.trim();
+    const langsOk = (values.clientLanguages?.length ?? 0) > 0;
+    const accept = !!values.acceptTerms;
 
-  const sanitizeInput = (input: string): string => sanitizeText(input, { trim: true });
+    const phoneValid = (() => {
+      if (!values.clientPhone) return false;
+      try {
+        const p = parsePhoneNumberFromString(values.clientPhone);
+        return !!(p && p.isValid());
+      } catch {
+        return false;
+      }
+    })();
 
-  const handleInputChange = (
-    e:
-      | React.ChangeEvent<HTMLInputElement>
-      | React.ChangeEvent<HTMLTextAreaElement>
-      | React.ChangeEvent<HTMLSelectElement>,
-  ) => {
-    const { name, value, type } = e.target as HTMLInputElement;
-    if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, acceptTerms: checked }));
-      return;
-    }
+    const sharedLang = hasLanguageMatchRealTime;
 
-    let sanitizedValue = value;
-    if (name === 'phoneNumber' || name === 'whatsappNumber') {
-      sanitizedValue = value.replace(/[^\d\s+()-]/g, '');
-    } else {
-      sanitizedValue = sanitizeText(value, { trim: false });
-    }
-    setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
-  };
+    return {
+      firstName: hasFirst,
+      lastName: hasLast,
+      title: hasTitle,
+      description: hasDesc,
+      nationality: hasNat,
+      currentCountry: hasCountry,
+      autrePays: otherOk,
+      langs: langsOk,
+      phone: phoneValid,
+      accept: accept,
+      sharedLang,
+    };
+  }, [watched, hasLanguageMatchRealTime]);
+
+  const formProgress = useMemo(() => {
+    const flags = Object.values(validFlags);
+    const done = flags.filter(Boolean).length;
+    return Math.round((done / flags.length) * 100);
+  }, [validFlags]);
+
+  // Redirection si provider introuvable
+  useEffect(() => {
+    if (!authLoading && !providerLoading && !provider) navigate('/');
+  }, [provider, providerLoading, authLoading, navigate]);
 
   const notifyProviderOfRequest = async (
     targetProviderId: string,
@@ -784,8 +723,6 @@ const BookingRequest: React.FC = () => {
     currentUser: { id?: string; firstName?: string; lastName?: string } | null,
     eurTotalForDisplay: number,
     durationForDisplay: number,
-    clientPhoneE164: string,
-    clientWhatsappE164: string,
   ): {
     selectedProvider: Partial<Provider> & { id: string; type: 'lawyer' | 'expat' };
     bookingRequest: BookingRequestData;
@@ -811,14 +748,14 @@ const BookingRequest: React.FC = () => {
     };
 
     const bookingRequest: BookingRequestData = {
-      clientPhone: clientPhoneE164,
+      clientPhone: state.clientPhone,
       clientId: (currentUser as any)?.uid ?? (currentUser as any)?.id,
       clientName: `${sanitizeInput(state.firstName)} ${sanitizeInput(state.lastName)}`.trim(),
       clientFirstName: sanitizeInput(state.firstName),
       clientLastName: sanitizeInput(state.lastName),
       clientNationality: sanitizeInput(state.nationality),
-      clientCurrentCountry: sanitizeInput(state.currentCountry === 'Autre' ? state.autrePays : state.currentCountry),
-      clientWhatsapp: clientWhatsappE164,
+      clientCurrentCountry: sanitizeInput(state.currentCountry === 'Autre' ? state.autrePays || '' : state.currentCountry),
+      clientWhatsapp: state.whatsapp || '',
       providerId: selectedProvider.id,
       providerName: selectedProvider.name || '',
       providerType: selectedProvider.type,
@@ -830,8 +767,11 @@ const BookingRequest: React.FC = () => {
       providerSpecialties: selectedProvider.specialties as string[] | undefined,
       title: sanitizeText(state.title, { trim: true }),
       description: sanitizeText(state.description, { trim: true }),
-      clientLanguages: languagesSpoken.map((l) => l.code),
-      clientLanguagesDetails: languagesSpoken.map((l) => ({ code: l.code, name: l.name })),
+      clientLanguages: state.clientLanguages,
+      clientLanguagesDetails: state.clientLanguages.map((code) => {
+        const found = (languages as Language[]).find((l) => l.code === code);
+        return { code, name: found?.name || code.toUpperCase() };
+      }),
       price: eurTotalForDisplay,
       duration: durationForDisplay,
       status: 'pending',
@@ -845,106 +785,80 @@ const BookingRequest: React.FC = () => {
   };
 
   const scrollToFirstIncomplete = () => {
+    const v = validFlags;
     const pairs: Array<[boolean, React.MutableRefObject<HTMLDivElement | null>]> = [
-      [!valid.firstName, refFirstName],
-      [!valid.lastName, refLastName],
-      [!valid.nationality, refNationality],
-      [!valid.currentCountry || !valid.autrePays, refCountry],
-      [!valid.title, refTitle],
-      [!valid.description, refDesc],
-      [!valid.langs || !valid.sharedLang, refLangs],
-      [!valid.phone, refPhone],
-      [!valid.accept, refCGU],
+      [!v.firstName, refFirstName],
+      [!v.lastName, refLastName],
+      [!v.nationality, refNationality],
+      [!v.currentCountry || !v.autrePays, refCountry],
+      [!v.title, refTitle],
+      [!v.description, refDesc],
+      [!v.langs || !v.sharedLang, refLangs],
+      [!v.phone, refPhone],
+      [!v.accept, refCGU],
     ];
     const target = pairs.find(([need]) => need)?.[1]?.current;
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const validateForm = () => {
-    const e: Record<string, string> = {};
-    const global: string[] = [];
-    if (!valid.firstName) { e.firstName = t.validators.firstName; global.push(`– ${t.validators.firstName}`); }
-    if (!valid.lastName) { e.lastName = t.validators.lastName; global.push(`– ${t.validators.lastName}`); }
-    if (!valid.title) { e.title = t.validators.title; global.push(`– ${t.validators.title}`); }
-    if (!valid.description) { e.description = t.validators.description; global.push(`– ${t.validators.description}`); }
-    if (!valid.nationality) { e.nationality = t.validators.nationality; global.push(`– ${t.validators.nationality}`); }
-    if (!valid.currentCountry) { e.currentCountry = t.validators.currentCountry; global.push(`– ${t.validators.currentCountry}`); }
-    if (formData.currentCountry === 'Autre' && !valid.autrePays) { e.autrePays = t.validators.otherCountry; global.push(`– ${t.validators.otherCountry}`); }
-    if (!valid.langs) { e.languages = t.validators.languages; global.push(`– ${t.validators.languages}`); }
-    if (!valid.sharedLang) { global.push(`– ${t.validators.langMismatch}`); }
-    if (!valid.phone) { e.phoneNumber = t.validators.phone; global.push(`– ${t.validators.phone}`); }
-    if (!valid.accept) { global.push(`– ${t.validators.accept}`); }
-    setFieldErrors(e);
-    setFormErrors(global);
-    return global.length === 0;
-  };
+  const onSubmit: SubmitHandler<BookingFormData> = async (data) => {
+    setFormError('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
- 
+    // blocage si pas de langue partagée (on log)
     if (!hasLanguageMatchRealTime) {
       try {
         await logLanguageMismatch({
-          clientLanguages: languagesSpoken.map((l) => l.code),
+          clientLanguages: data.clientLanguages,
           customLanguage: undefined,
           providerId: provider?.id || '',
           providerLanguages: provider?.languages || provider?.languagesSpoken || [],
           formData: {
-            title: formData.title,
-            description: formData.description,
-            nationality: formData.nationality,
-            currentCountry: formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry,
+            title: data.title,
+            description: data.description,
+            nationality: data.nationality,
+            currentCountry: data.currentCountry === 'Autre' ? data.autrePays : data.currentCountry,
           },
-          source: 'booking_request_form',
+          source: 'booking_request_form_rhf',
         });
       } catch (error) {
         console.warn('logLanguageMismatch failed', error);
       }
       setFormError(t.validators.langMismatch);
-      return;
-    }
-
-    if (!validateForm()) {
       scrollToFirstIncomplete();
       return;
     }
 
-    setIsLoading(true);
+    // validation RHF complète (au cas où)
+    const ok = await trigger();
+    if (!ok || Object.values(validFlags).some((v) => !v)) {
+      scrollToFirstIncomplete();
+      return;
+    }
+
     try {
       const eurTotalForDisplay = displayEUR;
       const durationForDisplay = displayDuration;
 
-      const clientPhoneE164 = phoneE164;
-      const clientWhatsappE164 = whatsappE164;
+      const { selectedProvider, bookingRequest } = prepareStandardizedData(
+        data,
+        provider!,
+        user,
+        eurTotalForDisplay,
+        durationForDisplay,
+      );
 
-const { selectedProvider, bookingRequest } = prepareStandardizedData(
-  formData,
-  provider,
-  user,
-  eurTotalForDisplay,
-  durationForDisplay,
-  clientPhoneE164,
-  clientWhatsappE164,
-);
+      // 🔐 UID de l'utilisateur
+      const uid = (user as any)?.uid;
+      if (!uid) {
+        setFormError("Session expirée. Reconnectez-vous.");
+        return;
+      }
 
-// 🔐 UID de l'utilisateur connecté (NE PAS déplacer)
-const uid = user?.uid;
-if (!uid) {
-  setFormError("Session expirée. Reconnectez-vous.");
-  setIsLoading(false);
-  return;
-}
-
-
-
-// ————————————————————————————
-// Création du booking request via le service centralisé
-// ————————————————————————————
-await createBookingRequest({
-  clientId: uid,
-  providerId: selectedProvider.id,
-
-        serviceType: role === 'lawyer' ? 'lawyer_call' : 'expat_call',
+      // Création du booking centralisée
+      await createBookingRequest({
+        clientId: uid,
+        providerId: selectedProvider.id,
+        serviceType: isLawyer ? 'lawyer_call' : 'expat_call',
         status: 'pending',
 
         title: bookingRequest.title,
@@ -977,11 +891,9 @@ await createBookingRequest({
       // (optionnel) notifier le prestataire
       // void notifyProviderOfRequest(selectedProvider.id, bookingRequest);
 
-      // ————————————————————————————
-      // ServiceData (admin = vérité ; fallback = prix secours + frais défaut)
-      // ————————————————————————————
+      // Calcul serviceData pour checkout
       const selectedCurrency: Currency = detectUserCurrency();
-      const roleForPricing: ServiceType = (provider.role || provider.type || 'expat') as ServiceType;
+      const roleForPricing: ServiceType = (provider!.role || provider!.type || 'expat') as ServiceType;
 
       let svcAmount = 0;
       let svcDuration = FALLBACK_TOTALS[roleForPricing].duration;
@@ -1006,7 +918,7 @@ await createBookingRequest({
 
       try {
         sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
-        sessionStorage.setItem('clientPhone', clientPhoneE164);
+        sessionStorage.setItem('clientPhone', bookingRequest.clientPhone);
         sessionStorage.setItem(
           'serviceData',
           JSON.stringify({
@@ -1015,7 +927,7 @@ await createBookingRequest({
             providerRole: roleForPricing,
             amount: svcAmount,
             duration: svcDuration,
-            clientPhone: clientPhoneE164,
+            clientPhone: bookingRequest.clientPhone,
             commissionAmount: svcCommission,
             providerAmount: svcProviderAmount,
             currency: selectedCurrency,
@@ -1029,12 +941,26 @@ await createBookingRequest({
     } catch (err) {
       console.error('Submit error', err);
       setFormError('Une erreur est survenue. Veuillez réessayer.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  /** ===== RENDER ===== */
+  // ===== RENDER =====
+  if (providerLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="flex items-center space-x-3 text-gray-700">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-700"></div>
+            <span>Chargement du prestataire…</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+  if (!provider) return null;
+
+  const inputHas = (name: keyof BookingFormData) => !!(errors as any)?.[name];
+
   return (
     <Layout>
       {/* SEO minimal */}
@@ -1139,73 +1065,96 @@ await createBookingRequest({
 
         {/* Form + Preview */}
         <div className="max-w-3xl mx-auto px-4">
-          <div>
-            {/* FORM */}
-            <div>
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-                <form onSubmit={handleSubmit} noValidate>
-                  {/* Section Perso */}
-                  <section className="p-5 sm:p-6">
-                    <SectionHeader icon={<MapPin className="w-5 h-5" />} title={t.personal} />
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+            <form onSubmit={handleSubmit(onSubmit)} noValidate>
+              {/* Section Perso */}
+              <section className="p-5 sm:p-6">
+                <SectionHeader icon={<MapPin className="w-5 h-5" />} title={t.personal} />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Prénom */}
-                      <div ref={refFirstName}>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">
-                          {t.fields.firstName} <span className="text-red-500">*</span>
-                        </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Prénom */}
+                  <div ref={refFirstName}>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.fields.firstName} <span className="text-red-500">*</span>
+                    </label>
+                    <Controller
+                      control={control}
+                      name="firstName"
+                      rules={{ required: t.validators.firstName }}
+                      render={({ field }) => (
                         <input
-                          name="firstName"
-                          value={formData.firstName}
-                          onChange={handleInputChange}
-                          className={`${inputClass('firstName')} ${fieldErrors.firstName ? 'bg-red-50' : ''}`}
+                          {...field}
+                          onChange={(e) => field.onChange(sanitizeText(e.target.value))}
+                          className={inputClass(inputHas('firstName'))}
                           placeholder={t.placeholders.firstName}
                         />
-                        <FieldSuccess show={valid.firstName}>Parfait ! ✨</FieldSuccess>
-                        {fieldErrors.firstName && <p className="mt-1 text-sm text-red-600">{fieldErrors.firstName}</p>}
-                      </div>
-                      {/* Nom */}
-                      <div ref={refLastName}>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">
-                          {t.fields.lastName} <span className="text-red-500">*</span>
-                        </label>
+                      )}
+                    />
+                    <FieldSuccess show={!errors.firstName && !!watch('firstName')}>Parfait ! ✨</FieldSuccess>
+                    {errors.firstName && <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>}
+                  </div>
+
+                  {/* Nom */}
+                  <div ref={refLastName}>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      {t.fields.lastName} <span className="text-red-500">*</span>
+                    </label>
+                    <Controller
+                      control={control}
+                      name="lastName"
+                      rules={{ required: t.validators.lastName }}
+                      render={({ field }) => (
                         <input
-                          name="lastName"
-                          value={formData.lastName}
-                          onChange={handleInputChange}
-                          className={`${inputClass('lastName')} ${fieldErrors.lastName ? 'bg-red-50' : ''}`}
+                          {...field}
+                          onChange={(e) => field.onChange(sanitizeText(e.target.value))}
+                          className={inputClass(inputHas('lastName'))}
                           placeholder={t.placeholders.lastName}
                         />
-                        <FieldSuccess show={valid.lastName}>Parfait ! ✨</FieldSuccess>
-                        {fieldErrors.lastName && <p className="mt-1 text-sm text-red-600">{fieldErrors.lastName}</p>}
-                      </div>
-                    </div>
+                      )}
+                    />
+                    <FieldSuccess show={!errors.lastName && !!watch('lastName')}>Parfait ! ✨</FieldSuccess>
+                    {errors.lastName && <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>}
+                  </div>
+                </div>
 
-                    {/* Nationalité */}
-                    <div className="mt-4" ref={refNationality}>
-                      <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.nationality} <span className="text-red-500">*</span>
-                      </label>
+                {/* Nationalité */}
+                <div className="mt-4" ref={refNationality}>
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.fields.nationality} <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    control={control}
+                    name="nationality"
+                    rules={{ required: t.validators.nationality }}
+                    render={({ field }) => (
                       <input
-                        name="nationality"
-                        value={formData.nationality}
-                        onChange={handleInputChange}
-                        className={`${inputClass('nationality')} ${fieldErrors.nationality ? 'bg-red-50' : ''}`}
+                        {...field}
+                        onChange={(e) => field.onChange(sanitizeText(e.target.value))}
+                        className={inputClass(inputHas('nationality'))}
                         placeholder={t.placeholders.nationality}
                       />
-                      {fieldErrors.nationality && <p className="mt-1 text-sm text-red-600">{fieldErrors.nationality}</p>}
-                    </div>
+                    )}
+                  />
+                  {errors.nationality && <p className="mt-1 text-sm text-red-600">{errors.nationality.message}</p>}
+                </div>
 
-                    {/* Pays d'intervention */}
-                    <div className="mt-4" ref={refCountry}>
-                      <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.currentCountry} <span className="text-red-500">*</span>
-                      </label>
+                {/* Pays d'intervention */}
+                <div className="mt-4" ref={refCountry}>
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.fields.currentCountry} <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    control={control}
+                    name="currentCountry"
+                    rules={{ required: t.validators.currentCountry }}
+                    render={({ field }) => (
                       <select
-                        name="currentCountry"
-                        value={formData.currentCountry}
-                        onChange={handleInputChange}
-                        className={`${inputClass('currentCountry')} ${fieldErrors.currentCountry ? 'bg-red-50' : ''}`}
+                        {...field}
+                        className={inputClass(inputHas('currentCountry'))}
+                        onChange={(e) => {
+                          field.onChange(e.target.value);
+                          if (e.target.value !== 'Autre') setValue('autrePays', '');
+                        }}
                       >
                         <option value="">-- Sélectionnez un pays --</option>
                         {countries.map((c) => (
@@ -1213,407 +1162,411 @@ await createBookingRequest({
                         ))}
                         <option value="Autre">Autre</option>
                       </select>
-                      {fieldErrors.currentCountry && <p className="mt-1 text-sm text-red-600">{fieldErrors.currentCountry}</p>}
-                      {formData.currentCountry === 'Autre' && (
-                        <div className="mt-3">
+                    )}
+                  />
+                  {errors.currentCountry && <p className="mt-1 text-sm text-red-600">{errors.currentCountry.message}</p>}
+
+                  {watch('currentCountry') === 'Autre' && (
+                    <div className="mt-3">
+                      <Controller
+                        control={control}
+                        name="autrePays"
+                        rules={{
+                          validate: (v) => (!!v?.trim() ? true : t.validators.otherCountry),
+                        }}
+                        render={({ field }) => (
                           <input
-                            name="autrePays"
-                            value={formData.autrePays}
-                            onChange={handleInputChange}
-                            className={`${inputClass('autrePays')} ${fieldErrors.autrePays ? 'bg-red-50' : ''}`}
+                            {...field}
+                            onChange={(e) => field.onChange(sanitizeText(e.target.value))}
+                            className={inputClass(!!errors.autrePays)}
                             placeholder={t.placeholders.otherCountry}
                           />
-                          {fieldErrors.autrePays && <p className="mt-1 text-sm text-red-600">{fieldErrors.autrePays}</p>}
-                        </div>
-                      )}
+                        )}
+                      />
+                      {errors.autrePays && <p className="mt-1 text-sm text-red-600">{errors.autrePays.message as string}</p>}
                     </div>
-                  </section>
+                  )}
+                </div>
+              </section>
 
-                  {/* Section Demande */}
-                  <section className="p-5 sm:p-6 border-t border-gray-50">
-                    <SectionHeader icon={<Globe className="w-5 h-5" />} title={t.request} />
+              {/* Section Demande */}
+              <section className="p-5 sm:p-6 border-t border-gray-50">
+                <SectionHeader icon={<Globe className="w-5 h-5" />} title={t.request} />
 
-                    {/* Titre */}
-                    <div ref={refTitle}>
-                      <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.title} <span className="text-red-500">*</span>
-                      </label>
+                {/* Titre */}
+                <div ref={refTitle}>
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.fields.title} <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    control={control}
+                    name="title"
+                    rules={{
+                      required: t.validators.title,
+                      validate: (v) => (v.trim().length >= 10 ? true : t.validators.title),
+                    }}
+                    render={({ field }) => (
                       <input
-                        name="title"
-                        value={formData.title}
-                        onChange={handleInputChange}
-                        className={`${inputClass('title')} ${fieldErrors.title ? 'bg-red-50' : ''}`}
+                        {...field}
+                        onChange={(e) => field.onChange(sanitizeText(e.target.value))}
+                        className={inputClass(!!errors.title)}
                         placeholder={t.placeholders.title}
                       />
-                      <div className="mt-1 text-xs text-gray-500">💡 {t.hints.title}</div>
-                      <FieldSuccess show={valid.title}>C’est clair 👍</FieldSuccess>
-                      {fieldErrors.title && <p className="mt-1 text-sm text-red-600">{fieldErrors.title}</p>}
-                    </div>
+                    )}
+                  />
+                  <div className="mt-1 text-xs text-gray-500">💡 {t.hints.title}</div>
+                  <FieldSuccess show={!errors.title && watch('title').trim().length >= 10}>C’est clair 👍</FieldSuccess>
+                  {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message as string}</p>}
+                </div>
 
-                    {/* Description */}
-                    <div className="mt-4" ref={refDesc}>
-                      <label className="block text-sm font-semibold text-gray-800 mb-1">
-                        {t.fields.description} <span className="text-red-500">*</span>
-                      </label>
+                {/* Description */}
+                <div className="mt-4" ref={refDesc}>
+                  <label className="block text-sm font-semibold text-gray-800 mb-1">
+                    {t.fields.description} <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    control={control}
+                    name="description"
+                    rules={{
+                      required: t.validators.description,
+                      validate: (v) => (v.trim().length >= 50 ? true : t.validators.description),
+                    }}
+                    render={({ field }) => (
                       <textarea
-                        name="description"
+                        {...field}
                         rows={5}
-                        value={formData.description}
-                        onChange={handleInputChange}
-                        className={`resize-none ${inputClass('description')} ${fieldErrors.description ? 'bg-red-50' : ''}`}
+                        onChange={(e) => field.onChange(sanitizeText(e.target.value))}
+                        className={`resize-none ${inputClass(!!errors.description)}`}
                         placeholder={t.placeholders.description}
                       />
-                      <div className="mt-1 text-xs text-gray-500">🔎 {t.hints.desc}</div>
-                      <FieldSuccess show={valid.description}>On y voit clair 👀</FieldSuccess>
-                      {fieldErrors.description && <p className="mt-1 text-sm text-red-600">{fieldErrors.description}</p>}
+                    )}
+                  />
+                  <div className="mt-1 text-xs text-gray-500">🔎 {t.hints.desc}</div>
+                  <FieldSuccess show={!errors.description && watch('description').trim().length >= 50}>On y voit clair 👀</FieldSuccess>
+                  {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message as string}</p>}
+                </div>
+              </section>
+
+              {/* Section Langues */}
+              <section className="p-5 sm:p-6 border-t border-gray-50" ref={refLangs}>
+                <SectionHeader icon={<LanguagesIcon className="w-5 h-5" />} title={t.languages} />
+
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  🗣️ {lang === 'en' ? 'Spoken languages' : 'Langues parlées'} <span className="text-red-500">*</span>
+                </label>
+
+                <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
+                  <MultiLanguageSelect
+                    value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
+                    onChange={(selected: MultiLanguageOption[]) => {
+                      const options = selected || [];
+                      const allLanguages = languages as Language[];
+                      const selectedLangs = options
+                        .map((opt) => allLanguages.find((langItem) => langItem.code === opt.value))
+                        .filter((v): v is Language => Boolean(v));
+                      setLanguagesSpoken(selectedLangs);
+                      setValue('clientLanguages', selectedLangs.map((s) => s.code), { shouldValidate: true });
+                    }}
+                    providerLanguages={provider?.languages || provider?.languagesSpoken || []}
+                    highlightShared
+                    locale={lang}
+                  />
+                </Suspense>
+
+                {/* Erreur RHF pour le tableau des langues */}
+                {(!watch('clientLanguages') || watch('clientLanguages').length === 0) && (
+                  <p className="mt-2 text-sm text-red-600">{t.validators.languages}</p>
+                )}
+
+                {/* Compatibilité */}
+                {languagesSpoken.length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {(() => {
+                      const providerLanguages = provider?.languages || provider?.languagesSpoken || [];
+                      const compatible = languagesSpoken.filter((l) => providerLanguages.includes(l.code));
+                      const incompatible = languagesSpoken.filter((l) => !providerLanguages.includes(l.code));
+                      return (
+                        <>
+                          {!!compatible.length && (
+                            <div className="p-4 bg-green-50 border-l-4 border-green-400 rounded-xl">
+                              <div className="flex">
+                                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                                <div className="ml-3">
+                                  <p className="text-green-900 font-semibold mb-2">✅ {t.labels.compatible} :</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {compatible.map((l) => (
+                                      <span key={l.code} className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full border border-green-200">
+                                        🌐 {l.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {!!incompatible.length && (
+                            <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-xl">
+                              <div className="flex">
+                                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                <div className="ml-3">
+                                  <p className="text-red-700 font-semibold mb-2">⚠️ {t.labels.incompatible} :</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {incompatible.map((l) => (
+                                      <span key={l.code} className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full border border-red-200">
+                                        🌐 {l.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {languagesSpoken.length > 0 && !hasLanguageMatchRealTime && (
+                  <div className="mt-3 p-4 bg-red-50 border-l-4 border-red-400 rounded-xl">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                      <div className="ml-3">
+                        <p className="text-red-700 font-semibold">🚫 {t.labels.communicationImpossible}</p>
+                        <p className="text-red-600 text-sm mt-1">{t.labels.needShared}</p>
+                      </div>
                     </div>
-                  </section>
+                  </div>
+                )}
+              </section>
 
-                  {/* Section Langues */}
-                  <section className="p-5 sm:p-6 border-t border-gray-50" ref={refLangs}>
-                    <SectionHeader icon={<LanguagesIcon className="w-5 h-5" />} title={t.languages} />
+              {/* Section Contact (RHF + PhoneField) */}
+              <section className="p-5 sm:p-6 border-t border-gray-50" ref={refPhone}>
+                <SectionHeader icon={<Phone className="w-5 h-5" />} title={t.contact} />
 
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      🗣️ {lang === 'en' ? 'Spoken languages' : 'Langues parlées'} <span className="text-red-500">*</span>
-                    </label>
+                {/* Téléphone client via PhoneField (RHF) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Phone size={16} className="inline mr-1" /> {t.fields.phone} <span className="text-red-500">*</span>
+                  </label>
 
-                    <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 animate-pulse" />}>
-                      <MultiLanguageSelect
-                        value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
-                        onChange={(selected: MultiLanguageOption[]) => {
-                          const options = selected || [];
-                          const allLanguages = languages as Language[];
-                          const selectedLangs = options
-                            .map((opt) => allLanguages.find((langItem) => langItem.code === opt.value))
-                            .filter((v): v is Language => Boolean(v));
-                          setLanguagesSpoken(selectedLangs);
-                          if (fieldErrors.languages) setFieldErrors((prev) => { const r = { ...prev }; delete r.languages; return r; });
-                        }}
-                        providerLanguages={provider?.languages || provider?.languagesSpoken || []}
-                        highlightShared
-                        locale={lang}
+                  <Controller
+                    control={control}
+                    name="clientPhone"
+                    rules={{
+                      required: t.validators.phone,
+                      validate: (v) => {
+                        try {
+                          const p = parsePhoneNumberFromString(v || '');
+                          return p && p.isValid() ? true : t.validators.phone;
+                        } catch {
+                          return t.validators.phone;
+                        }
+                      },
+                    }}
+                    render={({ field }) => (
+                      <PhoneField
+                        name={field.name}
+                        control={control}
+                        label=""
+                        required
+                        defaultCountry="FR"
+                        // Le composant PhoneField pilote sa propre UI via RHF: on s'aligne sur sa valeur
                       />
-                    </Suspense>
-
-                    {fieldErrors.languages && <p className="mt-2 text-sm text-red-600">{fieldErrors.languages}</p>}
-
-                    {/* Compatibilité */}
-                    {languagesSpoken.length > 0 && (
-                      <div className="mt-4 space-y-3">
-                        {(() => {
-                          const providerLanguages = provider?.languages || provider?.languagesSpoken || [];
-                          const compatible = languagesSpoken.filter((l) => providerLanguages.includes(l.code));
-                          const incompatible = languagesSpoken.filter((l) => !providerLanguages.includes(l.code));
-                          return (
-                            <>
-                              {!!compatible.length && (
-                                <div className="p-4 bg-green-50 border-l-4 border-green-400 rounded-xl">
-                                  <div className="flex">
-                                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                                    <div className="ml-3">
-                                      <p className="text-green-900 font-semibold mb-2">✅ {t.labels.compatible} :</p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {compatible.map((l) => (
-                                          <span key={l.code} className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full border border-green-200">
-                                            🌐 {l.name}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              {!!incompatible.length && (
-                                <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-xl">
-                                  <div className="flex">
-                                    <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                                    <div className="ml-3">
-                                      <p className="text-red-700 font-semibold mb-2">⚠️ {t.labels.incompatible} :</p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {incompatible.map((l) => (
-                                          <span key={l.code} className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full border border-red-200">
-                                            🌐 {l.name}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
                     )}
+                  />
 
-                    {languagesSpoken.length > 0 && !hasLanguageMatchRealTime && (
-                      <div className="mt-3 p-4 bg-red-50 border-l-4 border-red-400 rounded-xl">
-                        <div className="flex">
-                          <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                          <div className="ml-3">
-                            <p className="text-red-700 font-semibold">🚫 {t.labels.communicationImpossible}</p>
-                            <p className="text-red-600 text-sm mt-1">{t.labels.needShared}</p>
-                          </div>
-                        </div>
-                      </div>
+                  <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
+                    <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.phone}
+                  </div>
+                  {errors.clientPhone && <p className="mt-1 text-sm text-red-600">{errors.clientPhone.message as string}</p>}
+                  {!!watch('clientPhone') && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      ➜ International: <span className="font-mono">{watch('clientPhone')}</span>
+                    </div>
+                  )}
+                  <div className="mt-2 text-sm text-gray-700">⏱️ <strong>{t.callTiming}</strong></div>
+                </div>
+
+                {/* WhatsApp optionnel (re-usage PhoneField mais non requis) */}
+<div className="mt-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <MessageCircle size={16} className="inline mr-1" /> {t.fields.whatsapp}
+                  </label>
+
+                  <Controller
+                    control={control}
+                    name="whatsapp"
+                    rules={{
+                      validate: (v) => {
+                        // Si vide ou undefined, c'est valide (champ optionnel)
+                        if (!v || v.trim() === '') return true;
+                        try {
+                          const p = parsePhoneNumberFromString(v);
+                          return p && p.isValid() ? true : "Numéro WhatsApp invalide";
+                        } catch {
+                          return "Numéro WhatsApp invalide";
+                        }
+                      },
+                    }}
+                    render={({ field }) => (
+                      <input
+                        {...field}
+                        type="tel"
+                        className={inputClass(!!errors.whatsapp)}
+                        placeholder="+33 6 12 34 56 78"
+                      />
                     )}
-                  </section>
-
-                  {/* Section Contact */}
-                  <section className="p-5 sm:p-6 border-t border-gray-50" ref={refPhone}>
-                    <SectionHeader icon={<Phone className="w-5 h-5" />} title={t.contact} />
-
-                    {/* Numéro */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Phone size={16} className="inline mr-1" /> {t.fields.phone} <span className="text-red-500">*</span>
-                      </label>
-
-                      <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
-                        <select
-                          name="phoneCountryCode"
-                          value={formData.phoneCountryCode}
-                          onChange={handleInputChange}
-                          className={`${inputClass('phoneNumber')} w-full sm:w-28 text-sm`}
-                        >
-                          {countryCodeOptions.map(({ code, flag }) => (
-                            <option key={code} value={code}>
-                              {flag} {code}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          name="phoneNumber"
-                          type="tel"
-                          value={formData.phoneNumber}
-                          onChange={handleInputChange}
-                          className={`w-full sm:flex-1 ${inputClass('phoneNumber')} ${fieldErrors.phoneNumber ? 'bg-red-50' : ''}`}
-                          placeholder={t.placeholders.phone}
-                          maxLength={20}
-                        />
-                      </div>
-                      <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
-                        <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.phone}
-                      </div>
-                      {fieldErrors.phoneNumber && <p className="mt-1 text-sm text-red-600">{fieldErrors.phoneNumber}</p>}
-                      {!!phoneE164 && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          ➜ International: <span className="font-mono">{phoneE164}</span>
-                        </div>
-                      )}
-                      <div className="mt-2 text-sm text-gray-700">⏱️ <strong>{t.callTiming}</strong></div>
+                  />
+                  {errors.whatsapp && <p className="mt-1 text-sm text-red-600">{errors.whatsapp.message as string}</p>}
+                  {!!watch('whatsapp') && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      ➜ WhatsApp: <span className="font-mono">{watch('whatsapp')}</span>
                     </div>
+                  )}
+                  <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
+                    <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.whatsapp}
+                  </div>
+                </div>
+              </section>
 
-                    {/* WhatsApp */}
-                    <div className="mt-5">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <MessageCircle size={16} className="inline mr-1" /> {t.fields.whatsapp}
-                      </label>
-                      <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
-                        <select
-                          name="whatsappCountryCode"
-                          value={formData.whatsappCountryCode}
-                          onChange={handleInputChange}
-                          className={`${inputClass('whatsappNumber')} w-full sm:w-28 text-sm`}
-                        >
-                          {countryCodeOptions.map(({ code, flag }) => (
-                            <option key={code} value={code}>
-                              {flag} {code}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          name="whatsappNumber"
-                          type="tel"
-                          value={formData.whatsappNumber}
-                          onChange={handleInputChange}
-                          className={`w-full sm:flex-1 ${inputClass('whatsappNumber')}`}
-                          placeholder={t.placeholders.phone}
-                          maxLength={20}
-                        />
-                      </div>
-                      {!!whatsappE164 && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          ➜ WhatsApp (E.164): <span className="font-mono">{whatsappE164}</span>
-                        </div>
-                      )}
-                      <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
-                        <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.whatsapp}
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* CGU */}
-                  <section className="p-5 sm:p-6 border-t border-gray-50" ref={refCGU}>
-                    <div className="bg-gray-50 rounded-xl p-4 sm:p-5 border border-gray-200">
-                      <div className="flex items-start gap-3">
+              {/* CGU */}
+              <section className="p-5 sm:p-6 border-t border-gray-50" ref={refCGU}>
+                <div className="bg-gray-50 rounded-xl p-4 sm:p-5 border border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <Controller
+                      control={control}
+                      name="acceptTerms"
+                      rules={{ validate: (v) => (v ? true : t.validators.accept) }}
+                      render={({ field }) => (
                         <input
                           id="acceptTerms"
-                          name="acceptTerms"
                           type="checkbox"
-                          checked={formData.acceptTerms}
-                          onChange={handleInputChange}
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
                           className="h-5 w-5 mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500 flex-shrink-0"
                           required
                         />
-                        <label htmlFor="acceptTerms" className="text-sm text-gray-700 leading-relaxed">
-                          {t.fields.accept}
-                          <Link to="/cgu-clients" className="text-red-600 hover:text-red-700 underline font-medium">
-                            {t.cgu}
-                          </Link>
-                          {t.fields.andConfirm}
-                        </label>
+                      )}
+                    />
+                    <label htmlFor="acceptTerms" className="text-sm text-gray-700 leading-relaxed">
+                      {t.fields.accept}
+                      <Link to="/cgu-clients" className="text-red-600 hover:text-red-700 underline font-medium">
+                        {t.cgu}
+                      </Link>
+                      {t.fields.andConfirm}
+                    </label>
+                  </div>
+                  {errors.acceptTerms && <p className="mt-2 text-sm text-red-600">{errors.acceptTerms.message as string}</p>}
+                </div>
+              </section>
+
+              {/* Erreurs globales */}
+              {(formError) && (
+                <div className="px-5 sm:px-6 pb-0">
+                  <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                      <div className="ml-3">
+                        <p className="font-semibold text-red-800">{t.errorsTitle}</p>
+                        <p className="text-sm text-red-700 mt-1">{formError}</p>
                       </div>
                     </div>
-                  </section>
+                  </div>
+                </div>
+              )}
 
-                  {/* Erreurs globales */}
-                  {(formErrors.length > 0 || formError) && (
-                    <div className="px-5 sm:px-6 pb-0">
-                      <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4">
-                        <div className="flex">
-                          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                          <div className="ml-3">
-                            <p className="font-semibold text-red-800">{t.errorsTitle}</p>
-                            {formError && <p className="text-sm text-red-700 mt-1">{formError}</p>}
-                            {!!formErrors.length && (
-                              <ul className="list-disc list-inside text-sm text-red-700 mt-2 space-y-1">
-                                {formErrors.map((err, i) => (<li key={i}>{err}</li>))}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+              {/* Aperçu rapide */}
+              <div className="px-5 sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => setShowPreview((v) => !v)}
+                  className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50"
+                >
+                  {showPreview ? 'Masquer l’aperçu' : 'Afficher l’aperçu rapide'}
+                </button>
+
+                {showPreview && (
+                  <div className="mt-3">
+                    <PreviewCard
+                      title={watch('title')}
+                      country={watch('currentCountry') === 'Autre' ? watch('autrePays') : watch('currentCountry')}
+                      langs={watch('clientLanguages') || []}
+                      phone={watch('clientPhone')}
+                      priceLabel={`${displayEUR}€ / $${displayUSD}`}
+                      duration={displayDuration}
+                      langPack={t}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* CTA */}
+              <div className="p-5 sm:p-6">
+                <Button
+                  type="submit"
+                  loading={isSubmitting}
+                  fullWidth
+                  size="large"
+                  className={`${
+                    Object.values(validFlags).every(Boolean)
+                      ? `bg-gradient-to-r ${THEME.button} hover:opacity-95 transform hover:scale-[1.01] shadow-lg`
+                      : 'bg-gray-400 cursor-not-allowed'
+                  } text-white font-bold py-4 px-6 sm:px-8 rounded-xl transition-all duration-300 ease-out text-base sm:text-lg`}
+                  disabled={isSubmitting || !Object.values(validFlags).every(Boolean)}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3" />
+                      Traitement en cours...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <Euro size={20} className="mr-2 sm:mr-3" />
+                      <span>
+                        {t.continuePay} ({`${displayEUR}€ / $${displayUSD}`})
+                      </span>
                     </div>
                   )}
+                </Button>
 
-                  {/* Aperçu rapide */}
-                  <div className="px-5 sm:px-6">
-                    <button
-                      type="button"
-                      onClick={() => setShowPreview((v) => !v)}
-                      className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50"
-                    >
-                      {showPreview ? 'Masquer l’aperçu' : 'Afficher l’aperçu rapide'}
-                    </button>
-
-                    {showPreview && (
-                      <div className="mt-3">
-                        <PreviewCard
-                          title={formData.title}
-                          country={formData.currentCountry === 'Autre' ? formData.autrePays : formData.currentCountry}
-                          langs={languagesSpoken.map((l) => l.code)}
-                          phone={phoneE164 || `${formData.phoneCountryCode} ${formData.phoneNumber}`.trim()}
-                          priceLabel={`${displayEUR}€ / $${displayUSD}`}
-                          duration={displayDuration}
-                          langPack={t}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <div className="p-5 sm:p-6">
-                    <Button
-                      type="submit"
-                      loading={isLoading}
-                      fullWidth
-                      size="large"
-                      className={`${
-                        valid.firstName &&
-                        valid.lastName &&
-                        valid.title &&
-                        valid.description &&
-                        valid.nationality &&
-                        valid.currentCountry &&
-                        valid.langs &&
-                        valid.phone &&
-                        valid.accept &&
-                        valid.sharedLang
-                          ? `bg-gradient-to-r ${THEME.button} hover:opacity-95 transform hover:scale-[1.01] shadow-lg`
-                          : 'bg-gray-400 cursor-not-allowed'
-                      } text-white font-bold py-4 px-6 sm:px-8 rounded-xl transition-all duration-300 ease-out text-base sm:text-lg`}
-                      disabled={isLoading || !Object.values(valid).every(Boolean)}
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3" />
-                          Traitement en cours...
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center">
-                          <Euro size={20} className="mr-2 sm:mr-3" />
-                          <span>
-                            {t.continuePay} ({`${displayEUR}€ / $${displayUSD}`}
-                            )
-                          </span>
-                        </div>
-                      )}
-                    </Button>
-
-                    {!Object.values(valid).every(Boolean) && (
-                      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-yellow-800 text-sm font-medium mb-2">
-                          🔍{' '}
-                          {lang === 'en'
-                            ? 'Missing to enable the button:'
-                            : 'Éléments manquants pour activer le bouton :'}
-                        </p>
-                        <div className="grid grid-cols-1 gap-1 text-xs text-yellow-700">
-                          {!valid.firstName && (
-                            <div>• {t.validators.firstName}</div>
-                          )}
-                          {!valid.lastName && (
-                            <div>• {t.validators.lastName}</div>
-                          )}
-                          {!valid.title && <div>• {t.validators.title}</div>}
-                          {!valid.description && (
-                            <div>• {t.validators.description}</div>
-                          )}
-                          {!valid.phone && <div>• {t.validators.phone}</div>}
-                          {!valid.nationality && (
-                            <div>• {t.validators.nationality}</div>
-                          )}
-                          {!valid.currentCountry && (
-                            <div>• {t.validators.currentCountry}</div>
-                          )}
-                          {formData.currentCountry === 'Autre' &&
-                            !valid.autrePays && (
-                              <div>• {t.validators.otherCountry}</div>
-                            )}
-                          {!valid.langs && (
-                            <div>• {t.validators.languages}</div>
-                          )}
-                          {!hasLanguageMatchRealTime && (
-                            <div>• {t.validators.langMismatch}</div>
-                          )}
-                          {!valid.accept && (
-                            <div>• {t.validators.accept}</div>
-                          )}
-                        </div>
-                        <div className="mt-3">
-                          <button
-                            type="button"
-                            onClick={scrollToFirstIncomplete}
-                            className="text-xs font-semibold underline text-gray-800"
-                          >
-                            {lang === 'en'
-                              ? 'Jump to first missing field'
-                              : 'Aller au premier champ manquant'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="text-center pt-4">
-                      <p className="text-xs text-gray-500">
-                        🔒 {t.securePay} • {t.callTiming}
-                      </p>
+                {!Object.values(validFlags).every(Boolean) && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-800 text-sm font-medium mb-2">
+                      🔍 {lang === 'en' ? 'Missing to enable the button:' : 'Éléments manquants pour activer le bouton :'}
+                    </p>
+                    <div className="grid grid-cols-1 gap-1 text-xs text-yellow-700">
+                      {!validFlags.firstName && <div>• {t.validators.firstName}</div>}
+                      {!validFlags.lastName && <div>• {t.validators.lastName}</div>}
+                      {!validFlags.title && <div>• {t.validators.title}</div>}
+                      {!validFlags.description && <div>• {t.validators.description}</div>}
+                      {!validFlags.phone && <div>• {t.validators.phone}</div>}
+                      {!validFlags.nationality && <div>• {t.validators.nationality}</div>}
+                      {!validFlags.currentCountry && <div>• {t.validators.currentCountry}</div>}
+                      {watch('currentCountry') === 'Autre' && !validFlags.autrePays && <div>• {t.validators.otherCountry}</div>}
+                      {!validFlags.langs && <div>• {t.validators.languages}</div>}
+                      {!validFlags.sharedLang && <div>• {t.validators.langMismatch}</div>}
+                      {!validFlags.accept && <div>• {t.validators.accept}</div>}
+                    </div>
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={scrollToFirstIncomplete}
+                        className="text-xs font-semibold underline text-gray-800"
+                      >
+                        {lang === 'en' ? 'Jump to first missing field' : 'Aller au premier champ manquant'}
+                      </button>
                     </div>
                   </div>
-                </form>
+                )}
+
+                <div className="text-center pt-4">
+                  <p className="text-xs text-gray-500">
+                    🔒 {t.securePay} • {t.callTiming}
+                  </p>
+                </div>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </div>

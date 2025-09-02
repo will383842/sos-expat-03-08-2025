@@ -1,10 +1,57 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createAndScheduleCallHTTPS = void 0;
+exports.assertE164 = assertE164;
 // firebase/functions/src/createAndScheduleCallFunction.ts - Version rectifiée sans planification
 const https_1 = require("firebase-functions/v2/https");
 const callScheduler_1 = require("./callScheduler");
 const logError_1 = require("./utils/logs/logError");
+const admin = __importStar(require("firebase-admin"));
+/**
+ * Valide et retourne un numéro de téléphone au format E164
+ * @param phone Le numéro de téléphone à valider
+ * @param who Indique si c'est le numéro du provider ou du client (pour les messages d'erreur)
+ * @returns Le numéro validé
+ * @throws Error si le numéro n'est pas valide
+ */
+function assertE164(phone, who) {
+    if (!/^\+[1-9]\d{8,14}$/.test(phone || ''))
+        throw new Error(`Invalid ${who} phone: ${phone}`);
+    return phone;
+}
 /**
  * ✅ Cloud Function RECTIFIÉE - Crée l'appel SANS planification
  * La planification sera gérée par le webhook Stripe à +5 min
@@ -128,22 +175,22 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         }
         console.log(`✅ [${requestId}] Montant validé: ${amount}€`);
         // ========================================
-        // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE
+        // 6. VALIDATION DES NUMÉROS DE TÉLÉPHONE AVEC assertE164
         // ========================================
-        const phoneRegex = /^\+[1-9]\d{8,14}$/;
-        if (!phoneRegex.test(providerPhone)) {
-            console.error(`❌ [${requestId}] Numéro prestataire invalide:`, providerPhone);
-            throw new https_1.HttpsError('invalid-argument', 'Numéro de téléphone prestataire invalide. Format requis: +33XXXXXXXXX');
+        try {
+            // Utilisation de la nouvelle fonction assertE164 pour valider les numéros
+            const validatedProviderPhone = assertE164(providerPhone, 'provider');
+            const validatedClientPhone = assertE164(clientPhone, 'client');
+            if (validatedProviderPhone === validatedClientPhone) {
+                console.error(`❌ [${requestId}] Numéros identiques:`, { providerPhone: validatedProviderPhone, clientPhone: validatedClientPhone });
+                throw new https_1.HttpsError('invalid-argument', 'Les numéros du prestataire et du client doivent être différents.');
+            }
+            console.log(`✅ [${requestId}] Numéros de téléphone validés avec assertE164`);
         }
-        if (!phoneRegex.test(clientPhone)) {
-            console.error(`❌ [${requestId}] Numéro client invalide:`, clientPhone);
-            throw new https_1.HttpsError('invalid-argument', 'Numéro de téléphone client invalide. Format requis: +33XXXXXXXXX');
+        catch (phoneError) {
+            console.error(`❌ [${requestId}] Erreur validation numéro:`, phoneError);
+            throw new https_1.HttpsError('invalid-argument', phoneError instanceof Error ? phoneError.message : 'Numéro de téléphone invalide. Format requis: +33XXXXXXXXX');
         }
-        if (providerPhone === clientPhone) {
-            console.error(`❌ [${requestId}] Numéros identiques:`, { providerPhone, clientPhone });
-            throw new https_1.HttpsError('invalid-argument', 'Les numéros du prestataire et du client doivent être différents.');
-        }
-        console.log(`✅ [${requestId}] Numéros de téléphone validés`);
         // ========================================
         // 7. VALIDATION DU PAYMENT INTENT
         // ========================================
@@ -175,16 +222,42 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             clientLanguages: clientLanguages || ['fr'],
             providerLanguages: providerLanguages || ['fr']
         });
+        console.log(`✅ [${requestId}] Session d'appel créée avec succès - ID: ${callSession.id}`);
+        // ========================================
+        // 9. ÉCRITURE VERS LA COLLECTION PAYMENTS
+        // ========================================
+        try {
+            console.log(`💾 [${requestId}] Écriture vers collection payments - PaymentIntent: ${paymentIntentId}`);
+            await admin.firestore()
+                .collection('payments')
+                .doc(paymentIntentId) // l'ID du PaymentIntent passé par le front
+                .set({
+                callSessionId: callSession.id,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                // Ajout d'informations contextuelles utiles
+                amount: amount,
+                serviceType: serviceType,
+                clientId: clientId,
+                providerId: providerId,
+                status: 'call_session_created',
+                requestId: requestId
+            }, { merge: true });
+            console.log(`✅ [${requestId}] Écriture payments réussie - Lien créé: ${paymentIntentId} → ${callSession.id}`);
+        }
+        catch (paymentsError) {
+            console.error(`❌ [${requestId}] Erreur écriture payments:`, paymentsError);
+            // On ne fait pas échouer la fonction pour autant, juste un warning
+            console.warn(`⚠️ [${requestId}] Session créée mais lien payments échoué - webhook pourra toujours fonctionner`);
+        }
         // ✅ RECTIFICATION MAJEURE: Plus de planification ici
         // La planification sera désormais gérée par le webhook Stripe à payment_intent.succeeded
         // qui créera une Cloud Task programmée à +5 minutes
-        console.log(`✅ [${requestId}] Session d'appel créée avec succès - ID: ${callSession.id}`);
         console.log(`📅 [${requestId}] Status: ${callSession.status}`);
         console.log(`⏰ [${requestId}] Planification: Sera gérée par webhook Stripe à +5 min`);
         // Calculer l'heure théorique de programmation (pour info uniquement)
         const theoreticalScheduledTime = new Date(Date.now() + (5 * 60 * 1000)); // +5 min fixe
         // ========================================
-        // 9. RÉPONSE DE SUCCÈS
+        // 10. RÉPONSE DE SUCCÈS
         // ========================================
         const response = {
             success: true,
@@ -219,7 +292,7 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
     }
     catch (error) {
         // ========================================
-        // 10. GESTION D'ERREURS COMPLÈTE
+        // 11. GESTION D'ERREURS COMPLÈTE
         // ========================================
         const errorDetails = {
             requestId,

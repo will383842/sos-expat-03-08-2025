@@ -840,30 +840,7 @@ const BookingRequest: React.FC = () => {
         providerPhone: bookingRequest.providerPhone,
       });
 
-      // Notification du prestataire via manualSend (bus message_events)
-      try {
-        await manualSend(
-          'whatsapp_provider_booking_request',
-          'fr-FR',
-          {
-            uid: selectedProvider.id,
-            email: bookingRequest.providerEmail ?? null,
-            phone: bookingRequest.providerPhone ?? null,
-            whatsapp: (provider as any)?.whatsapp ?? null, // si stocké côté profil
-          },
-          {
-            clientName: bookingRequest.clientName,
-            clientCountry: bookingRequest.clientCurrentCountry,
-            clientLanguages: bookingRequest.clientLanguages,
-            requestTitle: bookingRequest.title,
-            requestDescription: bookingRequest.description,
-            amountEUR: displayEUR,
-          }
-        );
-      } catch (error) {
-        console.warn('Erreur notification prestataire:', error);
-        // Ne pas bloquer le processus si la notification échoue
-      }
+     
 
       // Calcul serviceData pour checkout
       const selectedCurrency: Currency = detectUserCurrency();

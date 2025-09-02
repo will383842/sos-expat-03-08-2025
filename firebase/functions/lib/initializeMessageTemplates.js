@@ -67,13 +67,13 @@ const defaultTemplates = [
         variables: ['requestTitle', 'language'],
         isActive: true
     },
-    // ====== TEMPLATES SMS ======
+    // ====== TEMPLATES SMS - MISE À JOUR SELON VOS RECOMMANDATIONS ======
     {
         id: 'sms_provider_notification',
         name: 'Notification SMS Prestataire',
         type: 'sms',
         language: 'fr',
-        content: 'SOS Expat: Un client va vous appeler dans 5min. Titre: {requestTitle}. Langue: {language}. Soyez prêt !',
+        content: '🔔 SOS Expat : Un client va vous appeler dans 5 min. Sujet: {requestTitle}. Langue: {language}.',
         variables: ['requestTitle', 'language'],
         isActive: true
     },
@@ -82,7 +82,7 @@ const defaultTemplates = [
         name: 'Notification SMS Client',
         type: 'sms',
         language: 'fr',
-        content: 'Votre appel SOS Expat est prévu dans quelques minutes. Sujet: {requestTitle}. Langue: {language}. Restez disponible !',
+        content: '✅ Votre appel SOS Expat est prévu dans 5 min. Sujet: {requestTitle}. Langue: {language}.',
         variables: ['requestTitle', 'language'],
         isActive: true
     },
@@ -414,7 +414,7 @@ async (request) => {
         // if (!userDoc.exists || userDoc.data()?.role !== 'admin') {
         //   throw new Error('Accès refusé - Admin requis');
         // }
-        console.log('🚀 Initialisation des templates de messages (optimisé CPU mais COMPLET)...');
+        console.log('🚀 Initialisation des templates de messages (SMS mis à jour)...');
         const db = admin.firestore();
         let created = 0;
         let updated = 0;
@@ -487,7 +487,7 @@ async (request) => {
         await createMultiLanguageTemplates(db);
         const summary = {
             success: true,
-            message: `Templates initialisés avec succès (optimisé CPU + COMPLET) !`,
+            message: `Templates initialisés avec succès (SMS notifications mis à jour) !`,
             details: {
                 created,
                 updated,
@@ -495,7 +495,7 @@ async (request) => {
                 total: defaultTemplates.length
             }
         };
-        console.log('✅ Initialisation terminée (optimisé mais complet):', summary);
+        console.log('✅ Initialisation terminée (SMS notifications optimisés):', summary);
         return summary;
     }
     catch (error) {
@@ -518,14 +518,16 @@ async (request) => {
 async function createMultiLanguageTemplates(db) {
     try {
         console.log('🌍 Création des templates multi-langues (version complète)...');
-        // Templates critiques à traduire
+        // Templates critiques à traduire - AJOUT DES NOUVEAUX TEMPLATES SMS
         const criticalTemplates = [
             'voice_provider_welcome',
             'voice_client_welcome',
             'sms_call_success_client',
             'sms_call_success_provider',
             'sms_call_failure_provider_no_answer_client',
-            'sms_call_failure_client_no_answer_provider'
+            'sms_call_failure_client_no_answer_provider',
+            'sms_provider_notification', // ✅ AJOUTÉ
+            'sms_client_notification' // ✅ AJOUTÉ
         ];
         const translations = {
             en: {
@@ -534,7 +536,9 @@ async function createMultiLanguageTemplates(db) {
                 'sms_call_success_client': 'SOS Expat: Call completed ({duration}min {seconds}s). Thank you! Leave a review. Invoice by email.',
                 'sms_call_success_provider': 'SOS Expat: Consultation completed ({duration}min {seconds}s). Payment within 24h. Thank you!',
                 'sms_call_failure_provider_no_answer_client': 'SOS Expat: Provider did not answer. No charge. Automatic refund. Choose another expert.',
-                'sms_call_failure_client_no_answer_provider': 'SOS Expat: Client did not answer. You will be compensated. Our team will contact you.'
+                'sms_call_failure_client_no_answer_provider': 'SOS Expat: Client did not answer. You will be compensated. Our team will contact you.',
+                'sms_provider_notification': '🔔 SOS Expat: A client will call you in 5 min. Subject: {requestTitle}. Language: {language}.',
+                'sms_client_notification': '✅ Your SOS Expat call is scheduled in 5 min. Subject: {requestTitle}. Language: {language}.'
             },
             es: {
                 'voice_provider_welcome': 'Hola, será conectado con su cliente SOS Expat. Por favor espere un momento.',
@@ -542,7 +546,9 @@ async function createMultiLanguageTemplates(db) {
                 'sms_call_success_client': 'SOS Expat: Llamada completada ({duration}min {seconds}s). ¡Gracias! Deje su opinión. Factura por email.',
                 'sms_call_success_provider': 'SOS Expat: Consulta completada ({duration}min {seconds}s). Pago en 24h. ¡Gracias!',
                 'sms_call_failure_provider_no_answer_client': 'SOS Expat: Proveedor no respondió. Sin cargo. Reembolso automático. Elija otro experto.',
-                'sms_call_failure_client_no_answer_provider': 'SOS Expat: Cliente no respondió. Será compensado. Nuestro equipo lo contactará.'
+                'sms_call_failure_client_no_answer_provider': 'SOS Expat: Cliente no respondió. Será compensado. Nuestro equipo lo contactará.',
+                'sms_provider_notification': '🔔 SOS Expat: Un cliente le llamará en 5 min. Tema: {requestTitle}. Idioma: {language}.',
+                'sms_client_notification': '✅ Su llamada SOS Expat está programada en 5 min. Tema: {requestTitle}. Idioma: {language}.'
             }
         };
         // 🔧 OPTIMISATION CPU: Traitement par lots aussi pour les multi-langues

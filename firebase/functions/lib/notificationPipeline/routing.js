@@ -15,7 +15,7 @@ async function getRouting(eventId) {
             strategy: 'parallel',
             channels: {
                 email: { enabled: true, provider: 'zoho', rateLimitH: 0, retries: 1, delaySec: 0 },
-                sms: { enabled: false, provider: 'twilio', rateLimitH: 0, retries: 1, delaySec: 0 },
+                sms: { enabled: true, provider: 'twilio', rateLimitH: 0, retries: 1, delaySec: 0 },
                 whatsapp: { enabled: false, provider: 'twilio', rateLimitH: 0, retries: 1, delaySec: 0 },
                 push: { enabled: false, provider: 'fcm', rateLimitH: 0, retries: 1, delaySec: 0 },
                 inapp: { enabled: false, provider: 'firestore', rateLimitH: 0, retries: 1, delaySec: 0 }

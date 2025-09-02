@@ -11,8 +11,19 @@ async function getTemplate(locale, eventId) {
     if (!doc.exists && locale !== 'en') {
         doc = await db.collection('message_templates').doc('en').collection('items').doc(eventId).get();
     }
-    if (!doc.exists)
+    if (!doc.exists) {
+        const legacy = await db.collection('message_templates').doc(eventId).get();
+        if (legacy.exists) {
+            const data = legacy.data() || {};
+            const content = String(data.content || data.text || '');
+            return {
+                email: { enabled: true, subject: data.subject || 'Nouvelle demande', html: data.html || '', text: data.text || content },
+                sms: { enabled: true, text: content },
+                whatsapp: { enabled: false, templateName: '' },
+            };
+        }
         return null;
+    }
     const templateData = doc.data() || {};
     // ADAPTATEUR : Convertir l'ancien format vers le nouveau
     // Tes JSON actuels ont la structure : { "email": { "subject": "...", "html": "..." } }

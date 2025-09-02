@@ -24,6 +24,7 @@ import { parsePhoneNumberFromString } from 'libphonenumber-js';
 // imports
 import PhoneField from '@/components/PhoneField';
 import { useForm } from 'react-hook-form';
+import { saveProviderMessage } from '@/firebase/saveProviderMessage';
 
 /* ------------------------------ Stripe init ------------------------------ */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
@@ -398,6 +399,7 @@ interface PaymentFormProps {
 
 type PhoneFormValues = {
   clientPhone: string;
+  currentCountry?: string;
 };
 
 const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, service, adminPricing, onSuccess, onError, isProcessing, setIsProcessing, isMobile }) => {
@@ -421,6 +423,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
   const { control, watch, setError } = useForm<PhoneFormValues>({
     defaultValues: {
       clientPhone: service?.clientPhone || '',
+      currentCountry: '',
     }
   });
 
@@ -454,6 +457,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         currency: serviceCurrency,
         status: 'pending',
         createdAt: serverTimestamp(),
+        notifiedAt: null, // For preventing duplicate notifications
       };
 
       try { await setDoc(doc(db, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
@@ -461,6 +465,73 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
       try { await setDoc(doc(db, 'providers', provider.id, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
     },
     [provider, user, adminPricing, serviceCurrency, service.serviceType, watch]
+  );
+
+  const sendProviderNotifications = useCallback(
+    async (paymentIntentId: string, clientPhoneE164: string, providerPhoneE164: string) => {
+      try {
+        // Check if we've already sent notifications to prevent duplicates
+        const paymentDocRef = doc(db, 'payments', paymentIntentId);
+        const paymentDoc = await import('firebase/firestore').then(({ getDoc }) => getDoc(paymentDocRef));
+        
+        if (paymentDoc.exists() && paymentDoc.data()?.notifiedAt) {
+          console.log('Notifications already sent for payment:', paymentIntentId);
+          return;
+        }
+
+        // 1. Send in-app message to provider dashboard
+        await saveProviderMessage(
+          provider.id,
+          `Nouvelle demande payée : ${service.serviceType}. Client : ${(user.firstName || '') + ' ' + (user.lastName || '')} (${(language || 'fr').toUpperCase()}).`,
+          {
+            clientFirstName: user.firstName || null,
+            clientCountry: watch('currentCountry') || null,
+            providerPhone: providerPhoneE164 || null,
+            bookingId: paymentIntentId || null,
+          }
+        );
+
+        // 2. Send SMS + Email notification via pipeline
+        const enqueueMessageEvent = httpsCallable(functions, 'enqueueMessageEvent');
+        await enqueueMessageEvent({
+          eventId: 'booking_paid_provider',
+          locale: language === 'fr' ? 'fr-FR' : 'en',
+          to: { 
+            email: provider?.email || null, 
+            phone: providerPhoneE164 || null, 
+            uid: provider.id 
+          },
+          context: {
+            provider: { 
+              id: provider.id, 
+              name: provider.fullName || provider.name 
+            },
+            client: { 
+              id: user.uid, 
+              name: `${user.firstName || ''} ${user.lastName || ''}`.trim(), 
+              country: watch('currentCountry') || null, 
+              phone: clientPhoneE164 || null 
+            },
+            booking: { 
+              paymentIntentId, 
+              amount: adminPricing.totalAmount, 
+              currency: serviceCurrency.toUpperCase(), 
+              serviceType: service.serviceType, 
+              createdAt: new Date().toISOString() 
+            }
+          }
+        });
+
+        // Mark as notified to prevent duplicates
+        await setDoc(paymentDocRef, { notifiedAt: serverTimestamp() }, { merge: true });
+
+        console.log('Provider notifications sent successfully for payment:', paymentIntentId);
+      } catch (notificationError) {
+        console.warn('Failed to send provider notifications:', notificationError);
+        // Don't throw - notifications are not critical to payment success
+      }
+    },
+    [provider, user, service, adminPricing, serviceCurrency, language, watch]
   );
 
   const actuallySubmitPayment = useCallback(async () => {
@@ -553,6 +624,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
 
       void persistPaymentDocs(paymentIntent.id);
 
+      // Send provider notifications after successful payment
+      void sendProviderNotifications(paymentIntent.id, clientPhoneE164, providerPhoneE164);
+
       const gtag = getGtag();
       gtag?.('event', 'checkout_success', {
         service_type: service.serviceType,
@@ -623,6 +697,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
     onSuccess,
     onError,
     persistPaymentDocs,
+    sendProviderNotifications,
     setError,
     watch,
     t,

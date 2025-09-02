@@ -51,7 +51,6 @@ const DashboardMessages = lazy(() => import('@/components/dashboard/DashboardMes
 const SOSCall = lazy(() => import('./pages/SOSCall'));
 const ExpatCall = lazy(() => import('./pages/ExpatCall'));
 const CallCheckout = lazy(() => import('./pages/CallCheckout'));
-const Checkout = lazy(() => import('./pages/Checkout'));
 const BookingRequest = lazy(() => import('./pages/BookingRequest'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const ProviderProfile = lazy(() => import('./pages/ProviderProfile'));
@@ -130,7 +129,6 @@ const protectedUserRoutes: RouteConfig[] = [
   { path: '/call-checkout', component: CallCheckout, protected: true },
   { path: '/call-checkout/:providerId', component: CallCheckout, protected: true },
   { path: '/booking-request/:providerId', component: BookingRequest, protected: true },
-  { path: '/checkout', component: Checkout, protected: true },
   { path: '/booking-request', component: BookingRequest, protected: true },
   { path: '/payment-success', component: PaymentSuccess, protected: true },
   { path: '/dashboard/messages', component: DashboardMessages, protected: true },

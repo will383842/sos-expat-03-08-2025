@@ -21,6 +21,7 @@ import {
 // import { db } from "../../firebase";
 // import { db } from "@/lib/firebase";
 import { db } from "@/config/firebase";
+import { getAuth } from "firebase/auth";
 
 // Types
 type Locale = "fr-FR" | "en";
@@ -81,6 +82,7 @@ type MessageEvent = {
   locale: Locale;
   to: Recipient;
   context: Record<string, unknown>;
+  vars: Record<string, unknown>;
   createdAt: ReturnType<typeof serverTimestamp> | string;
   status: DeliveryStatus;
   channelHint?: MessageChannel | null;
@@ -174,6 +176,7 @@ export async function resendDelivery(delivery: MessageDelivery): Promise<boolean
     locale: delivery.locale || "en",
     to: delivery.to || { uid: null, email: null, phone: null, whatsapp: null },
     context: delivery.context || {},
+    vars: delivery.context || {},
     createdAt: new Date().toISOString(),
     status: "queued",
     channelHint: null
@@ -196,6 +199,7 @@ export async function manualSend(
     locale,            // ex: "fr-FR"
     to,                // { uid, email, phone, whatsapp }
     context,           // variables pour le template
+    vars: context,     // ✅ miroir des variables pour le worker
     createdAt: serverTimestamp(),
     status: "queued",  // lu par le worker
     channelHint: null, // optionnel: "whatsapp" | "sms" | "email"

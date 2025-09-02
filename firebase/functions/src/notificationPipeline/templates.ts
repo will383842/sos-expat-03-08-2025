@@ -12,7 +12,19 @@ export async function getTemplate(locale: 'fr-FR'|'en', eventId: string): Promis
     doc = await db.collection('message_templates').doc('en').collection('items').doc(eventId).get();
   }
   
-  if (!doc.exists) return null;
+  if (!doc.exists) {
+    const legacy = await db.collection('message_templates').doc(eventId).get();
+    if (legacy.exists) {
+      const data: any = legacy.data() || {};
+      const content = String(data.content || data.text || '');
+      return {
+        email: { enabled: true, subject: data.subject || 'Nouvelle demande', html: data.html || '', text: data.text || content },
+        sms:   { enabled: true, text: content },
+        whatsapp: { enabled: false, templateName: '' },
+      } as TemplatesByEvent;
+    }
+    return null;
+  }
   
   const templateData = doc.data() || {};
   

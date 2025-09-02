@@ -24,6 +24,12 @@ import { sendWhatsApp } from "./providers/whatsapp/twilio";
 import { sendPush } from "./providers/push/fcm";
 import { writeInApp } from "./providers/inapp/firestore";
 
+// ➕ NORMALISATION D'EVENTID
+function normalizeEventId(id: string) {
+  if (id === 'whatsapp_provider_booking_request') return 'request.created.provider';
+  return id.replace(/^whatsapp_/, '').replace(/^sms_/, '');
+}
+
 // ----- Admin init (idempotent)
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -89,6 +95,10 @@ function channelsToAttempt(
 
 // ----- Envoi unitaire par canal
 async function sendOne(channel: Channel, provider: string, tmpl: TemplatesByEvent, ctx: any, evt: MessageEvent) {
+  if (channel === 'whatsapp') {
+    return { skipped: true, reason: 'whatsapp_disabled' };
+  }
+  
   if (channel === "email") {
     const to = ctx?.user?.email || evt.to?.email;
     if (!to || !tmpl.email?.enabled) throw new Error("Missing email destination or disabled template");
@@ -230,15 +240,16 @@ export const onMessageEventCreate = onDocumentCreated(
     console.log(`🌐 Resolved language: ${lang}`);
 
     // 3) Lecture du template Firestore + fallback EN
-    const templates = await getTemplate(lang, evt.eventId);
+    const canonicalId = normalizeEventId(evt.eventId);
+    const templates = await getTemplate(lang, canonicalId);
     if (!templates) {
-      console.warn(`⚠️  No template for ${evt.eventId} in language ${lang}`);
+      console.warn(`⚠️  No template for ${canonicalId} in language ${lang}`);
       return;
     }
-    console.log(`✅ Template loaded for ${evt.eventId}`);
+    console.log(`✅ Template loaded for ${canonicalId}`);
 
     // 4) Routing + rate-limit
-    const routing = await getRouting(evt.eventId);
+    const routing = await getRouting(canonicalId);
     
     const uidForLimit = evt?.uid || evt?.context?.user?.uid || "unknown";
     

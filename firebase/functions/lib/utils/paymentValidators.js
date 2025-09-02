@@ -153,7 +153,7 @@ let pricingCache = null;
 let pricingCacheExpiry = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 async function getPricingConfig(type, currency = 'eur', db) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         // Utiliser le cache si valide
         const now = Date.now();
@@ -171,12 +171,28 @@ async function getPricingConfig(type, currency = 'eur', db) {
                 pricingCache = adminPricing;
                 pricingCacheExpiry = now + CACHE_DURATION;
                 const adminConfig = (_b = adminPricing === null || adminPricing === void 0 ? void 0 : adminPricing[type]) === null || _b === void 0 ? void 0 : _b[currency];
+                // === GESTION DES OVERRIDES ACTIFS ===
+                const ov = (_d = (_c = adminPricing === null || adminPricing === void 0 ? void 0 : adminPricing.overrides) === null || _c === void 0 ? void 0 : _c[type]) === null || _d === void 0 ? void 0 : _d[currency];
+                const toMillis = (v) => (typeof v === 'number' ? v : ((v === null || v === void 0 ? void 0 : v.seconds) ? v.seconds * 1000 : undefined));
+                const active = !!(ov === null || ov === void 0 ? void 0 : ov.enabled)
+                    && (!toMillis(ov === null || ov === void 0 ? void 0 : ov.startsAt) || now >= toMillis(ov === null || ov === void 0 ? void 0 : ov.startsAt))
+                    && (!toMillis(ov === null || ov === void 0 ? void 0 : ov.endsAt) || now <= toMillis(ov === null || ov === void 0 ? void 0 : ov.endsAt));
+                if (active) {
+                    return {
+                        totalAmount: ov.totalAmount,
+                        connectionFeeAmount: ov.connectionFeeAmount || 0,
+                        providerAmount: Math.max(0, ov.totalAmount - (ov.connectionFeeAmount || 0)),
+                        duration: (_e = adminConfig === null || adminConfig === void 0 ? void 0 : adminConfig.duration) !== null && _e !== void 0 ? _e : exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
+                        currency
+                    };
+                }
+                // === FIN GESTION DES OVERRIDES ===
                 if (adminConfig && typeof adminConfig.totalAmount === 'number') {
                     return {
                         totalAmount: adminConfig.totalAmount,
                         connectionFeeAmount: adminConfig.connectionFeeAmount || 0,
-                        providerAmount: (_c = adminConfig.providerAmount) !== null && _c !== void 0 ? _c : (adminConfig.totalAmount - (adminConfig.connectionFeeAmount || 0)),
-                        duration: (_d = adminConfig.duration) !== null && _d !== void 0 ? _d : exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
+                        providerAmount: (_f = adminConfig.providerAmount) !== null && _f !== void 0 ? _f : (adminConfig.totalAmount - (adminConfig.connectionFeeAmount || 0)),
+                        duration: (_g = adminConfig.duration) !== null && _g !== void 0 ? _g : exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
                         currency
                     };
                 }

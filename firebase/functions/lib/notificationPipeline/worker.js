@@ -55,6 +55,12 @@ const twilioSms_1 = require("./providers/sms/twilioSms");
 const twilio_1 = require("./providers/whatsapp/twilio");
 const fcm_1 = require("./providers/push/fcm");
 const firestore_2 = require("./providers/inapp/firestore");
+// ➕ NORMALISATION D'EVENTID
+function normalizeEventId(id) {
+    if (id === 'whatsapp_provider_booking_request')
+        return 'request.created.provider';
+    return id.replace(/^whatsapp_/, '').replace(/^sms_/, '');
+}
 // ----- Admin init (idempotent)
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -91,6 +97,9 @@ function channelsToAttempt(strategy, order, routeChannels, tmpl, ctx) {
 // ----- Envoi unitaire par canal
 async function sendOne(channel, provider, tmpl, ctx, evt) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+    if (channel === 'whatsapp') {
+        return { skipped: true, reason: 'whatsapp_disabled' };
+    }
     if (channel === "email") {
         const to = ((_a = ctx === null || ctx === void 0 ? void 0 : ctx.user) === null || _a === void 0 ? void 0 : _a.email) || ((_b = evt.to) === null || _b === void 0 ? void 0 : _b.email);
         if (!to || !((_c = tmpl.email) === null || _c === void 0 ? void 0 : _c.enabled))
@@ -204,14 +213,15 @@ exports.onMessageEventCreate = (0, firestore_1.onDocumentCreated)({
     const lang = (0, i18n_1.resolveLang)((evt === null || evt === void 0 ? void 0 : evt.locale) || ((_c = (_b = evt === null || evt === void 0 ? void 0 : evt.context) === null || _b === void 0 ? void 0 : _b.user) === null || _c === void 0 ? void 0 : _c.preferredLanguage));
     console.log(`🌐 Resolved language: ${lang}`);
     // 3) Lecture du template Firestore + fallback EN
-    const templates = await (0, templates_1.getTemplate)(lang, evt.eventId);
+    const canonicalId = normalizeEventId(evt.eventId);
+    const templates = await (0, templates_1.getTemplate)(lang, canonicalId);
     if (!templates) {
-        console.warn(`⚠️  No template for ${evt.eventId} in language ${lang}`);
+        console.warn(`⚠️  No template for ${canonicalId} in language ${lang}`);
         return;
     }
-    console.log(`✅ Template loaded for ${evt.eventId}`);
+    console.log(`✅ Template loaded for ${canonicalId}`);
     // 4) Routing + rate-limit
-    const routing = await (0, routing_1.getRouting)(evt.eventId);
+    const routing = await (0, routing_1.getRouting)(canonicalId);
     const uidForLimit = (evt === null || evt === void 0 ? void 0 : evt.uid) || ((_e = (_d = evt === null || evt === void 0 ? void 0 : evt.context) === null || _d === void 0 ? void 0 : _d.user) === null || _e === void 0 ? void 0 : _e.uid) || "unknown";
     // Vérifier rate limit global s'il existe
     const globalRateLimit = Math.max(...Object.values(routing.channels).map(c => c.rateLimitH));

@@ -8,6 +8,8 @@ import {
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import ReviewModal from '../components/review/ReviewModal';
+import { manualSend } from '../services/admin/comms';
+import { toE164 } from '../utils/phone';
 
 // 🔁 Firestore
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -40,7 +42,7 @@ interface OrderDoc {
 }
 
 /* =========================
-   Types / constantes “service appel”
+   Types / constantes "service appel"
    ========================= */
 interface ProviderInfo {
   id: string;
@@ -79,7 +81,7 @@ const SuccessPayment: React.FC = () => {
   const callId = searchParams.get('callId') || `call_${Date.now()}`;
   const paymentIntentId = searchParams.get('paymentIntentId');
 
-  // >>> orderId pour le bloc “total payé + économies”
+  // >>> orderId pour le bloc "total payé + économies"
   const { orderId } = useParams<{ orderId: string }>();
 
   // UI state (appel)
@@ -257,7 +259,7 @@ const SuccessPayment: React.FC = () => {
   }, [paymentIntentId]);
 
   /* =========================
-     Compte à rebours “ready_to_ring”
+     Compte à rebours "ready_to_ring"
      ========================= */
   useEffect(() => {
     if (!paymentTimestamp || callState !== 'connecting') return;
@@ -281,7 +283,7 @@ const SuccessPayment: React.FC = () => {
   }, [paymentTimestamp, callState]);
 
   /* =========================
-     Timer local en “in_progress”
+     Timer local en "in_progress"
      ========================= */
   useEffect(() => {
     if (callState !== 'in_progress' || timeRemaining <= 0) return;
@@ -301,6 +303,57 @@ const SuccessPayment: React.FC = () => {
   }, [initializeServiceData]);
 
   /* =========================
+     Notification provider après paiement réussi
+     ========================= */
+  useEffect(() => {
+    // Déclencher quand le paiement est confirmé (paymentTimestamp existe)
+    if (!paymentTimestamp) return;
+
+    // Récupération des infos (adapte si tu stockes ailleurs)
+    const rqRaw = sessionStorage.getItem('bookingRequest');
+    const spRaw = sessionStorage.getItem('selectedProvider');
+    if (!rqRaw && !spRaw) return;
+
+    const bookingRequest = rqRaw ? JSON.parse(rqRaw) : null;
+    const selectedProvider = spRaw ? JSON.parse(spRaw) : null;
+
+    const region =
+      selectedProvider?.countryCode ||
+      bookingRequest?.providerCountryCode ||
+      'FR';
+
+    const phoneRes = toE164(
+      selectedProvider?.phone || bookingRequest?.providerPhone || '',
+      region
+    );
+    const phone = phoneRes.ok ? phoneRes.e164 : null;
+
+    const locale: 'fr-FR' | 'en' =
+      selectedProvider?.preferredLocale?.startsWith('fr') ? 'fr-FR' :
+      selectedProvider?.preferredLocale?.startsWith('en') ? 'en' :
+      (bookingRequest?.clientLanguages || '').includes('fr') ? 'fr-FR' : 'en';
+
+    manualSend(
+      'request.created.provider',
+      locale,
+      {
+        uid: selectedProvider?.id ?? null,
+        email: bookingRequest?.providerEmail ?? selectedProvider?.email ?? null,
+        phone,
+        fcmToken: selectedProvider?.fcmToken ?? null,
+      },
+      {
+        clientName: bookingRequest?.clientName,
+        clientCountry: bookingRequest?.clientCurrentCountry,
+        clientLanguages: bookingRequest?.clientLanguages,
+        requestTitle: bookingRequest?.title,
+        requestDescription: bookingRequest?.description,
+        amountEUR: bookingRequest?.priceEURFormatted ?? bookingRequest?.amountEUR ?? '',
+      }
+    ).catch(console.warn);
+  }, [paymentTimestamp]);
+
+  /* =========================
      Écoute Firestore : état de l'appel
      ========================= */
   useEffect(() => {
@@ -314,7 +367,7 @@ const SuccessPayment: React.FC = () => {
       switch (data.status) {
         case 'scheduled':
           if (callState === 'connecting') {
-            // keep “connecting”
+            // keep "connecting"
           } else {
             setCallState('connecting');
           }
@@ -405,7 +458,7 @@ const SuccessPayment: React.FC = () => {
   );
 
   /* =========================
-     >>> PARTIE “ORDER” pour Total payé + Économies
+     >>> PARTIE "ORDER" pour Total payé + Économies
      ========================= */
   const [order, setOrder] = useState<OrderDoc | null>(null);
   const [orderLoading, setOrderLoading] = useState<boolean>(true);
@@ -555,51 +608,6 @@ const SuccessPayment: React.FC = () => {
                 </h1>
                 
                 <div className="mb-8">
-                  <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-r from-green-500 to-blue-500 shadow-2xl mb-6 animate-bounce">
-                    <Phone className="w-16 h-16 text-white" />
-                  </div>
-                  <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                    {t.readyToRingDesc}
-                  </p>
-                  <div className="mt-4 inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-400/20">
-                    <span className="text-green-300 text-sm font-medium">{t.expertComing}</span>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {callState === 'in_progress' && (
-              <>
-                <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
-                  <span className="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                    {t.callInProgress}
-                  </span>
-                </h1>
-                
-                <div className="mb-8">
-                  <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-r from-green-500 to-blue-500 shadow-2xl mb-6">
-                    <Phone className="w-16 h-16 text-white animate-pulse" />
-                  </div>
-                  <div className="text-4xl font-black text-white mb-4">
-                    {formatTime(timeRemaining)}
-                  </div>
-                  <p className="text-xl text-gray-300">{t.timeRemaining}</p>
-                  <div className="mt-4 inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-400/20">
-                    <span className="text-green-300 text-sm font-medium">{t.youRock}</span>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {callState === 'completed' && (
-              <>
-                <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
-                  <span className="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                    {t.callCompleted}
-                  </span>
-                </h1>
-                
-                <div className="mb-8">
                   <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-r from-green-500 to-blue-500 shadow-2xl mb-6">
                     <CheckCircle className="w-16 h-16 text-white" />
                   </div>
@@ -642,7 +650,7 @@ const SuccessPayment: React.FC = () => {
         </section>
 
         {/* =========================
-            SECTION RÉCAP “TOTAL PAYÉ + ÉCONOMIES”
+            SECTION RÉCAP "TOTAL PAYÉ + ÉCONOMIES"
             ========================= */}
         <section className="pb-4 bg-gray-950">
           <div className="max-w-4xl mx-auto px-6">
@@ -710,7 +718,7 @@ const SuccessPayment: React.FC = () => {
               )}
             </div>
 
-            {/* Détails “debug” optionnels */}
+            {/* Détails "debug" optionnels */}
             {!!order && (
               <details className="mt-3 rounded-lg border border-white/10 bg-white/5 p-4 text-white/80">
                 <summary className="cursor-pointer select-none text-sm">Détails de la commande</summary>
@@ -733,7 +741,7 @@ const SuccessPayment: React.FC = () => {
                   )}
                   {typeof order?.metadata?.original_standard_amount !== 'undefined' && (
                     <div className="flex justify-between">
-                      <span>Prix standard d’origine</span>
+                      <span>Prix standard d'origine</span>
                       <span className="font-medium">
                         {C}{fmt(toNum(order?.metadata?.original_standard_amount))}
                       </span>
@@ -907,4 +915,49 @@ const SuccessPayment: React.FC = () => {
   );
 };
 
-export default SuccessPayment;
+export default SuccessPayment;-center w-32 h-32 rounded-full bg-gradient-to-r from-green-500 to-blue-500 shadow-2xl mb-6 animate-bounce">
+                    <Phone className="w-16 h-16 text-white" />
+                  </div>
+                  <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                    {t.readyToRingDesc}
+                  </p>
+                  <div className="mt-4 inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-400/20">
+                    <span className="text-green-300 text-sm font-medium">{t.expertComing}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {callState === 'in_progress' && (
+              <>
+                <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
+                  <span className="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    {t.callInProgress}
+                  </span>
+                </h1>
+                
+                <div className="mb-8">
+                  <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-r from-green-500 to-blue-500 shadow-2xl mb-6">
+                    <Phone className="w-16 h-16 text-white animate-pulse" />
+                  </div>
+                  <div className="text-4xl font-black text-white mb-4">
+                    {formatTime(timeRemaining)}
+                  </div>
+                  <p className="text-xl text-gray-300">{t.timeRemaining}</p>
+                  <div className="mt-4 inline-flex items-center space-x-2 bg-green-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-green-400/20">
+                    <span className="text-green-300 text-sm font-medium">{t.youRock}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {callState === 'completed' && (
+              <>
+                <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
+                  <span className="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    {t.callCompleted}
+                  </span>
+                </h1>
+                
+                <div className="mb-8">
+                  <div className="inline-flex items-center justify

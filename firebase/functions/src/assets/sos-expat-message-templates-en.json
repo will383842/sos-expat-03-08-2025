@@ -26,7 +26,7 @@
       },
       "email": {
         "subject": "Welcome aboard, {{user.firstName}} 👋",
-        "html": "<h1>Welcome!</h1><p>Your account is ready. Two minutes to complete your profile and you’re good ✨</p><p><a href='{{webappUrl}}/profile'>Complete profile</a></p>",
+        "html": "<h1>Welcome!</h1><p>Your account is ready. Two minutes to complete your profile and you're good ✨</p><p><a href='{{webappUrl}}/profile'>Complete profile</a></p>",
         "text": "Welcome {{user.firstName}}! Your profile is here: {{webappUrl}}/profile"
       },
       "sms": {
@@ -39,7 +39,7 @@
       },
       "inapp": {
         "title": "Welcome 👋",
-        "body": "Add a few details and you’re ready.",
+        "body": "Add a few details and you're ready.",
         "action": {
           "label": "Complete",
           "deeplink": "/profile"
@@ -91,12 +91,12 @@
       },
       "email": {
         "subject": "Your profile is almost perfect ✨",
-        "html": "<p>Add one tiny detail and you’re ready to match with the best providers.</p><p><a href='{{webappUrl}}/profile'>Complete now</a></p>",
+        "html": "<p>Add one tiny detail and you're ready to match with the best providers.</p><p><a href='{{webappUrl}}/profile'>Complete now</a></p>",
         "text": "One tiny detail left! {{webappUrl}}/profile"
       },
       "push": {
         "title": "Almost there 😎",
-        "body": "Finish your profile (1 min) and we’ll take it from there.",
+        "body": "Finish your profile (1 min) and we'll take it from there.",
         "deeplink": "sosexpat://profile"
       }
     },
@@ -136,22 +136,40 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "Request received ✅ — “{{request.title}}”",
-        "html": "<p>We’re reviewing and will update you super fast.</p><p><a href='{{webappUrl}}/requests/{{request.id}}'>View request</a></p>",
-        "text": "Request saved for “{{request.title}}”. Track: {{webappUrl}}/requests/{{request.id}}"
+        "subject": "Request received ✅ — \"{{request.title}}\"",
+        "html": "<p>We're reviewing and will update you super fast.</p><p><a href='{{webappUrl}}/requests/{{request.id}}'>View request</a></p>",
+        "text": "Request saved for \"{{request.title}}\". Track: {{webappUrl}}/requests/{{request.id}}"
       },
       "push": {
         "title": "Request saved",
-        "body": "We’ve got you ⏳",
-        "deeplink": "sosexpat://requests/{request.id}"
+        "body": "We've got you ⏳",
+        "deeplink": "sosexpat://requests/{{request.id}}"
       },
       "inapp": {
         "title": "Under review",
-        "body": "We’ll be quick 😉",
+        "body": "We'll be quick 😉",
         "action": {
           "label": "View",
           "deeplink": "/requests/{{request.id}}"
         }
+      }
+    },
+    {
+      "id": "request.created.provider",
+      "channels": {
+        "email": true,
+        "sms": true,
+        "whatsapp": false,
+        "push": false,
+        "inapp": false
+      },
+      "email": {
+        "subject": "New client request",
+        "html": "",
+        "text": "You received a request from {{clientName}} ({{clientCountry}}): {{requestTitle}}. Budget ~{{amountEUR}}€. {{requestDescription}}"
+      },
+      "sms": {
+        "text": "New request from {{clientName}} ({{clientCountry}}): \"{{requestTitle}}\". ~{{amountEUR}}€ — {{requestDescription}}"
       }
     },
     {
@@ -167,18 +185,18 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "Tiny tweak and we’re golden ✨",
+        "subject": "Tiny tweak and we're golden ✨",
         "html": "<p>We just need a detail: {{review.note}}</p><p><a href='{{webappUrl}}/requests/{{request.id}}/edit'>Complete</a></p>",
-        "text": "We’re missing a detail: {{review.note}} — {{webappUrl}}/requests/{{request.id}}/edit"
+        "text": "We're missing a detail: {{review.note}} — {{webappUrl}}/requests/{{request.id}}/edit"
       },
       "push": {
         "title": "Action needed",
         "body": "Add the missing info (1 min ⏱️)",
-        "deeplink": "sosexpat://requests/{request.id}/edit"
+        "deeplink": "sosexpat://requests/{{request.id}}/edit"
       },
       "inapp": {
         "title": "Quick fix ✍️",
-        "body": "Add what’s missing for quick approval.",
+        "body": "Add what's missing for quick approval.",
         "action": {
           "label": "Complete",
           "deeplink": "/requests/{{request.id}}/edit"
@@ -198,18 +216,18 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "Approved 🎉 — “{{request.title}}”",
-        "html": "<p>Let’s go! Head to payment to kick things off.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Pay now</a></p>",
+        "subject": "Approved 🎉 — \"{{request.title}}\"",
+        "html": "<p>Let's go! Head to payment to kick things off.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Pay now</a></p>",
         "text": "Approved. Pay here: {{webappUrl}}/checkout/{{request.id}}"
       },
       "push": {
         "title": "Request approved",
-        "body": "Let’s go 🚀",
-        "deeplink": "sosexpat://checkout/{request.id}"
+        "body": "Let's go 🚀",
+        "deeplink": "sosexpat://checkout/{{request.id}}"
       },
       "inapp": {
         "title": "Go time 🎉",
-        "body": "Make payment and we’ll connect your provider.",
+        "body": "Make payment and we'll connect your provider.",
         "action": {
           "label": "Pay",
           "deeplink": "/checkout/{{request.id}}"
@@ -249,14 +267,14 @@
       "email": {
         "subject": "Payment confirmed — {{request.title}}",
         "html": "<p>Thank you 🙏 Your provider is notified. Chat is open 🔓</p><p><a href='{{webappUrl}}/requests/{{request.id}}'>View my request</a></p>",
-        "text": "Payment confirmed for “{{request.title}}”. Your provider is notified. {{webappUrl}}/requests/{{request.id}}"
+        "text": "Payment confirmed for \"{{request.title}}\". Your provider is notified. {{webappUrl}}/requests/{{request.id}}"
       },
       "sms": {
-        "text": "✅ Payment OK for “{{request.title}}”. Your provider will reach out shortly."
+        "text": "✅ Payment OK for \"{{request.title}}\". Your provider will reach out shortly."
       },
       "push": {
         "title": "Payment confirmed",
-        "body": "Chat ready. Let’s chat 💬",
+        "body": "Chat ready. Let's chat 💬",
         "deeplink": "sosexpat://requests/{request.id}"
       },
       "inapp": {
@@ -282,11 +300,11 @@
       },
       "email": {
         "subject": "Oops — payment failed",
-        "html": "<p>It happens. Try another card or ping support — we’ve got you 💬</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Try again</a></p>",
-        "text": "Payment failed for “{{request.title}}”. Try again: {{webappUrl}}/checkout/{{request.id}}"
+        "html": "<p>It happens. Try another card or ping support — we've got you 💬</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Try again</a></p>",
+        "text": "Payment failed for "{{request.title}}". Try again: {{webappUrl}}/checkout/{{request.id}}"
       },
       "sms": {
-        "text": "⚠️ Payment failed for “{{request.title}}”. Try again: {{webappUrl}}/checkout/{{request.id}}"
+        "text": "⚠️ Payment failed for "{{request.title}}". Try again: {{webappUrl}}/checkout/{{request.id}}"
       },
       "inapp": {
         "title": "Payment failed 😕",
@@ -312,16 +330,16 @@
       "email": {
         "subject": "Connecting you now 🤝",
         "html": "<p>Your provider is joining the chat. Get your questions ready!</p><p><a href='{{webappUrl}}/messages'>Open chat</a></p>",
-        "text": "It’s happening! Your provider is joining the chat: {{webappUrl}}/messages"
+        "text": "It's happening! Your provider is joining the chat: {{webappUrl}}/messages"
       },
       "push": {
-        "title": "It’s happening ✨",
+        "title": "It's happening ✨",
         "body": "Your provider is on the way to chat.",
         "deeplink": "sosexpat://messages"
       },
       "inapp": {
         "title": "Connecting the dots 🤝",
-        "body": "You’ll chat in real time.",
+        "body": "You'll chat in real time.",
         "action": {
           "label": "Open chat",
           "deeplink": "/messages"
@@ -342,7 +360,7 @@
       },
       "email": {
         "subject": "New client confirmed — {{request.title}}",
-        "html": "<p>Client paid ✅ Here’s the recap and direct chat link.</p><p><a href='{{webappUrl}}/provider/messages/{{thread.id}}'>Open chat</a></p>",
+        "html": "<p>Client paid ✅ Here's the recap and direct chat link.</p><p><a href='{{webappUrl}}/provider/messages/{{thread.id}}'>Open chat</a></p>",
         "text": "New client confirmed. Chat: {{webappUrl}}/provider/messages/{{thread.id}}"
       },
       "push": {
@@ -486,7 +504,7 @@
       },
       "email": {
         "subject": "Job completed — nice one ✨",
-        "html": "<p>{{client.firstName}}’s request is closed. Your stats have been updated.</p><p><a href='{{webappUrl}}/provider/stats'>View stats</a></p>",
+        "html": "<p>{{client.firstName}}'s request is closed. Your stats have been updated.</p><p><a href='{{webappUrl}}/provider/stats'>View stats</a></p>",
         "text": "Job completed for {{client.firstName}}. Stats updated: {{webappUrl}}/provider/stats"
       },
       "push": {
@@ -516,13 +534,13 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "What’s next? We can help 💡",
+        "subject": "What's next? We can help 💡",
         "html": "<p>We can also assist with {{suggestions.topCountry}} or {{suggestions.topService}}.</p><p><a href='{{webappUrl}}/services'>Explore</a></p>",
         "text": "Need a hand? {{webappUrl}}/services"
       },
       "push": {
         "title": "Need help?",
-        "body": "We’ve got ideas for your next step 😉",
+        "body": "We've got ideas for your next step 😉",
         "deeplink": "sosexpat://services"
       }
     },
@@ -541,7 +559,7 @@
       },
       "email": {
         "subject": "Security alert 🔒",
-        "html": "<p>Login from {{security.city}}, {{security.country}} ({{security.ip}}).</p><p>If this wasn’t you, change your password.</p><p><a href='{{webappUrl}}/security'>Secure my account</a></p>",
+        "html": "<p>Login from {{security.city}}, {{security.country}} ({{security.ip}}).</p><p>If this wasn't you, change your password.</p><p><a href='{{webappUrl}}/security'>Secure my account</a></p>",
         "text": "Suspicious login detected. If not you: {{webappUrl}}/security"
       },
       "sms": {
@@ -549,7 +567,7 @@
       },
       "inapp": {
         "title": "Security",
-        "body": "We’ve got your back. Update your password if needed.",
+        "body": "We've got your back. Update your password if needed.",
         "action": {
           "label": "Secure",
           "deeplink": "/security"

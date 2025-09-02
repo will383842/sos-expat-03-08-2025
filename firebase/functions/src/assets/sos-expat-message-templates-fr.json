@@ -26,11 +26,11 @@
       },
       "email": {
         "subject": "Bienvenue à bord, {{user.firstName}} 👋",
-        "html": "<h1>Bienvenue !</h1><p>Ton compte est prêt. Deux minutes pour compléter ton profil et c’est parti ✨</p><p><a href='{{webappUrl}}/profile'>Compléter mon profil</a></p>",
+        "html": "<h1>Bienvenue !</h1><p>Ton compte est prêt. Deux minutes pour compléter ton profil et c'est parti ✨</p><p><a href='{{webappUrl}}/profile'>Compléter mon profil</a></p>",
         "text": "Bienvenue {{user.firstName}} ! Ton compte est prêt. Complète ton profil ici : {{webappUrl}}/profile"
       },
       "sms": {
-        "text": "Bienvenue {{user.firstName}} ! Prêt(e) à démarrer ? Ton profil t’attend : {{webappUrl}}/profile"
+        "text": "Bienvenue {{user.firstName}} ! Prêt(e) à démarrer ? Ton profil t'attend : {{webappUrl}}/profile"
       },
       "push": {
         "title": "Bienvenue !",
@@ -90,13 +90,13 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "Ton profil est à deux doigts d’être parfait ✨",
+        "subject": "Ton profil est à deux doigts d'être parfait ✨",
         "html": "<p>Encore 1 petite info et tu es prêt(e) à matcher avec les meilleurs prestataires.</p><p><a href='{{webappUrl}}/profile'>Compléter maintenant</a></p>",
-        "text": "Encore 1 petite info et c’est bon ! {{webappUrl}}/profile"
+        "text": "Encore 1 petite info et c'est bon ! {{webappUrl}}/profile"
       },
       "push": {
         "title": "Presque fini 😎",
-        "body": "Complète ton profil (1 min) et on s’occupe du reste.",
+        "body": "Complète ton profil (1 min) et on s'occupe du reste.",
         "deeplink": "sosexpat://profile"
       }
     },
@@ -142,7 +142,7 @@
       },
       "push": {
         "title": "Demande enregistrée",
-        "body": "On s’occupe de toi ⏳",
+        "body": "On s'occupe de toi ⏳",
         "deeplink": "sosexpat://requests/{request.id}"
       },
       "inapp": {
@@ -152,6 +152,27 @@
           "label": "Voir",
           "deeplink": "/requests/{{request.id}}"
         }
+      }
+    },
+    {
+      "id": "request.created.provider",
+      "roles": [
+        "provider"
+      ],
+      "channels": {
+        "email": true,
+        "sms": true,
+        "whatsapp": false,
+        "push": false,
+        "inapp": false
+      },
+      "email": {
+        "subject": "Nouvelle demande client",
+        "html": "",
+        "text": "Vous avez reçu une demande de {{clientName}} ({{clientCountry}}) : {{requestTitle}}. Budget ~{{amountEUR}}€. {{requestDescription}}"
+      },
+      "sms": {
+        "text": "Nouvelle demande de {{clientName}} ({{clientCountry}}) : « {{requestTitle}} ». ~{{amountEUR}}€ — {{requestDescription}}"
       }
     },
     {
@@ -168,7 +189,7 @@
       },
       "email": {
         "subject": "Petit coup de polish ✨",
-        "html": "<p>On a juste besoin d’un détail : {{review.note}}</p><p><a href='{{webappUrl}}/requests/{{request.id}}/edit'>Compléter</a></p>",
+        "html": "<p>On a juste besoin d'un détail : {{review.note}}</p><p><a href='{{webappUrl}}/requests/{{request.id}}/edit'>Compléter</a></p>",
         "text": "Il manque un petit détail : {{review.note}} — {{webappUrl}}/requests/{{request.id}}/edit"
       },
       "push": {
@@ -178,7 +199,7 @@
       },
       "inapp": {
         "title": "À peaufiner ✍️",
-        "body": "Ajoute ce qu’il manque pour validation rapide.",
+        "body": "Ajoute ce qu'il manque pour validation rapide.",
         "action": {
           "label": "Compléter",
           "deeplink": "/requests/{{request.id}}/edit"
@@ -199,12 +220,12 @@
       },
       "email": {
         "subject": "Validée 🎉 — « {{request.title}} »",
-        "html": "<p>Let’s go ! Passe au paiement pour lancer la mise en relation.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Payer maintenant</a></p>",
+        "html": "<p>Let's go ! Passe au paiement pour lancer la mise en relation.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Payer maintenant</a></p>",
         "text": "Demande validée. Paiement ici : {{webappUrl}}/checkout/{{request.id}}"
       },
       "push": {
         "title": "Demande validée",
-        "body": "Let’s go 🚀",
+        "body": "Let's go 🚀",
         "deeplink": "sosexpat://checkout/{request.id}"
       },
       "inapp": {
@@ -231,7 +252,7 @@
       "email": {
         "subject": "On a gardé ta demande au chaud 🔥",
         "html": "<p>Tu peux finaliser en 1 minute chrono.</p><p><a href='{{webappUrl}}/checkout/{{request.id}}'>Finaliser le paiement</a></p>",
-        "text": "Ta demande t’attend 😌 : {{webappUrl}}/checkout/{{request.id}}"
+        "text": "Ta demande t'attend 😌 : {{webappUrl}}/checkout/{{request.id}}"
       }
     },
     {
@@ -256,7 +277,7 @@
       },
       "push": {
         "title": "Paiement confirmé",
-        "body": "Chat prêt. Let’s chat 💬",
+        "body": "Chat prêt. Let's chat 💬",
         "deeplink": "sosexpat://requests/{request.id}"
       },
       "inapp": {
@@ -312,7 +333,7 @@
       "email": {
         "subject": "Mise en relation en cours 🤝",
         "html": "<p>Ton prestataire arrive dans le chat. Prépare tes questions !</p><p><a href='{{webappUrl}}/messages'>Ouvrir le chat</a></p>",
-        "text": "C’est parti ! Ton prestataire arrive dans le chat : {{webappUrl}}/messages"
+        "text": "C'est parti ! Ton prestataire arrive dans le chat : {{webappUrl}}/messages"
       },
       "push": {
         "title": "Ça se rapproche ✨",
@@ -352,7 +373,7 @@
       },
       "inapp": {
         "title": "Client confirmé",
-        "body": "On t’a préparé le thread.",
+        "body": "On t'a préparé le thread.",
         "action": {
           "label": "Ouvrir le chat",
           "deeplink": "/provider/messages/{{thread.id}}"
@@ -411,7 +432,7 @@
       },
       "push": {
         "title": "Message de {{client.firstName}} 💬",
-        "body": "Un petit mot t’attend.",
+        "body": "Un petit mot t'attend.",
         "deeplink": "sosexpat://provider/messages/{thread.id}"
       },
       "inapp": {
@@ -516,12 +537,12 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "Et si on t’aidait sur la suite ? 💡",
-        "html": "<p>On peut aussi t’accompagner pour {{suggestions.topCountry}} ou {{suggestions.topService}}.</p><p><a href='{{webappUrl}}/services'>Découvrir</a></p>",
-        "text": "Besoin d’un coup de main ? {{webappUrl}}/services"
+        "subject": "Et si on t'aidait sur la suite ? 💡",
+        "html": "<p>On peut aussi t'accompagner pour {{suggestions.topCountry}} ou {{suggestions.topService}}.</p><p><a href='{{webappUrl}}/services'>Découvrir</a></p>",
+        "text": "Besoin d'un coup de main ? {{webappUrl}}/services"
       },
       "push": {
-        "title": "Besoin d’aide ?",
+        "title": "Besoin d'aide ?",
         "body": "On a des bons plans pour la suite 😉",
         "deeplink": "sosexpat://services"
       }
@@ -541,8 +562,8 @@
       },
       "email": {
         "subject": "Alerte sécurité 🔒",
-        "html": "<p>Connexion depuis {{security.city}}, {{security.country}} ({{security.ip}}).</p><p>Si ce n’est pas toi, change ton mot de passe.</p><p><a href='{{webappUrl}}/security'>Sécuriser mon compte</a></p>",
-        "text": "Connexion suspecte détectée. Si ce n’est pas toi : {{webappUrl}}/security"
+        "html": "<p>Connexion depuis {{security.city}}, {{security.country}} ({{security.ip}}).</p><p>Si ce n'est pas toi, change ton mot de passe.</p><p><a href='{{webappUrl}}/security'>Sécuriser mon compte</a></p>",
+        "text": "Connexion suspecte détectée. Si ce n'est pas toi : {{webappUrl}}/security"
       },
       "sms": {
         "text": "⚠️ Connexion suspecte détectée. Sécurise ton compte : {{webappUrl}}/security"
@@ -569,7 +590,7 @@
         "whatsapp": false
       },
       "email": {
-        "subject": "Ton mois en un clin d’œil — {{date.monthName}} {{date.year}}",
+        "subject": "Ton mois en un clin d'œil — {{date.monthName}} {{date.year}}",
         "html": "<p>{{metrics.clients}} clients • {{metrics.revenue}}€ • {{metrics.rating}}★</p><p><a href='{{webappUrl}}/provider/stats?period=month'>Voir le détail</a></p>",
         "text": "Bilan : {{metrics.clients}} clients • {{metrics.revenue}}€ • {{metrics.rating}}★"
       },

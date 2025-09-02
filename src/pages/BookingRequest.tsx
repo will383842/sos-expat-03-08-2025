@@ -34,8 +34,7 @@ import { useApp } from '../contexts/AppContext';
 import { logLanguageMismatch } from '../services/analytics';
 import languages from '../data/languages-spoken';
 
-import { db, functions } from '../config/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '../config/firebase';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 
 import type { Provider } from '../types/provider';
@@ -51,8 +50,8 @@ import {
 
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { createBookingRequest } from '../services/booking';
-
-// ✅ votre composant RHF pour le téléphone
+import { manualSend } from '@/services/admin/comms';
+// ✅ composant RHF pour le téléphone
 import PhoneField from '@/components/PhoneField';
 
 /** ===== Types complémentaires ===== */
@@ -274,17 +273,8 @@ const countries = [
   'Zambie','Zimbabwe',
 ];
 
-interface NotificationData {
-  type: string;
-  providerId?: string;
-  recipientEmail?: string;
-  recipientPhone?: string;
-  recipientName?: string;
-  emailSubject?: string;
-  emailHtml?: string;
-  smsMessage?: string;
-  whatsappMessage?: string;
-}
+type MinimalUser = { uid?: string } | null;
+const ALL_LANGS = languages as unknown as Language[];
 
 interface BookingRequestData {
   clientPhone: string;
@@ -391,13 +381,13 @@ const PreviewCard = ({
         <Globe className={`w-4 h-4 ${THEME.icon}`} />
         <span className="font-medium truncate">{title || '—'}</span>
       </div>
-      {!!country && (
+      {Boolean(country) && (
         <div className="flex items-center gap-2 text-gray-700">
           <MapPin className={`w-4 h-4 ${THEME.icon}`} />
           <span className="truncate">{country}</span>
         </div>
       )}
-      {!!langs.length && (
+      {langs.length > 0 && (
         <div className="flex items-center gap-2 text-gray-700">
           <LanguagesIcon className={`w-4 h-4 ${THEME.icon}`} />
           <div className="flex flex-wrap gap-1">
@@ -409,7 +399,7 @@ const PreviewCard = ({
           </div>
         </div>
       )}
-      {!!phone && (
+      {Boolean(phone) && (
         <div className="flex items-center gap-2 text-gray-700">
           <Phone className={`w-4 h-4 ${THEME.icon}`} />
           <span className="truncate">{phone}</span>
@@ -558,7 +548,9 @@ const BookingRequest: React.FC = () => {
               setProvider(normalized);
               try {
                 sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
-              } catch {}
+              } catch (e) {
+                // ignore: quota/third-party cookie restrictions
+              }
             } else {
               setProvider(null);
             }
@@ -582,7 +574,9 @@ const BookingRequest: React.FC = () => {
               setProvider(normalized);
               try {
                 sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
-              } catch {}
+              } catch (e) {
+                // ignore: quota/third-party cookie restrictions
+              }
             } else {
               setProvider(null);
             }
@@ -634,7 +628,7 @@ const BookingRequest: React.FC = () => {
     const hasCountry = values.currentCountry.trim().length > 0;
     const otherOk = values.currentCountry !== 'Autre' ? true : !!values.autrePays?.trim();
     const langsOk = (values.clientLanguages?.length ?? 0) > 0;
-    const accept = !!values.acceptTerms;
+    const accept = Boolean(values.acceptTerms);
 
     const phoneValid = (() => {
       if (!values.clientPhone) return false;
@@ -674,53 +668,10 @@ const BookingRequest: React.FC = () => {
     if (!authLoading && !providerLoading && !provider) navigate('/');
   }, [provider, providerLoading, authLoading, navigate]);
 
-  const notifyProviderOfRequest = async (
-    targetProviderId: string,
-    requestData: BookingRequestData,
-  ): Promise<{ success: boolean; result?: unknown; error?: unknown }> => {
-    try {
-      if (!requestData.providerEmail && !requestData.providerPhone) {
-        return { success: false, error: 'Aucun contact disponible pour le prestataire' };
-      }
-      if (!requestData.title?.trim()) return { success: false, error: 'Titre de la demande manquant' };
-      if (!requestData.description?.trim()) return { success: false, error: 'Description de la demande manquante' };
-
-      const notificationData: NotificationData = {
-        type: 'provider_booking_request',
-        providerId: targetProviderId,
-        recipientName: requestData.providerName || 'Prestataire',
-        emailSubject: `SOS Expat - Nouvelle demande: ${requestData.title.substring(0, 50)}`,
-        emailHtml: `
-<h2>Nouvelle demande de consultation</h2>
-<p><strong>Client:</strong> ${requestData.clientFirstName} ${requestData.clientLastName}</p>
-<p><strong>Nationalité:</strong> ${requestData.clientNationality}</p>
-<p><strong>Pays:</strong> ${requestData.clientCurrentCountry}</p>
-<p><strong>Téléphone:</strong> ${requestData.clientPhone}</p>
-<p><strong>Titre:</strong> ${requestData.title}</p>
-<p><strong>Description:</strong> ${requestData.description}</p>
-<hr>
-<p>Connectez-vous à votre espace prestataire pour répondre.</p>`.trim(),
-        smsMessage: `SOS Expat: Nouvelle demande de ${requestData.clientFirstName}. Titre: "${requestData.title.substring(0, 30)}...". Consultez votre espace.`,
-        whatsappMessage: `🔔 SOS Expat: Nouvelle demande de ${requestData.clientFirstName} ${requestData.clientLastName}.\n\nTitre: "${requestData.title}"\nPays: ${requestData.clientCurrentCountry}\n\nConsultez votre espace prestataire.`,
-      };
-
-      if (requestData.providerEmail?.includes('@')) notificationData.recipientEmail = requestData.providerEmail;
-      if (requestData.providerPhone && requestData.providerPhone.length > 5) notificationData.recipientPhone = requestData.providerPhone;
-
-      if (!functions) throw new Error('Firebase Functions non initialisé');
-      const sendNotification = httpsCallable(functions, 'sendEmail');
-      const result = await sendNotification(notificationData);
-      return { success: true, result: (result as { data?: unknown })?.data };
-    } catch (error) {
-      console.error('notifyProviderOfRequest error', error);
-      return { success: false, error };
-    }
-  };
-
   const prepareStandardizedData = (
     state: BookingFormData,
     p: Provider,
-    currentUser: { id?: string; firstName?: string; lastName?: string } | null,
+    currentUser: MinimalUser,
     eurTotalForDisplay: number,
     durationForDisplay: number,
   ): {
@@ -749,15 +700,15 @@ const BookingRequest: React.FC = () => {
 
     const bookingRequest: BookingRequestData = {
       clientPhone: state.clientPhone,
-      clientId: (currentUser as any)?.uid ?? (currentUser as any)?.id,
+      clientId: currentUser?.uid || '',
       clientName: `${sanitizeInput(state.firstName)} ${sanitizeInput(state.lastName)}`.trim(),
       clientFirstName: sanitizeInput(state.firstName),
       clientLastName: sanitizeInput(state.lastName),
       clientNationality: sanitizeInput(state.nationality),
-      clientCurrentCountry: sanitizeInput(state.currentCountry === 'Autre' ? state.autrePays || '' : state.currentCountry),
+      clientCurrentCountry: sanitizeInput(state.currentCountry === 'Autre' ? (state.autrePays || '') : state.currentCountry),
       clientWhatsapp: state.whatsapp || '',
       providerId: selectedProvider.id,
-      providerName: selectedProvider.name || '',
+      providerName: selectedProvider.name ?? '',
       providerType: selectedProvider.type,
       providerCountry: selectedProvider.country || '',
       providerAvatar: selectedProvider.avatar || '',
@@ -769,7 +720,7 @@ const BookingRequest: React.FC = () => {
       description: sanitizeText(state.description, { trim: true }),
       clientLanguages: state.clientLanguages,
       clientLanguagesDetails: state.clientLanguages.map((code) => {
-        const found = (languages as Language[]).find((l) => l.code === code);
+        const found = ALL_LANGS.find((l) => l.code === code);
         return { code, name: found?.name || code.toUpperCase() };
       }),
       price: eurTotalForDisplay,
@@ -818,7 +769,8 @@ const BookingRequest: React.FC = () => {
             nationality: data.nationality,
             currentCountry: data.currentCountry === 'Autre' ? data.autrePays : data.currentCountry,
           },
-          source: 'booking_request_form_rhf',
+          // ✅ garder la valeur attendue par le type côté analytics pour éviter l'erreur TS
+          source: 'booking_request_form',
         });
       } catch (error) {
         console.warn('logLanguageMismatch failed', error);
@@ -842,15 +794,15 @@ const BookingRequest: React.FC = () => {
       const { selectedProvider, bookingRequest } = prepareStandardizedData(
         data,
         provider!,
-        user,
+        (user as MinimalUser) ?? null,
         eurTotalForDisplay,
         durationForDisplay,
       );
 
       // 🔐 UID de l'utilisateur
-      const uid = (user as any)?.uid;
+      const uid = (user as MinimalUser)?.uid;
       if (!uid) {
-        setFormError("Session expirée. Reconnectez-vous.");
+        setFormError('Session expirée. Reconnectez-vous.');
         return;
       }
 
@@ -888,8 +840,30 @@ const BookingRequest: React.FC = () => {
         providerPhone: bookingRequest.providerPhone,
       });
 
-      // (optionnel) notifier le prestataire
-      // void notifyProviderOfRequest(selectedProvider.id, bookingRequest);
+      // Notification du prestataire via manualSend (bus message_events)
+      try {
+        await manualSend(
+          'whatsapp_provider_booking_request',
+          'fr-FR',
+          {
+            uid: selectedProvider.id,
+            email: bookingRequest.providerEmail ?? null,
+            phone: bookingRequest.providerPhone ?? null,
+            whatsapp: (provider as any)?.whatsapp ?? null, // si stocké côté profil
+          },
+          {
+            clientName: bookingRequest.clientName,
+            clientCountry: bookingRequest.clientCurrentCountry,
+            clientLanguages: bookingRequest.clientLanguages,
+            requestTitle: bookingRequest.title,
+            requestDescription: bookingRequest.description,
+            amountEUR: displayEUR,
+          }
+        );
+      } catch (error) {
+        console.warn('Erreur notification prestataire:', error);
+        // Ne pas bloquer le processus si la notification échoue
+      }
 
       // Calcul serviceData pour checkout
       const selectedCurrency: Currency = detectUserCurrency();
@@ -959,7 +933,7 @@ const BookingRequest: React.FC = () => {
   }
   if (!provider) return null;
 
-  const inputHas = (name: keyof BookingFormData) => !!(errors as any)?.[name];
+  const inputHas = (name: keyof BookingFormData) => Boolean((errors as any)?.[name]);
 
   return (
     <Layout>
@@ -1042,7 +1016,7 @@ const BookingRequest: React.FC = () => {
               {!!provider?.languages?.length && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {(provider.languages || []).slice(0, 3).map((code, idx) => {
-                    const l = (languages as Language[]).find((x) => x.code === code);
+                    const l = ALL_LANGS.find((x) => x.code === code);
                     return (
                       <span key={`${code}-${idx}`} className="inline-block px-2 py-0.5 bg-blue-50 text-blue-800 text-xs rounded border border-blue-200">
                         {l ? l.name : code}
@@ -1090,8 +1064,8 @@ const BookingRequest: React.FC = () => {
                         />
                       )}
                     />
-                    <FieldSuccess show={!errors.firstName && !!watch('firstName')}>Parfait ! ✨</FieldSuccess>
-                    {errors.firstName && <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>}
+                    <FieldSuccess show={!errors.firstName && Boolean(watch('firstName'))}>Parfait ! ✨</FieldSuccess>
+                    {errors.firstName && <p className="mt-1 text-sm text-red-600">{String(errors.firstName.message)}</p>}
                   </div>
 
                   {/* Nom */}
@@ -1112,8 +1086,8 @@ const BookingRequest: React.FC = () => {
                         />
                       )}
                     />
-                    <FieldSuccess show={!errors.lastName && !!watch('lastName')}>Parfait ! ✨</FieldSuccess>
-                    {errors.lastName && <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>}
+                    <FieldSuccess show={!errors.lastName && Boolean(watch('lastName'))}>Parfait ! ✨</FieldSuccess>
+                    {errors.lastName && <p className="mt-1 text-sm text-red-600">{String(errors.lastName.message)}</p>}
                   </div>
                 </div>
 
@@ -1135,7 +1109,7 @@ const BookingRequest: React.FC = () => {
                       />
                     )}
                   />
-                  {errors.nationality && <p className="mt-1 text-sm text-red-600">{errors.nationality.message}</p>}
+                  {errors.nationality && <p className="mt-1 text-sm text-red-600">{String(errors.nationality.message)}</p>}
                 </div>
 
                 {/* Pays d'intervention */}
@@ -1164,7 +1138,7 @@ const BookingRequest: React.FC = () => {
                       </select>
                     )}
                   />
-                  {errors.currentCountry && <p className="mt-1 text-sm text-red-600">{errors.currentCountry.message}</p>}
+                  {errors.currentCountry && <p className="mt-1 text-sm text-red-600">{String(errors.currentCountry.message)}</p>}
 
                   {watch('currentCountry') === 'Autre' && (
                     <div className="mt-3">
@@ -1178,12 +1152,12 @@ const BookingRequest: React.FC = () => {
                           <input
                             {...field}
                             onChange={(e) => field.onChange(sanitizeText(e.target.value))}
-                            className={inputClass(!!errors.autrePays)}
+                            className={inputClass(Boolean(errors.autrePays))}
                             placeholder={t.placeholders.otherCountry}
                           />
                         )}
                       />
-                      {errors.autrePays && <p className="mt-1 text-sm text-red-600">{errors.autrePays.message as string}</p>}
+                      {errors.autrePays && <p className="mt-1 text-sm text-red-600">{String(errors.autrePays.message)}</p>}
                     </div>
                   )}
                 </div>
@@ -1209,14 +1183,14 @@ const BookingRequest: React.FC = () => {
                       <input
                         {...field}
                         onChange={(e) => field.onChange(sanitizeText(e.target.value))}
-                        className={inputClass(!!errors.title)}
+                        className={inputClass(Boolean(errors.title))}
                         placeholder={t.placeholders.title}
                       />
                     )}
                   />
                   <div className="mt-1 text-xs text-gray-500">💡 {t.hints.title}</div>
                   <FieldSuccess show={!errors.title && watch('title').trim().length >= 10}>C’est clair 👍</FieldSuccess>
-                  {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message as string}</p>}
+                  {errors.title && <p className="mt-1 text-sm text-red-600">{String(errors.title.message)}</p>}
                 </div>
 
                 {/* Description */}
@@ -1236,14 +1210,14 @@ const BookingRequest: React.FC = () => {
                         {...field}
                         rows={5}
                         onChange={(e) => field.onChange(sanitizeText(e.target.value))}
-                        className={`resize-none ${inputClass(!!errors.description)}`}
+                        className={`resize-none ${inputClass(Boolean(errors.description))}`}
                         placeholder={t.placeholders.description}
                       />
                     )}
                   />
                   <div className="mt-1 text-xs text-gray-500">🔎 {t.hints.desc}</div>
                   <FieldSuccess show={!errors.description && watch('description').trim().length >= 50}>On y voit clair 👀</FieldSuccess>
-                  {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message as string}</p>}
+                  {errors.description && <p className="mt-1 text-sm text-red-600">{String(errors.description.message)}</p>}
                 </div>
               </section>
 
@@ -1260,9 +1234,8 @@ const BookingRequest: React.FC = () => {
                     value={languagesSpoken.map((l) => ({ value: l.code, label: l.name }))}
                     onChange={(selected: MultiLanguageOption[]) => {
                       const options = selected || [];
-                      const allLanguages = languages as Language[];
                       const selectedLangs = options
-                        .map((opt) => allLanguages.find((langItem) => langItem.code === opt.value))
+                        .map((opt) => ALL_LANGS.find((langItem) => langItem.code == opt.value))
                         .filter((v): v is Language => Boolean(v));
                       setLanguagesSpoken(selectedLangs);
                       setValue('clientLanguages', selectedLangs.map((s) => s.code), { shouldValidate: true });
@@ -1371,7 +1344,6 @@ const BookingRequest: React.FC = () => {
                         label=""
                         required
                         defaultCountry="FR"
-                        // Le composant PhoneField pilote sa propre UI via RHF: on s'aligne sur sa valeur
                       />
                     )}
                   />
@@ -1379,8 +1351,8 @@ const BookingRequest: React.FC = () => {
                   <div className="mt-2 text-xs text-gray-600 flex items-center gap-1">
                     <Info className={`w-4 h-4 ${THEME.icon}`} /> {t.hints.phone}
                   </div>
-                  {errors.clientPhone && <p className="mt-1 text-sm text-red-600">{errors.clientPhone.message as string}</p>}
-                  {!!watch('clientPhone') && (
+                  {errors.clientPhone && <p className="mt-1 text-sm text-red-600">{String(errors.clientPhone.message)}</p>}
+                  {Boolean(watch('clientPhone')) && (
                     <div className="mt-1 text-xs text-gray-500">
                       ➜ International: <span className="font-mono">{watch('clientPhone')}</span>
                     </div>
@@ -1388,8 +1360,8 @@ const BookingRequest: React.FC = () => {
                   <div className="mt-2 text-sm text-gray-700">⏱️ <strong>{t.callTiming}</strong></div>
                 </div>
 
-                {/* WhatsApp optionnel (re-usage PhoneField mais non requis) */}
-<div className="mt-5">
+                {/* WhatsApp optionnel */}
+                <div className="mt-5">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <MessageCircle size={16} className="inline mr-1" /> {t.fields.whatsapp}
                   </label>
@@ -1399,13 +1371,12 @@ const BookingRequest: React.FC = () => {
                     name="whatsapp"
                     rules={{
                       validate: (v) => {
-                        // Si vide ou undefined, c'est valide (champ optionnel)
-                        if (!v || v.trim() === '') return true;
+                        if (!v || v.trim() === '') return true; // optionnel
                         try {
                           const p = parsePhoneNumberFromString(v);
-                          return p && p.isValid() ? true : "Numéro WhatsApp invalide";
+                          return p && p.isValid() ? true : 'Numéro WhatsApp invalide';
                         } catch {
-                          return "Numéro WhatsApp invalide";
+                          return 'Numéro WhatsApp invalide';
                         }
                       },
                     }}
@@ -1413,13 +1384,13 @@ const BookingRequest: React.FC = () => {
                       <input
                         {...field}
                         type="tel"
-                        className={inputClass(!!errors.whatsapp)}
+                        className={inputClass(Boolean(errors.whatsapp))}
                         placeholder="+33 6 12 34 56 78"
                       />
                     )}
                   />
-                  {errors.whatsapp && <p className="mt-1 text-sm text-red-600">{errors.whatsapp.message as string}</p>}
-                  {!!watch('whatsapp') && (
+                  {errors.whatsapp && <p className="mt-1 text-sm text-red-600">{String(errors.whatsapp.message)}</p>}
+                  {Boolean(watch('whatsapp')) && (
                     <div className="mt-1 text-xs text-gray-500">
                       ➜ WhatsApp: <span className="font-mono">{watch('whatsapp')}</span>
                     </div>
@@ -1457,12 +1428,12 @@ const BookingRequest: React.FC = () => {
                       {t.fields.andConfirm}
                     </label>
                   </div>
-                  {errors.acceptTerms && <p className="mt-2 text-sm text-red-600">{errors.acceptTerms.message as string}</p>}
+                  {errors.acceptTerms && <p className="mt-2 text-sm text-red-600">{String(errors.acceptTerms.message)}</p>}
                 </div>
               </section>
 
               {/* Erreurs globales */}
-              {(formError) && (
+              {formError && (
                 <div className="px-5 sm:px-6 pb-0">
                   <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4">
                     <div className="flex">
@@ -1490,7 +1461,7 @@ const BookingRequest: React.FC = () => {
                   <div className="mt-3">
                     <PreviewCard
                       title={watch('title')}
-                      country={watch('currentCountry') === 'Autre' ? watch('autrePays') : watch('currentCountry')}
+                      country={(watch('currentCountry') === 'Autre' ? (watch('autrePays') || '') : (watch('currentCountry') || ''))}
                       langs={watch('clientLanguages') || []}
                       phone={watch('clientPhone')}
                       priceLabel={`${displayEUR}€ / $${displayUSD}`}

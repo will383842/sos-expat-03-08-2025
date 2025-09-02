@@ -227,10 +227,11 @@ service cloud.firestore {
     }
     
     match /message_events/{id} {
-      // Option 1 (recommandé) : écriture seulement par la Callable
-      allow read: if isAdmin() || isDev();
-      allow write: if false;
-    }
+     // Création uniquement si connecté ET que le doc porte bien l'UID auteur
+    allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+   allow read: if isAdmin() || isDev();
+   allow update, delete: if false;
+ }
     
     match /message_deliveries/{id} {
       allow read: if isAdmin() || isDev();

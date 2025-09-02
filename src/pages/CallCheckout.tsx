@@ -526,7 +526,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         throw new Error(`${t('err.unexpectedStatus')}: ${status}`);
       }
 
-      const clientPhoneE164 = toE164(user?.phone || '') || service.clientPhone;
+      const clientPhoneE164 = toE164(
+        user?.phone || watch('clientPhone') || ''
+      );
       // Utiliser le téléphone du provider depuis les données de session ou provider
       const providerPhoneE164 = toE164(provider?.phoneNumber || provider?.phone || '');
 

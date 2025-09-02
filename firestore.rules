@@ -262,7 +262,7 @@ service cloud.firestore {
     }
 
     match /legal_documents/{docId} {
-      allow read: if resource.data.isActive == true;   // CHANGÉ: seulement publiés
+      allow read: if true;                             // RECTIFIÉ: lecture publique autorisée
       allow write: if isAdmin() || isDev();
     }
 

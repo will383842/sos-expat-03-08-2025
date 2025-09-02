@@ -575,15 +575,17 @@ const sendPaymentNotifications = traceFunction(async (callSessionId: string, dat
       providerPhone
         ? messageManager.sendSmartMessage({
             to: providerPhone,
-            templateId: 'provider_notification'
-            variables: { requestTitle: title, language }
+            templateId: 'provider_notification',
+            variables: { requestTitle: title, language },
+            preferWhatsApp: false            //  <-- force SMS
           })
         : Promise.resolve({ skipped: 'no_provider_phone' }),
       clientPhone
         ? messageManager.sendSmartMessage({
             to: clientPhone,
-            templateId: 'client_notification'
-            variables: { requestTitle: title, language }
+            templateId: 'client_notification',
+            variables: { requestTitle: title, language },
+            preferWhatsApp: false            //  <-- force SMS
           })
         : Promise.resolve({ skipped: 'no_client_phone' })
     ]);
@@ -777,11 +779,20 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
       ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Base de données mise à jour');
     }
 
-    if (paymentIntent.metadata?.callSessionId) {
-      ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Déclenchement des notifications post-paiement', {
-        callSessionId: paymentIntent.metadata.callSessionId});
+    // ✅ Fallback pour retrouver callSessionId même sans metadata Stripe
+    let callSessionId = paymentIntent.metadata?.callSessionId || '';
 
-      const callSessionId = paymentIntent.metadata.callSessionId;
+    if (!callSessionId) {
+      const snap = await database.collection('payments')
+        .where('stripePaymentIntentId', '==', paymentIntent.id)
+        .limit(1)
+        .get();
+      if (!snap.empty) callSessionId = (snap.docs[0].data() as any)?.callSessionId || '';
+    }
+
+    if (callSessionId) {
+      ultraLogger.info('STRIPE_PAYMENT_SUCCEEDED', 'Déclenchement des opérations post-paiement', {
+        callSessionId});
 
       await database
         .collection('call_sessions')
@@ -802,7 +813,7 @@ const handlePaymentIntentSucceeded = traceFunction(async (paymentIntent: Stripe.
         callSessionId,
         delaySeconds: 300});
 
-      // 🔔 ENVOI AUTOMATIQUE DES NOTIFICATIONS
+      // 🔔 ENVOI AUTOMATIQUE DES NOTIFICATIONS (SMS forcés)
       await sendPaymentNotifications(callSessionId, database);
     }
 

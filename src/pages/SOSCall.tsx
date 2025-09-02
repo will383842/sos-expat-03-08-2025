@@ -175,6 +175,7 @@ const languageOptions = [
    Composant principal
 ========================= */
 const SOSCall: React.FC = () => {
+  // ✅ TOUS LES HOOKS AU DÉBUT - OBLIGATOIRE POUR REACT
   const { language } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -215,6 +216,45 @@ const SOSCall: React.FC = () => {
     }
   });
 
+  // ✅ Configuration i18n avec useMemo - une seule fois en haut
+  const lang = (language as 'fr' | 'en') || 'fr';
+  
+  const cardTranslations = useMemo(() => ({
+    fr: {
+      lawyer: 'Avocat',
+      expat: 'Expatrié', 
+      languages: 'Langues',
+      about: 'À propos',
+      readMore: 'Lire plus',
+      online: 'En ligne',
+      offline: 'Hors ligne',
+      contactNow: 'Contacter maintenant',
+      viewProfile: 'Voir le profil',
+      years: 'ans',
+      rating: 'Note',
+      country: 'Pays',
+      experience: 'Années'
+    },
+    en: {
+      lawyer: 'Lawyer',
+      expat: 'Expat',
+      languages: 'Languages', 
+      about: 'About',
+      readMore: 'Read more',
+      online: 'Online',
+      offline: 'Offline',
+      contactNow: 'Contact now',
+      viewProfile: 'View profile',
+      years: 'years',
+      rating: 'Rating',
+      country: 'Country',
+      experience: 'Years'
+    }
+  }), []);
+
+  const t = cardTranslations[lang];
+
+  // ✅ TOUS LES useEffect APRÈS LES HOOKS DE STATE
   // Charger providers
   useEffect(() => {
     const typeParam = searchParams.get('type');
@@ -321,32 +361,6 @@ const SOSCall: React.FC = () => {
     return () => unsubscribe();
   }, [searchParams, setSearchParams]);
 
-  // Normalisation pays : on compare slug + includes (FR/EN)
-  const countryMatches = (providerCountry: string, selected: string, custom: string): boolean => {
-    if (selected === 'all') return true;
-    const prov = providerCountry || '';
-    if (selected === 'Autre') {
-      if (!custom) return true;
-      return normalize(prov).includes(normalize(custom));
-    }
-    if (prov === selected) return true;
-    if (normalize(prov) === normalize(selected)) return true;
-    return prov.toLowerCase().includes(selected.toLowerCase());
-  };
-
-  // Normalisation langues : via label FR
-  const langMatches = (langs: string[], selected: string, custom: string): boolean => {
-    if (selected === 'all') return true;
-    const normalizedProv = (langs || []).map((l) => normalize(getLanguageLabel(l)));
-    if (selected === 'Autre') {
-      if (!custom) return true;
-      const needle = normalize(getLanguageLabel(custom));
-      return normalizedProv.some((v) => v.includes(needle));
-    }
-    const target = normalize(getLanguageLabel(selected));
-    return normalizedProv.some((v) => v === target);
-  };
-
   // Filtrage + tri
   useEffect(() => {
     if (realProviders.length === 0) {
@@ -398,6 +412,33 @@ const SOSCall: React.FC = () => {
     const start = (page - 1) * PAGE_SIZE;
     return filteredProviders.slice(start, start + PAGE_SIZE);
   }, [filteredProviders, page]);
+
+  // ✅ FONCTIONS UTILITAIRES DÉCLARÉES APRÈS LES HOOKS
+  // Normalisation pays : on compare slug + includes (FR/EN)
+  const countryMatches = (providerCountry: string, selected: string, custom: string): boolean => {
+    if (selected === 'all') return true;
+    const prov = providerCountry || '';
+    if (selected === 'Autre') {
+      if (!custom) return true;
+      return normalize(prov).includes(normalize(custom));
+    }
+    if (prov === selected) return true;
+    if (normalize(prov) === normalize(selected)) return true;
+    return prov.toLowerCase().includes(selected.toLowerCase());
+  };
+
+  // Normalisation langues : via label FR
+  const langMatches = (langs: string[], selected: string, custom: string): boolean => {
+    if (selected === 'all') return true;
+    const normalizedProv = (langs || []).map((l) => normalize(getLanguageLabel(l)));
+    if (selected === 'Autre') {
+      if (!custom) return true;
+      const needle = normalize(getLanguageLabel(custom));
+      return normalizedProv.some((v) => v.includes(needle));
+    }
+    const target = normalize(getLanguageLabel(selected));
+    return normalizedProv.some((v) => v === target);
+  };
 
   // Handlers filtres
   const handleCountryChange = (value: string) => {
@@ -576,7 +617,7 @@ const SOSCall: React.FC = () => {
                         onChange={(e) => handleCountryChange(e.target.value)}
                         className="
                           w-full px-3 py-2
-                          bg-white text-gray-9 00
+                          bg-white text-gray-900
                           border border-gray-300 rounded-xl
                           dark:bg-white/10 dark:text-white dark:border-white/20
                           focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent
@@ -754,268 +795,224 @@ const SOSCall: React.FC = () => {
               </div>
             ) : filteredProviders.length > 0 ? (
               <>
-{/* Grille moderne 9 cartes/page avec i18n */}
-{(() => {
-  // Hook useApp pour récupérer la langue (comme dans Contact.tsx)
-  const { language } = useApp();
-  const lang = (language as 'fr' | 'en') || 'fr';
-  
-  // Configuration i18n avec le même pattern que Contact.tsx
-  const cardTranslations = {
-    fr: {
-      lawyer: 'Avocat',
-      expat: 'Expatrié',
-      languages: 'Langues',
-      about: 'À propos',
-      readMore: 'Lire plus',
-      online: 'En ligne',
-      offline: 'Hors ligne',
-      contactNow: 'Contacter maintenant',
-      viewProfile: 'Voir le profil',
-      years: 'ans',
-      rating: 'Note',
-      country: 'Pays',
-      experience: 'Années'
-    },
-    en: {
-      lawyer: 'Lawyer',
-      expat: 'Expat',
-      languages: 'Languages',
-      about: 'About',
-      readMore: 'Read more',
-      online: 'Online',
-      offline: 'Offline',
-      contactNow: 'Contact now',
-      viewProfile: 'View profile',
-      years: 'years',
-      rating: 'Rating',
-      country: 'Country',
-      experience: 'Years'
-    }
-  };
+                {/* Grille moderne 9 cartes/page avec i18n */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  {paginatedProviders.map((provider) => {
+                    const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 120);
+                    const langs = provider.languages
+                      .slice(0, 2)
+                      .map(getLanguageLabel);
 
-  const t = cardTranslations[lang];
+                    return (
+                      <article
+                        key={provider.id}
+                        className={`group relative bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-xl rounded-3xl overflow-hidden transition-all duration-700 hover:scale-[1.02] cursor-pointer border border-slate-200 hover:border-slate-300 hover:shadow-2xl hover:shadow-slate-400/20 flex flex-col ${
+                          provider.isOnline
+                            ? 'ring-1 ring-emerald-400/40 shadow-emerald-500/10'
+                            : 'ring-1 ring-red-400/40 shadow-red-500/10'
+                        }`}
+                        onClick={() => handleProviderClick(provider)}
+                        itemScope
+                        itemType="https://schema.org/Person"
+                      >
+                        {/* Status indicator */}
+                        <div className="absolute top-6 right-6 z-10">
+                          <div className={`w-4 h-4 rounded-full ${
+                            provider.isOnline ? 'bg-emerald-400 shadow-emerald-400/50' : 'bg-red-400 shadow-red-400/50'
+                          } shadow-lg animate-pulse`} />
+                        </div>
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-      {paginatedProviders.map((provider) => {
-        const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 120);
-        const langs = provider.languages
-          .slice(0, 2)
-          .map(getLanguageLabel);
+                        {/* Header avec photo et infos principales */}
+                        <div className="relative p-8 pb-6">
+                          <div className="flex items-start gap-6">
+                            {/* Avatar */}
+                            <div className="relative shrink-0">
+                              <div className="w-24 h-24 rounded-2xl overflow-hidden ring-2 ring-slate-200 group-hover:ring-slate-300 transition-all duration-500">
+                                <img
+                                  src={provider.avatar}
+                                  alt={`${provider.name} - ${provider.type === 'lawyer' ? t.lawyer : t.expat}`}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                  itemProp="image"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    const target = e.currentTarget as HTMLImageElement;
+                                    target.onerror = null;
+                                    target.src = '/default-avatar.png';
+                                  }}
+                                />
+                              </div>
+                              
+                              {/* Badge type */}
+                              <div className="absolute -bottom-3 -right-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl border-2 border-white shadow-lg ${
+                                  provider.type === 'lawyer' 
+                                    ? 'bg-gradient-to-br from-amber-400 to-orange-500' 
+                                    : 'bg-gradient-to-br from-blue-400 to-indigo-500'
+                                }`}>
+                                  {provider.type === 'lawyer' ? '⚖️' : '🌍'}
+                                </div>
+                              </div>
+                            </div>
 
-        return (
-          <article
-            key={provider.id}
-            className={`group relative bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-xl rounded-3xl overflow-hidden transition-all duration-700 hover:scale-[1.02] cursor-pointer border border-slate-200 hover:border-slate-300 hover:shadow-2xl hover:shadow-slate-400/20 flex flex-col ${
-              provider.isOnline
-                ? 'ring-1 ring-emerald-400/40 shadow-emerald-500/10'
-                : 'ring-1 ring-red-400/40 shadow-red-500/10'
-            }`}
-            onClick={() => handleProviderClick(provider)}
-            itemScope
-            itemType="https://schema.org/Person"
-          >
-            {/* Status indicator */}
-            <div className="absolute top-6 right-6 z-10">
-              <div className={`w-4 h-4 rounded-full ${
-                provider.isOnline ? 'bg-emerald-400 shadow-emerald-400/50' : 'bg-red-400 shadow-red-400/50'
-              } shadow-lg animate-pulse`} />
-            </div>
+                            {/* Infos principales */}
+                            <div className="flex-1 min-w-0">
+                              <div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-1 line-clamp-1 group-hover:text-slate-900 transition-colors" itemProp="name">
+                                  {provider.name}
+                                </h3>
+                                <p className="text-slate-600 text-sm font-medium">
+                                  {provider.type === 'lawyer' ? t.lawyer : t.expat}
+                                </p>
+                              </div>
 
-            {/* Header avec photo et infos principales */}
-            <div className="relative p-8 pb-6">
-              <div className="flex items-start gap-6">
-                {/* Avatar */}
-                <div className="relative shrink-0">
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden ring-2 ring-slate-200 group-hover:ring-slate-300 transition-all duration-500">
-                    <img
-                      src={provider.avatar}
-                      alt={`${provider.name} - ${provider.type === 'lawyer' ? t.lawyer : t.expat}`}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      itemProp="image"
-                      loading="lazy"
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        target.onerror = null;
-                        target.src = '/default-avatar.png';
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Badge type */}
-                  <div className="absolute -bottom-3 -right-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl border-2 border-white shadow-lg ${
-                      provider.type === 'lawyer' 
-                        ? 'bg-gradient-to-br from-amber-400 to-orange-500' 
-                        : 'bg-gradient-to-br from-blue-400 to-indigo-500'
-                    }`}>
-                      {provider.type === 'lawyer' ? '⚖️' : '🌍'}
-                    </div>
-                  </div>
+                              {/* Métadonnées */}
+                              <div className="flex items-center gap-4 mt-4 text-sm text-slate-600">
+                                <div className="flex items-center gap-1">
+                                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                  <span className="font-semibold">{provider.rating.toFixed(1)}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="w-4 h-4" />
+                                  <span>{provider.country}</span>
+                                </div>
+                                <div className="text-slate-500">
+                                  {provider.yearsOfExperience} {t.years}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Séparateur */}
+                        <div className="mx-8 h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
+
+                        {/* Contenu principal */}
+                        <div className="p-8 pt-6 space-y-6 flex-1 flex flex-col">
+                          {/* Langues */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
+                                <span className="text-xs">🗣️</span>
+                              </div>
+                              <span className="text-sm font-semibold text-slate-700">{t.languages}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {langs.map((lang, idx) => (
+                                <span
+                                  key={`${provider.id}-lang-${idx}`}
+                                  className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg"
+                                >
+                                  {lang}
+                                </span>
+                              ))}
+                              {provider.languages.length > 2 && (
+                                <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 text-xs rounded-lg">
+                                  +{provider.languages.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          {provider.description && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
+                                  <span className="text-xs">💬</span>
+                                </div>
+                                <span className="text-sm font-semibold text-slate-700">{t.about}</span>
+                              </div>
+                              <p className="text-sm text-slate-600 leading-relaxed" itemProp="description">
+                                {truncatedDescription}
+                              </p>
+                              {isTruncated && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleProviderClick(provider);
+                                  }}
+                                  className="text-sm text-slate-700 hover:text-slate-900 font-medium mt-2 inline-flex items-center gap-1 transition-colors"
+                                >
+                                  {t.readMore}
+                                  <span className="text-xs">→</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer avec CTA repensé */}
+                        <div className="p-8 pt-4 mt-auto space-y-3">
+                          {/* Status en ligne compact */}
+                          <div className="flex items-center justify-center gap-2 text-xs">
+                            {provider.isOnline ? (
+                              <>
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full">
+                                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                  <span className="text-emerald-700 font-medium">{t.online}</span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-full">
+                                  <div className="w-2 h-2 bg-red-400 rounded-full" />
+                                  <span className="text-red-600">{t.offline}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* CTA moderne */}
+                          <div className="space-y-2">
+                            {provider.isOnline ? (
+                              /* CTA principal pour contact direct */
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProviderClick(provider);
+                                }}
+                                className="w-full group/cta relative overflow-hidden bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white py-4 px-6 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/cta:translate-x-full transition-transform duration-700 skew-x-12" />
+                                <div className="relative flex items-center justify-center gap-3">
+                                  <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                                    <span className="text-sm">💬</span>
+                                  </div>
+                                  <span>{t.contactNow}</span>
+                                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                </div>
+                              </button>
+                            ) : (
+                              /* CTA secondaire pour consultation profil */
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProviderClick(provider);
+                                }}
+                                className="w-full group/cta relative bg-slate-100 hover:bg-slate-200 border-2 border-slate-200 hover:border-slate-300 text-slate-700 py-4 px-6 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-[1.02]"
+                              >
+                                <div className="flex items-center justify-center gap-3">
+                                  <div className="w-6 h-6 bg-slate-300/50 rounded-full flex items-center justify-center group-hover/cta:bg-slate-400/50 transition-colors">
+                                    <span className="text-sm">👤</span>
+                                  </div>
+                                  <span>{t.viewProfile}</span>
+                                  <span className="text-slate-400 group-hover/cta:text-slate-600 transition-colors">→</span>
+                                </div>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Métadonnées cachées pour SEO */}
+                        <div className="sr-only">
+                          <span itemProp="jobTitle">{provider.type === 'lawyer' ? t.lawyer : t.expat}</span>
+                          <span itemProp="workLocation">{provider.country}</span>
+                          <span itemProp="knowsLanguage">{provider.languages.map(getLanguageLabel).join(', ')}</span>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-
-                {/* Infos principales */}
-                <div className="flex-1 min-w-0">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-1 line-clamp-1 group-hover:text-slate-900 transition-colors" itemProp="name">
-                      {provider.name}
-                    </h3>
-                    <p className="text-slate-600 text-sm font-medium">
-                      {provider.type === 'lawyer' ? t.lawyer : t.expat}
-                    </p>
-                  </div>
-
-                  {/* Métadonnées */}
-                  <div className="flex items-center gap-4 mt-4 text-sm text-slate-600">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="font-semibold">{provider.rating.toFixed(1)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      <span>{provider.country}</span>
-                    </div>
-                    <div className="text-slate-500">
-                      {provider.yearsOfExperience} {t.years}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Séparateur */}
-            <div className="mx-8 h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
-
-            {/* Contenu principal */}
-            <div className="p-8 pt-6 space-y-6 flex-1 flex flex-col">
-              {/* Langues */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
-                    <span className="text-xs">🗣️</span>
-                  </div>
-                  <span className="text-sm font-semibold text-slate-700">{t.languages}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {langs.map((lang, idx) => (
-                    <span
-                      key={`${provider.id}-lang-${idx}`}
-                      className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg"
-                    >
-                      {lang}
-                    </span>
-                  ))}
-                  {provider.languages.length > 2 && (
-                    <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 text-xs rounded-lg">
-                      +{provider.languages.length - 2}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Description */}
-              {provider.description && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <span className="text-xs">💬</span>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-700">{t.about}</span>
-                  </div>
-                  <p className="text-sm text-slate-600 leading-relaxed" itemProp="description">
-                    {truncatedDescription}
-                  </p>
-                  {isTruncated && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleProviderClick(provider);
-                      }}
-                      className="text-sm text-slate-700 hover:text-slate-900 font-medium mt-2 inline-flex items-center gap-1 transition-colors"
-                    >
-                      {t.readMore}
-                      <span className="text-xs">→</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Footer avec CTA repensé */}
-            <div className="p-8 pt-4 mt-auto space-y-3">
-              {/* Status en ligne compact */}
-              <div className="flex items-center justify-center gap-2 text-xs">
-                {provider.isOnline ? (
-                  <>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                      <span className="text-emerald-700 font-medium">{t.online}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-full">
-                      <div className="w-2 h-2 bg-red-400 rounded-full" />
-                      <span className="text-red-600">{t.offline}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* CTA moderne */}
-              <div className="space-y-2">
-                {provider.isOnline ? (
-                  /* CTA principal pour contact direct */
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleProviderClick(provider);
-                    }}
-                    className="w-full group/cta relative overflow-hidden bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white py-4 px-6 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/cta:translate-x-full transition-transform duration-700 skew-x-12" />
-                    <div className="relative flex items-center justify-center gap-3">
-                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                        <span className="text-sm">💬</span>
-                      </div>
-                      <span>{t.contactNow}</span>
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                    </div>
-                  </button>
-                ) : (
-                  /* CTA secondaire pour consultation profil */
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleProviderClick(provider);
-                    }}
-                    className="w-full group/cta relative bg-slate-100 hover:bg-slate-200 border-2 border-slate-200 hover:border-slate-300 text-slate-700 py-4 px-6 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-[1.02]"
-                  >
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="w-6 h-6 bg-slate-300/50 rounded-full flex items-center justify-center group-hover/cta:bg-slate-400/50 transition-colors">
-                        <span className="text-sm">👤</span>
-                      </div>
-                      <span>{t.viewProfile}</span>
-                      <span className="text-slate-400 group-hover/cta:text-slate-600 transition-colors">→</span>
-                    </div>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Métadonnées cachées pour SEO */}
-            <div className="sr-only">
-              <span itemProp="jobTitle">{provider.type === 'lawyer' ? t.lawyer : t.expat}</span>
-              <span itemProp="workLocation">{provider.country}</span>
-              <span itemProp="knowsLanguage">{provider.languages.map(getLanguageLabel).join(', ')}</span>
-            </div>
-          </article>
-        );
-      })}
-    </div>
-  );
-})()}
 
                 {/* Pagination (bas) */}
                 <div className="flex items-center justify-between mt-6">

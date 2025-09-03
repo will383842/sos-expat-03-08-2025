@@ -20,9 +20,6 @@ import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
 import { detectUserCurrency, usePricingConfig } from '../services/pricingService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
-
-// imports
-import PhoneField from '@/components/PhoneField';
 import { useForm } from 'react-hook-form';
 import { saveProviderMessage } from '@/firebase/saveProviderMessage';
 
@@ -251,9 +248,6 @@ const useSEO = (meta: {
 };
 
 /* ------------------------ Helpers: device & phone utils ------------------ */
-const normalizePhone = (raw: string) => raw.replace(/[^\d+]/g, '');
-
-// E.164 normalizer
 const toE164 = (raw?: string) => {
   if (!raw) return '';
   const p = parsePhoneNumberFromString(raw);
@@ -402,11 +396,23 @@ type PhoneFormValues = {
   currentCountry?: string;
 };
 
+type BookingMeta = { title?: string; description?: string; country?: string; clientFirstName?: string };
+
 const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, service, adminPricing, onSuccess, onError, isProcessing, setIsProcessing, isMobile }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { t, language } = useTranslation();
   const { getTraceAttributes } = usePriceTracing();
+
+  // ---- bookingMeta depuis la session (titre, description, pays, prénom)
+  const bookingMeta: BookingMeta = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem('bookingMeta');
+      return raw ? (JSON.parse(raw) as BookingMeta) : {};
+    } catch {
+      return {};
+    }
+  }, []);
 
   const serviceCurrency = (service.currency || 'eur').toLowerCase() as Currency;
   const currencySymbol = serviceCurrency === 'usd' ? '$' : '€';
@@ -470,68 +476,87 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
   const sendProviderNotifications = useCallback(
     async (paymentIntentId: string, clientPhoneE164: string, providerPhoneE164: string) => {
       try {
-        // Check if we've already sent notifications to prevent duplicates
+        // Anti-doublon
         const paymentDocRef = doc(db, 'payments', paymentIntentId);
         const paymentDoc = await import('firebase/firestore').then(({ getDoc }) => getDoc(paymentDocRef));
-        
         if (paymentDoc.exists() && paymentDoc.data()?.notifiedAt) {
           console.log('Notifications already sent for payment:', paymentIntentId);
           return;
         }
 
-        // 1. Send in-app message to provider dashboard
-        await saveProviderMessage(
-          provider.id,
-          `Nouvelle demande payée : ${service.serviceType}. Client : ${(user.firstName || '') + ' ' + (user.lastName || '')} (${(language || 'fr').toUpperCase()}).`,
-          {
-            clientFirstName: user.firstName || null,
-            clientCountry: watch('currentCountry') || null,
-            providerPhone: providerPhoneE164 || null,
-            bookingId: paymentIntentId || null,
-          }
-        );
+        // ---- Données de la demande
+        const title = (bookingMeta?.title || (language === 'fr' ? 'Demande sans titre' : 'Untitled request')).toString();
+        const desc  = (bookingMeta?.description || '').toString();
+        const country = (bookingMeta?.country || (provider as any)?.country || '').toString();
+        const clientFirstName = (user.firstName || bookingMeta?.clientFirstName || '').toString();
 
-        // 2. Send SMS + Email notification via pipeline
-        const enqueueMessageEvent = httpsCallable(functions, 'enqueueMessageEvent');
-        await enqueueMessageEvent({
-          eventId: 'booking_paid_provider',
-          locale: language === 'fr' ? 'fr-FR' : 'en',
-          to: { 
-            email: provider?.email || null, 
-            phone: providerPhoneE164 || null, 
-            uid: provider.id 
-          },
-          context: {
-            provider: { 
-              id: provider.id, 
-              name: provider.fullName || provider.name 
-            },
-            client: { 
-              id: user.uid, 
-              name: `${user.firstName || ''} ${user.lastName || ''}`.trim(), 
-              country: watch('currentCountry') || null, 
-              phone: clientPhoneE164 || null 
-            },
-            booking: { 
-              paymentIntentId, 
-              amount: adminPricing.totalAmount, 
-              currency: serviceCurrency.toUpperCase(), 
-              serviceType: service.serviceType, 
-              createdAt: new Date().toISOString() 
+        // 1) In-app message sur le dashboard prestataire
+        try {
+          await saveProviderMessage(
+            provider.id,
+            `🔔 ${language === 'fr' ? 'Demande payée' : 'Paid request'} — ${title}\n\n${desc.slice(0, 600)}${
+              country ? `\n\n${language === 'fr' ? 'Pays' : 'Country'}: ${country}` : ''
+            }`,
+            {
+              clientFirstName,
+              requestTitle: title,
+              requestDescription: desc,
+              requestCountry: country,
+              paymentIntentId,
+              providerPhone: providerPhoneE164 || null,
             }
-          }
-        });
+          );
+        } catch (e) {
+          console.warn('saveProviderMessage failed:', e);
+        }
 
-        // Mark as notified to prevent duplicates
+        // 2) SMS + Email via pipeline (templates booking_paid_provider)
+        try {
+          const enqueueMessageEvent = httpsCallable(functions, 'enqueueMessageEvent');
+          await enqueueMessageEvent({
+            eventId: 'booking_paid_provider',
+            locale: language === 'fr' ? 'fr-FR' : 'en',
+            to: {
+              email: provider?.email || null,
+              phone: providerPhoneE164 || null,
+              uid: provider.id,
+            },
+            context: {
+              provider: { id: provider.id, name: provider.fullName || provider.name },
+              client: {
+                id: user.uid,
+                firstName: clientFirstName,
+                name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+                country,
+                phone: clientPhoneE164 || null,
+              },
+              request: {
+                title,
+                description: desc,
+                country,
+              },
+              booking: {
+                paymentIntentId,
+                amount: adminPricing.totalAmount,
+                currency: serviceCurrency.toUpperCase(),
+                serviceType: service.serviceType,
+                createdAt: new Date().toISOString(),
+              },
+            },
+          });
+        } catch (e) {
+          console.warn('enqueueMessageEvent failed:', e);
+        }
+
+        // Marque comme notifié (anti-refresh)
         await setDoc(paymentDocRef, { notifiedAt: serverTimestamp() }, { merge: true });
-
         console.log('Provider notifications sent successfully for payment:', paymentIntentId);
       } catch (notificationError) {
         console.warn('Failed to send provider notifications:', notificationError);
-        // Don't throw - notifications are not critical to payment success
+        // Ne jette pas l'erreur, le paiement reste “success”
       }
     },
-    [provider, user, service, adminPricing, serviceCurrency, language, watch]
+    [provider, user, service, adminPricing, serviceCurrency, language, bookingMeta]
   );
 
   const actuallySubmitPayment = useCallback(async () => {
@@ -561,6 +586,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           clientPhone: watch('clientPhone'),
           clientWhatsapp: '',
           currency: serviceCurrency,
+          requestTitle: bookingMeta?.title || '',
           timestamp: new Date().toISOString()
         }
       };
@@ -597,20 +623,17 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         throw new Error(`${t('err.unexpectedStatus')}: ${status}`);
       }
 
-      const clientPhoneE164 = toE164(
-        user?.phone || watch('clientPhone') || ''
-      );
-      // Utiliser le téléphone du provider depuis les données de session ou provider
-      const providerPhoneE164 = toE164(provider?.phoneNumber || provider?.phone || '');
+      const clientPhoneE164 = toE164(user?.phone || watch('clientPhone') || '');
+      const providerPhoneE164 = toE164((provider as any)?.phoneNumber || (provider as any)?.phone || '');
 
-      // Debug : afficher les numéros récupérés
+      // Debug
       console.log('Debug phones:', {
         clientPhoneE164,
         providerPhoneE164,
         userPhone: user?.phone,
         serviceClientPhone: service.clientPhone,
-        providerPhone: provider?.phone,
-        providerPhoneNumber: provider?.phoneNumber
+        providerPhone: (provider as any)?.phone,
+        providerPhoneNumber: (provider as any)?.phoneNumber
       });
 
       if (!/^\+[1-9]\d{8,14}$/.test(clientPhoneE164)) {
@@ -623,8 +646,6 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
       }
 
       void persistPaymentDocs(paymentIntent.id);
-
-      // Send provider notifications after successful payment
       void sendProviderNotifications(paymentIntent.id, clientPhoneE164, providerPhoneE164);
 
       const gtag = getGtag();
@@ -657,7 +678,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           currency: serviceCurrency.toUpperCase() as 'EUR' | 'USD',
           delayMinutes: 5,
           clientLanguages: [language],
-          providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
+          providerLanguages: (provider as any).languagesSpoken || (provider as any).languages || ['fr'],
         };
 
         void (async () => {
@@ -688,6 +709,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
     provider,
     user.uid,
     user.email,
+    user.firstName,
+    user.lastName,
     language,
     adminPricing.duration,
     serviceCurrency,
@@ -700,6 +723,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
     sendProviderNotifications,
     setError,
     watch,
+    bookingMeta,
     t,
   ]);
 
@@ -1252,7 +1276,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
   return (
     <Layout>
-      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
+      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)] sm:min-h=[calc(100vh-80px)]">
         <div className="max-w-lg mx-auto px-4 py-4">
           {(pricingError) && (
             <div className="mb-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">

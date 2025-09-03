@@ -50,7 +50,6 @@ import {
 
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { createBookingRequest } from '../services/booking';
-import { manualSend } from '@/services/admin/comms';
 // ✅ composant RHF pour le téléphone
 import PhoneField from '@/components/PhoneField';
 
@@ -273,7 +272,7 @@ const countries = [
   'Zambie','Zimbabwe',
 ];
 
-type MinimalUser = { uid?: string } | null;
+type MinimalUser = { uid?: string; firstName?: string } | null;
 const ALL_LANGS = languages as unknown as Language[];
 
 interface BookingRequestData {
@@ -473,7 +472,7 @@ const BookingRequest: React.FC = () => {
   });
 
   const watched = watch();
-  const [languagesSpoken, setLanguagesSpoken] = useState<Language[]>([]); // garde affichage + compat
+  const [languagesSpoken, setLanguagesSpoken] = useState<Language[]>([]);
   const [hasLanguageMatchRealTime, setHasLanguageMatchRealTime] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [formError, setFormError] = useState('');
@@ -549,7 +548,7 @@ const BookingRequest: React.FC = () => {
               try {
                 sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
               } catch (e) {
-                // ignore: quota/third-party cookie restrictions
+                // ignore
               }
             } else {
               setProvider(null);
@@ -575,7 +574,7 @@ const BookingRequest: React.FC = () => {
               try {
                 sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
               } catch (e) {
-                // ignore: quota/third-party cookie restrictions
+                // ignore
               }
             } else {
               setProvider(null);
@@ -769,7 +768,6 @@ const BookingRequest: React.FC = () => {
             nationality: data.nationality,
             currentCountry: data.currentCountry === 'Autre' ? data.autrePays : data.currentCountry,
           },
-          // ✅ garder la valeur attendue par le type côté analytics pour éviter l'erreur TS
           source: 'booking_request_form',
         });
       } catch (error) {
@@ -780,7 +778,7 @@ const BookingRequest: React.FC = () => {
       return;
     }
 
-    // validation RHF complète (au cas où)
+    // validation RHF complète
     const ok = await trigger();
     if (!ok || Object.values(validFlags).some((v) => !v)) {
       scrollToFirstIncomplete();
@@ -840,8 +838,6 @@ const BookingRequest: React.FC = () => {
         providerPhone: bookingRequest.providerPhone,
       });
 
-     
-
       // Calcul serviceData pour checkout
       const selectedCurrency: Currency = detectUserCurrency();
       const roleForPricing: ServiceType = (provider!.role || provider!.type || 'expat') as ServiceType;
@@ -867,9 +863,11 @@ const BookingRequest: React.FC = () => {
         svcProviderAmount = Math.max(0, Math.round((total - fee) * 100) / 100);
       }
 
+      // Stockage session pour CallCheckout (provider, phone, serviceData + bookingMeta)
       try {
         sessionStorage.setItem('selectedProvider', JSON.stringify(selectedProvider));
         sessionStorage.setItem('clientPhone', bookingRequest.clientPhone);
+
         sessionStorage.setItem(
           'serviceData',
           JSON.stringify({
@@ -884,8 +882,20 @@ const BookingRequest: React.FC = () => {
             currency: selectedCurrency,
           }),
         );
+
+        // 👇 Résumé de la demande pour CallCheckout (utilisé pour notifier le prestataire)
+        // ⚠️ Correction : country = clientCurrentCountry (pays d’intervention saisi par le client)
+        sessionStorage.setItem(
+          'bookingMeta',
+          JSON.stringify({
+            title: (bookingRequest.title || '').toString().trim(),
+            description: (bookingRequest.description || '').toString().trim(),
+            country: bookingRequest.clientCurrentCountry || '',
+            clientFirstName: bookingRequest.clientFirstName,
+          }),
+        );
       } catch (error) {
-        console.warn('Failed to save serviceData in session', error);
+        console.warn('Failed to save booking/session data', error);
       }
 
       navigate(`/call-checkout/${providerId}`);

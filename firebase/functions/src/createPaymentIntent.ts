@@ -13,8 +13,7 @@ import {
   formatAmount,
   // === ADD imports
   getPricingConfig,
-  validateAmount,
-  SECURITY_LIMITS,
+  validateAmount, // (si non utilisé ailleurs, tu peux le retirer)
   // === END
 } from './utils/paymentValidators';
 
@@ -59,7 +58,25 @@ console.log(
 );
 
 // =========================================
-// ☯️ Rate limit store (mémoire)
+// ✅ LIMITES SÉCURITÉ (inline, remplace l'ancien SECURITY_LIMITS)
+// =========================================
+const LIMITS = {
+  RATE_LIMIT: { WINDOW_MS: 10 * 60 * 1000, MAX_REQUESTS: 6 }, // 6 req / 10 min
+  AMOUNT_LIMITS: {
+    MIN_EUR: 1,  MAX_EUR: 500,  MAX_DAILY_EUR: 1000,
+    MIN_USD: 1,  MAX_USD: 600,  MAX_DAILY_USD: 1200,
+  },
+  VALIDATION: {
+    AMOUNT_COHERENCE_TOLERANCE: 0.5, // 50 centimes de tolérance
+    MAX_DESCRIPTION_LENGTH: 240,
+    ALLOWED_CURRENCIES: ['eur', 'usd'] as const,
+    ALLOWED_SERVICE_TYPES: ['lawyer_call', 'expat_call'] as const,
+  },
+  DUPLICATES: { WINDOW_MS: 15 * 60 * 1000 }, // 15 min
+} as const;
+
+// =========================================
+/** ☯️ Rate limit store (mémoire) */
 // =========================================
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
@@ -160,14 +177,14 @@ function checkRateLimit(userId: string): { allowed: boolean; resetTime?: number 
     rateLimitStore.get(key) ||
     ({
       count: 0,
-      resetTime: now + SECURITY_LIMITS.RATE_LIMIT.WINDOW_MS,
+      resetTime: now + LIMITS.RATE_LIMIT.WINDOW_MS,
     } as const);
 
-  if (currentLimit.count >= SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS) {
+  if (currentLimit.count >= LIMITS.RATE_LIMIT.MAX_REQUESTS) {
     logSecurityEvent('rate_limit_exceeded', {
       userId,
       count: currentLimit.count,
-      limit: SECURITY_LIMITS.RATE_LIMIT.MAX_REQUESTS,
+      limit: LIMITS.RATE_LIMIT.MAX_REQUESTS,
     });
     return { allowed: false, resetTime: currentLimit.resetTime };
   }
@@ -247,7 +264,7 @@ async function validateAmountSecurity(
 ): Promise<{ valid: boolean; error?: string }> {
   logSecurityEvent('amount_validation_start', { amount, currency, userId });
 
-  const { MIN_EUR, MAX_EUR, MAX_DAILY_EUR, MIN_USD, MAX_USD, MAX_DAILY_USD } = SECURITY_LIMITS.AMOUNT_LIMITS;
+  const { MIN_EUR, MAX_EUR, MAX_DAILY_EUR, MIN_USD, MAX_USD, MAX_DAILY_USD } = LIMITS.AMOUNT_LIMITS;
   const limits =
     currency === 'eur'
       ? { min: MIN_EUR, max: MAX_EUR, daily: MAX_DAILY_EUR }
@@ -298,7 +315,7 @@ async function checkDuplicatePayments(
   }
 
   try {
-    const windowMs = SECURITY_LIMITS.DUPLICATES.WINDOW_MS;
+    const windowMs = LIMITS.DUPLICATES.WINDOW_MS;
 
     const existingPayments = await db
       .collection('payments')
@@ -337,7 +354,7 @@ function validateAmountCoherence(
   const totalCalculated = Math.round((commissionAmount + providerAmount) * 100) / 100;
   const amountRounded = Math.round(totalAmount * 100) / 100;
   const difference = Math.abs(totalCalculated - amountRounded);
-  const tolerance = SECURITY_LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
+  const tolerance = LIMITS.VALIDATION.AMOUNT_COHERENCE_TOLERANCE;
 
   console.log('💰 Validation cohérence (commissionAmount):', {
     totalAmount: amountRounded,
@@ -361,7 +378,7 @@ function validateAmountCoherence(
 
 function sanitizeAndConvertInput(data: PaymentIntentRequestData) {
   const maxNameLength = isDevelopment ? 500 : 200;
-  const maxDescLength = SECURITY_LIMITS.VALIDATION.MAX_DESCRIPTION_LENGTH;
+  const maxDescLength = LIMITS.VALIDATION.MAX_DESCRIPTION_LENGTH;
   const maxMetaKeyLength = isDevelopment ? 100 : 50;
   const maxMetaValueLength = isDevelopment ? 500 : 200;
 
@@ -420,7 +437,8 @@ export const createPaymentIntent = onCall(
     timeoutSeconds: 60,
     minInstances: 0,
     maxInstances: 3,
-    // pas de cpu: 0.25/0.5 si concurrency > 1 ; ici on garde 1
+    // 🔐 Déclare explicitement les secrets requis par la fonction
+    secrets: [STRIPE_SECRET_KEY_TEST, STRIPE_SECRET_KEY_LIVE],
   },
   async (request: CallableRequest<PaymentIntentRequestData>) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -434,7 +452,11 @@ export const createPaymentIntent = onCall(
         isDevelopment,
         isProduction,
         bypassMode: BYPASS_MODE,
+        userId: request.auth?.uid,
+        clientId: (request.data as any)?.clientId,
+        providerId: (request.data as any)?.providerId,
       });
+console.log('[PI:REV]', 'LIMITS_ACTIVE', { hasLimits: !!(LIMITS && LIMITS.RATE_LIMIT) });
 
       // 1) AUTH
       if (!request.auth) {
@@ -494,7 +516,7 @@ export const createPaymentIntent = onCall(
         coupon,
       } = sanitizedData;
 
-      if (!serviceType || !SECURITY_LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
+      if (!serviceType || !LIMITS.VALIDATION.ALLOWED_SERVICE_TYPES.includes(serviceType)) {
         throw new HttpsError('invalid-argument', 'Type de service invalide');
       }
       if (!providerId || typeof providerId !== 'string' || providerId.length < 5) {
@@ -503,7 +525,7 @@ export const createPaymentIntent = onCall(
       if (!clientId || typeof clientId !== 'string' || clientId.length < 5) {
         throw new HttpsError('invalid-argument', 'ID client invalide');
       }
-      if (!SECURITY_LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
+      if (!LIMITS.VALIDATION.ALLOWED_CURRENCIES.includes(currency)) {
         throw new HttpsError('invalid-argument', `Devise non supportée: ${currency}`);
       }
 
@@ -603,6 +625,14 @@ export const createPaymentIntent = onCall(
       // 🔐 Choix de la clé Stripe selon le mode
       const stripeSecretKey = getStripeSecretParam().value();
 
+      // ✅ Vérifie la présence de la clé Stripe sélectionnée
+      if (!stripeSecretKey) {
+        throw new HttpsError(
+          'failed-precondition',
+          `Clé Stripe manquante pour le mode "${STRIPE_MODE.value() || 'test'}".`
+        );
+      }
+
       // 🧭 Dérive le providerType
       const providerType: 'lawyer' | 'expat' = serviceType === 'lawyer_call' ? 'lawyer' : 'expat';
 
@@ -670,7 +700,7 @@ export const createPaymentIntent = onCall(
                 requestId,
               },
             },
-            db
+            admin.firestore()
           );
         } catch (auditError) {
           console.warn('Audit logging failed:', auditError);
@@ -699,7 +729,7 @@ export const createPaymentIntent = onCall(
       // Récupération sécurisée de l'account ID Stripe
       let accountId: string | undefined;
       try {
-        const stripe = new Stripe(getStripeSecretParam().value(), { apiVersion: '2023-10-16' });
+        const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
         const account = await stripe.accounts.retrieve();
         accountId = account.id;
       } catch (error) {
@@ -755,13 +785,15 @@ export const createPaymentIntent = onCall(
  * ✅ Récap déploiement / config
  *
  * 1) Stocke tes deux clés dans Secret Manager :
+ *    firebase functions:secrets:set STRIPE_SECRET_KEY_TEST
+ *    firebase functions:secrets:set STRIPE_SECRET_KEY_LIVE
  *
- * 2) Ajoute le param STRIPE_MODE (config param, pas un secret) :
- *    firebase functions:config:set params_STRIPE_MODE="test"
+ * 2) Ajoute le param STRIPE_MODE (paramètre non secret) :
+ *    firebase functions:config:set STRIPE_MODE="test"
  *    # ou "live" lors du basculement prod
  *
  * 3) Vérifie que ton front et ton back sont dans le même mode :
- *    - Front: publie pk_test_*** si STRIPE_MODE=test, pk_live_*** si STRIPE_MODE=live
+ *    - Front: pk_test_*** si STRIPE_MODE=test, pk_live_*** si STRIPE_MODE=live
  *    - Back : sélectionne la bonne sk_* via STRIPE_MODE
  *
  * 4) Déploie :

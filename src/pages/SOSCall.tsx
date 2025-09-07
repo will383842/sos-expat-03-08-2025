@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { Phone, Star, MapPin, Search, ChevronDown, Wifi, WifiOff, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Phone, Star, MapPin, Search, ChevronDown, Wifi, WifiOff, Heart, ChevronLeft, ChevronRight, Eye, ArrowRight, Globe, Users, Zap } from 'lucide-react';
 import { collection, query, limit, onSnapshot, where, DocumentData, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import Layout from '../components/layout/Layout';
@@ -32,8 +32,8 @@ interface Provider {
   isVisible?: boolean;
   isApproved?: boolean;
   isBanned?: boolean;
-  role?: string;         // ajouté pour exclure admin
-  isAdmin?: boolean;     // ajouté pour exclure admin
+  role?: string;
+  isAdmin?: boolean;
 }
 
 interface RawProfile extends DocumentData {
@@ -63,8 +63,175 @@ interface RawProfile extends DocumentData {
 }
 
 /* =========================
-   Utils
+   Utils identiques à ModernProfileCard
 ========================= */
+const CARD_DIMENSIONS = {
+  width: 320,
+  height: 520,
+  imageHeight: 288,
+  contentHeight: 232
+} as const;
+
+const LANGUAGE_MAP: Record<string, string> = {
+  'Français': 'Français',
+  'French': 'Français',
+  'fr': 'Français',
+  'FR': 'Français',
+  'Anglais': 'Anglais',
+  'English': 'Anglais',
+  'en': 'Anglais',
+  'EN': 'Anglais',
+  'Espagnol': 'Espagnol',
+  'Spanish': 'Espagnol',
+  'Español': 'Espagnol',
+  'es': 'Espagnol',
+  'ES': 'Espagnol',
+  'Português': 'Portugais',
+  'Portuguese': 'Portugais',
+  'pt': 'Portugais',
+  'PT': 'Portugais',
+  'Deutsch': 'Allemand',
+  'German': 'Allemand',
+  'de': 'Allemand',
+  'DE': 'Allemand',
+  'Italiano': 'Italien',
+  'Italian': 'Italien',
+  'it': 'Italien',
+  'IT': 'Italien'
+};
+
+const FLAG_MAP: Record<string, string> = {
+  'France': '🇫🇷',
+  'Espagne': '🇪🇸',
+  'Spain': '🇪🇸',
+  'Canada': '🇨🇦',
+  'Portugal': '🇵🇹',
+  'Allemagne': '🇩🇪',
+  'Germany': '🇩🇪',
+  'Italie': '🇮🇹',
+  'Italy': '🇮🇹',
+  'Belgique': '🇧🇪',
+  'Belgium': '🇧🇪',
+  'Suisse': '🇨🇭',
+  'Switzerland': '🇨🇭',
+  'Royaume-Uni': '🇬🇧',
+  'United Kingdom': '🇬🇧',
+  'États-Unis': '🇺🇸',
+  'United States': '🇺🇸',
+  'Pays-Bas': '🇳🇱',
+  'Netherlands': '🇳🇱'
+};
+
+const PROFESSION_ICONS: Record<string, { icon: string; bgColor: string; textColor: string }> = {
+  'lawyer': { 
+    icon: '⚖️', 
+    bgColor: 'bg-slate-100', 
+    textColor: 'text-slate-800'
+  },
+  'expat': { 
+    icon: '🌍', 
+    bgColor: 'bg-blue-100', 
+    textColor: 'text-blue-800' 
+  }
+};
+
+const TRANSLATIONS = {
+  fr: {
+    professions: {
+      lawyer: 'Avocat',
+      expat: 'Expat'
+    },
+    labels: {
+      online: 'En ligne',
+      offline: 'Hors ligne',
+      languages: 'Langues',
+      years: 'ans',
+      reviews: 'avis',
+      viewProfile: 'Voir le profil',
+      others: 'autres'
+    }
+  },
+  en: {
+    professions: {
+      lawyer: 'Lawyer',
+      expat: 'Expat'
+    },
+    labels: {
+      online: 'Online',
+      offline: 'Offline',
+      languages: 'Languages',
+      years: 'years',
+      reviews: 'reviews',
+      viewProfile: 'View profile',
+      others: 'others'
+    }
+  }
+} as const;
+
+const getBrowserLanguage = (): 'fr' | 'en' => {
+  if (typeof window === 'undefined') return 'fr';
+  const browserLang = navigator.language.toLowerCase();
+  return browserLang.startsWith('fr') ? 'fr' : 'en';
+};
+
+const getLanguage = (userLanguage?: string): 'fr' | 'en' => {
+  if (userLanguage) return userLanguage as 'fr' | 'en';
+  return getBrowserLanguage();
+};
+
+const t = (lang: 'fr' | 'en', key: string, subKey?: string): string => {
+  const translation = TRANSLATIONS[lang] as Record<string, Record<string, string> | string>;
+  let text: string;
+  
+  if (subKey) {
+    const section = translation[key];
+    if (typeof section === 'object' && section !== null) {
+      text = section[subKey] || key;
+    } else {
+      text = key;
+    }
+  } else {
+    const value = translation[key];
+    text = typeof value === 'string' ? value : key;
+  }
+  
+  return text;
+};
+
+const getProfessionInfo = (type: string) => {
+  return PROFESSION_ICONS[type] || PROFESSION_ICONS['expat'];
+};
+
+const getLanguageLabel = (language: string): string => {
+  return LANGUAGE_MAP[language] || language;
+};
+
+const getCountryFlag = (country: string): string => {
+  return FLAG_MAP[country] || '🌍';
+};
+
+const useStatusColors = (isOnline: boolean) => {
+  return useMemo(() => 
+    isOnline ? {
+      border: 'border-green-300',
+      shadow: 'shadow-green-100',
+      glow: 'shadow-green-200/50',
+      borderShadow: 'drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]',
+      badge: 'bg-green-100 text-green-800 border-green-300',
+      button: 'bg-green-700 hover:bg-green-800 active:bg-green-900 border-green-700',
+      accent: 'text-green-700'
+    } : {
+      border: 'border-red-300',
+      shadow: 'shadow-red-100',
+      glow: 'shadow-red-200/50',
+      borderShadow: 'drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]',
+      badge: 'bg-red-100 text-red-800 border-red-300',
+      button: 'bg-red-700 hover:bg-red-800 active:bg-red-900 border-red-700',
+      accent: 'text-red-700'
+    }, [isOnline]
+  );
+};
+
 const slugify = (s: string) =>
   (s || '')
     .toString()
@@ -74,57 +241,6 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-
-const normalize = (s: string) => slugify(s).replace(/-/g, '');
-
-const LANGUAGE_LABELS_FR: Record<string, string> = {
-  af: 'Afrikaans', sq: 'Albanais', am: 'Amharique', ar: 'Arabe', hy: 'Arménien',
-  az: 'Azéri', eu: 'Basque', be: 'Biélorusse', bn: 'Bengali', bs: 'Bosniaque',
-  bg: 'Bulgare', my: 'Birman', ca: 'Catalan', zh: 'Chinois', 'zh-cn': 'Chinois', 'zh-tw': 'Chinois',
-  hr: 'Croate', cs: 'Tchèque', da: 'Danois', nl: 'Néerlandais', en: 'Anglais',
-  et: 'Estonien', fi: 'Finnois', fr: 'Français', ka: 'Géorgien', de: 'Allemand',
-  el: 'Grec', gu: 'Gujarati', he: 'Hébreu', hi: 'Hindi', hu: 'Hongrois',
-  is: 'Islandais', id: 'Indonésien', ga: 'Irlandais', it: 'Italien', ja: 'Japonais',
-  kn: 'Kannada', kk: 'Kazakh', km: 'Khmer', ko: 'Coréen', ky: 'Kirghize',
-  lo: 'Laotien', lv: 'Letton', lt: 'Lituanien', lb: 'Luxembourgeois', mk: 'Macédonien',
-  ms: 'Malais', ml: 'Malayalam', mt: 'Maltais', mr: 'Marathi', mn: 'Mongol',
-  ne: 'Népalais', no: 'Norvégien', nb: 'Norvégien', nn: 'Norvégien',
-  fa: 'Persan', ps: 'Pachto', pl: 'Polonais', pt: 'Portugais', 'pt-br': 'Portugais',
-  pa: 'Punjabi', ro: 'Roumain', ru: 'Russe', sr: 'Serbe', si: 'Singhalais',
-  sk: 'Slovaque', sl: 'Slovène', es: 'Espagnol', sw: 'Swahili', sv: 'Suédois',
-  ta: 'Tamoul', te: 'Telugu', th: 'Thaï', tr: 'Turc', tk: 'Turkmène',
-  uk: 'Ukrainien', ur: 'Ourdou', vi: 'Vietnamien', cy: 'Gallois'
-};
-
-const LANGUAGE_ALIASES: Record<string, string> = {
-  english: 'Anglais', french: 'Français', spanish: 'Espagnol', espanol: 'Espagnol',
-  german: 'Allemand', deutsch: 'Allemand', italian: 'Italien', italiano: 'Italien',
-  portuguese: 'Portugais', portugues: 'Portugais', russian: 'Russe', русский: 'Russe',
-  chinese: 'Chinois', 中文: 'Chinois', japanese: 'Japonais', 日本語: 'Japonais',
-  korean: 'Coréen', 한국어: 'Coréen', arabic: 'Arabe', العربية: 'Arabe',
-  hindi: 'Hindi', thai: 'Thaï', thaii: 'Thaï'
-};
-
-const getLanguageLabel = (language: string): string => {
-  const raw = (language || '').trim();
-  if (!raw) return '';
-  const key = raw.toLowerCase();
-  if (LANGUAGE_LABELS_FR[key]) return LANGUAGE_LABELS_FR[key];
-  const k2 = key.slice(0, 2);
-  if (LANGUAGE_LABELS_FR[k2]) return LANGUAGE_LABELS_FR[k2];
-  if (LANGUAGE_ALIASES[key]) return LANGUAGE_ALIASES[key];
-  const frenchGuess: Record<string, string> = {
-    francais: 'Français', anglais: 'Anglais', espagnol: 'Espagnol', allemand: 'Allemand',
-    italien: 'Italien', portugais: 'Portugais', russe: 'Russe', chinois: 'Chinois',
-    japonais: 'Japonais', coréen: 'Coréen', arabe: 'Arabe', hindi: 'Hindi', 'thaï': 'Thaï',
-    neerlandais: 'Néerlandais', 'néerlandais': 'Néerlandais', polonais: 'Polonais'
-  };
-  const norm = normalize(raw);
-  for (const [k, v] of Object.entries(frenchGuess)) {
-    if (normalize(k) === norm) return v;
-  }
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-};
 
 /* =========================
    Options filtres
@@ -172,10 +288,304 @@ const languageOptions = [
 ];
 
 /* =========================
+   ModernProfileCard Component (exact copy)
+========================= */
+const ModernProfileCard: React.FC<{
+  provider: Provider;
+  onProfileClick: (provider: Provider) => void;
+  index?: number;
+  language?: string;
+}> = React.memo(({ 
+  provider, 
+  onProfileClick, 
+  index = 0,
+  language 
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  const currentLang = useMemo(() => getLanguage(language), [language]);
+  const statusColors = useStatusColors(provider.isOnline);
+  const professionInfo = useMemo(() => getProfessionInfo(provider.type), [provider.type]);
+  
+  const handleImageError = React.useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.currentTarget;
+    if (target.src !== '/default-avatar.png' && !imageError) {
+      setImageError(true);
+      target.src = '/default-avatar.png';
+    }
+  }, [imageError]);
+
+  const handleClick = React.useCallback(() => {
+    onProfileClick(provider);
+  }, [provider, onProfileClick]);
+
+  const handleMouseEnter = React.useCallback(() => {
+    if (window.matchMedia('(hover: hover)').matches) {
+      setIsHovered(true);
+    }
+  }, []);
+
+  const handleMouseLeave = React.useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
+  const formattedLanguages = useMemo(() => {
+    const mappedLanguages = provider.languages.map(lang => getLanguageLabel(lang));
+    if (mappedLanguages.length <= 3) {
+      return mappedLanguages.join(' • ');
+    }
+    return `${mappedLanguages.slice(0, 2).join(' • ')} +${mappedLanguages.length - 2} ${t(currentLang, 'labels', 'others')}`;
+  }, [provider.languages, currentLang]);
+
+  const ariaLabels = useMemo(() => ({
+    card: `Carte de profil de ${provider.name}`,
+    status: `Statut en ligne : ${provider.isOnline ? t(currentLang, 'labels', 'online') : t(currentLang, 'labels', 'offline')}`,
+    rating: `Note ${provider.rating.toFixed(1)} sur 5`,
+    viewProfile: `Voir le profil de ${provider.name}`
+  }), [currentLang, provider.name, provider.isOnline, provider.rating]);
+
+  return (
+    <div className="flex-shrink-0 p-2 sm:p-4">
+      <article
+        className={`
+          relative bg-white rounded-2xl overflow-hidden cursor-pointer
+          transition-all duration-300 ease-out border-2 shadow-lg
+          w-80 h-[520px] sm:w-80 md:w-80
+          ${statusColors.border} ${statusColors.shadow} ${statusColors.borderShadow}
+          ${isHovered ? `scale-[1.02] ${statusColors.glow} shadow-xl` : ''}
+          focus:outline-none focus:ring-4 focus:ring-blue-500/50
+          hover:shadow-xl
+        `}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-label={ariaLabels.card}
+        style={{
+          animationDelay: `${index * 100}ms`,
+        }}
+      >
+        
+        {/* Header avec photo et statut - Dimensions explicites pour éviter layout shift */}
+        <div 
+          className="relative overflow-hidden bg-slate-100"
+          style={{ height: `${CARD_DIMENSIONS.imageHeight}px` }}
+        >
+          <img
+            src={provider.avatar || '/default-avatar.png'}
+            alt={`Photo de profil de ${provider.name}`}
+            className={`
+              w-full h-full object-cover transition-all duration-300
+              ${imageLoaded ? 'opacity-100' : 'opacity-0'}
+              ${isHovered ? 'scale-105' : ''}
+            `}
+            onLoad={() => setImageLoaded(true)}
+            onError={handleImageError}
+            loading="lazy"
+            decoding="async"
+            width={CARD_DIMENSIONS.width}
+            height={CARD_DIMENSIONS.imageHeight}
+          />
+          
+          {/* Overlay gradient amélioré */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+          
+          {/* Statut en ligne - Taille tactile optimisée */}
+          <div className="absolute top-3 left-3">
+            <div 
+              className={`
+                inline-flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium
+                backdrop-blur-sm border shadow-sm transition-colors
+                ${statusColors.badge}
+                min-h-[36px]
+              `}
+              aria-label={ariaLabels.status}
+            >
+              {provider.isOnline ? (
+                <Wifi className="w-4 h-4" aria-hidden="true" />
+              ) : (
+                <WifiOff className="w-4 h-4" aria-hidden="true" />
+              )}
+              <span>{provider.isOnline ? t(currentLang, 'labels', 'online') : t(currentLang, 'labels', 'offline')}</span>
+            </div>
+          </div>
+          
+          {/* Badge métier avec contraste amélioré */}
+          <div className="absolute top-3 right-3">
+            <div className={`
+              inline-flex items-center gap-2 px-3 py-2 rounded-full 
+              backdrop-blur-sm border shadow-sm border-white/30
+              ${professionInfo.bgColor} ${professionInfo.textColor}
+              min-h-[36px]
+            `}>
+              <span className="text-sm font-medium">
+                <span aria-hidden="true">{professionInfo.icon}</span> {t(currentLang, 'professions', provider.type)}
+              </span>
+            </div>
+          </div>
+          
+          {/* Note avec accessibilité améliorée */}
+          <div className="absolute bottom-3 right-3">
+            <div 
+              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/95 backdrop-blur-sm border border-slate-200 shadow-sm"
+              aria-label={ariaLabels.rating}
+            >
+              <Star className="w-4 h-4 text-amber-500 fill-current" aria-hidden="true" />
+              <span className="text-slate-800 text-sm font-medium">{provider.rating.toFixed(1)}</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Contenu principal - Hauteur fixe pour éviter layout shift */}
+        <div 
+          className="p-3 flex flex-col"
+          style={{ height: `${CARD_DIMENSIONS.contentHeight}px` }}
+        >
+          
+          {/* Nom et expérience */}
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-bold text-slate-800 truncate flex-1">
+                {provider.name}
+              </h3>
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-teal-50 border border-teal-200 flex-shrink-0">
+                <Zap className="w-3 h-3 text-teal-600" aria-hidden="true" />
+                <span className="text-teal-600 text-xs font-medium">
+                  {provider.yearsOfExperience} {t(currentLang, 'labels', 'years')}
+                </span>
+              </div>
+            </div>
+            
+            {/* Nationalité avec drapeau */}
+            {provider.country && (
+              <div className="flex items-center gap-2">
+                <span className="text-lg" aria-hidden="true">
+                  {getCountryFlag(provider.country)}
+                </span>
+                <span className="text-slate-600 text-xs font-medium">{provider.country}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Informations organisées - Hauteur fixe avec overflow */}
+          <div className="space-y-2 h-28 overflow-hidden">
+            
+            {/* Pays */}
+            <div className="flex items-center gap-2">
+              <span className="text-lg" aria-hidden="true">{getCountryFlag(provider.country)}</span>
+              <span className="text-blue-600 text-xs font-medium truncate">{provider.country}</span>
+            </div>
+            
+            {/* Langues */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Globe className="w-3 h-3 text-indigo-600" aria-hidden="true" />
+                <span className="text-slate-800 font-semibold text-xs">{t(currentLang, 'labels', 'languages')}</span>
+              </div>
+              <div className="pl-5">
+                <span className="text-indigo-600 text-xs">{formattedLanguages}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Stats */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-auto">
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3 text-amber-600" aria-hidden="true" />
+              <span className="text-amber-600 text-xs font-medium">
+                {provider.reviewCount} {t(currentLang, 'labels', 'reviews')}
+              </span>
+            </div>
+            <div className="text-slate-500 text-xs">
+              {t(currentLang, 'professions', provider.type)}
+            </div>
+          </div>
+          
+          {/* Bouton CTA - Taille tactile optimisée */}
+          <div className="mt-3">
+            <button 
+              className={`
+                w-full rounded-lg font-bold text-sm text-white
+                transition-all duration-300 flex items-center justify-center gap-2
+                border-2 shadow-lg relative overflow-hidden
+                ${statusColors.button}
+                hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]
+                focus:outline-none focus:ring-4 focus:ring-blue-500/50
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+              style={{ 
+                minHeight: '48px',
+                padding: '12px 16px'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick();
+              }}
+              type="button"
+              aria-label={ariaLabels.viewProfile}
+            >
+              <Eye className="w-4 h-4" aria-hidden="true" />
+              <span className="font-bold">{t(currentLang, 'labels', 'viewProfile')}</span>
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </article>
+
+      {/* Styles optimisés avec prefers-reduced-motion */}
+      <style>{`
+        article {
+          animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        
+        @keyframes slideInUp {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+          article {
+            animation: none;
+            opacity: 1;
+            transform: none;
+          }
+          
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+        
+        /* Optimisation focus pour navigation clavier */
+        article:focus-visible {
+          outline: 2px solid #3b82f6;
+          outline-offset: 2px;
+        }
+      `}</style>
+    </div>
+  );
+});
+
+ModernProfileCard.displayName = 'ModernProfileCard';
+
+/* =========================
    Composant principal
 ========================= */
 const SOSCall: React.FC = () => {
-  // ✅ TOUS LES HOOKS AU DÉBUT - OBLIGATOIRE POUR REACT
   const { language } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -216,7 +626,6 @@ const SOSCall: React.FC = () => {
     }
   });
 
-  // ✅ Configuration i18n avec useMemo - une seule fois en haut
   const lang = (language as 'fr' | 'en') || 'fr';
   
   const cardTranslations = useMemo(() => ({
@@ -252,9 +661,8 @@ const SOSCall: React.FC = () => {
     }
   }), []);
 
-  const t = cardTranslations[lang];
+  const tt = cardTranslations[lang];
 
-  // ✅ TOUS LES useEffect APRÈS LES HOOKS DE STATE
   // Charger providers
   useEffect(() => {
     const typeParam = searchParams.get('type');
@@ -263,7 +671,6 @@ const SOSCall: React.FC = () => {
       setSearchParams({ type: typeParam });
     }
 
-    // Requête TOLÉRANTE (pas de where isVisible === true)
     const sosProfilesQuery = query(
       collection(db, 'sos_profiles'),
       where('type', 'in', ['lawyer', 'expat']),
@@ -293,13 +700,11 @@ const SOSCall: React.FC = () => {
           const type: 'lawyer' | 'expat' =
             data.type === 'lawyer' ? 'lawyer' : 'expat';
 
-          // Pays : fallback "Monde", aucun contrôle coordonnée
           const country =
             data.currentPresenceCountry ||
             data.country ||
             'Monde';
 
-          // Hydratation provider
           const provider: Provider = {
             id: docSnap.id,
             name: fullName,
@@ -316,8 +721,8 @@ const SOSCall: React.FC = () => {
               (typeof data.yearsAsExpat === 'number' ? data.yearsAsExpat : 0),
             isOnline: data.isOnline === true,
             isActive: data.isActive !== false,
-            isVisible: data.isVisible !== false, // visible par défaut
-            isApproved: data.isApproved !== false, // tolérant par défaut
+            isVisible: data.isVisible !== false,
+            isApproved: data.isApproved !== false,
             isBanned: data.isBanned === true,
             role: typeof data.role === 'string' ? String(data.role).toLowerCase() : undefined,
             isAdmin: data.isAdmin === true,
@@ -330,7 +735,6 @@ const SOSCall: React.FC = () => {
                 : '/default-avatar.png',
           };
 
-          // Règle d'affichage unifiée (Home/SOS)
           const notAdmin = (provider.role ?? '') !== 'admin' && provider.isAdmin !== true;
           const notBanned = provider.isBanned !== true;
           const hasBasicInfo = provider.name.trim() !== '';
@@ -413,30 +817,28 @@ const SOSCall: React.FC = () => {
     return filteredProviders.slice(start, start + PAGE_SIZE);
   }, [filteredProviders, page]);
 
-  // ✅ FONCTIONS UTILITAIRES DÉCLARÉES APRÈS LES HOOKS
-  // Normalisation pays : on compare slug + includes (FR/EN)
+  // Normalisation pays
   const countryMatches = (providerCountry: string, selected: string, custom: string): boolean => {
     if (selected === 'all') return true;
     const prov = providerCountry || '';
     if (selected === 'Autre') {
       if (!custom) return true;
-      return normalize(prov).includes(normalize(custom));
+      return prov.toLowerCase().includes(custom.toLowerCase());
     }
     if (prov === selected) return true;
-    if (normalize(prov) === normalize(selected)) return true;
     return prov.toLowerCase().includes(selected.toLowerCase());
   };
 
-  // Normalisation langues : via label FR
+  // Normalisation langues
   const langMatches = (langs: string[], selected: string, custom: string): boolean => {
     if (selected === 'all') return true;
-    const normalizedProv = (langs || []).map((l) => normalize(getLanguageLabel(l)));
+    const normalizedProv = (langs || []).map((l) => getLanguageLabel(l).toLowerCase());
     if (selected === 'Autre') {
       if (!custom) return true;
-      const needle = normalize(getLanguageLabel(custom));
+      const needle = custom.toLowerCase();
       return normalizedProv.some((v) => v.includes(needle));
     }
-    const target = normalize(getLanguageLabel(selected));
+    const target = selected.toLowerCase();
     return normalizedProv.some((v) => v === target);
   };
 
@@ -487,16 +889,6 @@ const SOSCall: React.FC = () => {
     });
   };
 
-  // Utilitaire
-  const truncateText = (text: string, maxLength: number): { text: string; isTruncated: boolean } => {
-    const safe = text || '';
-    if (safe.length <= maxLength) return { text: safe, isTruncated: false };
-    return { text: safe.substring(0, maxLength) + '...', isTruncated: true };
-  };
-
-  /* =========================
-     Rendu
-  ========================= */
   return (
     <Layout>
       <SEOHead
@@ -511,32 +903,6 @@ const SOSCall: React.FC = () => {
           selectedType === 'lawyer' ? 'avocat' : selectedType === 'expat' ? 'expatrié' : 'expert'
         } vérifié disponible immédiatement. Consultation en ligne 24h/24, 7j/7 dans plus de 150 pays.`}
         canonicalUrl="/sos-appel"
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': 'Service',
-          name: `SOS Experts ${selectedType === 'lawyer' ? 'Juridiques' : 'Expatriation'}`,
-          provider: {
-            '@type': 'Organization',
-            name: 'SOS Expat & Travelers',
-            url: 'https://sosexpat.com',
-          },
-          serviceType: selectedType === 'lawyer' ? 'Legal Consultation' : 'Expat Assistance',
-          areaServed: {
-            '@type': 'Country',
-            name: selectedCountry !== 'all' ? selectedCountry : 'Worldwide',
-          },
-          description: `Service de consultation ${
-            selectedType === 'lawyer' ? 'juridique' : 'expatriation'
-          } en ligne disponible 24h/24`,
-          availableChannel: {
-            '@type': 'ServiceChannel',
-            serviceType: 'Online Video Call',
-            availableLanguage:
-              selectedLanguage !== 'all'
-                ? selectedLanguage
-                : [language || 'French', 'English', 'Spanish'],
-          },
-        }}
       />
 
       <div className="min-h-screen bg-gray-950">
@@ -784,7 +1150,7 @@ const SOSCall: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Array.from({ length: PAGE_SIZE }).map((_, index) => (
                   <div key={`sk-${index}`} className="bg-white/5 rounded-[28px] border border-white/10 overflow-hidden animate-pulse">
-                    <div className="aspect-[3/4] bg-white/10" />
+                    <div className="w-full h-80 bg-white/10" />
                     <div className="p-4 space-y-3">
                       <div className="h-4 bg-white/10 rounded w-3/4" />
                       <div className="h-3 bg-white/10 rounded w-1/2" />
@@ -795,227 +1161,49 @@ const SOSCall: React.FC = () => {
               </div>
             ) : filteredProviders.length > 0 ? (
               <>
-                {/* Grille moderne 9 cartes/page avec i18n */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                  {paginatedProviders.map((provider) => {
-                    const { text: truncatedDescription, isTruncated } = truncateText(provider.description, 120);
-                    const langs = provider.languages
-                      .slice(0, 2)
-                      .map(getLanguageLabel);
-
-                    return (
-                      <article
-                        key={provider.id}
-                        className={`group relative bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-xl rounded-3xl overflow-hidden transition-all duration-700 hover:scale-[1.02] cursor-pointer border border-slate-200 hover:border-slate-300 hover:shadow-2xl hover:shadow-slate-400/20 flex flex-col ${
-                          provider.isOnline
-                            ? 'ring-1 ring-emerald-400/40 shadow-emerald-500/10'
-                            : 'ring-1 ring-red-400/40 shadow-red-500/10'
-                        }`}
-                        onClick={() => handleProviderClick(provider)}
-                        itemScope
-                        itemType="https://schema.org/Person"
-                      >
-                        {/* Status indicator */}
-                        <div className="absolute top-6 right-6 z-10">
-                          <div className={`w-4 h-4 rounded-full ${
-                            provider.isOnline ? 'bg-emerald-400 shadow-emerald-400/50' : 'bg-red-400 shadow-red-400/50'
-                          } shadow-lg animate-pulse`} />
-                        </div>
-
-                        {/* Header avec photo et infos principales */}
-                        <div className="relative p-8 pb-6">
-                          <div className="flex items-start gap-6">
-                            {/* Avatar */}
-                            <div className="relative shrink-0">
-                              <div className="w-24 h-24 rounded-2xl overflow-hidden ring-2 ring-slate-200 group-hover:ring-slate-300 transition-all duration-500">
-                                <img
-                                  src={provider.avatar}
-                                  alt={`${provider.name} - ${provider.type === 'lawyer' ? t.lawyer : t.expat}`}
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                  itemProp="image"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    const target = e.currentTarget as HTMLImageElement;
-                                    target.onerror = null;
-                                    target.src = '/default-avatar.png';
-                                  }}
-                                />
-                              </div>
-                              
-                              {/* Badge type */}
-                              <div className="absolute -bottom-3 -right-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl border-2 border-white shadow-lg ${
-                                  provider.type === 'lawyer' 
-                                    ? 'bg-gradient-to-br from-amber-400 to-orange-500' 
-                                    : 'bg-gradient-to-br from-blue-400 to-indigo-500'
-                                }`}>
-                                  {provider.type === 'lawyer' ? '⚖️' : '🌍'}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Infos principales */}
-                            <div className="flex-1 min-w-0">
-                              <div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-1 line-clamp-1 group-hover:text-slate-900 transition-colors" itemProp="name">
-                                  {provider.name}
-                                </h3>
-                                <p className="text-slate-600 text-sm font-medium">
-                                  {provider.type === 'lawyer' ? t.lawyer : t.expat}
-                                </p>
-                              </div>
-
-                              {/* Métadonnées */}
-                              <div className="flex items-center gap-4 mt-4 text-sm text-slate-600">
-                                <div className="flex items-center gap-1">
-                                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                  <span className="font-semibold">{provider.rating.toFixed(1)}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
-                                  <span>{provider.country}</span>
-                                </div>
-                                <div className="text-slate-500">
-                                  {provider.yearsOfExperience} {t.years}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Séparateur */}
-                        <div className="mx-8 h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
-
-                        {/* Contenu principal */}
-                        <div className="p-8 pt-6 space-y-6 flex-1 flex flex-col">
-                          {/* Langues */}
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
-                                <span className="text-xs">🗣️</span>
-                              </div>
-                              <span className="text-sm font-semibold text-slate-700">{t.languages}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {langs.map((lang, idx) => (
-                                <span
-                                  key={`${provider.id}-lang-${idx}`}
-                                  className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg"
-                                >
-                                  {lang}
-                                </span>
-                              ))}
-                              {provider.languages.length > 2 && (
-                                <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 text-xs rounded-lg">
-                                  +{provider.languages.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Description */}
-                          {provider.description && (
-                            <div>
-                              <div className="flex items-center gap-2 mb-3">
-                                <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center">
-                                  <span className="text-xs">💬</span>
-                                </div>
-                                <span className="text-sm font-semibold text-slate-700">{t.about}</span>
-                              </div>
-                              <p className="text-sm text-slate-600 leading-relaxed" itemProp="description">
-                                {truncatedDescription}
-                              </p>
-                              {isTruncated && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleProviderClick(provider);
-                                  }}
-                                  className="text-sm text-slate-700 hover:text-slate-900 font-medium mt-2 inline-flex items-center gap-1 transition-colors"
-                                >
-                                  {t.readMore}
-                                  <span className="text-xs">→</span>
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Footer avec CTA repensé */}
-                        <div className="p-8 pt-4 mt-auto space-y-3">
-                          {/* Status en ligne compact */}
-                          <div className="flex items-center justify-center gap-2 text-xs">
-                            {provider.isOnline ? (
-                              <>
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full">
-                                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                  <span className="text-emerald-700 font-medium">{t.online}</span>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-full">
-                                  <div className="w-2 h-2 bg-red-400 rounded-full" />
-                                  <span className="text-red-600">{t.offline}</span>
-                                </div>
-                              </>
-                            )}
-                          </div>
-
-                          {/* CTA moderne */}
-                          <div className="space-y-2">
-                            {provider.isOnline ? (
-                              /* CTA principal pour contact direct */
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProviderClick(provider);
-                                }}
-                                className="w-full group/cta relative overflow-hidden bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white py-4 px-6 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
-                              >
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/cta:translate-x-full transition-transform duration-700 skew-x-12" />
-                                <div className="relative flex items-center justify-center gap-3">
-                                  <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                                    <span className="text-sm">💬</span>
-                                  </div>
-                                  <span>{t.contactNow}</span>
-                                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                                </div>
-                              </button>
-                            ) : (
-                              /* CTA secondaire pour consultation profil */
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProviderClick(provider);
-                                }}
-                                className="w-full group/cta relative bg-slate-100 hover:bg-slate-200 border-2 border-slate-200 hover:border-slate-300 text-slate-700 py-4 px-6 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-[1.02]"
-                              >
-                                <div className="flex items-center justify-center gap-3">
-                                  <div className="w-6 h-6 bg-slate-300/50 rounded-full flex items-center justify-center group-hover/cta:bg-slate-400/50 transition-colors">
-                                    <span className="text-sm">👤</span>
-                                  </div>
-                                  <span>{t.viewProfile}</span>
-                                  <span className="text-slate-400 group-hover/cta:text-slate-600 transition-colors">→</span>
-                                </div>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Métadonnées cachées pour SEO */}
-                        <div className="sr-only">
-                          <span itemProp="jobTitle">{provider.type === 'lawyer' ? t.lawyer : t.expat}</span>
-                          <span itemProp="workLocation">{provider.country}</span>
-                          <span itemProp="knowsLanguage">{provider.languages.map(getLanguageLabel).join(', ')}</span>
-                        </div>
-                      </article>
-                    );
-                  })}
+                {/* DESIGN EXACT DE ModernProfileCard - MOBILE FIRST */}
+                
+                {/* Version Mobile - Scroll horizontal */}
+                <div className="md:hidden">
+                  <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+                    {paginatedProviders.map((provider, index) => (
+                      <div key={provider.id} className="snap-start">
+                        <ModernProfileCard
+                          provider={provider}
+                          onProfileClick={handleProviderClick}
+                          index={index}
+                          language={language}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
+                {/* Version Desktop - Grille */}
+                <div className="hidden md:grid md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  {paginatedProviders.map((provider, index) => (
+                    <ModernProfileCard
+                      key={provider.id}
+                      provider={provider}
+                      onProfileClick={handleProviderClick}
+                      index={index}
+                      language={language}
+                    />
+                  ))}
+                </div>
+
+                <style>{`
+                  .scrollbar-hide {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                  }
+                  .scrollbar-hide::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
+
                 {/* Pagination (bas) */}
-                <div className="flex items-center justify-between mt-6">
+                <div className="flex items-center justify-between mt-8">
                   <div className="text-sm text-gray-300">
                     Page <strong>{page}</strong> / {totalPages} — {filteredProviders.length} résultats
                   </div>
@@ -1097,9 +1285,6 @@ const Pagination: React.FC<{
   const makePages = (): Array<number | 'ellipsis'> => {
     const pages: Array<number | 'ellipsis'> = [];
     const add = (n: number) => pages.push(n);
-    const addEllipsis = () => {
-      if (pages[pages.length - 1] !== 'ellipsis') pages.push('ellipsis');
-    };
 
     const windowSize = 1;
     add(1);

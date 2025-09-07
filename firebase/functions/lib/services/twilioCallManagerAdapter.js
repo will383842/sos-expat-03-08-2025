@@ -44,7 +44,6 @@ const logCallRecord_1 = require("../utils/logs/logCallRecord");
  * Cette fonction utilise directement TwilioCallManager sans dépendances circulaires
  */
 async function beginOutboundCallForSession(callSessionId) {
-    var _a;
     try {
         console.log(`🚀 [Adapter] Démarrage appel pour session: ${callSessionId}`);
         const db = (0, firestore_1.getFirestore)();
@@ -55,9 +54,9 @@ async function beginOutboundCallForSession(callSessionId) {
             throw new Error(`Session ${callSessionId} introuvable dans call_sessions`);
         }
         const sessionData = sessionDoc.data();
-        console.log(`✅ [Adapter] Session trouvée, status: ${sessionData === null || sessionData === void 0 ? void 0 : sessionData.status}`);
+        console.log(`✅ [Adapter] Session trouvée, status: ${sessionData?.status}`);
         // ✅ ÉTAPE 2: Vérifier le paiement avant de continuer
-        const paymentStatus = (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.payment) === null || _a === void 0 ? void 0 : _a.status;
+        const paymentStatus = sessionData?.payment?.status;
         if (paymentStatus && paymentStatus !== "authorized") {
             console.error(`❌ [Adapter] Paiement non autorisé (status=${paymentStatus})`);
             throw new Error(`Paiement non autorisé pour session ${callSessionId} (status=${paymentStatus})`);
@@ -72,7 +71,7 @@ async function beginOutboundCallForSession(callSessionId) {
         });
         console.log(`✅ [Adapter] Appel initié avec succès:`, {
             sessionId: callSessionId,
-            status: (result === null || result === void 0 ? void 0 : result.status) || 'unknown'
+            status: result?.status || 'unknown'
         });
         // ✅ ÉTAPE 4: Logger le succès
         await (0, logCallRecord_1.logCallRecord)({
@@ -81,7 +80,7 @@ async function beginOutboundCallForSession(callSessionId) {
             retryCount: 0,
             additionalData: {
                 adaptedVia: 'beginOutboundCallForSession',
-                resultStatus: (result === null || result === void 0 ? void 0 : result.status) || 'unknown'
+                resultStatus: result?.status || 'unknown'
             }
         });
         return result;

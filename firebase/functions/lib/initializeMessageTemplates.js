@@ -434,12 +434,15 @@ async (request) => {
                 try {
                     const templateRef = db.collection('message_templates').doc(template.id);
                     const existingDoc = await templateRef.get();
-                    const templateData = Object.assign(Object.assign({}, template), { updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                    const templateData = {
+                        ...template,
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    };
                     if (existingDoc.exists) {
                         // Mise à jour du template existant (garde le contenu personnalisé si modifié)
                         const existingData = existingDoc.data();
                         // Ne mettre à jour que si le contenu n'a pas été personnalisé
-                        const shouldUpdate = !(existingData === null || existingData === void 0 ? void 0 : existingData.isCustomized);
+                        const shouldUpdate = !existingData?.isCustomized;
                         if (shouldUpdate) {
                             batch.update(templateRef, {
                                 name: template.name,
@@ -460,8 +463,11 @@ async (request) => {
                     }
                     else {
                         // Création d'un nouveau template
-                        batch.set(templateRef, Object.assign(Object.assign({}, templateData), { createdAt: admin.firestore.FieldValue.serverTimestamp(), isCustomized: false // Marquer comme non personnalisé
-                         }));
+                        batch.set(templateRef, {
+                            ...templateData,
+                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                            isCustomized: false // Marquer comme non personnalisé
+                        });
                         created++;
                         batchOperations++;
                         console.log(`✅ Nouveau template créé: ${template.id}`);

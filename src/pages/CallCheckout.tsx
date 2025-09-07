@@ -1,9 +1,9 @@
-// CallCheckout.tsx
+// src/pages/CallCheckout.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Clock, Shield, AlertCircle, CreditCard, Lock, Calendar, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   CardNumberElement,
@@ -15,7 +15,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { functions, db } from '../config/firebase';
 import { httpsCallable, HttpsCallable } from 'firebase/functions';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { Provider, normalizeProvider } from '../types/provider';
 import Layout from '../components/layout/Layout';
 import { detectUserCurrency, usePricingConfig } from '../services/pricingService';
@@ -23,8 +23,21 @@ import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { useForm } from 'react-hook-form';
 import { saveProviderMessage } from '@/firebase/saveProviderMessage';
 
-/* ------------------------------ Stripe init ------------------------------ */
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
+/* -------------------------- Stripe singleton (HMR-safe) ------------------ */
+// Conserve la même Promise Stripe à travers les rechargements HMR.
+// → Empêche: "Unsupported prop change on Elements: you cannot change the `stripe` prop after setting it."
+declare global {
+  // eslint-disable-next-line no-var
+  var __STRIPE_PROMISE__: Promise<Stripe | null> | undefined;
+}
+const getStripePromise = (): Promise<Stripe | null> => {
+  if (!globalThis.__STRIPE_PROMISE__) {
+    const pk = import.meta.env.VITE_STRIPE_PUBLIC_KEY as string;
+    globalThis.__STRIPE_PROMISE__ = loadStripe(pk);
+  }
+  return globalThis.__STRIPE_PROMISE__;
+};
+const stripePromise = getStripePromise();
 
 /* --------------------------------- Types --------------------------------- */
 type Currency = 'eur' | 'usd';
@@ -102,6 +115,30 @@ interface CallCheckoutProps {
   serviceData?: Partial<ServiceData>;
   onGoBack?: () => void;
 }
+
+/* --------- Provider extras (pour éviter les "any" dans le fichier) ------- */
+type ProviderExtras = {
+  profilePhoto?: string;
+  phoneNumber?: string;
+  phone?: string;
+  languagesSpoken?: string[];
+  languages?: string[];
+  country?: string;
+  avatar?: string;
+  email?: string;
+  name?: string;
+  fullName?: string;
+  role?: ServiceKind;
+  type?: ServiceKind;
+};
+type ProviderWithExtras = Provider & ProviderExtras;
+
+/* ------------------------- Callable error logger ------------------------- */
+type CallableErrShape = { code?: string; message?: string; details?: unknown };
+const logCallableError = (label: string, e: unknown): void => {
+  const r = (e as CallableErrShape) || {};
+  console.error(label, r.code, r.message, r.details);
+};
 
 /* --------------------------------- gtag ---------------------------------- */
 type GtagFunction = (...args: unknown[]) => void;
@@ -254,6 +291,30 @@ const toE164 = (raw?: string) => {
   return p?.isValid() ? p.number : '';
 };
 
+/* ------------------- Hook mobile (corrige la règle des hooks) ------------ */
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 640px), (pointer: coarse)');
+    const update = () => setIsMobile(!!mq.matches);
+    update();
+
+    if ('addEventListener' in mq) {
+      mq.addEventListener('change', update);
+      return () => mq.removeEventListener('change', update);
+    } else {
+      // @ts-expect-error legacy Safari
+      mq.addListener(update);
+      // @ts-expect-error legacy Safari
+      return () => mq.removeListener(update);
+    }
+  }, []);
+
+  return isMobile;
+}
+
 /* --------------------- Price tracing: hook & helpers --------------------- */
 interface PricingEntryTrace {
   totalAmount: number;
@@ -381,7 +442,7 @@ interface PaymentFormSuccessPayload {
 }
 interface PaymentFormProps {
   user: User;
-  provider: Provider;
+  provider: ProviderWithExtras;
   service: ServiceData;
   adminPricing: PricingEntryTrace;
   onSuccess: (payload: PaymentFormSuccessPayload) => void;
@@ -398,13 +459,30 @@ type PhoneFormValues = {
 
 type BookingMeta = { title?: string; description?: string; country?: string; clientFirstName?: string };
 
-const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, service, adminPricing, onSuccess, onError, isProcessing, setIsProcessing, isMobile }) => {
+/* ---------------------- HttpsError type guard (front) -------------------- */
+type HttpsErrorCode =
+  | 'cancelled' | 'unknown' | 'invalid-argument' | 'deadline-exceeded' | 'not-found' | 'already-exists'
+  | 'permission-denied' | 'resource-exhausted' | 'failed-precondition' | 'aborted' | 'out-of-range'
+  | 'unimplemented' | 'internal' | 'unavailable' | 'data-loss' | 'unauthenticated';
+
+interface FirebaseHttpsError extends Error {
+  code: HttpsErrorCode;
+  details?: unknown;
+}
+const isHttpsError = (e: unknown): e is FirebaseHttpsError => {
+  if (!e || typeof e !== 'object') return false;
+  const r = e as Record<string, unknown>;
+  return typeof r.code === 'string' && typeof r.message === 'string';
+};
+
+const PaymentForm: React.FC<PaymentFormProps> = React.memo(({
+  user, provider, service, adminPricing, onSuccess, onError, isProcessing, setIsProcessing, isMobile
+}) => {
   const stripe = useStripe();
   const elements = useElements();
   const { t, language } = useTranslation();
   const { getTraceAttributes } = usePriceTracing();
 
-  // ---- bookingMeta depuis la session (titre, description, pays, prénom)
   const bookingMeta: BookingMeta = useMemo(() => {
     try {
       const raw = sessionStorage.getItem('bookingMeta');
@@ -426,7 +504,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState<(() => Promise<void>) | null>(null);
 
-  const { control, watch, setError } = useForm<PhoneFormValues>({
+  const { watch, setError } = useForm<PhoneFormValues>({
     defaultValues: {
       clientPhone: service?.clientPhone || '',
       currentCountry: '',
@@ -463,7 +541,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         currency: serviceCurrency,
         status: 'pending',
         createdAt: serverTimestamp(),
-        notifiedAt: null, // For preventing duplicate notifications
+        notifiedAt: null,
       };
 
       try { await setDoc(doc(db, 'payments', paymentIntentId), baseDoc, { merge: true }); } catch { /* no-op */ }
@@ -478,8 +556,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
       try {
         // Anti-doublon
         const paymentDocRef = doc(db, 'payments', paymentIntentId);
-        const paymentDoc = await import('firebase/firestore').then(({ getDoc }) => getDoc(paymentDocRef));
-        if (paymentDoc.exists() && paymentDoc.data()?.notifiedAt) {
+        const paymentSnap = await getDoc(paymentDocRef);
+        if (paymentSnap.exists() && paymentSnap.data()?.notifiedAt) {
           console.log('Notifications already sent for payment:', paymentIntentId);
           return;
         }
@@ -487,10 +565,10 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         // ---- Données de la demande
         const title = (bookingMeta?.title || (language === 'fr' ? 'Demande sans titre' : 'Untitled request')).toString();
         const desc  = (bookingMeta?.description || '').toString();
-        const country = (bookingMeta?.country || (provider as any)?.country || '').toString();
+        const country = (bookingMeta?.country || provider.country || '').toString();
         const clientFirstName = (user.firstName || bookingMeta?.clientFirstName || '').toString();
 
-        // 1) In-app message sur le dashboard prestataire
+        // 1) In-app message
         try {
           await saveProviderMessage(
             provider.id,
@@ -510,14 +588,14 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           console.warn('saveProviderMessage failed:', e);
         }
 
-        // 2) SMS + Email via pipeline (templates booking_paid_provider)
+        // 2) SMS + Email via pipeline
         try {
           const enqueueMessageEvent = httpsCallable(functions, 'enqueueMessageEvent');
           await enqueueMessageEvent({
             eventId: 'booking_paid_provider',
             locale: language === 'fr' ? 'fr-FR' : 'en',
             to: {
-              email: provider?.email || null,
+              email: provider.email || null,
               phone: providerPhoneE164 || null,
               uid: provider.id,
             },
@@ -530,11 +608,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
                 country,
                 phone: clientPhoneE164 || null,
               },
-              request: {
-                title,
-                description: desc,
-                country,
-              },
+              request: { title, description: desc, country },
               booking: {
                 paymentIntentId,
                 amount: adminPricing.totalAmount,
@@ -548,12 +622,11 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           console.warn('enqueueMessageEvent failed:', e);
         }
 
-        // Marque comme notifié (anti-refresh)
+        // Marque comme notifié
         await setDoc(paymentDocRef, { notifiedAt: serverTimestamp() }, { merge: true });
         console.log('Provider notifications sent successfully for payment:', paymentIntentId);
       } catch (notificationError) {
         console.warn('Failed to send provider notifications:', notificationError);
-        // Ne jette pas l'erreur, le paiement reste “success”
       }
     },
     [provider, user, service, adminPricing, serviceCurrency, language, bookingMeta]
@@ -564,7 +637,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
       setIsProcessing(true);
       validatePaymentData();
 
-      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> = httpsCallable(functions, 'createPaymentIntent');
+      const createPaymentIntent: HttpsCallable<PaymentIntentData, PaymentIntentResponse> =
+        httpsCallable(functions, 'createPaymentIntent');
 
       const paymentData: PaymentIntentData = {
         amount: adminPricing.totalAmount,
@@ -591,8 +665,21 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         }
       };
 
-      const res = await createPaymentIntent(paymentData);
-      const clientSecret = res.data.clientSecret;
+      // -------- LOG ciblé sur la callable (sans `any`)
+      let resData: PaymentIntentResponse | null = null;
+      try {
+        const res = await createPaymentIntent(paymentData);
+        resData = res.data as PaymentIntentResponse;
+      } catch (e: unknown) {
+        logCallableError('[createPaymentIntent:error]', e);
+        throw e; // on laisse la gestion d'erreur globale s’occuper de l’affichage
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[createPaymentIntent] response', resData);
+      }
+
+      const clientSecret = resData?.clientSecret;
       if (!clientSecret) throw new Error(t('err.noClientSecret'));
 
       const chosenCardElement = isMobile
@@ -624,7 +711,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
       }
 
       const clientPhoneE164 = toE164(user?.phone || watch('clientPhone') || '');
-      const providerPhoneE164 = toE164((provider as any)?.phoneNumber || (provider as any)?.phone || '');
+      const providerPhoneE164 = toE164(provider.phoneNumber || provider.phone || '');
 
       // Debug
       console.log('Debug phones:', {
@@ -632,8 +719,8 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
         providerPhoneE164,
         userPhone: user?.phone,
         serviceClientPhone: service.clientPhone,
-        providerPhone: (provider as any)?.phone,
-        providerPhoneNumber: (provider as any)?.phoneNumber
+        providerPhone: provider.phone,
+        providerPhoneNumber: provider.phoneNumber
       });
 
       if (!/^\+[1-9]\d{8,14}$/.test(clientPhoneE164)) {
@@ -678,22 +765,40 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
           currency: serviceCurrency.toUpperCase() as 'EUR' | 'USD',
           delayMinutes: 5,
           clientLanguages: [language],
-          providerLanguages: (provider as any).languagesSpoken || (provider as any).languages || ['fr'],
+          providerLanguages: provider.languagesSpoken || provider.languages || ['fr'],
         };
 
         void (async () => {
           try {
             await createAndScheduleCall(callData);
-          } catch (cfErr) {
-            console.warn('createAndScheduleCall failed (post-nav):', cfErr);
+          } catch (cfErr: unknown) {
+            logCallableError('createAndScheduleCall:error', cfErr);
           }
         })();
       } else {
         console.warn('Missing/invalid phone(s). Skipping call scheduling.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Payment error:', err);
-      const msg = err?.message || err?.details || (typeof err === 'string' ? err : t('err.genericPayment'));
+
+      let msg = t('err.genericPayment');
+
+      if (isHttpsError(err)) {
+        if (
+          err.code === 'failed-precondition' ||
+          err.code === 'invalid-argument' ||
+          err.code === 'unauthenticated'
+        ) {
+          msg = err.message || msg;
+        } else {
+          msg = err.message || msg;
+        }
+      } else if (err instanceof Error) {
+        msg = err.message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+
       onError(msg);
     } finally {
       setIsProcessing(false);
@@ -706,11 +811,13 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
     adminPricing.providerAmount,
     stripeCurrency,
     service.serviceType,
+    service.clientPhone,
     provider,
     user.uid,
     user.email,
     user.firstName,
     user.lastName,
+    user?.phone,
     language,
     adminPricing.duration,
     serviceCurrency,
@@ -837,7 +944,7 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
               <span className="text-gray-600">Expert</span>
               <div className="flex items-center space-x-2">
                 <img
-                  src={provider.avatar || (provider as any).profilePhoto || '/default-avatar.png'}
+                  src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
                   className="w-5 h-5 rounded-full object-cover"
                   onError={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
@@ -914,9 +1021,9 @@ const PaymentForm: React.FC<PaymentFormProps> = React.memo(({ user, provider, se
 
         <div className="flex items-center justify-center">
           <div className="flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
-            <Shield className="w-3 h-3 text-green-600" aria-hidden="true" />
+            <Shield className="w-3 h-3 text-green-600" aria-hidden={true} />
             <span className="text-xs font-medium text-gray-700">Stripe</span>
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" aria-hidden={true} />
           </div>
         </div>
       </form>
@@ -966,30 +1073,12 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const isMobile = (() => {
-    const [isMobile, setIsMobile] = useState<boolean>(false);
-    useEffect(() => {
-      if (typeof window === 'undefined' || !window.matchMedia) return;
-      const mq = window.matchMedia('(max-width: 640px), (pointer: coarse)');
-      const update = () => setIsMobile(!!mq.matches);
-      update();
-      if ('addEventListener' in mq) {
-        mq.addEventListener('change', update);
-        return () => mq.removeEventListener('change', update);
-      } else {
-        // @ts-expect-error legacy safari
-        mq.addListener(update);
-        // @ts-expect-error legacy safari
-        return () => mq.removeListener(update);
-      }
-    }, []);
-    return isMobile;
-  })();
+  const isMobile = useIsMobile();
 
   const { getTraceAttributes } = usePriceTracing();
   const { pricing, error: pricingError, loading: pricingLoading } = usePricingConfig() as {
     pricing?: { lawyer: Record<Currency, PricingEntryTrace>; expat: Record<Currency, PricingEntryTrace> };
-    error?: unknown;
+    error?: string | Error | null;
     loading: boolean;
   };
 
@@ -1028,13 +1117,13 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
     } catch { /* no-op */ }
   }, [selectedCurrency]);
 
-  const provider = useMemo<Provider | null>(() => {
-    if (selectedProvider?.id) return normalizeProvider(selectedProvider);
+  const provider = useMemo<ProviderWithExtras | null>(() => {
+    if (selectedProvider?.id) return normalizeProvider(selectedProvider) as ProviderWithExtras;
     try {
       const saved = sessionStorage.getItem('selectedProvider');
       if (saved) {
-        const p = JSON.parse(saved) as Provider;
-        if (p?.id) return normalizeProvider(p);
+        const p = JSON.parse(saved) as ProviderWithExtras;
+        if (p?.id) return normalizeProvider(p as Provider) as ProviderWithExtras;
       }
     } catch { /* no-op */ }
     return null;
@@ -1100,7 +1189,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             (el as HTMLElement).style.backgroundColor = '';
           });
           document.querySelectorAll(`[data-price-source="${source}"]`).forEach(el => {
-            el.classList.add('debug-price-highlight');
+            (el as HTMLElement).classList.add('debug-price-highlight');
             (el as HTMLElement).style.outline = '3px solid red';
             (el as HTMLElement).style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
           });
@@ -1276,9 +1365,9 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
   return (
     <Layout>
-      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)] sm:min-h=[calc(100vh-80px)]">
+      <main className="bg-gradient-to-br from-red-50 to-red-100 min-h-[calc(100vh-80px)] sm:min-h-[calc(100vh-80px)]">
         <div className="max-w-lg mx-auto px-4 py-4">
-          {(pricingError) && (
+          {!!pricingError && (
             <div className="mb-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
               {language === 'fr'
                 ? 'Les tarifs affichés proviennent d\'une configuration de secours. La configuration centrale sera rechargée automatiquement.'
@@ -1292,7 +1381,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
               className="flex items-center gap-2 text-red-600 hover:text-red-700 mb-3 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 rounded p-1 touch-manipulation"
               aria-label={t('ui.back')}
             >
-              <ArrowLeft size={16} aria-hidden="true" />
+              <ArrowLeft size={16} aria-hidden={true} />
               <span>{t('ui.back')}</span>
             </button>
 
@@ -1310,7 +1399,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">
                 <img
-                  src={provider.avatar || (provider as any).profilePhoto || '/default-avatar.png'}
+                  src={provider.avatar || provider.profilePhoto || '/default-avatar.png'}
                   alt={provider.fullName || provider.name || 'Expert'}
                   className="w-12 h-12 rounded-lg object-cover ring-2 ring-white shadow-sm"
                   onError={(e) => {
@@ -1332,10 +1421,10 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
                   }>
                     {(provider.role || provider.type) === 'lawyer' ? (language === 'fr' ? 'Avocat' : 'Lawyer') : (language === 'fr' ? 'Expert' : 'Expert')}
                   </span>
-                  <span className="text-gray-600 text-xs">{(provider as any)?.country || 'FR'}</span>
+                  <span className="text-gray-600 text-xs">{provider.country || 'FR'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                  <Clock size={12} aria-hidden="true" />
+                  <Clock size={12} aria-hidden={true} />
                   <span>{adminPricing.duration} min</span>
                   <span>•</span>
                   <span className="text-green-600 font-medium">{language === 'fr' ? 'Disponible' : 'Available'}</span>
@@ -1386,7 +1475,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
             <div className="p-4">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-                  <CreditCard className="w-4 h-4 text-white" aria-hidden="true" />
+                  <CreditCard className="w-4 h-4 text-white" aria-hidden={true} />
                 </div>
                 <h4 className="text-lg font-bold text-gray-900">Paiement</h4>
               </div>
@@ -1394,7 +1483,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg" role="alert" aria-live="assertive">
                   <div className="flex items-center">
-                    <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" aria-hidden="true" />
+                    <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" aria-hidden={true} />
                     <span className="text-sm text-red-700">{error}</span>
                   </div>
                 </div>
@@ -1421,7 +1510,7 @@ const CallCheckout: React.FC<CallCheckoutProps> = ({ selectedProvider, serviceDa
 
           <aside className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
-              <Shield className="w-4 h-4 text-blue-600 mt-0.5" aria-hidden="true" />
+              <Shield className="w-4 h-4 text-blue-600 mt-0.5" aria-hidden={true} />
               <div>
                 <h4 className="font-semibold text-blue-900 text-sm">Paiement sécurisé</h4>
                 <p className="text-xs text-blue-800 mt-1">Données protégées par SSL. Appel lancé automatiquement après paiement.</p>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { DocumentData as FirestoreData } from 'firebase/firestore';
 import {
   Users,
   UserPlus,

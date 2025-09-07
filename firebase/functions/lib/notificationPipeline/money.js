@@ -9,9 +9,8 @@ const minorUnitsMap = {
     BHD: 1000, JOD: 1000, KWD: 1000, OMR: 1000, TND: 1000
 };
 function minorUnitsFor(currency) {
-    var _a;
     const c = String(currency || "EUR").toUpperCase();
-    return (_a = minorUnitsMap[c]) !== null && _a !== void 0 ? _a : 100;
+    return minorUnitsMap[c] ?? 100;
 }
 function formatMoney(amountMinor, currency, locale) {
     const minor = typeof amountMinor === "string" ? Number(amountMinor) : amountMinor;
@@ -22,7 +21,7 @@ function formatMoney(amountMinor, currency, locale) {
     try {
         return new Intl.NumberFormat(loc, { style: "currency", currency: cur }).format(value);
     }
-    catch (_a) {
+    catch {
         return new Intl.NumberFormat(loc, { style: "currency", currency: "EUR" }).format(value);
     }
 }

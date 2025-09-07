@@ -257,6 +257,10 @@ const I18N = {
   },
 } as const;
 
+// === Types i18n génériques (fix 21) ===
+type I18NMap = typeof I18N;
+type AnyI18N = I18NMap[keyof I18NMap];
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const mapDuo = (list: Duo[], lang: 'fr' | 'en') => list.map((item) => item[lang]);
 
@@ -342,7 +346,7 @@ const PreviewCard = ({
   lang, t, progress, fullName, photo, currentCountry, presenceCountry, interventionCountry, yearsAsExpat, languages, helpTypes,
 }: {
   lang: 'fr' | 'en';
-  t: typeof I18N['fr'];
+  t: AnyI18N; // <- générique (fix 21)
   progress: number;
   fullName: string;
   photo?: string;
@@ -511,7 +515,7 @@ const RegisterExpat: React.FC = () => {
   const { register, isLoading, error } = useAuth();
   const { language } = useApp(); // 'fr' | 'en'
   const lang = (language as 'fr' | 'en') || 'fr';
-  const t = I18N[lang];
+  const t: AnyI18N = I18N[lang]; // <- annotation explicite
 
   // ---- SEO / OG meta ----
   useEffect(() => {
@@ -630,7 +634,7 @@ const RegisterExpat: React.FC = () => {
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { name, value, type, checked } = e.target as HTMLInputElement;
-      setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value }));
+      setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value } as ExpatFormData));
       if (fieldErrors[name]) {
         setFieldErrors((prev) => {
           const rest = { ...prev };

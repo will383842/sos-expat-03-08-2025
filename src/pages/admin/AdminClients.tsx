@@ -449,7 +449,7 @@ const AdminClients: React.FC = () => {
         prev.map((c: Client) => (c.id === clientId ? { ...c, status: newStatus } : c))
       );
       alert(t("successUpdate"));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Erreur de mise à jour du statut:", error);
       alert(t("errorUpdate"));
     }
@@ -478,7 +478,7 @@ const AdminClients: React.FC = () => {
       setSelectedClients([]);
       await loadPage();
       alert(t("successUpdate"));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Erreur action en lot:", error);
       alert(t("errorUpdate"));
     }
@@ -619,14 +619,14 @@ const AdminClients: React.FC = () => {
       a.click();
       URL.revokeObjectURL(url);
       alert(t("exportAllDone"));
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Export all error", e);
       alert(t("errorUpdate"));
     }
   };
 
   return (
-    <AdminLayout activeMenuKey="admin-users-clients">
+    <AdminLayout>
       <div className="space-y-6">
         {/* Header (rendu dans la page pour éviter les props inconnues d'AdminLayout) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1150,7 +1150,7 @@ const AdminClients: React.FC = () => {
                   setSelectedClients([]);
                   await loadPage();
                   alert(t("successUpdate"));
-                } catch (e) {
+                } catch (e: unknown) {
                   console.error("Reason action error", e);
                   alert(t("errorUpdate"));
                 }

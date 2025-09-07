@@ -146,7 +146,7 @@ async function listPendingTasks(maxResults = 100) {
             pageSize: maxResults
         });
         const pending = tasks
-            .filter((task) => { var _a; return task.scheduleTime && ((_a = task.httpRequest) === null || _a === void 0 ? void 0 : _a.body); })
+            .filter((task) => task.scheduleTime && task.httpRequest?.body)
             .map((task) => {
             try {
                 const payload = JSON.parse(task.httpRequest.body.toString());
@@ -262,7 +262,7 @@ async function createTestTask(payload, delaySeconds = 5) {
                     "Content-Type": "application/json",
                     "X-Task-Auth": TASKS_AUTH_SECRET.value()
                 },
-                body: Buffer.from(JSON.stringify(Object.assign(Object.assign({}, payload), { taskId })))
+                body: Buffer.from(JSON.stringify({ ...payload, taskId }))
             }
         };
         const [response] = await client.createTask({ parent: queuePath, task });

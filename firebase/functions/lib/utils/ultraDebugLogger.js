@@ -193,7 +193,7 @@ class UltraDebugLogger {
         this.saveToFirestore(entry);
     }
     error(source, message, data, error) {
-        const stack = (error === null || error === void 0 ? void 0 : error.stack) || new Error().stack;
+        const stack = error?.stack || new Error().stack;
         const entry = this.createLogEntry('ERROR', source, message, data, stack);
         this.logs.push(entry);
         this.logToConsole(entry);
@@ -222,8 +222,11 @@ class UltraDebugLogger {
             await this.initFirebaseIfNeeded();
             if (this.db) {
                 // Nettoyer l'entrée avant sauvegarde
-                const payload = clean(Object.assign(Object.assign({}, entry), { sessionId: this.sessionId, savedAt: new Date() // Utiliser Date au lieu de FieldValue pour plus de simplicité
-                 }));
+                const payload = clean({
+                    ...entry,
+                    sessionId: this.sessionId,
+                    savedAt: new Date() // Utiliser Date au lieu de FieldValue pour plus de simplicité
+                });
                 // Sauvegarder dans une collection spéciale pour le debug
                 await this.db.collection('ultra_debug_logs').add(payload);
             }
@@ -269,7 +272,6 @@ class UltraDebugLogger {
     }
     // Méthode pour générer un rapport complet de debugging
     async generateDebugReport() {
-        var _a;
         const report = {
             sessionId: this.sessionId,
             generatedAt: new Date().toISOString(),
@@ -291,16 +293,13 @@ class UltraDebugLogger {
             },
             firebase: {
                 isInitialized: this.isFirebaseInitialized,
-                apps: ((_a = admin.apps) !== null && _a !== void 0 ? _a : []).filter(Boolean).map((app) => {
-                    var _a, _b;
-                    return ({
-                        name: app.name,
-                        options: {
-                            projectId: (_a = app === null || app === void 0 ? void 0 : app.options) === null || _a === void 0 ? void 0 : _a.projectId,
-                            storageBucket: (_b = app === null || app === void 0 ? void 0 : app.options) === null || _b === void 0 ? void 0 : _b.storageBucket
-                        }
-                    });
-                })
+                apps: (admin.apps ?? []).filter(Boolean).map((app) => ({
+                    name: app.name,
+                    options: {
+                        projectId: app?.options?.projectId,
+                        storageBucket: app?.options?.storageBucket
+                    }
+                }))
             },
             logs: this.logs,
             summary: {

@@ -130,7 +130,7 @@ const isValidPricingConfig = (config) => {
             isValidServiceConfig(config.expat.eur) &&
             isValidServiceConfig(config.expat.usd));
     }
-    catch (_a) {
+    catch {
         return false;
     }
 };

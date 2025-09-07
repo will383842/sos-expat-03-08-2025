@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { sendContactReply } from '../../../api/sendContactReply.ts'; // <-- adapter si nécessaire
-
+import { updateContactMessageStatus } from '../../../firebase/contactMessages';
 const SendToContact: React.FC = () => {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');

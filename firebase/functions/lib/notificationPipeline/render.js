@@ -26,8 +26,7 @@ function get(obj, path) {
     return String(path || "").split(".").reduce((acc, k) => (acc != null ? acc[k] : undefined), obj);
 }
 function resolveLocale(ctx) {
-    var _a;
-    const pref = ((_a = ctx === null || ctx === void 0 ? void 0 : ctx.user) === null || _a === void 0 ? void 0 : _a.preferredLanguage) || (ctx === null || ctx === void 0 ? void 0 : ctx.locale);
+    const pref = ctx?.user?.preferredLanguage || ctx?.locale;
     return String(pref || "").toLowerCase().startsWith("fr") ? "fr-FR" : "en";
 }
 //# sourceMappingURL=render.js.map

@@ -14,7 +14,13 @@ const generateInvoice = async (invoice) => {
             action: 'read',
             expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 jours
         });
-        const invoiceData = Object.assign(Object.assign({}, invoice), { downloadUrl: url, timestamp: firebase_1.FieldValue.serverTimestamp(), createdAt: new Date(), environment: process.env.NODE_ENV || 'development' });
+        const invoiceData = {
+            ...invoice,
+            downloadUrl: url,
+            timestamp: firebase_1.FieldValue.serverTimestamp(),
+            createdAt: new Date(),
+            environment: process.env.NODE_ENV || 'development'
+        };
         await firebase_1.db.collection('invoice_records').doc(invoice.invoiceNumber).set(invoiceData);
         return url;
     }

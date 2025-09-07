@@ -250,7 +250,7 @@ class CallSchedulerManager {
      * Obtient les statistiques du scheduler
      */
     getStats() {
-        return Object.assign({}, this.stats);
+        return { ...this.stats };
     }
     /**
      * 🔄 MODIFIÉ: Ferme proprement le scheduler

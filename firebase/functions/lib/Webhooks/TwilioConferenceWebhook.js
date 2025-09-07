@@ -215,7 +215,7 @@ async function handleParticipantLeave(sessionId, body) {
         await TwilioCallManager_1.twilioCallManager.updateParticipantStatus(sessionId, participantType, 'disconnected', admin.firestore.Timestamp.fromDate(new Date()));
         // Récupérer la durée de la conférence si disponible
         const session = await TwilioCallManager_1.twilioCallManager.getCallSession(sessionId);
-        const duration = (session === null || session === void 0 ? void 0 : session.conference.duration) || 0;
+        const duration = session?.conference.duration || 0;
         // Gérer la déconnexion selon le participant et la durée
         await TwilioCallManager_1.twilioCallManager.handleEarlyDisconnection(sessionId, participantType, duration);
         // (Maintenant que la méthode existe dans TwilioCallManager)

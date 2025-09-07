@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { Link, useNavigate, Outlet, useOutlet } from 'react-router-dom';
+import { Link, useNavigate, useOutlet } from 'react-router-dom';
 import {
   Shield,
   LogOut,

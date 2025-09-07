@@ -5,6 +5,8 @@ service cloud.firestore {
 
     // ========= UTILITAIRES =========
     function isAuthenticated() { return request.auth != null; }
+    // Alias pour compat avec la spec fournie
+    function isSignedIn() { return isAuthenticated(); }
     
     // Nouvelle fonction isAdmin basée sur le token
     function isAdmin() { 
@@ -61,24 +63,8 @@ service cloud.firestore {
 
     // ====================== SOS_PROFILES ======================
     match /sos_profiles/{profileId} {
-      // 🔐 Lecture publique autorisée uniquement pour :
-      // - type = 'lawyer' (ET isApproved == true)
-      // - OU type = 'expat'
-      // - ET pas banni / pas admin
-      allow read: if
-        (
-          resource.data.type == 'lawyer' ||
-          resource.data.type == 'expat'
-        ) &&
-        resource.data.isBanned != true &&
-        resource.data.isAdmin != true &&
-        !(resource.data.role == 'admin') &&
-        (
-          (resource.data.type == 'lawyer' && resource.data.isApproved == true) ||
-          (resource.data.type == 'expat')
-        );
-        // 👉 Si tu veux aussi requérir la visibilité, ajoute :
-        // && resource.data.isVisible == true
+      // ✅ Lecture PUBLIQUE pour réafficher les profils sans contrainte de filtre côté client
+      allow read: if true;
 
       allow create: if (isAuthenticated() && request.resource.data.type in ['lawyer','expat']) || isAdmin() || isDev();
 
@@ -118,10 +104,30 @@ service cloud.firestore {
                request.resource.data.type in ['lawyer','expat'] &&
                request.resource.data.fullName is string;
       }
-      allow read: if isDocOwner() || isAdmin() || isDev();
+      // ✅ Lecture PUBLIQUE
+      allow read: if true;
       allow create: if ((creatingOwnDoc() && hasValidProviderFields()) || isAdmin()) || isDev();
       allow update: if isAdmin() || (isDocOwner() && !affectedKeys().hasAny(['uid','role','email','isAdmin','isApproved','isBanned','type'])) || isDev();
       allow delete: if isAdmin() || isDev();
+    }
+
+    // ------ MESSAGES DANS /providers/{providerId}/messages/{messageId} ------
+    match /providers/{providerId}/messages/{messageId} {
+      // Création : uniquement par l'utilisateur connecté qui en est l'expéditeur,
+      // pour le bon provider, avec un texte raisonnable.
+      allow create: if isSignedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.providerId == providerId
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000;
+
+      // Lecture: par le prestataire destinataire OU par l'expéditeur
+      allow read: if isSignedIn()
+        && (providerId == request.auth.uid || resource.data.senderId == request.auth.uid);
+
+      // Pas de modification/suppression directe côté client
+      allow update, delete: if false;
     }
 
     // ========= CALLS =========
@@ -199,7 +205,7 @@ service cloud.firestore {
       allow read: if (isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId)) || isAdmin() || isDev();
       allow create, update, delete: if isAdmin() || isDev();
     }
-    match /callSessions/{sessionId} {
+    match /callSessions/{sessionId} { // alias éventuel
       allow read: if (isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.providerId)) || isAdmin() || isDev();
       allow create, update, delete: if isAdmin() || isDev();
     }
@@ -227,11 +233,11 @@ service cloud.firestore {
     }
     
     match /message_events/{id} {
-     // Création uniquement si connecté ET que le doc porte bien l'UID auteur
-    allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
-   allow read: if isAdmin() || isDev();
-   allow update, delete: if false;
- }
+      // Création uniquement si connecté ET que le doc porte bien l'UID auteur
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isAdmin() || isDev();
+      allow update, delete: if false;
+    }
     
     match /message_deliveries/{id} {
       allow read: if isAdmin() || isDev();
@@ -243,12 +249,12 @@ service cloud.firestore {
 
     // 🔄 ANALYTICS — autoriser la création par un user connecté
     match /analytics/{analyticsId} {
-      allow create: if isAuthenticated();              // CHANGÉ
+      allow create: if isAuthenticated();
       allow read, update, delete: if isAdmin() || isDev();
     }
     // 🔄 Journal d'erreurs côté client (nouvelle collection)
     match /analytics_errors/{id} {
-      allow create: if isAuthenticated();              // NOUVEAU
+      allow create: if isAuthenticated();
       allow read, update, delete: if isAdmin() || isDev();
     }
 
@@ -263,7 +269,7 @@ service cloud.firestore {
     }
 
     match /legal_documents/{docId} {
-      allow read: if true;                             // RECTIFIÉ: lecture publique autorisée
+      allow read: if true;  // lecture publique
       allow write: if isAdmin() || isDev();
     }
 
@@ -287,6 +293,32 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if isAdmin() || isDev();
       allow write: if isAdmin() || isDev();
+    }
+
+    // ================= PROVIDER MESSAGE ORDER CUSTOMERS =================
+    // Conversation "boîte du prestataire" + visibilité à l'expéditeur.
+    match /providerMessageOrderCustomers/{messageId} {
+      // Création : l'expéditeur doit être le user connecté
+      allow create: if isAuthenticated()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.providerId is string
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 1000;
+
+      // Lecture : prestataire concerné OU expéditeur du message (et admin/dev)
+      allow read: if (isAuthenticated()
+        && (request.auth.uid == resource.data.providerId
+            || request.auth.uid == resource.data.senderId))
+        || isAdmin() || isDev();
+
+      // Mise à jour : uniquement par le prestataire, et seulement sur isRead
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.providerId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isRead']);
+
+      // Suppression : seulement admin/dev
+      allow delete: if isAdmin() || isDev();
     }
 
     // ======================= Catch-all =======================

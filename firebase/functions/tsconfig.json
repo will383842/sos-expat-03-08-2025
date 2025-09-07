@@ -1,17 +1,33 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es2017",
-    "strict": true,
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "lib": ["ES2020"],
+    "rootDir": "src",
     "outDir": "lib",
-    "sourceMap": true,
+
+    "strict": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "skipLibCheck": true,
+    "noUnusedParameters": true,
+
+    "sourceMap": true,
     "esModuleInterop": true,
-    "resolveJsonModule": true,   // ✅ Permet d'importer voicePrompts.json
-    "allowSyntheticDefaultImports": true // ✅ option utile avec les JSON + import default
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmitOnError": true,
+    "forceConsistentCasingInFileNames": true
   },
   "compileOnSave": true,
-  "include": ["src"]
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "lib",
+    "lib/**",
+    "src/backup_js_files/**",
+    "**/*.test.ts"
+  ]
 }

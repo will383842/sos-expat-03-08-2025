@@ -1,6 +1,6 @@
 import React from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
-import { Users, UserCheck, Search, Filter } from 'lucide-react';
+import { Users, UserCheck } from 'lucide-react';
 
 const AdminProviders: React.FC = () => {
   return (
@@ -12,14 +12,18 @@ const AdminProviders: React.FC = () => {
               <UserCheck className="w-7 h-7 mr-2 text-blue-600" />
               Gestion des Prestataires
             </h1>
-            <p className="text-gray-600 mt-1">Liste et gestion des prestataires (avocats, expatriés)</p>
+            <p className="text-gray-600 mt-1">
+              Liste et gestion des prestataires (avocats, expatriés)
+            </p>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
           <div className="text-center">
             <Users className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Page en cours de développement</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Page en cours de développement
+            </h3>
             <p className="text-gray-600 mb-6">
               Cette section permettra de gérer tous les prestataires de la plateforme
             </p>
@@ -44,4 +48,4 @@ const AdminProviders: React.FC = () => {
   );
 };
 
-export default AdminPerformanceReports;
+export default AdminProviders;

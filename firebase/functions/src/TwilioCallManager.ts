@@ -20,12 +20,20 @@ interface VoicePrompts {
 }
 
 // 🔊 Textes d'intro multilingues (incluent S.O.S Expat)
-import _prompts from './content/voicePrompts.json';
-const prompts = _prompts as unknown as VoicePrompts;
+import promptsJson from './content/voicePrompts.json';
+const prompts = promptsJson as VoicePrompts;
 
 export interface CallSessionState {
   id: string;
-  status: 'pending' | 'provider_connecting' | 'client_connecting' | 'both_connecting' | 'active' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | 'pending'
+    | 'provider_connecting'
+    | 'client_connecting'
+    | 'both_connecting'
+    | 'active'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   participants: {
     provider: {
       phone: string;
@@ -176,14 +184,17 @@ interface StartOutboundCallCreatePayload extends StartOutboundCallExistingPayloa
   clientLanguages?: string[];
   providerLanguages?: string[];
 }
-type StartOutboundCallInput = StartOutboundCallExistingPayload | StartOutboundCallCreatePayload;
+type StartOutboundCallInput =
+  | StartOutboundCallExistingPayload
+  | StartOutboundCallCreatePayload;
+
 function isCreatePayload(i: StartOutboundCallInput): i is StartOutboundCallCreatePayload {
   return (
-    (i as any).providerId !== undefined &&
-    (i as any).providerPhone !== undefined &&
-    (i as any).clientPhone !== undefined &&
-    (i as any).paymentIntentId !== undefined &&
-    (i as any).amount !== undefined
+    'providerId' in i &&
+    'providerPhone' in i &&
+    'clientPhone' in i &&
+    'paymentIntentId' in i &&
+    'amount' in i
   );
 }
 
@@ -238,7 +249,7 @@ export class TwilioCallManager {
       await mgr.initiateCallSequence(input.sessionId, delayMinutes);
       return created;
     } catch (error) {
-      await logError('TwilioCallManager:startOutboundCall', error);
+      await logError('TwilioCallManager:startOutboundCall', error as unknown);
       throw error;
     }
   }
@@ -263,7 +274,7 @@ export class TwilioCallManager {
           const sessionId = this.callQueue.shift();
           if (sessionId) await this.processQueuedCall(sessionId);
         } catch (error) {
-          await logError('TwilioCallManager:queueProcessor', error);
+          await logError('TwilioCallManager:queueProcessor', error as unknown);
         } finally {
           this.isProcessingQueue = false;
         }
@@ -278,7 +289,7 @@ export class TwilioCallManager {
         await this.initiateCallSequence(sessionId, 0);
       }
     } catch (error) {
-      await logError('TwilioCallManager:processQueuedCall', error);
+      await logError('TwilioCallManager:processQueuedCall', error as unknown);
     }
   }
 
@@ -372,7 +383,7 @@ export class TwilioCallManager {
       return callSession;
 
     } catch (error) {
-      await logError('TwilioCallManager:createCallSession', error);
+      await logError('TwilioCallManager:createCallSession', error as unknown);
       throw error;
     }
   }
@@ -390,7 +401,7 @@ export class TwilioCallManager {
       }
       await this.executeCallSequence(sessionId);
     } catch (error) {
-      await logError('TwilioCallManager:initiateCallSequence', error);
+      await logError('TwilioCallManager:initiateCallSequence', error as unknown);
       await this.handleCallFailure(sessionId, 'system_error');
     }
   }
@@ -489,7 +500,7 @@ export class TwilioCallManager {
       ]);
       return validStatuses.has(status);
     } catch (error) {
-      await logError('TwilioCallManager:validatePaymentStatus', error);
+      await logError('TwilioCallManager:validatePaymentStatus', error as unknown);
       return false;
     }
   }
@@ -567,7 +578,7 @@ export class TwilioCallManager {
           }
         }
       } catch (error) {
-        await logError(`TwilioCallManager:callParticipant:${participantType}:attempt_${attempt}`, error);
+        await logError(`TwilioCallManager:callParticipant:${participantType}:attempt_${attempt}`, error as unknown);
 
         await logCallRecord({
           callId: sessionId,
@@ -596,14 +607,14 @@ export class TwilioCallManager {
         'metadata.updatedAt': admin.firestore.Timestamp.now()
       });
     } catch (error) {
-      await logError('TwilioCallManager:incrementAttemptCount', error);
+      await logError('TwilioCallManager:incrementAttemptCount', error as unknown);
     }
   }
 
   private async waitForConnection(
     sessionId: string,
     participantType: 'provider' | 'client',
-    attempt: number
+    _attempt: number // ← renommé pour lever TS6133
   ): Promise<boolean> {
     const maxWaitTime = CALL_CONFIG.CONNECTION_WAIT_TIME;
     const checkInterval = 3000;
@@ -623,7 +634,7 @@ export class TwilioCallManager {
         if (participant.status === 'connected') return true;
         if (participant.status === 'disconnected' || participant.status === 'no_answer') return false;
       } catch (error) {
-        console.warn(`Erreur waitForConnection: ${error}`);
+        console.warn(`Erreur waitForConnection: ${String(error)}`);
       }
     }
     return false;
@@ -684,7 +695,7 @@ export class TwilioCallManager {
         await this.handleCallCompletion(sessionId, duration);
       }
     } catch (error) {
-      await logError('TwilioCallManager:handleEarlyDisconnection', error);
+      await logError('TwilioCallManager:handleEarlyDisconnection', error as unknown);
     }
   }
 
@@ -723,7 +734,7 @@ export class TwilioCallManager {
 
         await Promise.allSettled(notificationPromises);
       } catch (notificationError) {
-        await logError('TwilioCallManager:handleCallFailure:notification', notificationError);
+        await logError('TwilioCallManager:handleCallFailure:notification', notificationError as unknown);
       }
 
       await this.processRefund(sessionId, `failed_${reason}`);
@@ -735,7 +746,7 @@ export class TwilioCallManager {
         additionalData: { reason, paymentIntentId: callSession.payment.intentId }
       });
     } catch (error) {
-      await logError('TwilioCallManager:handleCallFailure', error);
+      await logError('TwilioCallManager:handleCallFailure', error as unknown);
     }
   }
 
@@ -760,7 +771,7 @@ export class TwilioCallManager {
         console.error(`❌ Remboursement KO ${sessionId}:`, refundResult.error);
       }
     } catch (error) {
-      await logError('TwilioCallManager:processRefund', error);
+      await logError('TwilioCallManager:processRefund', error as unknown);
     }
   }
 
@@ -791,7 +802,7 @@ export class TwilioCallManager {
           })
         ]);
       } catch (notificationError) {
-        await logError('TwilioCallManager:handleCallCompletion:notification', notificationError);
+        await logError('TwilioCallManager:handleCallCompletion:notification', notificationError as unknown);
       }
 
       if (this.shouldCapturePayment(callSession, duration)) {
@@ -805,7 +816,7 @@ export class TwilioCallManager {
         additionalData: { duration }
       });
     } catch (error) {
-      await logError('TwilioCallManager:handleCallCompletion', error);
+      await logError('TwilioCallManager:handleCallCompletion', error as unknown);
     }
   }
 
@@ -853,7 +864,7 @@ export class TwilioCallManager {
         return false;
       }
     } catch (error) {
-      await logError('TwilioCallManager:capturePaymentForSession', error);
+      await logError('TwilioCallManager:capturePaymentForSession', error as unknown);
       return false;
     }
   }
@@ -872,7 +883,8 @@ export class TwilioCallManager {
         status: 'pending',
         callStartedAt: session.conference.startedAt,
         callEndedAt: session.conference.endedAt,
-        bothConnected: session.participants.provider.status === 'connected' &&
+        bothConnected:
+          session.participants.provider.status === 'connected' &&
           session.participants.client.status === 'connected',
         requestId: session.metadata.requestId
       };
@@ -881,7 +893,7 @@ export class TwilioCallManager {
         this.db.collection('reviews_requests').add(reviewRequest)
       );
     } catch (error) {
-      await logError('TwilioCallManager:createReviewRequest', error);
+      await logError('TwilioCallManager:createReviewRequest', error as unknown);
     }
   }
 
@@ -919,7 +931,7 @@ export class TwilioCallManager {
 
       return true;
     } catch (error) {
-      await logError('TwilioCallManager:cancelCallSession', error);
+      await logError('TwilioCallManager:cancelCallSession', error as unknown);
       return false;
     }
   }
@@ -936,11 +948,14 @@ export class TwilioCallManager {
       }
       await Promise.allSettled(promises);
     } catch (error) {
-      await logError('TwilioCallManager:cancelActiveCallsForSession', error);
+      await logError('TwilioCallManager:cancelActiveCallsForSession', error as unknown);
     }
   }
 
-  private async cancelTwilioCall(callSid: string, twilioClient: any): Promise<void> {
+  private async cancelTwilioCall(
+    callSid: string,
+    twilioClient: ReturnType<typeof getTwilioClient>
+  ): Promise<void> {
     try {
       await twilioClient.calls(callSid).update({ status: 'completed' });
     } catch (error) {
@@ -950,12 +965,19 @@ export class TwilioCallManager {
 
   private async getActiveSessionsCount(): Promise<number> {
     try {
-      const snapshot = await this.db.collection('call_sessions')
-        .where('status', 'in', ['pending', 'provider_connecting', 'client_connecting', 'both_connecting', 'active'])
+      const snapshot = await this.db
+        .collection('call_sessions')
+        .where('status', 'in', [
+          'pending',
+          'provider_connecting',
+          'client_connecting',
+          'both_connecting',
+          'active'
+        ])
         .get();
       return snapshot.size;
     } catch (error) {
-      await logError('TwilioCallManager:getActiveSessionsCount', error);
+      await logError('TwilioCallManager:getActiveSessionsCount', error as unknown);
       return 0;
     }
   }
@@ -992,12 +1014,16 @@ export class TwilioCallManager {
         })
       );
     } catch (error) {
-      await logError('TwilioCallManager:updateCallSessionStatus', error);
+      await logError('TwilioCallManager:updateCallSessionStatus', error as unknown);
       throw error;
     }
   }
 
-  async updateParticipantCallSid(sessionId: string, participantType: 'provider' | 'client', callSid: string): Promise<void> {
+  async updateParticipantCallSid(
+    sessionId: string,
+    participantType: 'provider' | 'client',
+    callSid: string
+  ): Promise<void> {
     try {
       await this.saveWithRetry(() =>
         this.db.collection('call_sessions').doc(sessionId).update({
@@ -1006,7 +1032,7 @@ export class TwilioCallManager {
         })
       );
     } catch (error) {
-      await logError('TwilioCallManager:updateParticipantCallSid', error);
+      await logError('TwilioCallManager:updateParticipantCallSid', error as unknown);
       throw error;
     }
   }
@@ -1033,14 +1059,19 @@ export class TwilioCallManager {
         this.db.collection('call_sessions').doc(sessionId).update(updateData)
       );
     } catch (error) {
-      await logError('TwilioCallManager:updateParticipantStatus', error);
+      await logError('TwilioCallManager:updateParticipantStatus', error as unknown);
       throw error;
     }
   }
 
-  async updateConferenceInfo(sessionId: string, updates: Partial<CallSessionState['conference']>): Promise<void> {
+  async updateConferenceInfo(
+    sessionId: string,
+    updates: Partial<CallSessionState['conference']>
+  ): Promise<void> {
     try {
-      const updateData: Record<string, unknown> = { 'metadata.updatedAt': admin.firestore.Timestamp.now() };
+      const updateData: Record<string, unknown> = {
+        'metadata.updatedAt': admin.firestore.Timestamp.now()
+      };
       Object.entries(updates).forEach(([key, value]) => {
         updateData[`conference.${key}`] = value;
       });
@@ -1048,7 +1079,7 @@ export class TwilioCallManager {
         this.db.collection('call_sessions').doc(sessionId).update(updateData)
       );
     } catch (error) {
-      await logError('TwilioCallManager:updateConferenceInfo', error);
+      await logError('TwilioCallManager:updateConferenceInfo', error as unknown);
       throw error;
     }
   }
@@ -1058,43 +1089,52 @@ export class TwilioCallManager {
       const doc = await this.db.collection('call_sessions').doc(sessionId).get();
       return doc.exists ? (doc.data() as CallSessionState) : null;
     } catch (error) {
-      await logError('TwilioCallManager:getCallSession', error);
+      await logError('TwilioCallManager:getCallSession', error as unknown);
       return null;
     }
   }
 
   async findSessionByConferenceSid(conferenceSid: string): Promise<CallSessionState | null> {
     try {
-      const snapshot = await this.db.collection('call_sessions')
+      const snapshot = await this.db
+        .collection('call_sessions')
         .where('conference.sid', '==', conferenceSid)
         .limit(1)
         .get();
       return snapshot.empty ? null : (snapshot.docs[0].data() as CallSessionState);
     } catch (error) {
-      await logError('TwilioCallManager:findSessionByConferenceSid', error);
+      await logError('TwilioCallManager:findSessionByConferenceSid', error as unknown);
       return null;
     }
   }
 
-  async findSessionByCallSid(callSid: string): Promise<{ session: CallSessionState; participantType: 'provider' | 'client' } | null> {
+  async findSessionByCallSid(
+    callSid: string
+  ): Promise<{ session: CallSessionState; participantType: 'provider' | 'client' } | null> {
     try {
-      let snapshot = await this.db.collection('call_sessions')
+      let snapshot = await this.db
+        .collection('call_sessions')
         .where('participants.provider.callSid', '==', callSid)
         .limit(1)
         .get();
 
-      if (!snapshot.empty) return { session: snapshot.docs[0].data() as CallSessionState, participantType: 'provider' };
+      if (!snapshot.empty) {
+        return { session: snapshot.docs[0].data() as CallSessionState, participantType: 'provider' };
+      }
 
-      snapshot = await this.db.collection('call_sessions')
+      snapshot = await this.db
+        .collection('call_sessions')
         .where('participants.client.callSid', '==', callSid)
         .limit(1)
         .get();
 
-      if (!snapshot.empty) return { session: snapshot.docs[0].data() as CallSessionState, participantType: 'client' };
+      if (!snapshot.empty) {
+        return { session: snapshot.docs[0].data() as CallSessionState, participantType: 'client' };
+      }
 
       return null;
     } catch (error) {
-      await logError('TwilioCallManager:findSessionByCallSid', error);
+      await logError('TwilioCallManager:findSessionByCallSid', error as unknown);
       return null;
     }
   }
@@ -1183,7 +1223,7 @@ export class TwilioCallManager {
 
       return stats;
     } catch (error) {
-      await logError('TwilioCallManager:getCallStatistics', error);
+      await logError('TwilioCallManager:getCallStatistics', error as unknown);
       throw error;
     }
   }
@@ -1217,7 +1257,7 @@ export class TwilioCallManager {
           deleted += failedSnapshot.size;
         } catch (error) {
           errors += failedSnapshot.size;
-          await logError('TwilioCallManager:cleanupOldSessions:failed', error);
+          await logError('TwilioCallManager:cleanupOldSessions:failed', error as unknown);
         }
       }
 
@@ -1235,13 +1275,13 @@ export class TwilioCallManager {
           deleted += completedSnapshot.size;
         } catch (error) {
           errors += completedSnapshot.size;
-          await logError('TwilioCallManager:cleanupOldSessions:completed', error);
+          await logError('TwilioCallManager:cleanupOldSessions:completed', error as unknown);
         }
       }
 
       return { deleted, errors };
     } catch (error) {
-      await logError('TwilioCallManager:cleanupOldSessions', error);
+      await logError('TwilioCallManager:cleanupOldSessions', error as unknown);
       return { deleted: 0, errors: 1 };
     }
   }

@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  AlertTriangle, 
-  Search, 
-  Filter, 
-  Eye, 
-  CheckCircle, 
-  XCircle, 
-  Calendar,
-  Flag,
-  MessageSquare,
-  User,
+import {
+  AlertTriangle,
+  Search,
+  Eye,
+  CheckCircle,
+  XCircle,
   Star,
-  Phone,
-  Mail
+  Mail,
 } from 'lucide-react';
-import { collection, query, getDocs, doc, updateDoc, addDoc, serverTimestamp, where, orderBy, limit } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  getDocs,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  orderBy,
+  limit,
+  Timestamp,
+} from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/common/Button';
@@ -23,199 +27,269 @@ import Modal from '../../components/common/Modal';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 import { useAuth } from '../../contexts/AuthContext';
 
-interface Report {
+/** ────────────────────────────────────────────────────────────────────────────
+ * Types
+ * ────────────────────────────────────────────────────────────────────────────
+ */
+
+const REPORT_STATUSES = ['pending', 'dismissed', 'resolved'] as const;
+type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+type ReportType = 'contact' | 'review' | 'profile';
+type TargetType = 'contact' | 'review' | 'profile';
+type Priority = 'low' | 'normal' | 'high';
+
+export interface Report {
   id: string;
-  type: 'review' | 'user' | 'content' | 'contact';
+  type: ReportType;
+  status: ReportStatus;
   reporterId: string;
   reporterName: string;
   targetId: string;
-  targetType: 'review' | 'user' | 'call' | 'message' | 'contact';
+  targetType: TargetType;
   reason: string;
-  details: string;
-  status: 'pending' | 'resolved' | 'dismissed';
+  details?: string;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
   resolvedAt?: Date;
   resolvedBy?: string;
   adminNotes?: string;
-  // Champs spécifiques aux messages de contact
+  priority?: Priority;
+
+  // champs spécifiques aux messages de contact
   firstName?: string;
   lastName?: string;
   email?: string;
   subject?: string;
   category?: string;
   message?: string;
-  priority?: 'low' | 'normal' | 'high' | 'urgent';
 }
+
+type SelectedStatusFilter = 'all' | ReportStatus;
+
+interface ContactMessageDoc {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  subject?: string;
+  category?: string;
+  message?: string;
+  status?: unknown; // sera normalisé
+  priority?: Priority;
+  createdAt?: Date | Timestamp | number;
+  updatedAt?: Date | Timestamp | number;
+  response?: string;
+  resolvedAt?: Date | Timestamp | number;
+  resolvedBy?: string;
+}
+
+type CurrentUser = {
+  id?: string;
+  role?: 'admin' | 'user' | 'expat' | 'lawyer' | 'client';
+} | null;
+
+/** ────────────────────────────────────────────────────────────────────────────
+ * Helpers
+ * ────────────────────────────────────────────────────────────────────────────
+ */
+
+const isReportStatus = (val: unknown): val is ReportStatus =>
+  typeof val === 'string' && (REPORT_STATUSES as readonly string[]).includes(val);
+
+const toDate = (v: unknown): Date => {
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') {
+    // support seconds or milliseconds
+    return new Date(v < 1e12 ? v * 1000 : v);
+  }
+  if (v && typeof (v as { toDate?: () => Date }).toDate === 'function') {
+    return (v as { toDate: () => Date }).toDate();
+  }
+  return new Date();
+};
+
+const safeLower = (v?: string): string => (v ?? '').toLowerCase();
+
+/** ────────────────────────────────────────────────────────────────────────────
+ * Component
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 const AdminReports: React.FC = () => {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: rawUser } = useAuth() as { user: CurrentUser };
+  const currentUser = rawUser;
+
   const [reports, setReports] = useState<Report[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<SelectedStatusFilter>('all');
+
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [adminNotes, setAdminNotes] = useState('');
-  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [adminNotes, setAdminNotes] = useState<string>('');
+  const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'admin') {
       navigate('/admin/login');
       return;
     }
+    void loadAllReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, navigate]);
 
-    loadReports();
-    loadContactMessages();
-  }, [currentUser, navigate, selectedStatus]);
-
-  const loadContactMessages = async () => {
+  const loadAllReports = async (): Promise<void> => {
     try {
+      setIsLoading(true);
+
+      // 1) Charger les messages de contact depuis Firestore
       const contactQuery = query(
         collection(db, 'contact_messages'),
         orderBy('createdAt', 'desc'),
         limit(50)
       );
-      
       const contactSnapshot = await getDocs(contactQuery);
-      
-      const contactReports = contactSnapshot.docs.map(doc => ({
-        id: doc.id,
-        type: 'contact' as const,
-        reporterId: 'system',
-        reporterName: 'Système',
-        targetId: doc.id,
-        targetType: 'contact' as const,
-        reason: 'Message de contact',
-        details: doc.data().message || '',
-        status: doc.data().status === 'resolved' ? 'resolved' : 'pending' as const,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().createdAt?.toDate() || new Date(),
-        firstName: doc.data().firstName,
-        lastName: doc.data().lastName,
-        email: doc.data().email,
-        subject: doc.data().subject,
-        category: doc.data().category,
-        message: doc.data().message,
-        priority: doc.data().priority || 'normal'
-      }));
-      
-      setReports(prev => [...prev, ...contactReports]);
-    } catch (error) {
-      console.error('Error loading contact messages:', error);
-    }
-  };
 
-  const loadReports = async () => {
-    try {
-      setIsLoading(true);
-      
-      const mockReports: Report[] = [
+      const contactReports: Report[] = contactSnapshot.docs.map((d) => {
+        const data = d.data() as ContactMessageDoc;
+
+        const createdAt = toDate(data.createdAt);
+        const updatedAt = data.updatedAt ? toDate(data.updatedAt) : createdAt;
+
+        const normalizedStatus: ReportStatus = isReportStatus(data.status)
+          ? data.status
+          : 'pending';
+
+        // Remonter le contenu textuel dans "details" pour une recherche générique
+        const details = data.message ?? data.subject ?? 'Message de contact';
+
+        return {
+          id: d.id,
+          type: 'contact',
+          status: normalizedStatus,
+          reporterId: 'system',
+          reporterName: 'Système',
+          targetId: d.id,
+          targetType: 'contact',
+          reason: 'Message de contact',
+          details,
+          createdAt,
+          updatedAt,
+          resolvedAt: data.resolvedAt ? toDate(data.resolvedAt) : undefined,
+          resolvedBy: data.resolvedBy,
+          adminNotes: data.response,
+          priority: data.priority ?? 'normal',
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          subject: data.subject,
+          category: data.category,
+          message: data.message,
+        };
+      });
+
+      // 2) Mock (ou charge les autres reports de ta collection si tu en as une)
+      const otherReports: Report[] = [
         {
-          id: '1',
+          id: 'demo-review-1',
           type: 'review',
-          reporterId: 'user123',
+          status: 'pending',
+          reporterId: 'user_123',
           reporterName: 'Jean Dupont',
-          targetId: 'review456',
+          targetId: 'review_456',
           targetType: 'review',
           reason: 'Contenu inapproprié',
-          details: 'Cet avis contient des propos offensants et des insultes.',
-          status: 'pending',
+          details: 'Cet avis contient des propos offensants.',
           createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-        }
+          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          priority: 'normal',
+        },
       ];
-      
-      let filteredReports = mockReports;
-      if (selectedStatus !== 'all') {
-        filteredReports = mockReports.filter(report => report.status === selectedStatus);
-      }
-      
-      setReports(filteredReports);
-      
+
+      // 3) Agréger proprement (un seul setReports)
+      setReports([...contactReports, ...otherReports]);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error loading reports:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleViewReport = (report: Report) => {
+  const handleViewReport = (report: Report): void => {
     setSelectedReport(report);
-    setAdminNotes(report.adminNotes || '');
+    setAdminNotes(report.adminNotes ?? '');
     setShowReportModal(true);
   };
 
-  const handleResolveReport = async () => {
+  const handleResolveReport = async (): Promise<void> => {
     if (!selectedReport) return;
-    
+
     try {
       setIsActionLoading(true);
-      
+
       if (selectedReport.type === 'contact') {
         await updateDoc(doc(db, 'contact_messages', selectedReport.id), {
           status: 'resolved',
           resolvedAt: serverTimestamp(),
           resolvedBy: currentUser?.id,
           response: adminNotes,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
-        
-        // Envoyer email de réponse (simulation)
-        console.log('Email envoyé à:', selectedReport.email);
       }
-      
-      setReports(prev => 
-        prev.map(report => 
-          report.id === selectedReport.id 
-            ? { 
-                ...report, 
-                status: 'resolved', 
-                resolvedAt: new Date(), 
-                resolvedBy: currentUser?.id, 
+
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === selectedReport.id
+            ? {
+                ...r,
+                status: 'resolved',
+                resolvedAt: new Date(),
+                resolvedBy: currentUser?.id,
                 adminNotes: adminNotes,
-                updatedAt: new Date() 
+                updatedAt: new Date(),
               }
-            : report
+            : r
         )
       );
-      
+
       setShowReportModal(false);
       setSelectedReport(null);
-      
+      // Optionnel: remplace par ton système de toast
+      // eslint-disable-next-line no-alert
       alert('Message traité avec succès');
-      
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error resolving report:', error);
+      // eslint-disable-next-line no-alert
       alert('Erreur lors du traitement du message');
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('fr-FR', {
+  const formatDate = (date: Date): string =>
+    new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     }).format(date);
-  };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: ReportStatus): JSX.Element => {
     switch (status) {
       case 'resolved':
         return (
-          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium flex items-center">
+          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium inline-flex items-center">
             <CheckCircle size={12} className="mr-1" />
             Résolu
           </span>
         );
       case 'dismissed':
         return (
-          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium flex items-center">
+          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium inline-flex items-center">
             <XCircle size={12} className="mr-1" />
             Ignoré
           </span>
@@ -223,7 +297,7 @@ const AdminReports: React.FC = () => {
       case 'pending':
       default:
         return (
-          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium flex items-center">
+          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium inline-flex items-center">
             <AlertTriangle size={12} className="mr-1" />
             En attente
           </span>
@@ -231,25 +305,25 @@ const AdminReports: React.FC = () => {
     }
   };
 
-  const getTargetTypeBadge = (targetType: string) => {
+  const getTargetTypeBadge = (targetType: TargetType): JSX.Element => {
     switch (targetType) {
       case 'contact':
         return (
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium flex items-center">
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium inline-flex items-center">
             <Mail size={12} className="mr-1" />
             Contact
           </span>
         );
       case 'review':
         return (
-          <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium flex items-center">
+          <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium inline-flex items-center">
             <Star size={12} className="mr-1" />
             Avis
           </span>
         );
       default:
         return (
-          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium flex items-center">
+          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium inline-flex items-center">
             <AlertTriangle size={12} className="mr-1" />
             {targetType}
           </span>
@@ -257,18 +331,26 @@ const AdminReports: React.FC = () => {
     }
   };
 
-  const filteredReports = reports.filter(report => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      report.reporterName?.toLowerCase().includes(searchLower) ||
-      report.reason?.toLowerCase().includes(searchLower) ||
-      report.details?.toLowerCase().includes(searchLower) ||
-      report.email?.toLowerCase().includes(searchLower) ||
-      report.subject?.toLowerCase().includes(searchLower)
-    );
-  });
+  const filteredReports = useMemo<Report[]>(() => {
+    const search = safeLower(searchTerm);
+
+    const bySearch = (r: Report): boolean => {
+      if (!search) return true;
+
+      return (
+        safeLower(r.reporterName).includes(search) ||
+        safeLower(r.reason).includes(search) ||
+        safeLower(r.details).includes(search) ||
+        safeLower(r.email).includes(search) ||
+        safeLower(r.subject).includes(search)
+      );
+    };
+
+    const byStatus = (r: Report): boolean =>
+      selectedStatus === 'all' ? true : r.status === selectedStatus;
+
+    return reports.filter((r) => bySearch(r) && byStatus(r));
+  }, [reports, searchTerm, selectedStatus]);
 
   return (
     <AdminLayout>
@@ -285,11 +367,11 @@ const AdminReports: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               </form>
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) => setSelectedStatus(e.target.value as SelectedStatusFilter)}
                 className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="all">Tous les statuts</option>
@@ -330,7 +412,7 @@ const AdminReports: React.FC = () => {
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                         <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" />
                         </div>
                         <p className="mt-2">Chargement...</p>
                       </td>
@@ -341,17 +423,16 @@ const AdminReports: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
-                              {report.firstName?.[0] || report.reporterName?.[0] || 'U'}
+                              {(report.firstName ?? report.reporterName ?? 'U').slice(0, 1)}
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {report.firstName && report.lastName 
+                                {report.firstName && report.lastName
                                   ? `${report.firstName} ${report.lastName}`
-                                  : report.reporterName || 'Utilisateur'
-                                }
+                                  : report.reporterName ?? 'Utilisateur'}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {report.email || report.reporterId}
+                                {report.email ?? report.reporterId}
                               </div>
                             </div>
                           </div>
@@ -361,7 +442,7 @@ const AdminReports: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900 line-clamp-2">
-                            {report.subject || report.reason}
+                            {report.subject ?? report.reason}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -407,7 +488,9 @@ const AdminReports: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900">
-                    {selectedReport.type === 'contact' ? 'Message de contact' : `Signalement #${selectedReport.id.substring(0, 8)}`}
+                    {selectedReport.type === 'contact'
+                      ? 'Message de contact'
+                      : `Signalement #${selectedReport.id.substring(0, 8)}`}
                   </h3>
                   <div className="flex items-center space-x-2 mt-1">
                     {getTargetTypeBadge(selectedReport.targetType)}
@@ -428,36 +511,38 @@ const AdminReports: React.FC = () => {
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-1">Nom</h5>
                       <div className="text-sm font-medium">
-                        {selectedReport.firstName && selectedReport.lastName 
+                        {selectedReport.firstName && selectedReport.lastName
                           ? `${selectedReport.firstName} ${selectedReport.lastName}`
-                          : selectedReport.reporterName || 'Non spécifié'
-                        }
+                          : selectedReport.reporterName ?? 'Non spécifié'}
                       </div>
                     </div>
-                    
+
                     {selectedReport.email && (
                       <div>
                         <h5 className="text-sm font-medium text-gray-700 mb-1">Email</h5>
                         <div className="text-sm text-gray-700">{selectedReport.email}</div>
                       </div>
                     )}
-                    
+
                     {selectedReport.category && (
                       <div>
                         <h5 className="text-sm font-medium text-gray-700 mb-1">Catégorie</h5>
                         <div className="text-sm text-gray-700">{selectedReport.category}</div>
                       </div>
                     )}
-                    
+
                     {selectedReport.priority && (
                       <div>
                         <h5 className="text-sm font-medium text-gray-700 mb-1">Priorité</h5>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          selectedReport.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                          selectedReport.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                          selectedReport.priority === 'low' ? 'bg-gray-100 text-gray-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            selectedReport.priority === 'high'
+                              ? 'bg-orange-100 text-orange-800'
+                              : selectedReport.priority === 'low'
+                              ? 'bg-gray-100 text-gray-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
                           {selectedReport.priority}
                         </span>
                       </div>
@@ -474,11 +559,11 @@ const AdminReports: React.FC = () => {
                         <p className="text-sm text-gray-700">{selectedReport.subject}</p>
                       </div>
                     )}
-                    
+
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-1">Message</h5>
                       <p className="text-sm text-gray-700 whitespace-pre-line">
-                        {selectedReport.message || selectedReport.details}
+                        {selectedReport.message ?? selectedReport.details ?? ''}
                       </p>
                     </div>
                   </div>
@@ -502,13 +587,10 @@ const AdminReports: React.FC = () => {
               )}
 
               <div className="flex justify-end space-x-3 pt-4">
-                <Button
-                  onClick={() => setShowReportModal(false)}
-                  variant="outline"
-                >
+                <Button onClick={() => setShowReportModal(false)} variant="outline">
                   Fermer
                 </Button>
-                
+
                 {selectedReport.status === 'pending' && (
                   <Button
                     onClick={handleResolveReport}
@@ -529,4 +611,3 @@ const AdminReports: React.FC = () => {
 };
 
 export default AdminReports;
-

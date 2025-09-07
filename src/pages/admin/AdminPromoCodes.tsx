@@ -1,3 +1,4 @@
+// src/pages/admin/AdminPromoCodes.tsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -59,6 +60,7 @@ interface Coupon {
   created_by: string;
   updated_at: Date;
   description?: string;
+  maxDiscount?: number;
 }
 
 interface CouponUsage {
@@ -99,6 +101,9 @@ function toDateSafe(v: unknown): Date | undefined {
   return undefined;
 }
 
+const sanitizeCode = (raw: string): string =>
+  raw.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
+
 /* ===================== Component ===================== */
 
 const AdminPromoCodes: React.FC = () => {
@@ -133,6 +138,7 @@ const AdminPromoCodes: React.FC = () => {
     services: ["lawyer_call", "expat_call"],
     active: true,
     description: "",
+    maxDiscount: undefined,
   });
 
   const [stats, setStats] = useState<CouponStats>({
@@ -144,60 +150,58 @@ const AdminPromoCodes: React.FC = () => {
 
   /* ===================== Effects ===================== */
 
-  // Reset pagination au changement de page déclenché manuellement
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") {
+    if (!currentUser || (currentUser as unknown as { role?: string })?.role !== "admin") {
       navigate("/admin/login");
       return;
     }
     void loadCoupons();
   }, [currentUser, navigate, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Charger stats au mount et après actions
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") return;
+    if (!currentUser || (currentUser as unknown as { role?: string })?.role !== "admin") return;
     void loadStats();
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ===================== Loaders ===================== */
 
+  const mapCouponDoc = (d: DocumentData, id: string): Coupon => {
+    const raw = d as Record<string, unknown>;
+    return {
+      id,
+      code: String(raw.code ?? ""),
+      type:
+        (raw.type as Coupon["type"]) && (raw.type === "percentage" || raw.type === "fixed")
+          ? (raw.type as Coupon["type"])
+          : "fixed",
+      amount: typeof raw.amount === "number" ? raw.amount : 0,
+      min_order_amount:
+        typeof raw.min_order_amount === "number" ? raw.min_order_amount : 0,
+      max_uses_total:
+        typeof raw.max_uses_total === "number" ? raw.max_uses_total : 0,
+      max_uses_per_user:
+        typeof raw.max_uses_per_user === "number" ? raw.max_uses_per_user : 0,
+      valid_from: toDateSafe(raw.valid_from) ?? new Date(),
+      valid_until: toDateSafe(raw.valid_until) ?? new Date(),
+      services: Array.isArray(raw.services)
+        ? (raw.services as unknown[]).map(String)
+        : [],
+      active: Boolean(raw.active),
+      created_at: toDateSafe(raw.created_at) ?? new Date(),
+      created_by: String(raw.created_by ?? "admin"),
+      updated_at: toDateSafe(raw.updated_at) ?? new Date(),
+      description:
+        typeof raw.description === "string" ? raw.description : undefined,
+      maxDiscount:
+        typeof raw.maxDiscount === "number" ? raw.maxDiscount : undefined,
+    };
+  };
+
   const loadStats = useCallback(async (): Promise<void> => {
     try {
-      // Coupons
       const couponsSnap = await getDocs(collection(db, "coupons"));
-      const allCoupons: Coupon[] = couponsSnap.docs.map((d) => {
-        const raw = d.data() as Record<string, unknown>;
-        return {
-          id: d.id,
-          code: String(raw.code ?? ""),
-          type:
-            (raw.type as Coupon["type"]) && (raw.type === "percentage" || raw.type === "fixed")
-              ? (raw.type as Coupon["type"])
-              : "fixed",
-          amount: typeof raw.amount === "number" ? raw.amount : 0,
-          min_order_amount:
-            typeof raw.min_order_amount === "number" ? raw.min_order_amount : 0,
-          max_uses_total:
-            typeof raw.max_uses_total === "number" ? raw.max_uses_total : 0,
-          max_uses_per_user:
-            typeof raw.max_uses_per_user === "number"
-              ? raw.max_uses_per_user
-              : 0,
-          valid_from: toDateSafe(raw.valid_from) ?? new Date(),
-          valid_until: toDateSafe(raw.valid_until) ?? new Date(),
-          services: Array.isArray(raw.services)
-            ? (raw.services as unknown[]).map(String)
-            : [],
-          active: Boolean(raw.active),
-          created_at: toDateSafe(raw.created_at) ?? new Date(),
-          created_by: String(raw.created_by ?? "admin"),
-          updated_at: toDateSafe(raw.updated_at) ?? new Date(),
-          description:
-            typeof raw.description === "string" ? raw.description : undefined,
-        };
-      });
+      const allCoupons: Coupon[] = couponsSnap.docs.map((d) => mapCouponDoc(d.data(), d.id));
 
-      // Usages
       const usagesSnap = await getDocs(collection(db, "coupon_usages"));
       const allUsages: CouponUsage[] = usagesSnap.docs.map((d) => {
         const raw = d.data() as Record<string, unknown>;
@@ -218,10 +222,7 @@ const AdminPromoCodes: React.FC = () => {
       const totalCoupons = allCoupons.length;
       const activeCoupons = allCoupons.filter((c) => c.active).length;
       const totalUsages = allUsages.length;
-      const totalSavings = allUsages.reduce(
-        (sum, u) => sum + u.discount_amount,
-        0
-      );
+      const totalSavings = allUsages.reduce((sum, u) => sum + u.discount_amount, 0);
 
       setStats({ totalCoupons, activeCoupons, totalUsages, totalSavings });
     } catch (error) {
@@ -248,44 +249,14 @@ const AdminPromoCodes: React.FC = () => {
 
       constraints.push(limit(COUPONS_PER_PAGE));
 
-      const q = query(baseRef, ...constraints);
-      const snap = await getDocs(q);
+      const qy = query(baseRef, ...constraints);
+      const snap = await getDocs(qy);
 
       const lastDoc = snap.docs[snap.docs.length - 1] ?? null;
       setLastVisible(lastDoc);
       setHasMore(snap.docs.length === COUPONS_PER_PAGE);
 
-      const mapped: Coupon[] = snap.docs.map((d) => {
-        const raw = d.data() as Record<string, unknown>;
-        return {
-          id: d.id,
-          code: String(raw.code ?? ""),
-          type:
-            (raw.type as Coupon["type"]) && (raw.type === "percentage" || raw.type === "fixed")
-              ? (raw.type as Coupon["type"])
-              : "fixed",
-          amount: typeof raw.amount === "number" ? raw.amount : 0,
-          min_order_amount:
-            typeof raw.min_order_amount === "number" ? raw.min_order_amount : 0,
-          max_uses_total:
-            typeof raw.max_uses_total === "number" ? raw.max_uses_total : 0,
-          max_uses_per_user:
-            typeof raw.max_uses_per_user === "number"
-              ? raw.max_uses_per_user
-              : 0,
-          valid_from: toDateSafe(raw.valid_from) ?? new Date(),
-          valid_until: toDateSafe(raw.valid_until) ?? new Date(),
-          services: Array.isArray(raw.services)
-            ? (raw.services as unknown[]).map(String)
-            : [],
-          active: Boolean(raw.active),
-          created_at: toDateSafe(raw.created_at) ?? new Date(),
-          created_by: String(raw.created_by ?? "admin"),
-          updated_at: toDateSafe(raw.updated_at) ?? new Date(),
-          description:
-            typeof raw.description === "string" ? raw.description : undefined,
-        };
-      });
+      const mapped: Coupon[] = snap.docs.map((d) => mapCouponDoc(d.data(), d.id));
 
       if (page === 1) {
         setCoupons(mapped);
@@ -310,13 +281,13 @@ const AdminPromoCodes: React.FC = () => {
       try {
         setIsLoadingUsages(true);
 
-        const q = query(
+        const qy = query(
           collection(db, "coupon_usages"),
           where("couponCode", "==", couponCode),
           orderBy("used_at", "desc"),
           limit(50)
         );
-        const snap = await getDocs(q);
+        const snap = await getDocs(qy);
 
         const mapped: CouponUsage[] = snap.docs.map((d) => {
           const raw = d.data() as Record<string, unknown>;
@@ -367,6 +338,7 @@ const AdminPromoCodes: React.FC = () => {
       services: ["lawyer_call", "expat_call"],
       active: true,
       description: "",
+      maxDiscount: undefined,
     });
     setSelectedCoupon(null);
     setShowAddModal(true);
@@ -386,6 +358,7 @@ const AdminPromoCodes: React.FC = () => {
       services: coupon.services,
       active: coupon.active,
       description: coupon.description,
+      maxDiscount: coupon.maxDiscount,
     });
     setShowEditModal(true);
   };
@@ -405,47 +378,62 @@ const AdminPromoCodes: React.FC = () => {
     try {
       setIsActionLoading(true);
 
-      // Validation minimale
-      if (
-        !formData.code ||
-        !formData.type ||
-        formData.amount === undefined ||
-        !formData.valid_from ||
-        !formData.valid_until
-      ) {
-        alert("Veuillez remplir tous les champs obligatoires");
+      // Validation minimale + saine
+      const code = sanitizeCode(formData.code ?? "");
+      const type = formData.type ?? "fixed";
+      const amount = Number(formData.amount ?? 0);
+      const minOrder = Number(formData.min_order_amount ?? 0);
+      const maxTotal = Number(formData.max_uses_total ?? 1);
+      const maxPerUser = Number(formData.max_uses_per_user ?? 1);
+      const validFrom = formData.valid_from;
+      const validUntil = formData.valid_until;
+      const maxDiscount = formData.maxDiscount;
+
+      if (!code || !validFrom || !validUntil) {
+        alert("Veuillez remplir tous les champs obligatoires.");
+        return;
+      }
+      if (new Date(validFrom) >= new Date(validUntil)) {
+        alert("La date de début doit précéder la date de fin.");
+        return;
+      }
+      if (amount < 0 || minOrder < 0 || maxTotal < 1 || maxPerUser < 1) {
+        alert("Vérifiez les bornes numériques (montants ≥ 0, nombres > 0).");
+        return;
+      }
+      if (type === "percentage" && (amount < 1 || amount > 100)) {
+        alert("Pourcentage: entre 1 et 100.");
+        return;
+      }
+      if (typeof maxDiscount === "number" && maxDiscount < 0) {
+        alert("maxDiscount ne peut pas être négatif.");
         return;
       }
 
-      const code = formData.code.toUpperCase();
-
       // Unicité si création
       if (!selectedCoupon) {
-        const q = query(
-          collection(db, "coupons"),
-          where("code", "==", code),
-          limit(1)
-        );
-        const snap = await getDocs(q);
+        const qy = query(collection(db, "coupons"), where("code", "==", code), limit(1));
+        const snap = await getDocs(qy);
         if (!snap.empty) {
           alert("Ce code promo existe déjà");
           return;
         }
       }
 
-      // Données à persister (timestamps serveur pour Firestore)
+      // Données à persister
       const couponDataForFirestore = {
         code,
-        type: formData.type,
-        amount: formData.amount,
-        min_order_amount: formData.min_order_amount ?? 0,
-        max_uses_total: formData.max_uses_total ?? 100,
-        max_uses_per_user: formData.max_uses_per_user ?? 1,
-        valid_from: Timestamp.fromDate(formData.valid_from),
-        valid_until: Timestamp.fromDate(formData.valid_until),
+        type,
+        amount,
+        min_order_amount: minOrder,
+        max_uses_total: maxTotal,
+        max_uses_per_user: maxPerUser,
+        valid_from: Timestamp.fromDate(new Date(validFrom)),
+        valid_until: Timestamp.fromDate(new Date(validUntil)),
         services: formData.services ?? ["lawyer_call", "expat_call"],
         active: formData.active ?? true,
         description: formData.description ?? "",
+        maxDiscount: typeof maxDiscount === "number" ? maxDiscount : null,
         updated_at: serverTimestamp(),
       };
 
@@ -459,16 +447,17 @@ const AdminPromoCodes: React.FC = () => {
               ? {
                   ...c,
                   code,
-                  type: formData.type!,
-                  amount: formData.amount!,
-                  min_order_amount: formData.min_order_amount ?? 0,
-                  max_uses_total: formData.max_uses_total ?? 100,
-                  max_uses_per_user: formData.max_uses_per_user ?? 1,
-                  valid_from: formData.valid_from!,
-                  valid_until: formData.valid_until!,
+                  type,
+                  amount,
+                  min_order_amount: minOrder,
+                  max_uses_total: maxTotal,
+                  max_uses_per_user: maxPerUser,
+                  valid_from: new Date(validFrom),
+                  valid_until: new Date(validUntil),
                   services: formData.services ?? ["lawyer_call", "expat_call"],
                   active: formData.active ?? true,
                   description: formData.description ?? "",
+                  maxDiscount: typeof maxDiscount === "number" ? maxDiscount : undefined,
                   updated_at: new Date(),
                 }
               : c
@@ -485,16 +474,17 @@ const AdminPromoCodes: React.FC = () => {
         const newCoupon: Coupon = {
           id: ref.id,
           code,
-          type: formData.type!,
-          amount: formData.amount!,
-          min_order_amount: formData.min_order_amount ?? 0,
-          max_uses_total: formData.max_uses_total ?? 100,
-          max_uses_per_user: formData.max_uses_per_user ?? 1,
-          valid_from: formData.valid_from!,
-          valid_until: formData.valid_until!,
+          type,
+          amount,
+          min_order_amount: minOrder,
+          max_uses_total: maxTotal,
+          max_uses_per_user: maxPerUser,
+          valid_from: new Date(validFrom),
+          valid_until: new Date(validUntil),
           services: formData.services ?? ["lawyer_call", "expat_call"],
           active: formData.active ?? true,
           description: formData.description ?? "",
+          maxDiscount: typeof maxDiscount === "number" ? maxDiscount : undefined,
           created_at: new Date(),
           created_by: currentUser?.uid ?? "admin",
           updated_at: new Date(),
@@ -508,11 +498,7 @@ const AdminPromoCodes: React.FC = () => {
       setSelectedCoupon(null);
       void loadStats();
 
-      alert(
-        selectedCoupon
-          ? "Code promo mis à jour avec succès"
-          : "Code promo créé avec succès"
-      );
+      alert(selectedCoupon ? "Code promo mis à jour avec succès" : "Code promo créé avec succès");
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
       console.error("Error saving coupon:", error);
@@ -788,10 +774,7 @@ const AdminPromoCodes: React.FC = () => {
                             {coupon.type === "percentage" ? (
                               <Percent size={16} className="text-purple-600 mr-1" />
                             ) : (
-                              <DollarSign
-                                size={16}
-                                className="text-green-600 mr-1"
-                              />
+                              <DollarSign size={16} className="text-green-600 mr-1" />
                             )}
                             <span className="text-sm font-medium">
                               {formatAmount(coupon.amount, coupon.type)}
@@ -802,16 +785,15 @@ const AdminPromoCodes: React.FC = () => {
                               Min: {coupon.min_order_amount}€
                             </div>
                           )}
+                          {typeof coupon.maxDiscount === "number" && (
+                            <div className="text-xs text-gray-500">
+                              Réduc. max: {coupon.maxDiscount.toFixed(2)}€
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div>Du: {formatDate(coupon.valid_from)}</div>
-                          <div
-                            className={`${
-                              isExpired(coupon.valid_until)
-                                ? "text-red-600 font-medium"
-                                : ""
-                            }`}
-                          >
+                          <div className={`${isExpired(coupon.valid_until) ? "text-red-600 font-medium" : ""}`}>
                             Au: {formatDate(coupon.valid_until)}
                           </div>
                         </td>
@@ -859,22 +841,12 @@ const AdminPromoCodes: React.FC = () => {
                               <Edit size={18} />
                             </button>
                             <button
-                              onClick={() =>
-                                void handleToggleActive(coupon.id, coupon.active)
-                              }
-                              className={`${
-                                coupon.active
-                                  ? "text-red-600 hover:text-red-800"
-                                  : "text-green-600 hover:text-green-800"
-                              }`}
+                              onClick={() => void handleToggleActive(coupon.id, coupon.active)}
+                              className={`${coupon.active ? "text-red-600 hover:text-red-800" : "text-green-600 hover:text-green-800"}`}
                               title={coupon.active ? "Désactiver" : "Activer"}
                               disabled={isActionLoading}
                             >
-                              {coupon.active ? (
-                                <XCircle size={18} />
-                              ) : (
-                                <CheckCircle size={18} />
-                              )}
+                              {coupon.active ? <XCircle size={18} /> : <CheckCircle size={18} />}
                             </button>
                             <button
                               onClick={() => handleDeleteCoupon(coupon)}
@@ -903,9 +875,7 @@ const AdminPromoCodes: React.FC = () => {
             {hasMore && (
               <div className="px-6 py-4 border-t border-gray-200">
                 <Button onClick={handleLoadMore} disabled={isLoading} fullWidth>
-                  {isLoading
-                    ? "Chargement..."
-                    : "Charger plus de codes promo"}
+                  {isLoading ? "Chargement..." : "Charger plus de codes promo"}
                 </Button>
               </div>
             )}
@@ -924,10 +894,7 @@ const AdminPromoCodes: React.FC = () => {
         >
           <div className="space-y-4">
             <div>
-              <label
-                htmlFor="code"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
                 Code promo *
               </label>
               <input
@@ -937,21 +904,19 @@ const AdminPromoCodes: React.FC = () => {
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    code: e.target.value.toUpperCase(),
+                    code: sanitizeCode(e.target.value),
                   }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="ex: WELCOME10"
                 disabled={showEditModal} // code inchangé en édition
               />
+              <p className="text-xs text-gray-500 mt-1">Caractères autorisés : A-Z, 0-9, “_” et “-” (max 32).</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label
-                  htmlFor="type"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
                   Type de réduction *
                 </label>
                 <select
@@ -971,23 +936,20 @@ const AdminPromoCodes: React.FC = () => {
               </div>
 
               <div>
-                <label
-                  htmlFor="amount"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
                   Montant de la réduction *
                 </label>
                 <input
                   id="amount"
                   type="number"
-                  min="0"
+                  min={formData.type === "fixed" ? 0 : 1}
+                  max={formData.type === "percentage" ? 100 : undefined}
                   step={formData.type === "fixed" ? "0.01" : "1"}
                   value={formData.amount ?? 0}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      amount:
-                        e.target.value === "" ? 0 : parseFloat(e.target.value),
+                      amount: e.target.value === "" ? 0 : Number(e.target.value),
                     }))
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -996,39 +958,53 @@ const AdminPromoCodes: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="min_order_amount"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Montant minimum de commande (€)
-              </label>
-              <input
-                id="min_order_amount"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.min_order_amount ?? 0}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    min_order_amount:
-                      e.target.value === ""
-                        ? 0
-                        : parseFloat(e.target.value),
-                  }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="ex: 20.00"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="min_order_amount" className="block text-sm font-medium text-gray-700 mb-1">
+                  Montant minimum de commande (€)
+                </label>
+                <input
+                  id="min_order_amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.min_order_amount ?? 0}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      min_order_amount: e.target.value === "" ? 0 : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="ex: 20.00"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="maxDiscount" className="block text-sm font-medium text-gray-700 mb-1">
+                  Réduction maximale (€) — optionnel
+                </label>
+                <input
+                  id="maxDiscount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.maxDiscount ?? ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      maxDiscount: e.target.value === "" ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="ex: 20.00"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label
-                  htmlFor="valid_from"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="valid_from" className="block text-sm font-medium text-gray-700 mb-1">
                   Valide à partir du *
                 </label>
                 <input
@@ -1055,10 +1031,7 @@ const AdminPromoCodes: React.FC = () => {
               </div>
 
               <div>
-                <label
-                  htmlFor="valid_until"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="valid_until" className="block text-sm font-medium text-gray-700 mb-1">
                   Valide jusqu'au *
                 </label>
                 <input
@@ -1087,10 +1060,7 @@ const AdminPromoCodes: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label
-                  htmlFor="max_uses_total"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="max_uses_total" className="block text-sm font-medium text-gray-700 mb-1">
                   Nombre maximum d'utilisations total
                 </label>
                 <input
@@ -1101,8 +1071,7 @@ const AdminPromoCodes: React.FC = () => {
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      max_uses_total:
-                        e.target.value === "" ? 1 : parseInt(e.target.value, 10),
+                      max_uses_total: e.target.value === "" ? 1 : parseInt(e.target.value, 10),
                     }))
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1111,10 +1080,7 @@ const AdminPromoCodes: React.FC = () => {
               </div>
 
               <div>
-                <label
-                  htmlFor="max_uses_per_user"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="max_uses_per_user" className="block text-sm font-medium text-gray-700 mb-1">
                   Nombre maximum d'utilisations par utilisateur
                 </label>
                 <input
@@ -1125,8 +1091,7 @@ const AdminPromoCodes: React.FC = () => {
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      max_uses_per_user:
-                        e.target.value === "" ? 1 : parseInt(e.target.value, 10),
+                      max_uses_per_user: e.target.value === "" ? 1 : parseInt(e.target.value, 10),
                     }))
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -1148,9 +1113,7 @@ const AdminPromoCodes: React.FC = () => {
                     onChange={(e) => {
                       const services = [...(formData.services ?? [])];
                       if (e.target.checked) {
-                        if (!services.includes("lawyer_call")) {
-                          services.push("lawyer_call");
-                        }
+                        if (!services.includes("lawyer_call")) services.push("lawyer_call");
                       } else {
                         const index = services.indexOf("lawyer_call");
                         if (index !== -1) services.splice(index, 1);
@@ -1172,9 +1135,7 @@ const AdminPromoCodes: React.FC = () => {
                     onChange={(e) => {
                       const services = [...(formData.services ?? [])];
                       if (e.target.checked) {
-                        if (!services.includes("expat_call")) {
-                          services.push("expat_call");
-                        }
+                        if (!services.includes("expat_call")) services.push("expat_call");
                       } else {
                         const index = services.indexOf("expat_call");
                         if (index !== -1) services.splice(index, 1);
@@ -1191,18 +1152,13 @@ const AdminPromoCodes: React.FC = () => {
             </div>
 
             <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                 Description
               </label>
               <textarea
                 id="description"
                 value={formData.description ?? ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, description: e.target.value }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="Description du code promo (optionnel)"
@@ -1214,9 +1170,7 @@ const AdminPromoCodes: React.FC = () => {
                 id="active"
                 type="checkbox"
                 checked={formData.active ?? true}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, active: e.target.checked }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, active: e.target.checked }))}
                 className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
               />
               <label htmlFor="active" className="ml-2 block text-sm text-gray-700">

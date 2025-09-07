@@ -21,7 +21,6 @@ const CPU_OPTIMIZED_CONFIG = {
 const db = (0, firestore_1.getFirestore)();
 // ✅ Fonction interne (pour usage depuis d'autres Cloud Functions comme les webhooks)
 async function notifyAfterPaymentInternal(callId) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v;
     const startTime = Date.now();
     try {
         v2_1.logger.info(`🚀 Début notifyAfterPaymentInternal pour callId: ${callId}`);
@@ -37,10 +36,10 @@ async function notifyAfterPaymentInternal(callId) {
             return;
         }
         // ✅ CORRECT: Mapping des nouveaux champs avec fallback robuste
-        const providerPhone = (_d = (_c = (_b = (_a = callData.participants) === null || _a === void 0 ? void 0 : _a.provider) === null || _b === void 0 ? void 0 : _b.phone) !== null && _c !== void 0 ? _c : callData.providerPhone) !== null && _d !== void 0 ? _d : '';
-        const clientPhone = (_h = (_g = (_f = (_e = callData.participants) === null || _e === void 0 ? void 0 : _e.client) === null || _f === void 0 ? void 0 : _f.phone) !== null && _g !== void 0 ? _g : callData.clientPhone) !== null && _h !== void 0 ? _h : '';
-        const language = (_o = (_l = (_k = (_j = callData.metadata) === null || _j === void 0 ? void 0 : _j.clientLanguages) === null || _k === void 0 ? void 0 : _k[0]) !== null && _l !== void 0 ? _l : (_m = callData.clientLanguages) === null || _m === void 0 ? void 0 : _m[0]) !== null && _o !== void 0 ? _o : 'fr';
-        const title = (_r = (_q = (_p = callData.metadata) === null || _p === void 0 ? void 0 : _p.title) !== null && _q !== void 0 ? _q : callData.title) !== null && _r !== void 0 ? _r : 'Consultation';
+        const providerPhone = callData.participants?.provider?.phone ?? callData.providerPhone ?? '';
+        const clientPhone = callData.participants?.client?.phone ?? callData.clientPhone ?? '';
+        const language = callData.metadata?.clientLanguages?.[0] ?? callData.clientLanguages?.[0] ?? 'fr';
+        const title = callData.metadata?.title ?? callData.title ?? 'Consultation';
         // 🛡️ Validation stricte des données critiques
         if (!providerPhone || !clientPhone) {
             const error = `Numéros de téléphone manquants - Provider: ${providerPhone ? '✓' : '✗'}, Client: ${clientPhone ? '✓' : '✗'}`;
@@ -51,8 +50,8 @@ async function notifyAfterPaymentInternal(callId) {
                 // 🔧 FIX: Éviter de logger les données sensibles
                 structureInfo: {
                     hasParticipants: !!callData.participants,
-                    hasProviderData: !!((_s = callData.participants) === null || _s === void 0 ? void 0 : _s.provider),
-                    hasClientData: !!((_t = callData.participants) === null || _t === void 0 ? void 0 : _t.client),
+                    hasProviderData: !!callData.participants?.provider,
+                    hasClientData: !!callData.participants?.client,
                     hasMetadata: !!callData.metadata
                 }
             });
@@ -75,7 +74,7 @@ async function notifyAfterPaymentInternal(callId) {
             providerPhone: `${providerPhone.substring(0, 6)}***`,
             clientPhone: `${clientPhone.substring(0, 6)}***`,
             // 📊 Indicateur de quelle structure a été utilisée
-            dataSource: ((_v = (_u = callData.participants) === null || _u === void 0 ? void 0 : _u.provider) === null || _v === void 0 ? void 0 : _v.phone) ? 'NEW_STRUCTURE' : 'LEGACY_FALLBACK'
+            dataSource: callData.participants?.provider?.phone ? 'NEW_STRUCTURE' : 'LEGACY_FALLBACK'
         });
         // 🔄 Envoi parallèle des notifications pour optimiser les performances
         // 📱 Configuration SMS forcée
@@ -153,17 +152,16 @@ async function notifyAfterPaymentInternal(callId) {
 }
 // ✅ Cloud Function (appelable depuis le frontend) - OPTIMISÉE CPU
 exports.notifyAfterPayment = (0, https_1.onCall)(CPU_OPTIMIZED_CONFIG, async (request) => {
-    var _a, _b;
     const startTime = Date.now();
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     try {
         v2_1.logger.info(`🎯 Cloud Function notifyAfterPayment appelée`, {
             requestId,
-            userId: (_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid,
+            userId: request.auth?.uid,
             data: request.data
         });
         // 🛡️ Vérification d'authentification stricte
-        if (!((_b = request.auth) === null || _b === void 0 ? void 0 : _b.uid)) {
+        if (!request.auth?.uid) {
             v2_1.logger.warn(`🚫 Tentative d'accès non authentifié`, { requestId });
             throw new https_1.HttpsError('unauthenticated', 'Authentification requise pour cette opération');
         }

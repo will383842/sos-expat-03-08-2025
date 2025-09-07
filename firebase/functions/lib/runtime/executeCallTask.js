@@ -91,7 +91,7 @@ async function runExecuteCallTask(req, res) {
         console.log('✅ [executeCallTask] Call execution completed:', {
             callSessionId,
             executionTimeMs: executionTime,
-            resultStatus: (callResult === null || callResult === void 0 ? void 0 : callResult.status) || 'unknown',
+            resultStatus: callResult?.status || 'unknown',
             hasResult: !!callResult
         });
         // ✅ ÉTAPE 6: Log de succès
@@ -102,7 +102,7 @@ async function runExecuteCallTask(req, res) {
             additionalData: {
                 executionTimeMs: executionTime,
                 completedAt: new Date().toISOString(),
-                resultStatus: (callResult === null || callResult === void 0 ? void 0 : callResult.status) || 'unknown'
+                resultStatus: callResult?.status || 'unknown'
             }
         });
         // ✅ ÉTAPE 7: Réponse de succès

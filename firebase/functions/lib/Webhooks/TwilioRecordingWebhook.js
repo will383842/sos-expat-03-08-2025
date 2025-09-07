@@ -69,7 +69,7 @@ exports.TwilioRecordingWebhook = (0, https_1.onRequest)({
         }
         else if (body.CallSid) {
             const result = await TwilioCallManager_1.twilioCallManager.findSessionByCallSid(body.CallSid);
-            session = (result === null || result === void 0 ? void 0 : result.session) || null;
+            session = result?.session || null;
         }
         if (!session) {
             console.warn(`Session non trouvée pour enregistrement: ${body.RecordingSid}`);
@@ -295,7 +295,10 @@ async function getSessionRecordings(sessionId) {
             .where('sessionId', '==', sessionId)
             .orderBy('createdAt', 'desc')
             .get();
-        return snapshot.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
     }
     catch (error) {
         await (0, logError_1.logError)('getSessionRecordings', error);

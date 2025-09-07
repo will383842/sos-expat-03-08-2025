@@ -1,6 +1,6 @@
 // src/config/firebase.ts
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
+import { getAuth, connectAuthEmulator, type Auth } from "firebase/auth";
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -8,24 +8,27 @@ import {
   connectFirestoreEmulator,
   serverTimestamp,
   setLogLevel,
+  type Firestore,
 } from "firebase/firestore";
-import { getStorage, connectStorageEmulator } from "firebase/storage";
+import { getStorage, connectStorageEmulator, type FirebaseStorage } from "firebase/storage";
 import {
   getFunctions,
   connectFunctionsEmulator,
   httpsCallable,
+  // ⚠️ ne pas importer 'Functions' ici (pas exporté selon les versions)
+  // type HttpsCallable est exporté sur la plupart des versions, mais on n'en a pas besoin
 } from "firebase/functions";
 
 /** ----------------------------------------
  *  Configuration Firebase (variables .env)
  * ---------------------------------------- */
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+const firebaseConfig: FirebaseOptions = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
 };
 
 // Vérifications basiques d’env
@@ -43,12 +46,12 @@ if (!firebaseConfig.storageBucket) {
  * ---------------------------------------------------- */
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Auth / Storage
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+// Auth / Storage / Firestore
+export const auth: Auth = getAuth(app);
+export const storage: FirebaseStorage = getStorage(app);
 
 // Firestore avec cache offline multi-onglets
-export const db = initializeFirestore(app, {
+export const db: Firestore = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
   }),
@@ -62,10 +65,10 @@ setLogLevel("error");
  * ---------------------------------------------------- */
 const RAW_REGION = (import.meta.env.VITE_FUNCTIONS_REGION ?? "europe-west1").toString();
 const RAW_REGION_DEV = (import.meta.env.VITE_FUNCTIONS_REGION_DEV ?? "").toString();
-const IS_DEV = !!import.meta.env.DEV;
+const IS_DEV = Boolean(import.meta.env.DEV);
 const REGION = IS_DEV && RAW_REGION_DEV ? RAW_REGION_DEV : RAW_REGION;
 
-// ✅ Instance Functions
+// ✅ Instance Functions (type inféré automatiquement)
 export const functions = getFunctions(app, REGION);
 
 /** ----------------------------------------
@@ -87,16 +90,16 @@ const PORT_STORAGE = Number(import.meta.env.VITE_EMULATOR_PORT_STORAGE ?? 9199);
 if (USE_EMULATORS && typeof window !== "undefined") {
   try {
     connectAuthEmulator(auth, `http://${EMU_HOST}:${PORT_AUTH}`, { disableWarnings: true });
-  } catch {}
+  } catch { /* noop */ }
   try {
     connectFirestoreEmulator(db, EMU_HOST, PORT_FS);
-  } catch {}
+  } catch { /* noop */ }
   try {
     connectFunctionsEmulator(functions, EMU_HOST, PORT_FUNC);
-  } catch {}
+  } catch { /* noop */ }
   try {
     connectStorageEmulator(storage, EMU_HOST, PORT_STORAGE);
-  } catch {}
+  } catch { /* noop */ }
 }
 
 /** ----------------------------------------
@@ -109,9 +112,15 @@ console.log("✅ Firebase initialisé :", {
 });
 
 /** ----------------------------------------
- *  Helper httpsCallable typé
+ *  Helper httpsCallable typé (sans any explicite)
  * ---------------------------------------- */
-export const call = <T, R = unknown>(name: string) => httpsCallable<T, R>(functions, name);
+// name: nom de la callable Firebase
+// TPayload: type des données envoyées
+// TReturn: type des données retournées
+export function call<TPayload, TReturn = unknown>(name: string) {
+  // Le type de retour est inféré comme HttpsCallable<TPayload, TReturn>
+  return httpsCallable<TPayload, TReturn>(functions, name);
+}
 
 // ✅ Expose aussi httpsCallable si besoin d'import direct
 export { httpsCallable } from "firebase/functions";

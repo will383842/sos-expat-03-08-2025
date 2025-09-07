@@ -19,7 +19,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import type { MultiValue } from 'react-select';
 import type { Provider } from '../types/provider';
-// Imports PhoneField et useForm supprimés pour éviter les erreurs
 
 // ===== Lazy (perf) =====
 const ImageUploader = lazy(() => import('../components/common/ImageUploader'));
@@ -93,8 +92,8 @@ const SPECIALTIES: Duo[] = [
 // ===== Types =====
 interface LawyerFormData {
   firstName: string; lastName: string; email: string; password: string;
-  phone: string; // E.164 géré par PhoneField
-  whatsapp: string; // E.164 géré par PhoneField
+  phone: string;
+  whatsapp: string;
   currentCountry: string; currentPresenceCountry: string; customCountry: string;
   preferredLanguage: 'fr' | 'en';
   practiceCountries: string[]; customPracticeCountry: string;
@@ -535,7 +534,7 @@ const RegisterLawyer: React.FC = () => {
   // ---- Initial state ----
   const initial: LawyerFormData = {
     firstName: '', lastName: '', email: '', password: '',
-    phone: '', whatsapp: '', // E.164 géré par PhoneField
+    phone: '', whatsapp: '',
     currentCountry: '', currentPresenceCountry: '', customCountry: '',
     preferredLanguage: lang,
     practiceCountries: [], customPracticeCountry: '',
@@ -1038,7 +1037,7 @@ const RegisterLawyer: React.FC = () => {
                           value={form.password}
                           onChange={onChange}
                           onBlur={() => markTouched('password')}
-                          onKeyUp={(e) => setCapsPassword((e as any).getModifierState?.('CapsLock'))}
+                          onKeyUp={(e: React.KeyboardEvent<HTMLInputElement>) => setCapsPassword(e.getModifierState('CapsLock'))}
                           autoComplete="new-password"
                           placeholder={t.help.minPassword}
                           aria-describedby="pwd-hint pwd-meter"

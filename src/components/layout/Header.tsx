@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Menu, X, Phone, Shield, ChevronDown, Globe, User, UserPlus,
+  Menu, X, Phone, Shield, ChevronDown, Globe, User as UserIcon, UserPlus,
   Settings, LogOut, Wifi, WifiOff
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import type { User } from '../../contexts/types';
 
 /** ================================
  *  Types & Global
@@ -37,21 +38,19 @@ interface NavigationItem {
   desktopIcon?: string; // emoji (desktop)
 }
 
-interface AppUser {
+/** Champs additionnels présents côté Auth/Firestore mais pas forcément dans le type domaine */
+type WithAuthExtras = User & {
   uid?: string;
-  id?: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
   displayName?: string;
-  fullName?: string;
   profilePhoto?: string;
   photoURL?: string;
-  role?: 'lawyer' | 'expat' | 'admin' | 'user';
-  type?: 'lawyer' | 'expat' | 'admin' | 'user';
-  isOnline?: boolean;
   isVerified?: boolean;
-}
+  isOnline?: boolean;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+};
 
 /** ================================
  *  Flags
@@ -137,23 +136,23 @@ const useScrolled = () => {
  *  ================================ */
 const useAvailabilityToggle = () => {
   const { user } = useAuth();
-  const [isOnline, setIsOnline] = useState<boolean>(!!user?.isOnline);
+  const typedUser: WithAuthExtras | null = user as WithAuthExtras | null;
+
+  const [isOnline, setIsOnline] = useState<boolean>(!!typedUser?.isOnline);
   const [isUpdating, setIsUpdating] = useState(false);
   const sosSnapshotSubscribed = useRef(false);
 
-  const isProvider =
-    user?.role === 'lawyer' ||
-    user?.role === 'expat' ||
-    user?.type === 'lawyer' ||
-    user?.type === 'expat';
+  const isProvider = typedUser?.role === 'lawyer' || typedUser?.role === 'expat';
+
+  // ID unique (uid Firebase ou id Firestore)
+  const userId = useMemo<string | undefined>(() => {
+    if (!typedUser) return undefined;
+    return typedUser.uid ?? typedUser.id;
+  }, [typedUser]);
 
   // --- Helpers d'écriture ---
   const writeSosProfile = useCallback(async (newStatus: boolean) => {
-    if (!user || !isProvider) return;
-
-    const typedUser = user as AppUser;
-    const userId = typedUser.uid || typedUser.id;
-    if (!userId) return;
+    if (!typedUser || !isProvider || !userId) return;
 
     const sosRef = doc(db, 'sos_profiles', userId);
     const updateData = {
@@ -165,27 +164,27 @@ const useAvailabilityToggle = () => {
       isVisibleOnMap: true,
     };
 
-    // 1) Update direct (doc id = uid)
+    // 1) Update direct (doc id = userId)
     try {
       await updateDoc(sosRef, updateData);
       return;
     } catch {
-      // continue
+      /* pass, on tente la suite */
     }
 
-    // 2) S'il n'existe pas, crée/merge par {uid}
+    // 2) S'il n'existe pas, crée/merge
     try {
       const snap = await getDoc(sosRef);
       if (!snap.exists()) {
         const newProfileData = {
-          type: typedUser.role || typedUser.type,
+          type: typedUser.role,
           fullName:
             typedUser.fullName ||
             `${typedUser.firstName || ''} ${typedUser.lastName || ''}`.trim() ||
             'Expert',
           ...updateData,
           isActive: true,
-          isApproved: (typedUser.role || typedUser.type) !== 'lawyer',
+          isApproved: typedUser.role !== 'lawyer',
           isVerified: !!typedUser.isVerified,
           rating: 5.0,
           reviewCount: 0,
@@ -195,7 +194,7 @@ const useAvailabilityToggle = () => {
         return;
       }
     } catch {
-      // continue vers fallback query
+      /* pass, on tente la suite */
     }
 
     // 3) Fallback : anciens docs avec id ≠ uid → update tous les docs où uid == userId
@@ -209,27 +208,28 @@ const useAvailabilityToggle = () => {
     }
 
     // 4) Dernier recours : créer doc {uid}
-    await setDoc(sosRef, {
-      type: typedUser.role || typedUser.type,
-      fullName:
-        typedUser.fullName ||
-        `${typedUser.firstName || ''} ${typedUser.lastName || ''}`.trim() ||
-        'Expert',
-      ...updateData,
-      isActive: true,
-      isApproved: (typedUser.role || typedUser.type) !== 'lawyer',
-      isVerified: !!typedUser.isVerified,
-      rating: 5.0,
-      reviewCount: 0,
-      createdAt: serverTimestamp(),
-    }, { merge: true });
-  }, [user, isProvider]);
+    await setDoc(
+      sosRef,
+      {
+        type: typedUser.role,
+        fullName:
+          typedUser.fullName ||
+          `${typedUser.firstName || ''} ${typedUser.lastName || ''}`.trim() ||
+          'Expert',
+        ...updateData,
+        isActive: true,
+        isApproved: typedUser.role !== 'lawyer',
+        isVerified: !!typedUser.isVerified,
+        rating: 5.0,
+        reviewCount: 0,
+        createdAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }, [typedUser, isProvider, userId]);
 
   const writeUsersPresenceBestEffort = useCallback(async (newStatus: boolean) => {
-    if (!user) return;
-    const typedUser = user as AppUser;
-    const userId = typedUser.uid || typedUser.id;
-    if (!userId) return;
+    if (!typedUser || !userId) return;
 
     const userRef = doc(db, 'users', userId);
     const payload = {
@@ -240,7 +240,7 @@ const useAvailabilityToggle = () => {
     };
     try {
       await updateDoc(userRef, payload);
-    } catch (e) {
+    } catch {
       // Tentative avec setDoc merge si updateDoc échoue
       try {
         await setDoc(userRef, { uid: userId, ...payload }, { merge: true });
@@ -248,17 +248,13 @@ const useAvailabilityToggle = () => {
         console.warn('Users presence update ignorée (règles/email) :', e2);
       }
     }
-  }, [user]);
+  }, [typedUser, userId]);
 
   // --- Ecoute temps réel : sos_profiles = source de vérité pour l'UI ---
   useEffect(() => {
-    if (!user || !isProvider) return;
+    if (!typedUser || !isProvider || !userId) return;
     if (sosSnapshotSubscribed.current) return;
     sosSnapshotSubscribed.current = true;
-
-    const typedUser = user as AppUser;
-    const userId = typedUser.uid || typedUser.id;
-    if (!userId) return;
 
     const sosRef = doc(db, 'sos_profiles', userId);
 
@@ -269,7 +265,7 @@ const useAvailabilityToggle = () => {
         const data = snap.data();
         if (!data) return;
         const next = data.isOnline === true;
-        setIsOnline(prev => (prev !== next ? next : prev));
+        setIsOnline((prev) => (prev !== next ? next : prev));
       },
       (err) => console.error('Erreur snapshot sos_profiles:', err)
     );
@@ -278,18 +274,15 @@ const useAvailabilityToggle = () => {
       sosSnapshotSubscribed.current = false;
       un();
     };
-  }, [user?.uid, isProvider]);
+  }, [typedUser, isProvider, userId]);
 
   // Garde en phase avec un éventuel changement externe du user
   useEffect(() => {
-    if (user?.isOnline !== undefined) setIsOnline(!!user.isOnline);
-  }, [user?.isOnline]);
+    if (typeof typedUser?.isOnline !== 'undefined') setIsOnline(!!typedUser.isOnline);
+  }, [typedUser?.isOnline]);
 
   const toggle = useCallback(async () => {
-    if (!user || isUpdating) return;
-    const typedUser = user as AppUser;
-    const userId = typedUser.uid || typedUser.id;
-    if (!userId) return;
+    if (!typedUser || isUpdating) return;
 
     const newStatus = !isOnline;
     setIsUpdating(true);
@@ -316,7 +309,7 @@ const useAvailabilityToggle = () => {
     } finally {
       setIsUpdating(false);
     }
-  }, [isOnline, isUpdating, user, writeSosProfile, writeUsersPresenceBestEffort]);
+  }, [isOnline, isUpdating, typedUser, writeSosProfile, writeUsersPresenceBestEffort]);
 
   return { isOnline, isUpdating, isProvider, toggle };
 };
@@ -333,7 +326,7 @@ const HeaderAvailabilityToggle = memo(() => {
 
   return (
     <button
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
+      onClick={() => { toggle(); }}
       disabled={isUpdating}
       type="button"
       className={`group flex items-center px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] touch-manipulation ${
@@ -359,12 +352,13 @@ HeaderAvailabilityToggle.displayName = 'HeaderAvailabilityToggle';
 /** ================================
  *  User Avatar (bigger)
  *  ================================ */
-const UserAvatar = memo<{ user: AppUser | null; size?: 'sm' | 'md' }>(({ user, size = 'md' }) => {
+const UserAvatar = memo<{ user: User | null; size?: 'sm' | 'md' }>(({ user, size = 'md' }) => {
   const [imageError, setImageError] = useState(false);
   const sizeClasses = size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
 
-  const photoUrl = user?.profilePhoto || user?.photoURL;
-  const displayName = user?.firstName || user?.displayName || user?.email || 'User';
+  const u = user as WithAuthExtras | null;
+  const photoUrl = u?.profilePhoto || u?.photoURL;
+  const displayName = u?.firstName || u?.displayName || u?.email || 'User';
   const onError = useCallback(() => setImageError(true), []);
 
   if (!photoUrl || imageError) {
@@ -373,7 +367,7 @@ const UserAvatar = memo<{ user: AppUser | null; size?: 'sm' | 'md' }>(({ user, s
         className={`${sizeClasses} rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-base ring-2 ring-white/30 hover:ring-white/60 transition-all duration-300`}
         aria-label={`Avatar de ${displayName}`}
       >
-        {displayName.charAt(0).toUpperCase()}
+        {displayName?.charAt(0).toUpperCase?.()}
       </div>
     );
   }
@@ -562,6 +556,7 @@ PWAIconButton.displayName = 'PWAIconButton';
  *  ================================ */
 const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = false, scrolled = false }) => {
   const { user, logout } = useAuth();
+  const typedUser: WithAuthExtras | null = user as WithAuthExtras | null;
   const { language } = useApp();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -603,7 +598,7 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     logout: language === 'fr' ? 'Déconnexion' : 'Logout',
   };
 
-  if (!user) {
+  if (!typedUser) {
     const loginBtnDesktop = scrolled
       ? 'group relative p-3 rounded-full hover:bg-white/10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] min-w-[44px] flex items-center justify-center'
       : 'group relative p-3 rounded-full hover:bg-gray-100 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500/20 min-h-[44px] min-w-[44px] flex items-center justify-center border border-gray-200';
@@ -621,7 +616,7 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
           className={isMobile ? 'group flex items-center justify-center w-full bg-white text-red-600 px-6 py-4 rounded-2xl border border-gray-300 hover:bg-gray-50 hover:scale-[1.01] transition-all duration-300 font-semibold min-h-[48px] touch-manipulation' : loginBtnDesktop}
           aria-label={t.login}
         >
-          {isMobile ? (<><User className="w-5 h-5 mr-3" /><span>{t.login}</span></>) : (<User className={loginIconDesktop} />)}
+          {isMobile ? (<><UserIcon className="w-5 h-5 mr-3" /><span>{t.login}</span></>) : (<UserIcon className={loginIconDesktop} />)}
         </Link>
         <Link
           to="/register"
@@ -657,15 +652,15 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
     return (
       <div className="space-y-4">
         <div className={mobileContainer}>
-          <UserAvatar user={user} />
+          <UserAvatar user={typedUser} />
           <div>
-            <div className={nameClass}>{user.firstName || user.displayName || user.email}</div>
-            <div className={roleClass}>{user.role || 'Utilisateur'}</div>
+            <div className={nameClass}>{typedUser.firstName || typedUser.displayName || typedUser.email}</div>
+            <div className={roleClass}>{typedUser.role || 'Utilisateur'}</div>
           </div>
         </div>
 
         <div className="space-y-3">
-          {user.role === 'admin' && (
+          {typedUser.role === 'admin' && (
             <Link to="/admin/dashboard" className={adminLinkClass} aria-label={t.adminConsole}>
               <Shield className="w-5 h-5 mr-3" />
               <span className="font-medium">{t.adminConsole}</span>
@@ -693,8 +688,8 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
         aria-haspopup="true"
         aria-label="Menu utilisateur"
       >
-        <UserAvatar user={user} />
-        <span className="text-sm font-medium hidden md:inline">{user.firstName || user.displayName || 'User'}</span>
+        <UserAvatar user={typedUser} />
+        <span className="text-sm font-medium hidden md:inline">{typedUser.firstName || typedUser.displayName || 'User'}</span>
         <ChevronDown className={`w-4 h-4 transition-all duration-300 ${open ? 'rotate-180 text-yellow-300' : ''}`} />
       </button>
 
@@ -702,16 +697,16 @@ const UserMenu = memo<{ isMobile?: boolean; scrolled?: boolean }>(({ isMobile = 
         <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 animate-in slide-in-from-top-2 duration-300">
           <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-red-50 to-orange-50 rounded-t-2xl">
             <div className="flex items-center space-x-3">
-              <UserAvatar user={user} />
+              <UserAvatar user={typedUser} />
               <div>
-                <div className="font-semibold text-gray-900">{user.firstName || user.displayName || user.email}</div>
-                <div className="text-xs text-gray-500 capitalize">{user.role || 'Utilisateur'}</div>
+                <div className="font-semibold text-gray-900">{typedUser.firstName || typedUser.displayName || typedUser.email}</div>
+                <div className="text-xs text-gray-500 capitalize">{typedUser.role || 'Utilisateur'}</div>
               </div>
             </div>
           </div>
 
           <div className="py-1">
-            {user.role === 'admin' && (
+            {typedUser.role === 'admin' && (
               <Link to="/admin/dashboard" className="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 rounded-xl mx-1 focus:outline-none focus:bg-red-50" onClick={() => setOpen(false)}>
                 <Shield className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
                 {t.adminConsole}

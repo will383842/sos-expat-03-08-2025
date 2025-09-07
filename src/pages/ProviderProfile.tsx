@@ -174,34 +174,97 @@ interface LocalizedText {
   en?: string;
   [key: string]: string | undefined;
 }
-interface Education { institution?: string | LocalizedText; degree?: string | LocalizedText; year?: number; [key: string]: unknown; }
-interface Certification { name?: string | LocalizedText; issuer?: string | LocalizedText; year?: number; [key: string]: unknown; }
-interface User { id: string; [key: string]: unknown; }
-interface AuthUser extends User {
+interface Education {
+  institution?: string | LocalizedText;
+  degree?: string | LocalizedText;
+  year?: number;
+  [key: string]: unknown;
+}
+interface Certification {
+  name?: string | LocalizedText;
+  issuer?: string | LocalizedText;
+  year?: number;
+  [key: string]: unknown;
+}
+
+// ✅ AuthUser ad hoc (n’hérite pas)
+type AuthUser = {
   uid?: string;
   id?: string;
+} & Partial<import('../contexts/types').User>;
+
+interface LocationState {
+  selectedProvider?: Partial<SosProfile>;
+  providerData?: Partial<SosProfile>;
+  navigationSource?: string;
 }
-interface LocationState { selectedProvider?: Partial<SosProfile>; providerData?: Partial<SosProfile>; navigationSource?: string; }
 interface SosProfile {
-  uid: string; id?: string; type: 'lawyer' | 'expat'; fullName: string; firstName: string; lastName: string;
-  slug?: string; country: string; city?: string; languages: string[]; mainLanguage?: string;
-  specialties: string[]; helpTypes?: string[]; description?: string | LocalizedText; professionalDescription?: string | LocalizedText;
-  experienceDescription?: string | LocalizedText; motivation?: string | LocalizedText; bio?: string | LocalizedText;
-  profilePhoto?: string; photoURL?: string; avatar?: string; rating: number; reviewCount: number; yearsOfExperience: number; yearsAsExpat?: number;
-  isOnline?: boolean; isActive: boolean; isApproved: boolean; isVerified: boolean; isVisibleOnMap?: boolean;
-  // ❌ Supprimé: price?: number; duration?: number; (plus d'override provider)
-  education?: Education | Education[] | LocalizedText; certifications?: Certification | Certification[] | LocalizedText;
-  lawSchool?: string | LocalizedText; graduationYear?: number; responseTime?: string; successRate?: number; totalCalls?: number; successfulCalls?: number;
-  totalResponses?: number; totalResponseTime?: number; avgResponseTimeMs?: number; createdAt?: TSLike; updatedAt?: TSLike; lastSeen?: TSLike;
+  uid: string;
+  id?: string;
+  type: 'lawyer' | 'expat';
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  slug?: string;
+  country: string;
+  city?: string;
+  languages: string[];
+  mainLanguage?: string;
+  specialties: string[];
+  helpTypes?: string[];
+  description?: string | LocalizedText;
+  professionalDescription?: string | LocalizedText;
+  experienceDescription?: string | LocalizedText;
+  motivation?: string | LocalizedText;
+  bio?: string | LocalizedText;
+  profilePhoto?: string;
+  photoURL?: string;
+  avatar?: string;
+  rating: number;
+  reviewCount: number;
+  yearsOfExperience: number;
+  yearsAsExpat?: number;
+  isOnline?: boolean;
+  isActive: boolean;
+  isApproved: boolean;
+  isVerified: boolean;
+  isVisibleOnMap?: boolean;
+  // ❌ Supprimé: price?: number; duration?: number;
+  education?: Education | Education[] | LocalizedText;
+  certifications?: Certification | Certification[] | LocalizedText;
+  lawSchool?: string | LocalizedText;
+  graduationYear?: number;
+  responseTime?: string;
+  successRate?: number;
+  totalCalls?: number;
+  successfulCalls?: number;
+  totalResponses?: number;
+  totalResponseTime?: number;
+  avgResponseTimeMs?: number;
+  createdAt?: TSLike;
+  updatedAt?: TSLike;
+  lastSeen?: TSLike;
 }
 interface RatingDistribution { 5: number; 4: number; 3: number; 2: number; 1: number; }
 interface OnlineStatus { isOnline: boolean; lastUpdate: Date | null; listenerActive: boolean; connectionAttempts: number; }
-interface RouteParams extends Record<string, string | undefined> { id?: string; country?: string; language?: string; type?: string; slug?: string; profileId?: string; name?: string; }
+interface RouteParams extends Record<string, string | undefined> {
+  id?: string; country?: string; language?: string; type?: string; slug?: string; profileId?: string; name?: string;
+}
 
 // Utils
-const detectLanguage = (): 'fr' | 'en' => (typeof navigator !== 'undefined' && navigator.language ? (navigator.language.toLowerCase().startsWith('fr') ? 'fr' : 'en') : 'en');
+const detectLanguage = (): 'fr' | 'en' =>
+  (typeof navigator !== 'undefined' && navigator.language
+    ? (navigator.language.toLowerCase().startsWith('fr') ? 'fr' : 'en')
+    : 'en');
+
 const safeNormalize = (v?: string): string =>
-  (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  (v || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 const getFirstString = (val: unknown, preferred?: string): string | undefined => {
   if (!val) return undefined;
   if (typeof val === 'string') return val.trim() || undefined;
@@ -222,22 +285,40 @@ const getFirstString = (val: unknown, preferred?: string): string | undefined =>
   }
   return undefined;
 };
+
 const toArrayFromAny = (val: unknown, preferred?: string): string[] => {
   if (!val) return [];
-  if (Array.isArray(val)) return val.map((x) => (typeof x === 'string' ? x : getFirstString(x, preferred) || '')).map((s) => s.trim()).filter(Boolean);
+  if (Array.isArray(val)) {
+    return val
+      .map((x) => (typeof x === 'string' ? x : getFirstString(x, preferred) || ''))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
   if (typeof val === 'string') return val.split(/[;,]/).map((s) => s.trim()).filter(Boolean);
   if (typeof val === 'object' && val !== null) {
     const obj = val as Record<string, unknown>;
-    return Object.values(obj).map((v) => (typeof v === 'string' ? v : getFirstString(v, preferred) || '')).map((s) => s.trim()).filter(Boolean);
+    return Object.values(obj)
+      .map((v) => (typeof v === 'string' ? v : getFirstString(v, preferred) || ''))
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return [];
 };
+
 const pickDescription = (p: Partial<SosProfile>, preferredLang?: string): string => {
-  const chain = [getFirstString(p.description, preferredLang), getFirstString(p.bio, preferredLang), getFirstString(p.professionalDescription, preferredLang), getFirstString(p.experienceDescription, preferredLang)];
+  const chain = [
+    getFirstString(p.description, preferredLang),
+    getFirstString(p.bio, preferredLang),
+    getFirstString(p.professionalDescription, preferredLang),
+    getFirstString(p.experienceDescription, preferredLang),
+  ];
   return chain.find(Boolean) || TEXTS[preferredLang as 'fr' | 'en']?.noSpecialties || 'No description available.';
 };
+
 const toStringFromAny = (val: unknown, preferred?: string): string | undefined => getFirstString(val, preferred);
+
 const isFsTimestamp = (v: unknown): v is FsTimestamp => typeof (v as FsTimestamp | null)?.toDate === 'function';
+
 const formatJoinDate = (val: TSLike, lang: 'fr' | 'en'): string | undefined => {
   if (!val) return undefined;
   const d = isFsTimestamp(val) ? val.toDate() : val instanceof Date ? val : undefined;
@@ -267,6 +348,15 @@ const formatUSD = (value?: number) => {
   }).format(value);
 };
 
+// ✅ Helper type-safe pour extraire l'ID utilisateur sans any
+const getAuthUserId = (u: unknown): string | undefined => {
+  if (!u || (typeof u !== 'object' && typeof u !== 'function')) return undefined;
+  const maybe = u as { uid?: unknown; id?: unknown };
+  const uid = typeof maybe.uid === 'string' && maybe.uid.trim() ? maybe.uid : undefined;
+  const id = typeof maybe.id === 'string' && maybe.id.trim() ? maybe.id : undefined;
+  return uid ?? id;
+};
+
 // Component
 const ProviderProfile: React.FC = () => {
   const params = useParams<RouteParams>();
@@ -276,8 +366,14 @@ const ProviderProfile: React.FC = () => {
   const { user } = useAuth();
   const { language } = useApp();
 
-  const detectedLang = useMemo(() => (language === 'fr' || language === 'en' ? (language as 'fr' | 'en') : detectLanguage()), [language]);
-  const t = useCallback((key: keyof typeof TEXTS.fr): string => TEXTS[detectedLang]?.[key] || TEXTS.en[key] || key, [detectedLang]);
+  const detectedLang = useMemo(
+    () => (language === 'fr' || language === 'en' ? (language as 'fr' | 'en') : detectLanguage()),
+    [language]
+  );
+  const t = useCallback(
+    (key: keyof typeof TEXTS.fr): string => TEXTS[detectedLang]?.[key] || TEXTS.en[key] || key,
+    [detectedLang]
+  );
   const preferredLangKey = detectedLang === 'fr' ? 'fr' : 'en';
 
   const [provider, setProvider] = useState<SosProfile | null>(null);
@@ -295,7 +391,9 @@ const ProviderProfile: React.FC = () => {
   const [showImageModal, setShowImageModal] = useState(false);
 
   // Online status
-  const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({ isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0 });
+  const [onlineStatus, setOnlineStatus] = useState<OnlineStatus>({
+    isOnline: false, lastUpdate: null, listenerActive: false, connectionAttempts: 0
+  });
 
   // ======= Prix depuis Admin uniquement (EUR principal + équivalent USD) =======
   const serviceTypeForPricing: 'lawyer' | 'expat' | undefined = provider?.type;
@@ -352,7 +450,8 @@ const ProviderProfile: React.FC = () => {
         let providerData: SosProfile | null = null;
         let foundProviderId: string | null = null;
 
-        const rawIdParam = id || params.slug || params.profileId || params.name || location.pathname.split('/').pop() || '';
+        const rawIdParam =
+          id || params.slug || params.profileId || params.name || location.pathname.split('/').pop() || '';
         const lastToken = rawIdParam.split('-').pop() || rawIdParam;
         const slugNoUid = rawIdParam.replace(/-[a-zA-Z0-9]{8,}$/, '');
 
@@ -416,13 +515,22 @@ const ProviderProfile: React.FC = () => {
           const type = typeParam === 'avocat' ? 'lawyer' : typeParam === 'expatrie' ? 'expat' : undefined;
           if (type) {
             try {
-              const qRef = query(collection(db, 'sos_profiles'), where('type', '==', type), where('isActive', '==', true), limit(50));
+              const qRef = query(
+                collection(db, 'sos_profiles'),
+                where('type', '==', type),
+                where('isActive', '==', true),
+                limit(50)
+              );
               const qs = await getDocs(qRef);
               const match = qs.docs.find((d) => {
                 const data = d.data() || {};
                 const dataSlug = (data.slug as string | undefined) || '';
                 const computedNameSlug = safeNormalize(`${data.firstName || ''}-${data.lastName || ''}`);
-                return dataSlug === slugNoUid || (dataSlug && dataSlug.startsWith(slugNoUid)) || computedNameSlug === slugNoUid;
+                return (
+                  dataSlug === slugNoUid ||
+                  (dataSlug && dataSlug.startsWith(slugNoUid)) ||
+                  computedNameSlug === slugNoUid
+                );
               });
 
               if (match) {
@@ -529,12 +637,15 @@ const ProviderProfile: React.FC = () => {
 
         if (providerData && foundProviderId) {
           if (!providerData.fullName?.trim()) {
-            providerData.fullName = `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 'Profil SOS';
+            providerData.fullName =
+              `${providerData.firstName || ''} ${providerData.lastName || ''}`.trim() || 'Profil SOS';
           }
           setProvider(providerData);
           setRealProviderId(foundProviderId);
           if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => { loadReviews(foundProviderId, providerData!.uid); });
+            requestIdleCallback(() => {
+              loadReviews(foundProviderId, providerData.uid);
+            });
           } else {
             await loadReviews(foundProviderId, providerData.uid);
           }
@@ -593,12 +704,16 @@ const ProviderProfile: React.FC = () => {
       const isLawyer = provider.type === 'lawyer';
       const displayType = isLawyer ? 'avocat' : 'expatrie';
       const countrySlug = safeNormalize(provider.country || '');
-      const langSlug = provider.mainLanguage || (provider.languages?.[0] ? safeNormalize(provider.languages[0]) : 'francais');
-      const nameSlug = provider.slug || safeNormalize(`${provider.firstName || ''}-${provider.lastName || ''}`) || safeNormalize(provider.fullName || '');
+      const langSlug =
+        provider.mainLanguage || (provider.languages?.[0] ? safeNormalize(provider.languages[0]) : 'francais');
+      const nameSlug =
+        provider.slug || safeNormalize(`${provider.firstName || ''}-${provider.lastName || ''}`) || safeNormalize(provider.fullName || '');
       const seoUrl = `/${displayType}/${countrySlug}/${langSlug}/${nameSlug}-${provider.id}`;
       if (window.location.pathname !== seoUrl) window.history.replaceState(null, '', seoUrl);
 
-      const pageTitle = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`;
+      const pageTitle = `${provider.fullName} - ${
+        isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')
+      } ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country} | SOS Expat & Travelers`;
       document.title = pageTitle;
 
       const updateOrCreateMeta = (property: string, content: string): void => {
@@ -633,20 +748,29 @@ const ProviderProfile: React.FC = () => {
     const gtag = (window as Window & { gtag?: (...args: unknown[]) => void }).gtag;
     if (typeof window !== 'undefined' && typeof gtag === 'function') {
       gtag('event', 'book_call_click', {
-        provider_id: provider.id, provider_uid: provider.uid, provider_type: provider.type, provider_country: provider.country, is_online: onlineStatus.isOnline,
+        provider_id: provider.id,
+        provider_uid: provider.uid,
+        provider_type: provider.type,
+        provider_country: provider.country,
+        is_online: onlineStatus.isOnline,
       });
     }
-    if (((user as AuthUser)?.uid ?? (user as AuthUser)?.id)) {
+    const authUserId = getAuthUserId(user);
+    if (authUserId) {
       logAnalyticsEvent({
         eventType: 'book_call_click',
-        userId: (user as AuthUser).uid ?? (user as AuthUser).id,
+        userId: authUserId,
         eventData: {
-          providerId: provider.id, providerUid: provider.uid, providerType: provider.type, providerName: provider.fullName, providerOnlineStatus: onlineStatus.isOnline,
+          providerId: provider.id,
+          providerUid: provider.uid,
+          providerType: provider.type,
+          providerName: provider.fullName,
+          providerOnlineStatus: onlineStatus.isOnline,
         },
       });
     }
-    try { 
-      sessionStorage.setItem(STORAGE_KEYS.SELECTED_PROVIDER, JSON.stringify(provider)); 
+    try {
+      sessionStorage.setItem(STORAGE_KEYS.SELECTED_PROVIDER, JSON.stringify(provider));
     } catch (error) {
       console.warn('Failed to save provider to sessionStorage:', error);
     }
@@ -663,27 +787,45 @@ const ProviderProfile: React.FC = () => {
     if (!provider) return;
     const isLawyer = provider.type === 'lawyer';
     const countrySlug = safeNormalize(provider.country);
-    const langSlug = provider.mainLanguage || (provider.languages?.[0] ? safeNormalize(provider.languages[0]) : 'francais');
+    const langSlug =
+      provider.mainLanguage || (provider.languages?.[0] ? safeNormalize(provider.languages[0]) : 'francais');
     const nameSlug = provider.slug || safeNormalize(`${provider.firstName}-${provider.lastName}`);
     const seoPath = `/${isLawyer ? 'avocat' : 'expatrie'}/${countrySlug}/${langSlug}/${nameSlug}-${provider.id}`;
     const currentUrl = `${window.location.origin}${seoPath}`;
-    const title = `${provider.fullName} - ${isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')} ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}`;
+    const title = `${provider.fullName} - ${
+      isLawyer ? (detectedLang === 'fr' ? 'Avocat' : 'Lawyer') : (detectedLang === 'fr' ? 'Expatrié' : 'Expat')
+    } ${detectedLang === 'fr' ? 'en' : 'in'} ${provider.country}`;
 
     switch (platform) {
       case 'facebook':
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`, '_blank', 'noopener,noreferrer');
         break;
       case 'twitter':
-        window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(title)}`, '_blank', 'noopener,noreferrer');
+        window.open(
+          `https://twitter.com/intent/tweet?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(title)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
         break;
       case 'linkedin':
-        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentUrl)}`, '_blank', 'noopener,noreferrer');
+        window.open(
+          `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentUrl)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
         break;
       case 'copy':
         if (navigator.clipboard?.writeText) {
-          navigator.clipboard.writeText(currentUrl); alert(t('linkCopied'));
+          navigator.clipboard.writeText(currentUrl);
+          alert(t('linkCopied'));
         } else {
-          const textArea = document.createElement('textarea'); textArea.value = currentUrl; document.body.appendChild(textArea); textArea.select(); document.execCommand('copy'); document.body.removeChild(textArea); alert(t('linkCopied'));
+          const textArea = document.createElement('textarea');
+          textArea.value = currentUrl;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert(t('linkCopied'));
         }
         break;
     }
@@ -732,9 +874,16 @@ const ProviderProfile: React.FC = () => {
   // Computed
   const isLawyer = provider?.type === 'lawyer';
   const isExpat = provider?.type === 'expat';
-  const languagesList = useMemo<string[]>(() => (provider?.languages?.length ? provider.languages : ['Français']), [provider?.languages]);
-  const mainPhoto = (provider?.profilePhoto || provider?.photoURL || provider?.avatar || '/default-avatar.png') as string;
-  const descriptionText = useMemo(() => (provider ? pickDescription(provider, preferredLangKey) : ''), [provider, preferredLangKey]);
+  const languagesList = useMemo<string[]>(
+    () => (provider?.languages?.length ? provider.languages : ['Français']),
+    [provider?.languages]
+  );
+  const mainPhoto: string =
+    provider?.profilePhoto || provider?.photoURL || provider?.avatar || '/default-avatar.png';
+  const descriptionText = useMemo(
+    () => (provider ? pickDescription(provider, preferredLangKey) : ''),
+    [provider, preferredLangKey]
+  );
   const educationText = useMemo(() => {
     if (!provider || !isLawyer) return undefined;
     return toStringFromAny(provider.lawSchool, preferredLangKey) || toStringFromAny(provider.education, preferredLangKey);
@@ -747,7 +896,9 @@ const ProviderProfile: React.FC = () => {
   }, [provider, isLawyer, preferredLangKey]);
   const derivedSpecialties = useMemo(() => {
     if (!provider) return [];
-    const arr = isLawyer ? toArrayFromAny(provider.specialties, preferredLangKey) : toArrayFromAny(provider.helpTypes || provider.specialties, preferredLangKey);
+    const arr = isLawyer
+      ? toArrayFromAny(provider.specialties, preferredLangKey)
+      : toArrayFromAny(provider.helpTypes || provider.specialties, preferredLangKey);
     return arr.map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
   }, [provider, isLawyer, preferredLangKey]);
   const joinDateText = useMemo(() => {
@@ -779,7 +930,7 @@ const ProviderProfile: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        {user && provider && ((user as AuthUser)?.uid ?? (user as AuthUser)?.id) === provider.uid && (
+        {user && provider && getAuthUserId(user) === provider.uid && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold mb-2">Visibilité sur la carte</h3>
@@ -1220,7 +1371,15 @@ const ProviderProfile: React.FC = () => {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowImageModal(false)} role="dialog" aria-modal="true" aria-labelledby="image-modal-title">
           <div className="relative max-w-3xl max-h-[90vh] m-4">
             <h2 id="image-modal-title" className="sr-only">{t('photoOf')} {provider.fullName}</h2>
-            <img src={mainPhoto} alt={`${t('photoOf')} ${provider.fullName}`} className="max-w-full max-h-[90vh] object-contain rounded-xl" style={{ maxWidth: IMAGE_SIZES.MODAL_MAX_WIDTH, maxHeight: IMAGE_SIZES.MODAL_MAX_HEIGHT }} onError={handleImageError} loading="lazy" decoding="async" />
+            <img
+              src={mainPhoto}
+              alt={`${t('photoOf')} ${provider.fullName}`}
+              className="max-w-full max-h-[90vh] object-contain rounded-xl"
+              style={{ maxWidth: IMAGE_SIZES.MODAL_MAX_WIDTH, maxHeight: IMAGE_SIZES.MODAL_MAX_HEIGHT }}
+              onError={handleImageError}
+              loading="lazy"
+              decoding="async"
+            />
             <button className="absolute top-4 right-4 bg-white rounded-full p-2 text-gray-800 hover:bg-gray-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white/50" onClick={() => setShowImageModal(false)} aria-label={t('close')}>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
             </button>

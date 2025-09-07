@@ -1,3 +1,5 @@
+// src/types/provider.ts
+
 // Interface Provider unifiée pour assurer la cohérence entre tous les composants
 // Basée sur l'interface originale de Providers.tsx + extensions pour tous les autres fichiers
 export interface Provider {
@@ -18,7 +20,7 @@ export interface Provider {
   isVisible: boolean;
   isApproved: boolean;
   isBanned: boolean;
-  
+
   // Champs étendus pour compatibilité avec les autres composants
   fullName?: string;
   firstName?: string;
@@ -30,6 +32,7 @@ export interface Provider {
   email?: string;
   phone?: string;
   phoneNumber?: string;
+  telephone?: string; // <— ajouté pour corriger les usages existants
   whatsapp?: string;
   whatsAppNumber?: string;
   languagesSpoken?: string[]; // Alias de languages pour compatibilité
@@ -81,9 +84,9 @@ export function normalizeProvider(providerData: unknown): Provider {
     Math.random().toString(36);
 
   // type / role
-  const rawType = (o.type ?? o.role ?? o.providerType);
+  const rawType = o.type ?? o.role ?? o.providerType;
   const type: 'lawyer' | 'expat' =
-    rawType === 'lawyer' || rawType === 'expat' ? rawType : 'expat';
+    rawType === 'lawyer' || rawType === 'expat' ? (rawType as 'lawyer' | 'expat') : 'expat';
 
   // name / fullName
   const nameCandidate =
@@ -115,10 +118,8 @@ export function normalizeProvider(providerData: unknown): Provider {
     toStrArray(o.providerSpecialties, []);
 
   // price / duration
-  const price =
-    toNum(o.price, type === 'lawyer' ? 49 : 19);
-  const duration =
-    toNum(o.duration, type === 'lawyer' ? 20 : 30);
+  const price = toNum(o.price, type === 'lawyer' ? 49 : 19);
+  const duration = toNum(o.duration, type === 'lawyer' ? 20 : 30);
 
   // rating / reviews
   const rating = (() => {
@@ -128,9 +129,7 @@ export function normalizeProvider(providerData: unknown): Provider {
   const reviewCount = Math.max(0, toNum(o.reviewCount, toNum(o.providerReviewCount, 0)));
 
   // years of experience
-  const yearsOfExperience = Math.max(
-    toNum(o.yearsOfExperience, toNum(o.yearsAsExpat, 1))
-  );
+  const yearsOfExperience = Math.max(0, toNum(o.yearsOfExperience, toNum(o.yearsAsExpat, 1)));
 
   // media / description
   const avatar = toStr(o.avatar) || toStr(o.profilePhoto) || toStr(o.providerAvatar) || '/default-avatar.png';
@@ -141,6 +140,7 @@ export function normalizeProvider(providerData: unknown): Provider {
   const phoneNumber = toStr(o.phoneNumber) || toStr(o.phone) || toStr(o.providerPhone);
   const whatsapp = toStr(o.whatsapp) || toStr(o.whatsAppNumber);
   const whatsAppNumber = toStr(o.whatsAppNumber) || toStr(o.whatsapp);
+  const telephone = toStr(o.telephone) || phone || phoneNumber; // normalisation
   const email = toStr(o.email);
 
   // flags
@@ -179,7 +179,7 @@ export function normalizeProvider(providerData: unknown): Provider {
     isVisible,
     isApproved,
     isBanned,
-    
+
     // Champs étendus pour compatibilité avec autres composants
     fullName,
     firstName,
@@ -191,6 +191,7 @@ export function normalizeProvider(providerData: unknown): Provider {
     email,
     phone,
     phoneNumber,
+    telephone,
     whatsapp,
     whatsAppNumber,
     languagesSpoken: languages,
@@ -200,7 +201,7 @@ export function normalizeProvider(providerData: unknown): Provider {
     yearsAsExpat,
     graduationYear,
     expatriationYear,
-    isActive
+    isActive,
   };
 }
 
@@ -209,10 +210,10 @@ export function normalizeProvider(providerData: unknown): Provider {
  */
 export function validateProvider(provider: Provider | null): provider is Provider {
   if (!provider) return false;
-  
+
   return Boolean(
-    provider.id?.trim() &&
-    provider.name?.trim() &&
+    provider.id.trim() &&
+    provider.name.trim() &&
     provider.role &&
     !provider.isBanned &&
     provider.isVisible &&
@@ -243,7 +244,7 @@ export function createDefaultProvider(providerId: string): Provider {
     isVisible: true,
     isApproved: true,
     isBanned: false,
-    
+
     // Champs étendus
     fullName: 'Expert Consultant',
     firstName: '',
@@ -255,6 +256,7 @@ export function createDefaultProvider(providerId: string): Provider {
     email: '',
     phone: '',
     phoneNumber: '',
+    telephone: '',
     whatsapp: '',
     whatsAppNumber: '',
     languagesSpoken: ['fr'],
@@ -264,8 +266,6 @@ export function createDefaultProvider(providerId: string): Provider {
     yearsAsExpat: 1,
     graduationYear: '',
     expatriationYear: '',
-    isActive: true
+    isActive: true,
   };
 }
-
-

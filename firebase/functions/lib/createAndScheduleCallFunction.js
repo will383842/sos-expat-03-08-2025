@@ -67,7 +67,6 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
     cors: true,
     // ✅ Pas de secrets Twilio ici - ils sont gérés dans lib/twilio et importés dans index.ts
 }, async (request) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4;
     const requestId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
         // ========================================
@@ -83,16 +82,16 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         // 2. VALIDATION DES DONNÉES DÉTAILLÉE
         // ========================================
         console.log(`🔍 [${requestId}] Données reçues:`, {
-            providerId: ((_a = request.data) === null || _a === void 0 ? void 0 : _a.providerId) ? request.data.providerId.substring(0, 8) + '...' : 'MANQUANT',
-            clientId: ((_b = request.data) === null || _b === void 0 ? void 0 : _b.clientId) ? request.data.clientId.substring(0, 8) + '...' : 'MANQUANT',
-            providerPhone: ((_c = request.data) === null || _c === void 0 ? void 0 : _c.providerPhone) ? '✅ Fourni' : '❌ MANQUANT',
-            clientPhone: ((_d = request.data) === null || _d === void 0 ? void 0 : _d.clientPhone) ? '✅ Fourni' : '❌ MANQUANT',
-            serviceType: ((_e = request.data) === null || _e === void 0 ? void 0 : _e.serviceType) || 'MANQUANT',
-            providerType: ((_f = request.data) === null || _f === void 0 ? void 0 : _f.providerType) || 'MANQUANT',
-            paymentIntentId: ((_g = request.data) === null || _g === void 0 ? void 0 : _g.paymentIntentId) ? '✅ Fourni' : '❌ MANQUANT',
-            amount: ((_h = request.data) === null || _h === void 0 ? void 0 : _h.amount) || 'MANQUANT',
-            clientWhatsapp: ((_j = request.data) === null || _j === void 0 ? void 0 : _j.clientWhatsapp) ? '✅ Fourni' : 'Non fourni (optionnel)',
-            delayMinutes: ((_k = request.data) === null || _k === void 0 ? void 0 : _k.delayMinutes) || 5
+            providerId: request.data?.providerId ? request.data.providerId.substring(0, 8) + '...' : 'MANQUANT',
+            clientId: request.data?.clientId ? request.data.clientId.substring(0, 8) + '...' : 'MANQUANT',
+            providerPhone: request.data?.providerPhone ? '✅ Fourni' : '❌ MANQUANT',
+            clientPhone: request.data?.clientPhone ? '✅ Fourni' : '❌ MANQUANT',
+            serviceType: request.data?.serviceType || 'MANQUANT',
+            providerType: request.data?.providerType || 'MANQUANT',
+            paymentIntentId: request.data?.paymentIntentId ? '✅ Fourni' : '❌ MANQUANT',
+            amount: request.data?.amount || 'MANQUANT',
+            clientWhatsapp: request.data?.clientWhatsapp ? '✅ Fourni' : 'Non fourni (optionnel)',
+            delayMinutes: request.data?.delayMinutes || 5
         });
         const { providerId, clientId, providerPhone, clientPhone, serviceType, providerType, paymentIntentId, amount, delayMinutes = 5, // ✅ Garde pour compatibilité mais ne sera plus utilisé
         clientLanguages, providerLanguages, clientWhatsapp } = request.data;
@@ -300,20 +299,20 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
             errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
             stack: error instanceof Error ? error.stack : undefined,
             requestData: {
-                providerId: ((_m = (_l = request.data) === null || _l === void 0 ? void 0 : _l.providerId) === null || _m === void 0 ? void 0 : _m.substring(0, 8)) + '...' || 'undefined',
-                clientId: ((_p = (_o = request.data) === null || _o === void 0 ? void 0 : _o.clientId) === null || _p === void 0 ? void 0 : _p.substring(0, 8)) + '...' || 'undefined',
-                serviceType: (_q = request.data) === null || _q === void 0 ? void 0 : _q.serviceType,
-                amount: (_r = request.data) === null || _r === void 0 ? void 0 : _r.amount,
-                amountType: typeof ((_s = request.data) === null || _s === void 0 ? void 0 : _s.amount),
-                paymentIntentId: (_t = request.data) === null || _t === void 0 ? void 0 : _t.paymentIntentId,
+                providerId: request.data?.providerId?.substring(0, 8) + '...' || 'undefined',
+                clientId: request.data?.clientId?.substring(0, 8) + '...' || 'undefined',
+                serviceType: request.data?.serviceType,
+                amount: request.data?.amount,
+                amountType: typeof request.data?.amount,
+                paymentIntentId: request.data?.paymentIntentId,
                 hasAuth: !!request.auth,
-                delayMinutes: (_u = request.data) === null || _u === void 0 ? void 0 : _u.delayMinutes,
-                hasProviderPhone: !!((_v = request.data) === null || _v === void 0 ? void 0 : _v.providerPhone),
-                hasClientPhone: !!((_w = request.data) === null || _w === void 0 ? void 0 : _w.clientPhone),
-                providerPhoneLength: ((_y = (_x = request.data) === null || _x === void 0 ? void 0 : _x.providerPhone) === null || _y === void 0 ? void 0 : _y.length) || 0,
-                clientPhoneLength: ((_0 = (_z = request.data) === null || _z === void 0 ? void 0 : _z.clientPhone) === null || _0 === void 0 ? void 0 : _0.length) || 0
+                delayMinutes: request.data?.delayMinutes,
+                hasProviderPhone: !!request.data?.providerPhone,
+                hasClientPhone: !!request.data?.clientPhone,
+                providerPhoneLength: request.data?.providerPhone?.length || 0,
+                clientPhoneLength: request.data?.clientPhone?.length || 0
             },
-            userAuth: ((_2 = (_1 = request.auth) === null || _1 === void 0 ? void 0 : _1.uid) === null || _2 === void 0 ? void 0 : _2.substring(0, 8)) + '...' || 'not-authenticated',
+            userAuth: request.auth?.uid?.substring(0, 8) + '...' || 'not-authenticated',
             timestamp: new Date().toISOString(),
             newFlow: 'stripe_webhook_scheduling' // ✅ Indiquer le nouveau flux dans les logs d'erreur
         };
@@ -322,8 +321,8 @@ exports.createAndScheduleCallHTTPS = (0, https_1.onCall)({
         console.error(`❌ [${requestId}] Erreur lors de la création de session:`, {
             error: errorDetails.error,
             errorType: errorDetails.errorType,
-            serviceType: (_3 = request.data) === null || _3 === void 0 ? void 0 : _3.serviceType,
-            amount: (_4 = request.data) === null || _4 === void 0 ? void 0 : _4.amount,
+            serviceType: request.data?.serviceType,
+            amount: request.data?.amount,
             hasProviderPhone: errorDetails.requestData.hasProviderPhone,
             hasClientPhone: errorDetails.requestData.hasClientPhone,
             newFlow: errorDetails.newFlow

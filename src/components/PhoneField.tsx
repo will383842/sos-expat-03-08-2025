@@ -1,30 +1,37 @@
 import React from 'react';
-import { Controller, Control } from 'react-hook-form';
+import { Controller, Control, FieldValues, Path } from 'react-hook-form';
 import { toE164 } from '../utils/phone';
 
-type Props = {
-  name: string;
-  control: Control<any>;
+type CountryCode = 'FR' | 'BE' | 'CH' | 'MA' | 'ES' | 'IT' | 'DE' | 'GB';
+
+export type PhoneFieldProps<TFieldValues extends FieldValues = FieldValues> = {
+  name: Path<TFieldValues>;
+  control: Control<TFieldValues>;
   label?: string;
-  defaultCountry?: 'FR'|'BE'|'CH'|'MA'|'ES'|'IT'|'DE'|'GB';
+  defaultCountry?: CountryCode;
   placeholder?: string;
   required?: boolean;
 };
 
-export default function PhoneField({
-  name, control, label, defaultCountry='FR', placeholder='+33612345678', required
-}: Props) {
+export default function PhoneField<TFieldValues extends FieldValues = FieldValues>({
+  name,
+  control,
+  label,
+  defaultCountry = 'FR',
+  placeholder = '+33612345678',
+  required,
+}: PhoneFieldProps<TFieldValues>) {
   return (
     <Controller
       name={name}
       control={control}
       rules={{
+        // ✅ plus de setValueAs ici
         required: required ? 'Numéro requis' : false,
-        validate: (v: string) => toE164(v, defaultCountry).ok || 'Numéro invalide (ex: +33612345678)',
-        setValueAs: (v: string) => {
-          const r = toE164(v, defaultCountry);
-          return r.ok ? r.e164 : v; // stocke en E.164
-        }
+        validate: (v: string) => {
+          const res = toE164(v, defaultCountry);
+          return res.ok || 'Numéro invalide (ex: +33612345678)';
+        },
       }}
       render={({ field, fieldState }) => (
         <div className="flex flex-col gap-1">
@@ -36,12 +43,16 @@ export default function PhoneField({
             placeholder={placeholder}
             className={`input ${fieldState.error ? 'border-red-500' : ''}`}
             onBlur={(e) => {
-              const r = toE164(e.currentTarget.value, defaultCountry);
-              if (r.ok) field.onChange(r.e164); // normalise au blur
+              const normalized = toE164(e.currentTarget.value, defaultCountry);
+              if (normalized.ok) {
+                field.onChange(normalized.e164); // ✅ normalisation au blur
+              }
               field.onBlur();
             }}
           />
-          {fieldState.error && <span className="text-red-600 text-xs">{fieldState.error.message}</span>}
+          {fieldState.error && (
+            <span className="text-red-600 text-xs">{fieldState.error.message}</span>
+          )}
         </div>
       )}
     />

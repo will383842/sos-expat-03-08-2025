@@ -1,6 +1,6 @@
 // LogsPage.tsx
 import React, { useEffect, useState } from 'react';
-import { db } from '../../config/firebase';
+import { db } from '@/config/firebase';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { format } from 'date-fns';
 

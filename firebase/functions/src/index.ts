@@ -345,7 +345,7 @@ ultraLogger.info('EXPORTS', 'Début du chargement des exports directs');
 
 export { createAndScheduleCallHTTPS };
 export { createAndScheduleCallHTTPS as createAndScheduleCall };
-export { createPaymentIntent } from './createPaymentIntent'; // ⚠️ Ajouter secrets dans createPaymentIntent.ts
+export { createPaymentIntent } from './createPaymentIntent'; 
 export { api } from './adminApi';
 
 // Webhooks
@@ -1594,7 +1594,7 @@ export const testWebhook = onRequest(
     concurrency: 1,
     timeoutSeconds: 60
   },
-  wrapHttpFunction('testWebhook', async (req: FirebaseRequest, res: Response) => {
+  wrapHttpFunction('testWebhook', async (_req: FirebaseRequest, res: Response) => {
     try {
       res.status(200).json({ ok: true, now: new Date().toISOString() });
     } catch (e: any) {

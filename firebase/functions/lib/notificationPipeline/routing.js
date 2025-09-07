@@ -5,9 +5,8 @@ exports.isRateLimited = isRateLimited;
 const firestore_1 = require("firebase-admin/firestore");
 const db = (0, firestore_1.getFirestore)();
 async function getRouting(eventId) {
-    var _a, _b;
     const conf = await db.collection('message_routing').doc('config').get();
-    const routing = (_b = (_a = conf.data()) === null || _a === void 0 ? void 0 : _a.routing) !== null && _b !== void 0 ? _b : {};
+    const routing = conf.data()?.routing ?? {};
     const eventRouting = routing[eventId];
     if (!eventRouting) {
         // Configuration par défaut

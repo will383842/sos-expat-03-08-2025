@@ -176,8 +176,7 @@ function isSupportedLang(lang) {
  * utile pour choisir la langue des notifications initiales.
  */
 function pickBestClientLang(clientLangs, fallback = exports.DEFAULT_FALLBACK_LANG) {
-    var _a;
     const c = normalizeLangList(clientLangs);
-    return (_a = c[0]) !== null && _a !== void 0 ? _a : fallback;
+    return c[0] ?? fallback;
 }
 //# sourceMappingURL=Language.js.map

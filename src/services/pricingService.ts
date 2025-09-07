@@ -1,5 +1,5 @@
-// src/services/pricingService.ts (FRONTEND VERSION — STRICT TYPAGE)
-import { doc, getDoc } from "firebase/firestore";
+// src/services/pricingService.ts
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useEffect, useState } from "react";
 
@@ -23,48 +23,50 @@ export interface PriceOverride {
 // === END
 
 export interface ServiceConfig {
-  /** Total payé par le client (unités de devise, ex: 50.00) */
   totalAmount: number;
-  /** Frais de service plateforme (même unité que totalAmount) */
   connectionFeeAmount: number;
-  /** Montant net pour le prestataire (total - fees) */
   providerAmount: number;
-  /** Durée de la prestation en minutes */
   duration: number;
-  /** "eur" | "usd" */
   currency: string;
 }
 
 export interface PricingConfig {
   lawyer: { eur: ServiceConfig; usd: ServiceConfig };
   expat: { eur: ServiceConfig; usd: ServiceConfig };
-  // 👇 NEW
   overrides?: {
     lawyer?: Partial<Record<Currency, PriceOverride>>;
     expat?: Partial<Record<Currency, PriceOverride>>;
+    settings?: {
+      stackableDefault?: boolean;
+    };
   };
 }
 
-/** Firestore: structure attendue */
 export interface FirestorePricingDoc {
-  lawyer?: { eur?: Partial<ServiceConfig & { platformFeePercent?: number }>; usd?: Partial<ServiceConfig & { platformFeePercent?: number }> };
-  expat?: { eur?: Partial<ServiceConfig & { platformFeePercent?: number }>; usd?: Partial<ServiceConfig & { platformFeePercent?: number }> };
+  lawyer?: {
+    eur?: Partial<ServiceConfig & { platformFeePercent?: number }>;
+    usd?: Partial<ServiceConfig & { platformFeePercent?: number }>;
+  };
+  expat?: {
+    eur?: Partial<ServiceConfig & { platformFeePercent?: number }>;
+    usd?: Partial<ServiceConfig & { platformFeePercent?: number }>;
+  };
   overrides?: {
     lawyer?: Partial<Record<Currency, PriceOverride>>;
     expat?: Partial<Record<Currency, PriceOverride>>;
+    settings?: {
+      stackableDefault?: boolean;
+    };
   };
 }
 
-/** Source de vérité Firestore */
 const PRICING_REF = doc(db, "admin_config", "pricing");
 
 /** Cache mémoire (5 min) */
 let _cache: { data: PricingConfig | null; ts: number } = { data: null, ts: 0 };
 const CACHE_MS = 5 * 60 * 1000;
 
-/**
- * ✅ Fallback unique (exigence projet)
- */
+/** Fallback */
 const DEFAULT_FALLBACK: PricingConfig = {
   lawyer: {
     eur: makeConfigFromBase({ base: 50, feePercent: 20, duration: 20, currency: "eur" }),
@@ -76,10 +78,10 @@ const DEFAULT_FALLBACK: PricingConfig = {
   },
 };
 
-/** Utilitaire pour construire un ServiceConfig à partir d'un prix de base + % fee */
+/** Utils */
 function makeConfigFromBase(params: {
-  base: number; // total payé par le client
-  feePercent: number; // ex: 20 (= 20%)
+  base: number;
+  feePercent: number;
   duration: number;
   currency: Currency | string;
 }): ServiceConfig {
@@ -95,12 +97,10 @@ function makeConfigFromBase(params: {
   };
 }
 
-/** Arrondi bancaire simple à 2 décimales */
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-/** Validation stricte d'un ServiceConfig */
 function isValidServiceConfig(c: unknown): c is ServiceConfig {
   if (!c || typeof c !== "object") return false;
   const cfg = c as ServiceConfig;
@@ -109,15 +109,10 @@ function isValidServiceConfig(c: unknown): c is ServiceConfig {
     typeof cfg.connectionFeeAmount === "number" &&
     typeof cfg.providerAmount === "number" &&
     typeof cfg.duration === "number" &&
-    typeof cfg.currency === "string" &&
-    Number.isFinite(cfg.totalAmount) &&
-    Number.isFinite(cfg.connectionFeeAmount) &&
-    Number.isFinite(cfg.providerAmount) &&
-    Number.isFinite(cfg.duration)
+    typeof cfg.currency === "string"
   );
 }
 
-/** Validation stricte d'un PricingConfig complet */
 function isValidPricingConfig(cfg: unknown): cfg is PricingConfig {
   if (!cfg || typeof cfg !== "object") return false;
   const c = cfg as PricingConfig;
@@ -129,9 +124,7 @@ function isValidPricingConfig(cfg: unknown): cfg is PricingConfig {
   );
 }
 
-/**
- * Lecture Firestore (sans merge partiel).
- */
+/** Lecture Firestore */
 export async function getPricingConfig(): Promise<PricingConfig> {
   const now = Date.now();
   if (_cache.data && now - _cache.ts < CACHE_MS) return _cache.data;
@@ -160,9 +153,6 @@ export async function getPricingConfig(): Promise<PricingConfig> {
   }
 }
 
-/**
- * Normalise le document Firestore quel que soit le format retenu côté admin.
- */
 function normalizeFirestoreDocument(raw: FirestorePricingDoc): PricingConfig {
   const fromNode = (
     node: Partial<ServiceConfig & { platformFeePercent?: number }> | undefined,
@@ -170,9 +160,7 @@ function normalizeFirestoreDocument(raw: FirestorePricingDoc): PricingConfig {
     currency: Currency,
     defaultDuration: number
   ): ServiceConfig => {
-    if (!node) {
-      return DEFAULT_FALLBACK[service][currency];
-    }
+    if (!node) return DEFAULT_FALLBACK[service][currency];
 
     if (typeof node.totalAmount === "number" && typeof node.platformFeePercent === "number") {
       return makeConfigFromBase({
@@ -210,7 +198,6 @@ function normalizeFirestoreDocument(raw: FirestorePricingDoc): PricingConfig {
       eur: fromNode(raw?.expat?.eur, "expat", "eur", defaultDurations.expat),
       usd: fromNode(raw?.expat?.usd, "expat", "usd", defaultDurations.expat),
     },
-    // 👇 Préservation des overrides depuis Firestore
     overrides: raw?.overrides,
   };
 }
@@ -247,7 +234,7 @@ export function usePricingConfig() {
   return { pricing, loading, error, reload };
 }
 
-/** Utilitaire simple pour récupérer le pricing d'un service+devise */
+/** Simple util */
 export async function getServicePricing(
   serviceType: ServiceType,
   currency: Currency = "eur"
@@ -256,7 +243,6 @@ export async function getServicePricing(
   return cfg[serviceType][currency];
 }
 
-/** API centrale pour CallCheckout/Wrapper */
 export async function calculateServiceAmounts(
   serviceType: ServiceType,
   currency: Currency = "eur"
@@ -271,33 +257,24 @@ export async function calculateServiceAmounts(
   };
 }
 
-/** Détection devise côté navigateur */
 export function detectUserCurrency(): Currency {
   try {
     const saved = localStorage.getItem("preferredCurrency") as Currency | null;
     if (saved === "eur" || saved === "usd") return saved;
     const nav = (navigator?.language || "").toLowerCase();
-    return nav.includes("fr") ||
-      nav.includes("de") ||
-      nav.includes("es") ||
-      nav.includes("it") ||
-      nav.includes("pt") ||
-      nav.includes("nl")
-      ? "eur"
-      : "usd";
+    return nav.match(/fr|de|es|it|pt|nl/) ? "eur" : "usd";
   } catch {
     return "eur";
   }
 }
 
-// === ADD: helpers override
+// === Overrides Helpers ===
 function toMillis(v?: number | { seconds: number }): number | undefined {
   if (typeof v === "number") return v;
   if (v && typeof (v as any).seconds === "number") return (v as any).seconds * 1000;
   return undefined;
 }
 
-/** Retourne le prix effectif (override si actif) + le standard pour l'affichage barré */
 export function getEffectivePrice(
   cfg: PricingConfig,
   service: ServiceType,
@@ -322,4 +299,64 @@ export function getEffectivePrice(
 
   return { price, standard, override: active ? ov! : null };
 }
-// === END
+
+// === New Mutators ===
+
+/** Met à jour les champs de base (merge) */
+export async function saveBasePricing(
+  partial: Partial<FirestorePricingDoc>
+): Promise<void> {
+  await setDoc(PRICING_REF, partial, { merge: true });
+  clearPricingCache();
+}
+
+/** Met à jour un override (merge) */
+export async function saveOverride(
+  service: ServiceType,
+  currency: Currency,
+  payload: Partial<PriceOverride>
+): Promise<void> {
+  const path = `overrides.${service}.${currency}`;
+  await updateDoc(PRICING_REF, { [path]: payload });
+  clearPricingCache();
+}
+
+/** Active/désactive le stackable par défaut */
+export async function setStackableDefault(value: boolean): Promise<void> {
+  await updateDoc(PRICING_REF, {
+    "overrides.settings.stackableDefault": value,
+  });
+  clearPricingCache();
+}
+
+/** Simulation d’un total avec coupon (optionnel) */
+export async function simulateTotal(params: {
+  service: ServiceType;
+  currency: Currency;
+  coupon?: { type: "fixed" | "percentage"; amount: number; maxDiscount?: number };
+}) {
+  const { service, currency, coupon } = params;
+  const cfg = await getPricingConfig();
+  const { price } = getEffectivePrice(cfg, service, currency);
+
+  let finalTotal = price.totalAmount;
+  let discount = 0;
+
+  if (coupon) {
+    if (coupon.type === "fixed") {
+      discount = Math.min(coupon.amount, finalTotal);
+    } else {
+      discount = (coupon.amount / 100) * finalTotal;
+    }
+    if (coupon.maxDiscount !== undefined) {
+      discount = Math.min(discount, coupon.maxDiscount);
+    }
+    finalTotal = Math.max(0, round2(finalTotal - discount));
+  }
+
+  return {
+    base: price,
+    finalTotal: round2(finalTotal),
+    discount: round2(discount),
+  };
+}

@@ -286,7 +286,7 @@ interface BookingRequestData {
   clientWhatsapp: string;
   providerId: string;
   providerName: string;
-  providerType: string;
+  providerType: 'lawyer' | 'expat';
   providerCountry: string;
   providerAvatar: string;
   providerRating?: number;
@@ -547,7 +547,7 @@ const BookingRequest: React.FC = () => {
               setProvider(normalized);
               try {
                 sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
-              } catch (e) {
+              } catch {
                 // ignore
               }
             } else {
@@ -573,7 +573,7 @@ const BookingRequest: React.FC = () => {
               setProvider(normalized);
               try {
                 sessionStorage.setItem('selectedProvider', JSON.stringify(normalized));
-              } catch (e) {
+              } catch {
                 // ignore
               }
             } else {
@@ -677,12 +677,15 @@ const BookingRequest: React.FC = () => {
     selectedProvider: Partial<Provider> & { id: string; type: 'lawyer' | 'expat' };
     bookingRequest: BookingRequestData;
   } => {
+    const providerType: 'lawyer' | 'expat' =
+      p.type === 'lawyer' || p.role === 'lawyer' ? 'lawyer' : 'expat';
+
     const selectedProvider: Partial<Provider> & { id: string; type: 'lawyer' | 'expat' } = {
       id: p.id,
       name: p.name,
       firstName: p.firstName,
       lastName: p.lastName,
-      type: (p.type || p.role) as 'lawyer' | 'expat',
+      type: providerType,
       country: p.country,
       avatar: p.avatar,
       price: p.price,
@@ -697,6 +700,9 @@ const BookingRequest: React.FC = () => {
       phone: p.phone,
     };
 
+    const normalizedCountry =
+      (state.currentCountry === 'Autre' ? state.autrePays : state.currentCountry) ?? 'N/A';
+
     const bookingRequest: BookingRequestData = {
       clientPhone: state.clientPhone,
       clientId: currentUser?.uid || '',
@@ -704,7 +710,7 @@ const BookingRequest: React.FC = () => {
       clientFirstName: sanitizeInput(state.firstName),
       clientLastName: sanitizeInput(state.lastName),
       clientNationality: sanitizeInput(state.nationality),
-      clientCurrentCountry: sanitizeInput(state.currentCountry === 'Autre' ? (state.autrePays || '') : state.currentCountry),
+      clientCurrentCountry: sanitizeInput(normalizedCountry),
       clientWhatsapp: state.whatsapp || '',
       providerId: selectedProvider.id,
       providerName: selectedProvider.name ?? '',
@@ -725,7 +731,7 @@ const BookingRequest: React.FC = () => {
       price: eurTotalForDisplay,
       duration: durationForDisplay,
       status: 'pending',
-      serviceType: isLawyer ? 'lawyer_call' : 'expat_call',
+      serviceType: providerType === 'lawyer' ? 'lawyer_call' : 'expat_call',
       ip: window.location.hostname,
       userAgent: navigator.userAgent,
       providerEmail: selectedProvider.email,
@@ -766,7 +772,8 @@ const BookingRequest: React.FC = () => {
             title: data.title,
             description: data.description,
             nationality: data.nationality,
-            currentCountry: data.currentCountry === 'Autre' ? data.autrePays : data.currentCountry,
+            currentCountry:
+              (data.currentCountry === 'Autre' ? data.autrePays : data.currentCountry) ?? 'N/A',
           },
           source: 'booking_request_form',
         });
@@ -797,16 +804,19 @@ const BookingRequest: React.FC = () => {
         durationForDisplay,
       );
 
-      // 🔐 UID de l'utilisateur
+      // 🔐 UID de l'utilisateur (juste pour contrôle local, plus envoyé au service)
       const uid = (user as MinimalUser)?.uid;
       if (!uid) {
         setFormError('Session expirée. Reconnectez-vous.');
         return;
       }
 
-      // Création du booking centralisée
+      // 👇 littéral 20 | 30 garanti (pas un number)
+      const svcDuration: 20 | 30 = (isLawyer ? 20 : 30);
+
+      // Création du booking centralisée (sans clientId, avec svcDuration)
       await createBookingRequest({
-        clientId: uid,
+        // clientId retiré : dérivé côté service
         providerId: selectedProvider.id,
         serviceType: isLawyer ? 'lawyer_call' : 'expat_call',
         status: 'pending',
@@ -816,7 +826,8 @@ const BookingRequest: React.FC = () => {
         clientPhone: bookingRequest.clientPhone,
         clientWhatsapp: bookingRequest.clientWhatsapp,
         price: bookingRequest.price,
-        duration: bookingRequest.duration,
+        // ✅ on envoie le littéral `20 | 30`
+        svcDuration,
         clientLanguages: bookingRequest.clientLanguages,
         clientLanguagesDetails: bookingRequest.clientLanguagesDetails,
         providerName: bookingRequest.providerName,
@@ -840,17 +851,17 @@ const BookingRequest: React.FC = () => {
 
       // Calcul serviceData pour checkout
       const selectedCurrency: Currency = detectUserCurrency();
-      const roleForPricing: ServiceType = (provider!.role || provider!.type || 'expat') as ServiceType;
+      const roleForPricing: ServiceType = role;
 
       let svcAmount = 0;
-      let svcDuration = FALLBACK_TOTALS[roleForPricing].duration;
+      let svcDurationNumber = FALLBACK_TOTALS[roleForPricing].duration;
       let svcCommission = 0;
       let svcProviderAmount = 0;
 
       try {
         const p = await calculateServiceAmounts(roleForPricing, selectedCurrency);
         svcAmount = p.totalAmount;
-        svcDuration = p.duration;
+        svcDurationNumber = p.duration;
         svcCommission = p.connectionFeeAmount;
         svcProviderAmount = p.providerAmount;
       } catch {
@@ -875,7 +886,7 @@ const BookingRequest: React.FC = () => {
             serviceType: roleForPricing === 'lawyer' ? 'lawyer_call' : 'expat_call',
             providerRole: roleForPricing,
             amount: svcAmount,
-            duration: svcDuration,
+            duration: svcDurationNumber, // number pour l'UI de checkout
             clientPhone: bookingRequest.clientPhone,
             commissionAmount: svcCommission,
             providerAmount: svcProviderAmount,
@@ -883,8 +894,7 @@ const BookingRequest: React.FC = () => {
           }),
         );
 
-        // 👇 Résumé de la demande pour CallCheckout (utilisé pour notifier le prestataire)
-        // ⚠️ Correction : country = clientCurrentCountry (pays d’intervention saisi par le client)
+        // Résumé de la demande pour CallCheckout (utilisé pour notifier le prestataire)
         sessionStorage.setItem(
           'bookingMeta',
           JSON.stringify({
@@ -920,7 +930,7 @@ const BookingRequest: React.FC = () => {
   }
   if (!provider) return null;
 
-  const inputHas = (name: keyof BookingFormData) => Boolean((errors as any)?.[name]);
+  const inputHas = <K extends keyof BookingFormData>(name: K) => Boolean(errors[name]);
 
   return (
     <Layout>
@@ -1222,7 +1232,7 @@ const BookingRequest: React.FC = () => {
                     onChange={(selected: MultiLanguageOption[]) => {
                       const options = selected || [];
                       const selectedLangs = options
-                        .map((opt) => ALL_LANGS.find((langItem) => langItem.code == opt.value))
+                        .map((opt) => ALL_LANGS.find((langItem) => langItem.code === opt.value))
                         .filter((v): v is Language => Boolean(v));
                       setLanguagesSpoken(selectedLangs);
                       setValue('clientLanguages', selectedLangs.map((s) => s.code), { shouldValidate: true });

@@ -38,8 +38,7 @@ const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const db = admin.firestore();
 exports.enqueueMessageEvent = (0, https_1.onCall)({ region: "europe-west1" }, async (req) => {
-    var _a;
-    const authUid = ((_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid) || null;
+    const authUid = req.auth?.uid || null;
     const data = req.data || {};
     const { eventId, locale = "fr-FR", to = {}, context = {} } = data;
     if (!eventId || typeof eventId !== "string") {

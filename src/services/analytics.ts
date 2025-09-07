@@ -3,18 +3,32 @@
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-// Utilitaire pour nettoyer les objets des valeurs undefined
-const cleanObject = (obj: any): any => {
-  const cleaned: any = {};
-  Object.entries(obj).forEach(([key, value]) => {
+/* -------------------------------- Utilities -------------------------------- */
+
+/**
+ * Retire les clés dont la valeur est `undefined` tout en conservant le typage.
+ */
+const cleanObject = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+  const cleaned: Partial<T> = {};
+  const entries = Object.entries(obj) as [keyof T, T[keyof T]][];
+  for (const [key, value] of entries) {
     if (value !== undefined) {
-      cleaned[key] = value;
+      (cleaned as Record<keyof T, unknown>)[key] = value;
     }
-  });
+  }
   return cleaned;
 };
 
-// Interfaces pour les différents types d'événements analytiques
+/* ----------------------------- Global typings ------------------------------ */
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
+/* --------------------------------- Types ----------------------------------- */
+
 export interface BaseAnalyticsEvent {
   timestamp: Date;
   userId?: string;
@@ -43,7 +57,7 @@ export interface UserActionEvent extends BaseAnalyticsEvent {
   category: 'user' | 'provider' | 'call' | 'payment' | 'search' | 'navigation';
   label?: string;
   value?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ConversionEvent extends BaseAnalyticsEvent {
@@ -61,6 +75,7 @@ export interface ErrorEvent extends BaseAnalyticsEvent {
   errorStack?: string;
   component?: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
+  metadata?: Record<string, unknown>;
 }
 
 export interface PerformanceEvent extends BaseAnalyticsEvent {
@@ -70,11 +85,12 @@ export interface PerformanceEvent extends BaseAnalyticsEvent {
   status?: 'success' | 'error' | 'timeout';
 }
 
-// Service principal d'analytics
+/* ----------------------------- Service class ------------------------------- */
+
 class AnalyticsService {
   private sessionId: string;
   private userId?: string;
-  private isEnabled: boolean = true;
+  private isEnabled = true;
 
   constructor() {
     this.sessionId = this.generateSessionId();
@@ -82,269 +98,267 @@ class AnalyticsService {
     this.setupPerformanceTracking();
   }
 
-  /**
-   * Génère un ID de session unique
-   */
+  /** Génère un ID de session unique */
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
-  /**
-   * Définit l'utilisateur actuel pour les analytics
-   */
+  /** Définit l'utilisateur courant pour les analytics */
   setUser(userId: string): void {
     this.userId = userId;
   }
 
-  /**
-   * Active ou désactive les analytics
-   */
+  /** Active / désactive l'envoi des analytics */
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
   }
 
-  /**
-   * Données de base pour tous les événements (nettoyées)
-   */
-  private getBaseEventData(): Record<string, any> {
-    return cleanObject({
+  /** Données de base communes à tous les événements */
+  private getBaseEventData(): Omit<BaseAnalyticsEvent, 'timestamp'> {
+    return {
       userId: this.userId,
       sessionId: this.sessionId,
-      userAgent: navigator?.userAgent,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       url: typeof window !== 'undefined' ? window.location?.href : undefined,
-      referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined
-    });
+      referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,
+    };
   }
 
-  /**
-   * Enregistre un événement d'incompatibilité linguistique
-   */
-  async logLanguageMismatch(data: Omit<LanguageMismatchEvent, keyof BaseAnalyticsEvent>): Promise<void> {
+  /* --------------------------- Public log methods -------------------------- */
+
+  /** Incompatibilité linguistique */
+  async logLanguageMismatch(
+    data: Omit<LanguageMismatchEvent, keyof BaseAnalyticsEvent>
+  ): Promise<void> {
     if (!this.isEnabled) return;
 
     try {
-      const eventData = {
+      const eventData: Record<string, unknown> = {
         ...this.getBaseEventData(),
         ...cleanObject(data),
         timestamp: serverTimestamp(),
-        eventType: 'language_mismatch'
+        eventType: 'language_mismatch',
       };
 
-      // Enregistrer dans Firestore
       await addDoc(collection(db, 'analytics_language_mismatches'), eventData);
 
-      // Incrémenter les compteurs pour les métriques rapides
       await this.incrementCounter('language_mismatches_total');
       await this.incrementCounter(`language_mismatches_${data.source}`);
 
+      // Optionnel: console debug
+      // eslint-disable-next-line no-console
       console.log('📊 Language mismatch logged:', {
         providerId: data.providerId,
         clientLanguages: data.clientLanguages,
         providerLanguages: data.providerLanguages,
-        source: data.source
+        source: data.source,
       });
-
     } catch (error) {
-      console.error('❌ Erreur lors du logging de l\'incompatibilité linguistique:', error);
-      // Ne pas faire échouer l'application pour un problème d'analytics
+      // eslint-disable-next-line no-console
+      console.error("❌ Erreur lors du logging de l'incompatibilité linguistique:", error);
     }
   }
 
-  /**
-   * Enregistre une action utilisateur
-   */
-  async logUserAction(data: Omit<UserActionEvent, keyof BaseAnalyticsEvent>): Promise<void> {
+  /** Action utilisateur */
+  async logUserAction(
+    data: Omit<UserActionEvent, keyof BaseAnalyticsEvent>
+  ): Promise<void> {
     if (!this.isEnabled) return;
 
     try {
-      const eventData = {
+      const eventData: Record<string, unknown> = {
         ...this.getBaseEventData(),
         ...cleanObject(data),
         timestamp: serverTimestamp(),
-        eventType: 'user_action'
+        eventType: 'user_action',
       };
 
       await addDoc(collection(db, 'analytics_user_actions'), eventData);
 
-      // Google Analytics 4 style tracking (si disponible)
-      if (typeof gtag !== 'undefined') {
-        gtag('event', data.action, {
+      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+        window.gtag('event', data.action, {
           event_category: data.category,
           event_label: data.label,
           value: data.value,
-          custom_map: data.metadata
+          custom_map: data.metadata,
         });
       }
-
     } catch (error) {
-      console.error('❌ Erreur lors du logging de l\'action utilisateur:', error);
+      // eslint-disable-next-line no-console
+      console.error("❌ Erreur lors du logging de l'action utilisateur:", error);
     }
   }
 
-  /**
-   * Enregistre un événement de conversion
-   */
-  async logConversion(data: Omit<ConversionEvent, keyof BaseAnalyticsEvent>): Promise<void> {
+  /** Conversion */
+  async logConversion(
+    data: Omit<ConversionEvent, keyof BaseAnalyticsEvent>
+  ): Promise<void> {
     if (!this.isEnabled) return;
 
     try {
-      const eventData = {
+      const eventData: Record<string, unknown> = {
         ...this.getBaseEventData(),
         ...cleanObject(data),
         timestamp: serverTimestamp(),
-        eventType: 'conversion'
+        eventType: 'conversion',
       };
 
       await addDoc(collection(db, 'analytics_conversions'), eventData);
 
-      // Incrémenter les compteurs de conversion
       await this.incrementCounter(`conversions_${data.conversionType}`);
       if (data.providerType) {
         await this.incrementCounter(`conversions_${data.providerType}_${data.conversionType}`);
       }
 
-      // Google Analytics conversion tracking
-      if (typeof gtag !== 'undefined') {
-        gtag('event', 'conversion', {
+      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+        window.gtag('event', 'conversion', {
           transaction_id: this.sessionId,
-          value: data.amount || 0,
+          value: data.amount ?? 0,
           currency: 'EUR',
           event_category: 'ecommerce',
-          event_label: data.conversionType
+          event_label: data.conversionType,
         });
       }
 
+      // eslint-disable-next-line no-console
       console.log('🎯 Conversion logged:', data.conversionType, data.amount);
-
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('❌ Erreur lors du logging de conversion:', error);
     }
   }
 
-  /**
-   * Enregistre une erreur
-   */
-  async logError(data: Omit<ErrorEvent, keyof BaseAnalyticsEvent>): Promise<void> {
+  /** Erreur */
+  async logError(
+    data: Omit<ErrorEvent, keyof BaseAnalyticsEvent>
+  ): Promise<void> {
     if (!this.isEnabled) return;
 
     try {
-      const eventData = {
+      const eventData: Record<string, unknown> = {
         ...this.getBaseEventData(),
         ...cleanObject(data),
         timestamp: serverTimestamp(),
-        eventType: 'error'
+        eventType: 'error',
       };
 
       await addDoc(collection(db, 'analytics_errors'), eventData);
 
-      // Incrémenter les compteurs d'erreurs
       await this.incrementCounter('errors_total');
       await this.incrementCounter(`errors_${data.errorType}`);
       await this.incrementCounter(`errors_severity_${data.severity}`);
 
-      // Log critique en console pour le debugging
       if (data.severity === 'critical' || data.severity === 'high') {
+        // eslint-disable-next-line no-console
         console.error('🚨 Critical error logged:', data);
       }
-
     } catch (error) {
-      console.error('❌ Erreur lors du logging d\'erreur:', error);
+      // eslint-disable-next-line no-console
+      console.error("❌ Erreur lors du logging d'erreur:", error);
     }
   }
 
-  /**
-   * Enregistre une métrique de performance
-   */
-  async logPerformance(data: Omit<PerformanceEvent, keyof BaseAnalyticsEvent>): Promise<void> {
+  /** Performance */
+  async logPerformance(
+    data: Omit<PerformanceEvent, keyof BaseAnalyticsEvent>
+  ): Promise<void> {
     if (!this.isEnabled) return;
 
     try {
-      const eventData = {
+      const eventData: Record<string, unknown> = {
         ...this.getBaseEventData(),
         ...cleanObject(data),
         timestamp: serverTimestamp(),
-        eventType: 'performance'
+        eventType: 'performance',
       };
 
       await addDoc(collection(db, 'analytics_performance'), eventData);
 
-      // Alertes pour les performances dégradées
-      if (data.duration > 5000) { // Plus de 5 secondes
+      if (data.duration > 5000) {
+        // eslint-disable-next-line no-console
         console.warn('⚠️ Performance issue detected:', data);
       }
-
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('❌ Erreur lors du logging de performance:', error);
     }
   }
 
-  /**
-   * Incrémente un compteur dans Firestore
-   */
-  private async incrementCounter(counterName: string, value: number = 1): Promise<void> {
+  /* ------------------------------ Internals -------------------------------- */
+
+  /** Incrémente un compteur dans Firestore */
+  private async incrementCounter(counterName: string, value = 1): Promise<void> {
     try {
       const counterRef = doc(db, 'analytics_counters', counterName);
       await updateDoc(counterRef, {
         count: increment(value),
-        lastUpdated: serverTimestamp()
+        lastUpdated: serverTimestamp(),
       }).catch(async () => {
-        // Si le document n'existe pas, le créer
-        await addDoc(collection(db, 'analytics_counters'), cleanObject({
-          name: counterName,
-          count: value,
-          createdAt: serverTimestamp(),
-          lastUpdated: serverTimestamp()
-        }));
+        // Si le document n'existe pas, créer une ligne dans la collection
+        await addDoc(
+          collection(db, 'analytics_counters'),
+          cleanObject({
+            name: counterName,
+            count: value,
+            createdAt: serverTimestamp(),
+            lastUpdated: serverTimestamp(),
+          })
+        );
       });
     } catch (error) {
-      console.error('❌ Erreur lors de l\'incrémentation du compteur:', error);
+      // eslint-disable-next-line no-console
+      console.error("❌ Erreur lors de l'incrémentation du compteur:", error);
     }
   }
 
-  /**
-   * Configure le tracking automatique des erreurs JavaScript
-   */
+  /** Tracking automatique des erreurs JS */
   private setupErrorTracking(): void {
     if (typeof window === 'undefined') return;
 
-    // Erreurs non catchées
-    window.addEventListener('error', (event) => {
+    window.addEventListener('error', (event: globalThis.ErrorEvent) => {
       this.logError({
         errorType: 'javascript_error',
         errorMessage: event.message,
         errorStack: event.error?.stack,
         component: event.filename,
-        severity: 'high'
+        severity: 'high',
       });
     });
 
-    // Promesses rejetées non catchées
-    window.addEventListener('unhandledrejection', (event) => {
+    window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+      const reason = (event as PromiseRejectionEvent).reason as unknown;
+      const message =
+        typeof reason === 'object' && reason !== null && 'message' in reason
+          ? String((reason as { message?: unknown }).message)
+          : String(reason);
+
+      const stack =
+        typeof reason === 'object' && reason !== null && 'stack' in reason
+          ? String((reason as { stack?: unknown }).stack)
+          : undefined;
+
       this.logError({
         errorType: 'javascript_error',
-        errorMessage: event.reason?.message || String(event.reason),
-        errorStack: event.reason?.stack,
-        severity: 'medium'
+        errorMessage: message || 'Unhandled promise rejection',
+        errorStack: stack,
+        severity: 'medium',
       });
     });
   }
 
-  /**
-   * Configure le tracking automatique des performances
-   */
+  /** Tracking automatique des perfs */
   private setupPerformanceTracking(): void {
     if (typeof window === 'undefined') return;
 
-    // Navigation Timing API
     if ('performance' in window && 'getEntriesByType' in performance) {
       window.addEventListener('load', () => {
         setTimeout(() => {
-          const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+          const [navigation] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
           if (navigation) {
             this.logPerformance({
               metricType: 'page_load',
               duration: navigation.loadEventEnd - navigation.fetchStart,
-              status: 'success'
+              status: 'success',
             });
           }
         }, 1000);
@@ -352,15 +366,17 @@ class AnalyticsService {
     }
   }
 
-  /**
-   * Track une recherche de prestataires
-   */
-  async trackProviderSearch(filters: {
-    country?: string;
-    language?: string;
-    providerType?: 'lawyer' | 'expat';
-    specialty?: string;
-  }, resultsCount: number): Promise<void> {
+  /* -------------------------- Convenience trackers -------------------------- */
+
+  async trackProviderSearch(
+    filters: {
+      country?: string;
+      language?: string;
+      providerType?: 'lawyer' | 'expat';
+      specialty?: string;
+    },
+    resultsCount: number
+  ): Promise<void> {
     await this.logUserAction({
       action: 'provider_search',
       category: 'search',
@@ -368,14 +384,11 @@ class AnalyticsService {
       value: resultsCount,
       metadata: cleanObject({
         filters: cleanObject(filters),
-        resultsCount
-      })
+        resultsCount,
+      }),
     });
   }
 
-  /**
-   * Track la sélection d'un prestataire
-   */
   async trackProviderSelected(providerId: string, providerType: 'lawyer' | 'expat'): Promise<void> {
     await this.logUserAction({
       action: 'provider_selected',
@@ -383,119 +396,98 @@ class AnalyticsService {
       label: providerType,
       metadata: {
         providerId,
-        providerType
-      }
+        providerType,
+      },
     });
   }
 
-  /**
-   * Track le début d'une demande de réservation
-   */
   async trackBookingStarted(providerId: string, providerType: 'lawyer' | 'expat'): Promise<void> {
     await this.logConversion({
       conversionType: 'booking_started',
       providerId,
       providerType,
-      funnel_step: 1
+      funnel_step: 1,
     });
   }
 
-  /**
-   * Track la completion d'une demande de réservation
-   */
   async trackBookingCompleted(providerId: string, providerType: 'lawyer' | 'expat', amount: number): Promise<void> {
     await this.logConversion({
       conversionType: 'booking_completed',
       providerId,
       providerType,
       amount,
-      funnel_step: 2
+      funnel_step: 2,
     });
   }
 
-  /**
-   * Track un paiement réussi
-   */
   async trackPaymentSuccessful(amount: number, providerId: string, providerType: 'lawyer' | 'expat'): Promise<void> {
     await this.logConversion({
       conversionType: 'payment_successful',
       providerId,
       providerType,
       amount,
-      funnel_step: 3
+      funnel_step: 3,
     });
   }
 
-  /**
-   * Track un appel complété
-   */
-  async trackCallCompleted(duration: number, providerId: string, providerType: 'lawyer' | 'expat', amount: number): Promise<void> {
+  async trackCallCompleted(
+    duration: number,
+    providerId: string,
+    providerType: 'lawyer' | 'expat',
+    amount: number
+  ): Promise<void> {
     await this.logConversion({
       conversionType: 'call_completed',
       providerId,
       providerType,
       amount,
       duration,
-      funnel_step: 4
+      funnel_step: 4,
     });
   }
 
-  /**
-   * Track une erreur de paiement
-   */
   async trackPaymentError(errorMessage: string, amount?: number): Promise<void> {
     await this.logError({
       errorType: 'payment_error',
       errorMessage,
       severity: 'high',
-      metadata: cleanObject({ amount })
+      metadata: cleanObject({ amount }),
     });
   }
 
-  /**
-   * Track une erreur d'appel
-   */
   async trackCallError(errorMessage: string, providerId: string): Promise<void> {
     await this.logError({
       errorType: 'call_error',
       errorMessage,
       severity: 'high',
-      metadata: { providerId }
+      metadata: { providerId },
     });
   }
 }
 
-// Instance singleton du service d'analytics
+/* ------------------------------- Exports ----------------------------------- */
+
 export const analyticsService = new AnalyticsService();
 
-// Fonctions d'aide pour l'utilisation dans les composants
-export const logLanguageMismatch = (data: Omit<LanguageMismatchEvent, keyof BaseAnalyticsEvent>) => {
-  return analyticsService.logLanguageMismatch(data);
-};
+export const logLanguageMismatch = (data: Omit<LanguageMismatchEvent, keyof BaseAnalyticsEvent>) =>
+  analyticsService.logLanguageMismatch(data);
 
-export const logUserAction = (data: Omit<UserActionEvent, keyof BaseAnalyticsEvent>) => {
-  return analyticsService.logUserAction(data);
-};
+export const logUserAction = (data: Omit<UserActionEvent, keyof BaseAnalyticsEvent>) =>
+  analyticsService.logUserAction(data);
 
-export const logConversion = (data: Omit<ConversionEvent, keyof BaseAnalyticsEvent>) => {
-  return analyticsService.logConversion(data);
-};
+export const logConversion = (data: Omit<ConversionEvent, keyof BaseAnalyticsEvent>) =>
+  analyticsService.logConversion(data);
 
-export const logError = (data: Omit<ErrorEvent, keyof BaseAnalyticsEvent>) => {
-  return analyticsService.logError(data);
-};
+export const logError = (data: Omit<ErrorEvent, keyof BaseAnalyticsEvent>) =>
+  analyticsService.logError(data);
 
-export const logPerformance = (data: Omit<PerformanceEvent, keyof BaseAnalyticsEvent>) => {
-  return analyticsService.logPerformance(data);
-};
+export const logPerformance = (data: Omit<PerformanceEvent, keyof BaseAnalyticsEvent>) =>
+  analyticsService.logPerformance(data);
 
-// Configuration du service (à appeler au démarrage de l'app)
-export const configureAnalytics = (userId?: string, enabled: boolean = true) => {
-  if (userId) {
-    analyticsService.setUser(userId);
-  }
+/** A appeler au démarrage de l'app */
+export const configureAnalytics = (userId?: string, enabled = true): void => {
+  if (userId) analyticsService.setUser(userId);
   analyticsService.setEnabled(enabled);
 };
 
-// Export de l'instance pour les cas d'usage avancés
 export default analyticsService;

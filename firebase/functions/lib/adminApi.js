@@ -63,7 +63,6 @@ exports.api = (0, https_1.onRequest)({
         'https://sos-expat.com' // Domaine custom prod
     ]
 }, async (req, res) => {
-    var _a, _b, _c, _d, _e, _f;
     try {
         const path = req.path.replace(/\/+$/, ''); // trim trailing /
         console.log('🔍 API Request:', {
@@ -107,7 +106,7 @@ exports.api = (0, https_1.onRequest)({
                 const totalCommissions = curr.totalCommission || 0;
                 const activeTransactions = pendingSnap.size;
                 const conversionRate = curr.count
-                    ? ((curr.count - (((_a = curr.byStatus) === null || _a === void 0 ? void 0 : _a.failed) || 0)) / curr.count) * 100
+                    ? ((curr.count - (curr.byStatus?.failed || 0)) / curr.count) * 100
                     : 0;
                 const response = {
                     monthlyRevenue,
@@ -165,11 +164,12 @@ exports.api = (0, https_1.onRequest)({
                     .catch(() => null);
                 const fmt = (ts) => ts ? ts.toDate().toISOString() : 'N/A';
                 const response = {
-                    pricing: fmt((_b = pricingDoc === null || pricingDoc === void 0 ? void 0 : pricingDoc.updateTime) !== null && _b !== void 0 ? _b : pricingDoc === null || pricingDoc === void 0 ? void 0 : pricingDoc.get('updatedAt')),
-                    commissions: fmt(((_c = lastPayment === null || lastPayment === void 0 ? void 0 : lastPayment.docs[0]) === null || _c === void 0 ? void 0 : _c.get('updatedAt')) ||
-                        ((_d = lastPayment === null || lastPayment === void 0 ? void 0 : lastPayment.docs[0]) === null || _d === void 0 ? void 0 : _d.get('createdAt'))),
-                    analytics: fmt(((_e = lastAnalytics === null || lastAnalytics === void 0 ? void 0 : lastAnalytics.docs[0]) === null || _e === void 0 ? void 0 : _e.get('updatedAt')) ||
-                        ((_f = lastAnalytics === null || lastAnalytics === void 0 ? void 0 : lastAnalytics.docs[0]) === null || _f === void 0 ? void 0 : _f.get('createdAt')))
+                    pricing: fmt(pricingDoc?.updateTime ??
+                        pricingDoc?.get('updatedAt')),
+                    commissions: fmt(lastPayment?.docs[0]?.get('updatedAt') ||
+                        lastPayment?.docs[0]?.get('createdAt')),
+                    analytics: fmt(lastAnalytics?.docs[0]?.get('updatedAt') ||
+                        lastAnalytics?.docs[0]?.get('createdAt'))
                 };
                 console.log('🕐 Réponse last-modifications:', response);
                 res.json(response);

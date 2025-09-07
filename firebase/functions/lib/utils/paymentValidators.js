@@ -47,85 +47,80 @@ exports.isSuspiciousAmount = isSuspiciousAmount;
 exports.logPaymentAudit = logPaymentAudit;
 exports.generatePaymentId = generatePaymentId;
 const admin = __importStar(require("firebase-admin"));
-/**
- * Configuration RÉELLE des montants - MODIFIABLE depuis l'admin
- * (uniquement en termes de frais de mise en relation)
- */
+/* ────────────────────────────────────────────────────────────────────────────
+   Configuration par défaut (modifiable dans l'admin)
+   ──────────────────────────────────────────────────────────────────────────── */
 exports.DEFAULT_PRICING_CONFIG = {
     lawyer: {
         eur: {
-            totalAmount: 49, // Prix total payé par le client
-            connectionFeeAmount: 19, // ✅ Frais fixes de mise en relation
-            providerAmount: 30, // ✅ Ce que reçoit le prestataire (49 - 19 = 30)
+            totalAmount: 49,
+            connectionFeeAmount: 19,
+            providerAmount: 30,
             duration: 25,
-            currency: 'eur'
+            currency: 'eur',
         },
         usd: {
-            totalAmount: 55, // Prix total payé par le client
-            connectionFeeAmount: 25, // ✅ Frais fixes de mise en relation
-            providerAmount: 30, // ✅ Ce que reçoit le prestataire (55 - 25 = 30)
+            totalAmount: 55,
+            connectionFeeAmount: 25,
+            providerAmount: 30,
             duration: 25,
-            currency: 'usd'
-        }
+            currency: 'usd',
+        },
     },
     expat: {
         eur: {
-            totalAmount: 19, // Prix total payé par le client
-            connectionFeeAmount: 9, // ✅ Frais fixes de mise en relation
-            providerAmount: 10, // ✅ Ce que reçoit le prestataire (19 - 9 = 10)
+            totalAmount: 19,
+            connectionFeeAmount: 9,
+            providerAmount: 10,
             duration: 35,
-            currency: 'eur'
+            currency: 'eur',
         },
         usd: {
-            totalAmount: 25, // Prix total payé par le client
-            connectionFeeAmount: 15, // ✅ Frais fixes de mise en relation
-            providerAmount: 10, // ✅ Ce que reçoit le prestataire (25 - 15 = 10)
+            totalAmount: 25,
+            connectionFeeAmount: 15,
+            providerAmount: 10,
             duration: 35,
-            currency: 'usd'
-        }
-    }
+            currency: 'usd',
+        },
+    },
 };
-/**
- * Limites de validation par devise
- */
+/* ────────────────────────────────────────────────────────────────────────────
+   Limites de validation par devise
+   ──────────────────────────────────────────────────────────────────────────── */
 exports.PAYMENT_LIMITS = {
-    eur: {
-        MIN_AMOUNT: 5,
-        MAX_AMOUNT: 500,
-        MAX_DAILY: 2000,
-        TOLERANCE: 10
-    },
-    usd: {
-        MIN_AMOUNT: 6,
-        MAX_AMOUNT: 600,
-        MAX_DAILY: 2400,
-        TOLERANCE: 12
-    },
-    SPLIT_TOLERANCE_CENTS: 1
+    eur: { MIN_AMOUNT: 5, MAX_AMOUNT: 500, MAX_DAILY: 2000, TOLERANCE: 10 },
+    usd: { MIN_AMOUNT: 6, MAX_AMOUNT: 600, MAX_DAILY: 2400, TOLERANCE: 12 },
+    SPLIT_TOLERANCE_CENTS: 1,
 };
+/* ────────────────────────────────────────────────────────────────────────────
+   Helpers monétaires
+   ──────────────────────────────────────────────────────────────────────────── */
 /**
- * Convertit un montant vers des centimes selon la devise
+ * Convertit un montant (unité principale) en centimes selon la devise.
+ * On centralise l'arrondi et on exploite le paramètre `currency`
+ * (prêt pour d’autres devises avec un nombre de décimales différent).
  */
 function toCents(amount, currency = 'eur') {
-    if (typeof amount !== 'number' || isNaN(amount)) {
+    if (typeof amount !== 'number' || Number.isNaN(amount)) {
         throw new Error(`Montant invalide: ${amount}`);
     }
-    // Arrondir d'abord à 2 décimales puis convertir
-    const rounded = Math.round(amount * 100) / 100;
-    return Math.round(rounded * 100);
+    const decimals = currency === 'usd' ? 2 : 2; // évolutif si d'autres devises
+    const factor = Math.pow(10, decimals);
+    return Math.round(amount * factor);
 }
 /**
- * Convertit des centimes vers l'unité principale selon la devise
+ * Convertit des centimes vers l’unité principale selon la devise.
  */
 function fromCents(cents, currency = 'eur') {
-    if (typeof cents !== 'number' || isNaN(cents)) {
+    if (typeof cents !== 'number' || Number.isNaN(cents)) {
         throw new Error(`Montant en centimes invalide: ${cents}`);
     }
-    return Math.round(cents) / 100;
+    const decimals = currency === 'usd' ? 2 : 2;
+    const factor = Math.pow(10, decimals);
+    // On garde un arrondi propre à `decimals` pour éviter des flottants bizarres
+    return Math.round((cents / factor) * factor) / factor;
 }
-/**
- * Garde les anciennes fonctions pour compatibilité
- */
+/** Garde les anciennes fonctions pour compatibilité */
 const eurosToCents = (euros) => toCents(euros, 'eur');
 exports.eurosToCents = eurosToCents;
 const centsToEuros = (cents) => fromCents(cents, 'eur');
@@ -138,132 +133,146 @@ function formatAmount(amount, currency = 'eur') {
         style: 'currency',
         currency: currency.toUpperCase(),
         minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        maximumFractionDigits: 2,
     }).format(amount);
 }
-/**
- * Garde l'ancienne fonction pour compatibilité
- */
+/** Compatibilité historique */
 const formatEuros = (euros) => formatAmount(euros, 'eur');
 exports.formatEuros = formatEuros;
-/**
- * Récupère la configuration de pricing depuis Firestore (avec cache)
- */
 let pricingCache = null;
 let pricingCacheExpiry = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-async function getPricingConfig(type, currency = 'eur', db) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    try {
-        // Utiliser le cache si valide
-        const now = Date.now();
-        if (pricingCache && now < pricingCacheExpiry) {
-            const cached = (_a = pricingCache[type]) === null || _a === void 0 ? void 0 : _a[currency];
-            if (cached)
-                return cached;
+function toMillis(v) {
+    if (typeof v === 'number')
+        return v;
+    // Firestore Timestamp
+    if (v && typeof v === 'object') {
+        const maybeTs = v;
+        if (typeof maybeTs.toDate === 'function') {
+            try {
+                return maybeTs.toDate().getTime();
+            }
+            catch { /* ignore */ }
         }
-        // Récupérer depuis Firestore si disponible
+        if (typeof maybeTs.seconds === 'number') {
+            return maybeTs.seconds * 1000;
+        }
+    }
+    return undefined;
+}
+async function getPricingConfig(type, currency = 'eur', db) {
+    try {
+        const now = Date.now();
+        // 1) Cache
+        if (pricingCache && now < pricingCacheExpiry) {
+            const cached = pricingCache[type]?.[currency];
+            if (cached && typeof cached.totalAmount === 'number') {
+                return {
+                    totalAmount: cached.totalAmount,
+                    connectionFeeAmount: cached.connectionFeeAmount ?? 0,
+                    providerAmount: cached.providerAmount ?? (cached.totalAmount - (cached.connectionFeeAmount ?? 0)),
+                    duration: cached.duration ?? exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
+                    currency,
+                };
+            }
+        }
+        // 2) Firestore
         if (db) {
-            const configDoc = await db.collection('admin_config').doc('pricing').get();
-            if (configDoc.exists) {
-                const adminPricing = configDoc.data();
-                // Mettre en cache
+            const snap = await db.collection('admin_config').doc('pricing').get();
+            if (snap.exists) {
+                const adminPricing = snap.data();
                 pricingCache = adminPricing;
                 pricingCacheExpiry = now + CACHE_DURATION;
-                const adminConfig = (_b = adminPricing === null || adminPricing === void 0 ? void 0 : adminPricing[type]) === null || _b === void 0 ? void 0 : _b[currency];
-                // === GESTION DES OVERRIDES ACTIFS ===
-                const ov = (_d = (_c = adminPricing === null || adminPricing === void 0 ? void 0 : adminPricing.overrides) === null || _c === void 0 ? void 0 : _c[type]) === null || _d === void 0 ? void 0 : _d[currency];
-                const toMillis = (v) => (typeof v === 'number' ? v : ((v === null || v === void 0 ? void 0 : v.seconds) ? v.seconds * 1000 : undefined));
-                const active = !!(ov === null || ov === void 0 ? void 0 : ov.enabled)
-                    && (!toMillis(ov === null || ov === void 0 ? void 0 : ov.startsAt) || now >= toMillis(ov === null || ov === void 0 ? void 0 : ov.startsAt))
-                    && (!toMillis(ov === null || ov === void 0 ? void 0 : ov.endsAt) || now <= toMillis(ov === null || ov === void 0 ? void 0 : ov.endsAt));
-                if (active) {
+                const adminCfg = adminPricing?.[type]?.[currency];
+                // Overrides
+                const ovTable = type === 'lawyer'
+                    ? adminPricing?.overrides?.lawyer
+                    : adminPricing?.overrides?.expat;
+                const ov = ovTable?.[currency];
+                const active = ov?.enabled === true &&
+                    (toMillis(ov?.startsAt) ? now >= toMillis(ov?.startsAt) : true) &&
+                    (toMillis(ov?.endsAt) ? now <= toMillis(ov?.endsAt) : true);
+                if (active && typeof ov?.totalAmount === 'number') {
+                    const total = ov.totalAmount;
+                    const conn = ov.connectionFeeAmount ?? 0;
                     return {
-                        totalAmount: ov.totalAmount,
-                        connectionFeeAmount: ov.connectionFeeAmount || 0,
-                        providerAmount: Math.max(0, ov.totalAmount - (ov.connectionFeeAmount || 0)),
-                        duration: (_e = adminConfig === null || adminConfig === void 0 ? void 0 : adminConfig.duration) !== null && _e !== void 0 ? _e : exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
-                        currency
+                        totalAmount: total,
+                        connectionFeeAmount: conn,
+                        providerAmount: typeof ov.providerAmount === 'number' ? ov.providerAmount : Math.max(0, total - conn),
+                        duration: adminCfg?.duration ?? exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
+                        currency,
                     };
                 }
-                // === FIN GESTION DES OVERRIDES ===
-                if (adminConfig && typeof adminConfig.totalAmount === 'number') {
+                if (adminCfg && typeof adminCfg.totalAmount === 'number') {
+                    const total = adminCfg.totalAmount;
+                    const conn = adminCfg.connectionFeeAmount ?? 0;
                     return {
-                        totalAmount: adminConfig.totalAmount,
-                        connectionFeeAmount: adminConfig.connectionFeeAmount || 0,
-                        providerAmount: (_f = adminConfig.providerAmount) !== null && _f !== void 0 ? _f : (adminConfig.totalAmount - (adminConfig.connectionFeeAmount || 0)),
-                        duration: (_g = adminConfig.duration) !== null && _g !== void 0 ? _g : exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
-                        currency
+                        totalAmount: total,
+                        connectionFeeAmount: conn,
+                        providerAmount: typeof adminCfg.providerAmount === 'number' ? adminCfg.providerAmount : Math.max(0, total - conn),
+                        duration: adminCfg.duration ?? exports.DEFAULT_PRICING_CONFIG[type][currency].duration,
+                        currency,
                     };
                 }
             }
         }
-        // Fallback vers la config par défaut
+        // 3) Fallback
+        // eslint-disable-next-line no-console
         console.log(`💡 Utilisation config par défaut pour ${type}/${currency}`);
         return exports.DEFAULT_PRICING_CONFIG[type][currency];
     }
-    catch (error) {
-        console.error('Erreur récupération pricing config:', error);
-        // Fallback vers config par défaut en cas d'erreur
+    catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Erreur récupération pricing config:', err);
         return exports.DEFAULT_PRICING_CONFIG[type][currency];
     }
 }
+/* ────────────────────────────────────────────────────────────────────────────
+   Validations & calculs
+   ──────────────────────────────────────────────────────────────────────────── */
 /**
  * Valide qu'un montant est dans les limites acceptables selon la devise
  */
 function validateAmount(amount, type, currency = 'eur') {
-    // Vérifications de base
-    if (typeof amount !== 'number' || isNaN(amount)) {
+    if (typeof amount !== 'number' || Number.isNaN(amount)) {
         return { valid: false, error: 'Montant invalide' };
     }
     const limits = exports.PAYMENT_LIMITS[currency];
     const config = exports.DEFAULT_PRICING_CONFIG[type][currency];
     if (amount < limits.MIN_AMOUNT) {
-        return {
-            valid: false,
-            error: `Montant minimum ${limits.MIN_AMOUNT}${currency === 'eur' ? '€' : '$'}`
-        };
+        return { valid: false, error: `Montant minimum ${limits.MIN_AMOUNT}${currency === 'eur' ? '€' : '$'}` };
     }
     if (amount > limits.MAX_AMOUNT) {
-        return {
-            valid: false,
-            error: `Montant maximum ${limits.MAX_AMOUNT}${currency === 'eur' ? '€' : '$'}`
-        };
+        return { valid: false, error: `Montant maximum ${limits.MAX_AMOUNT}${currency === 'eur' ? '€' : '$'}` };
     }
-    // Cohérence avec le prix total attendu
-    const expectedAmount = config.totalAmount;
-    const difference = Math.abs(amount - expectedAmount);
+    // Cohérence vis-à-vis du prix standard
+    const expected = config.totalAmount;
+    const difference = Math.abs(amount - expected);
     if (difference > limits.TOLERANCE) {
         return {
             valid: true,
-            warning: `Montant inhabituel: ${formatAmount(amount, currency)} (attendu: ${formatAmount(expectedAmount, currency)})`
+            warning: `Montant inhabituel: ${formatAmount(amount, currency)} (attendu: ${formatAmount(expected, currency)})`,
         };
     }
     return { valid: true };
 }
 /**
- * Calcule la répartition (frais de mise en relation / prestataire) selon la devise
+ * Calcule la répartition (frais / prestataire) selon la devise
  */
 function calculateSplit(totalAmount, type, currency = 'eur') {
     const config = exports.DEFAULT_PRICING_CONFIG[type][currency];
-    // Montants en unité principale avec arrondi à 2 décimales
     const connectionFeeAmount = Math.round(config.connectionFeeAmount * 100) / 100;
     const providerAmount = Math.round((totalAmount - connectionFeeAmount) * 100) / 100;
-    // Conversion en centimes
     const totalCents = toCents(totalAmount, currency);
     const connectionFeeCents = toCents(connectionFeeAmount, currency);
     const providerCents = toCents(providerAmount, currency);
-    // Vérification de cohérence
     const sumCents = connectionFeeCents + providerCents;
     const isValid = Math.abs(sumCents - totalCents) <= exports.PAYMENT_LIMITS.SPLIT_TOLERANCE_CENTS;
     if (!isValid) {
+        // eslint-disable-next-line no-console
         console.error('⚠️ Incohérence dans la répartition:', {
-            totalCents,
-            connectionFeeCents,
-            providerCents,
-            sumCents,
-            difference: sumCents - totalCents,
-            currency
+            totalCents, connectionFeeCents, providerCents, sumCents,
+            difference: sumCents - totalCents, currency,
         });
     }
     return {
@@ -274,7 +283,7 @@ function calculateSplit(totalAmount, type, currency = 'eur') {
         connectionFeeAmount,
         providerAmount,
         currency,
-        isValid
+        isValid,
     };
 }
 /**
@@ -284,11 +293,11 @@ function validateSplit(totalAmount, connectionFeeAmount, providerAmount, currenc
     const sum = Math.round((connectionFeeAmount + providerAmount) * 100) / 100;
     const total = Math.round(totalAmount * 100) / 100;
     const difference = Math.abs(sum - total);
-    if (difference > 0.01) { // Tolérance de 1 centime
+    if (difference > 0.01) {
         return {
             valid: false,
             error: `Répartition incohérente: ${formatAmount(sum, currency)} != ${formatAmount(total, currency)}`,
-            difference
+            difference,
         };
     }
     return { valid: true };
@@ -300,18 +309,20 @@ async function checkDailyLimit(userId, amount, currency = 'eur', db) {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
-        const paymentsSnapshot = await db.collection('payments')
+        const todayTs = admin.firestore.Timestamp.fromDate(today);
+        const snap = await db
+            .collection('payments')
             .where('clientId', '==', userId)
-            .where('createdAt', '>=', todayTimestamp)
+            .where('createdAt', '>=', todayTs)
             .where('currency', '==', currency)
             .where('status', 'in', ['succeeded', 'captured', 'processing'])
             .get();
         let currentTotal = 0;
-        paymentsSnapshot.docs.forEach(doc => {
-            const payment = doc.data();
-            // Utiliser le montant dans l'unité principale
-            const paymentAmount = payment.amount || fromCents(payment.amountCents || 0, currency);
+        snap.docs.forEach(d => {
+            const payment = d.data();
+            const paymentAmount = typeof payment.amount === 'number'
+                ? payment.amount
+                : fromCents(typeof payment.amountCents === 'number' ? payment.amountCents : 0, currency);
             currentTotal += paymentAmount;
         });
         const limits = exports.PAYMENT_LIMITS[currency];
@@ -321,61 +332,53 @@ async function checkDailyLimit(userId, amount, currency = 'eur', db) {
             allowed,
             currentTotal,
             limit: limits.MAX_DAILY,
-            error: allowed ? undefined : `Limite journalière dépassée: ${formatAmount(newTotal, currency)} / ${formatAmount(limits.MAX_DAILY, currency)}`
+            error: allowed
+                ? undefined
+                : `Limite journalière dépassée: ${formatAmount(newTotal, currency)} / ${formatAmount(limits.MAX_DAILY, currency)}`,
         };
     }
-    catch (error) {
-        console.error('Erreur vérification limite journalière:', error);
-        // En cas d'erreur, on autorise par défaut (pour ne pas bloquer les paiements)
-        return {
-            allowed: true,
-            currentTotal: 0,
-            limit: exports.PAYMENT_LIMITS[currency].MAX_DAILY
-        };
+    catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Erreur vérification limite journalière:', err);
+        return { allowed: true, currentTotal: 0, limit: exports.PAYMENT_LIMITS[currency].MAX_DAILY };
     }
 }
 /**
- * Vérifie si un montant est suspect selon la devise
+ * Détermine si un montant paraît suspect
  */
 function isSuspiciousAmount(amount, type, currency = 'eur', previousPayments = []) {
     const reasons = [];
-    // Montant très différent du prix total standard pour cette devise
     const expected = exports.DEFAULT_PRICING_CONFIG[type][currency].totalAmount;
     const deviation = Math.abs(amount - expected) / expected;
-    if (deviation > 0.5) { // 50% de déviation
+    if (deviation > 0.5)
         reasons.push(`Déviation importante du prix standard (${Math.round(deviation * 100)}%)`);
-    }
-    // Montant avec trop de décimales (tentative de manipulation)
     const decimals = (amount.toString().split('.')[1] || '').length;
-    if (decimals > 2) {
+    if (decimals > 2)
         reasons.push(`Trop de décimales: ${decimals}`);
-    }
-    // Pattern de montants répétitifs suspects
     if (previousPayments.length >= 3) {
         const lastThree = previousPayments.slice(-3);
-        if (lastThree.every(p => p === amount)) {
+        if (lastThree.every((p) => p === amount))
             reasons.push('Montants identiques répétés');
-        }
     }
-    // Montants ronds suspects pour ce type de service
-    if (amount % 10 === 0 && amount !== expected) {
+    if (amount % 10 === 0 && amount !== expected)
         reasons.push('Montant rond inhabituel');
-    }
-    return {
-        suspicious: reasons.length > 0,
-        reasons
-    };
+    return { suspicious: reasons.length > 0, reasons };
 }
 /**
- * Log de transaction pour audit avec devise
+ * Log d’audit (types stricts pour metadata)
  */
 async function logPaymentAudit(data, db) {
     try {
-        await db.collection('payment_audit').add(Object.assign(Object.assign({}, data), { amountCents: toCents(data.amount, data.currency), timestamp: admin.firestore.FieldValue.serverTimestamp(), environment: process.env.NODE_ENV || 'development' }));
+        await db.collection('payment_audit').add({
+            ...data,
+            amountCents: toCents(data.amount, data.currency),
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            environment: process.env.NODE_ENV || 'development',
+        });
     }
-    catch (error) {
-        console.error('Erreur log audit:', error);
-        // Ne pas bloquer le process si le log échoue
+    catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Erreur log audit:', err);
     }
 }
 /**
@@ -383,7 +386,7 @@ async function logPaymentAudit(data, db) {
  */
 function generatePaymentId() {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 9);
+    const random = Math.random().toString(36).slice(2, 9);
     return `pay_${timestamp}_${random}`;
 }
 //# sourceMappingURL=paymentValidators.js.map

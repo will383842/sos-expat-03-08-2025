@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { db } from "@/config/firebase";
+import { db, auth } from "@/config/firebase"; // ← ajoute auth
 import {
   collection,
   query,
@@ -17,9 +17,10 @@ import { Loader } from "@/components/ui/loader";
 interface Message {
   id: string;
   providerId: string;
+  senderId?: string;
   message: string;
   isRead: boolean;
-  createdAt: { seconds: number; nanoseconds: number };
+  createdAt: { seconds: number; nanoseconds: number } | { toDate: () => Date };
   metadata?: {
     clientFirstName?: string;
     clientCountry?: string;
@@ -34,33 +35,64 @@ const DashboardMessages: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.id) return;
+    // attendre que l’auth soit prête
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    // Alerte utile si jamais ton contexte n'a pas le même identifiant
+    if (user?.id && user.id !== uid) {
+      // Cela arrive souvent quand user.id = id du doc Firestore et pas l’UID Auth
+      console.warn("[Messages] user.id != auth.uid → j’utilise auth.uid pour la requête", { userId: user.id, authUid: uid });
+    }
 
     const messagesRef = collection(db, "providerMessageOrderCustomers");
     const q = query(
       messagesRef,
-      where("providerId", "==", user.id),
+      where("providerId", "==", uid),        // ← FILTRE SUR L’UID AUTH
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched: Message[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Message, "id">),
-      }));
-      setMessages(fetched);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetched: Message[] = snapshot.docs.map((d) => {
+          const data = d.data() as Omit<Message, "id">;
+        return { id: d.id, ...data };
+        });
+        setMessages(fetched);
+        setLoading(false);
+      },
+      (err: unknown) => {
+        console.error("onSnapshot messages error:", err);
+        setLoading(false);
+        unsubscribe(); // coupe pour éviter le spam si permission-denied
+      }
+    );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user]); // le hook se relance si le contexte change
 
   const markAsRead = async (messageId: string) => {
+    // règles: seul le provider (auth.uid == providerId) peut passer isRead à true
     const messageRef = doc(db, "providerMessageOrderCustomers", messageId);
     await updateDoc(messageRef, { isRead: true });
   };
 
   if (loading) return <Loader />;
+
+  const formatDate = (createdAt: Message["createdAt"]): string => {
+    try {
+      if ("toDate" in createdAt && typeof createdAt.toDate === "function") {
+        return createdAt.toDate().toLocaleString();
+      }
+      // @ts-expect-error: fallback sur shape seconds/nanoseconds
+      if (typeof createdAt?.seconds === "number") {
+        // @ts-expect-error: idem
+        return new Date(createdAt.seconds * 1000).toLocaleString();
+      }
+    } catch {}
+    return "—";
+  };
 
   return (
     <div className="space-y-6">
@@ -76,27 +108,22 @@ const DashboardMessages: React.FC = () => {
             <CardContent>
               <div className="p-4 space-y-2">
                 <p className="font-semibold text-sm text-gray-500">
-                  Reçu le{" "}
-                  {new Date(msg.createdAt.seconds * 1000).toLocaleString()}
+                  Reçu le {formatDate(msg.createdAt)}
                 </p>
                 <p>
                   <strong>Client :</strong>{" "}
-                  {msg.metadata?.clientFirstName || "Inconnu"}
+                  {msg.metadata?.clientFirstName ?? "Inconnu"}
                 </p>
                 <p>
                   <strong>Pays :</strong>{" "}
-                  {msg.metadata?.clientCountry || "Non précisé"}
+                  {msg.metadata?.clientCountry ?? "Non précisé"}
                 </p>
                 <p>
                   <strong>Message :</strong> {msg.message}
                 </p>
 
                 {!msg.isRead && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => markAsRead(msg.id)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => markAsRead(msg.id)}>
                     ✅ Marquer comme lu
                   </Button>
                 )}

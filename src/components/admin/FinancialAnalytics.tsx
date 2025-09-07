@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, Calendar, Users, Percent, Download, Filter } from 'lucide-react';
+import { TrendingUp, DollarSign, Calendar, Users, Percent, Download } from 'lucide-react';
 import Button from '../common/Button';
 
 interface Payment {

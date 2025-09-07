@@ -1,456 +1,806 @@
 // src/pages/admin/AdminPricing.tsx
-import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, 
-  Settings, 
-  TrendingUp, 
-  ChevronDown, 
-  ChevronRight,
-  Activity,
-  Zap,
-  Shield,
-  AlertCircle
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Settings,
+  Save,
+  Euro,
+  DollarSign,
+  Calendar,
+  Check,
+  X,
+  RefreshCw,
+  Eye,
 } from 'lucide-react';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  Timestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
+} from 'firebase/firestore';
 import AdminLayout from '../../components/admin/AdminLayout';
-import { PricingManagement } from '../../components/admin/PricingManagement';
-import { FinancialAnalytics } from '../../components/admin/FinancialAnalytics';
-import PricingMigrationPanel from '../../components/admin/PricingMigrationPanel';
+import { db } from '../../config/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
-// Types pour les données réelles
-interface FinancialStats {
-  monthlyRevenue: number;
-  totalCommissions: number;
-  activeTransactions: number;
-  conversionRate: number;
-  changes: {
-    revenue: number;
-    commissions: number;
-    transactions: number;
-    conversion: number;
+/* ---------------- Types ---------------- */
+
+type Currency = 'eur' | 'usd';
+type ServiceKind = 'expat' | 'lawyer';
+type ServiceLabel = 'Expat' | 'Avocat';
+
+interface PricingNode {
+  connectionFeeAmount: number; // notre marge
+  providerAmount: number;      // reversé prestataire
+  totalAmount: number;         // total client
+  currency: Currency;
+  duration: number;            // minutes
+}
+
+interface PricingOverrideNode {
+  enabled: boolean;
+  startsAt: Timestamp | null;
+  endsAt: Timestamp | null;
+  connectionFeeAmount: number;
+  providerAmount: number;
+  totalAmount: number;
+  stackableWithCoupons: boolean;
+  label: string;
+  strikeTargets: string; // pour l’affichage "prix barré" si tu l’utilises au front
+}
+
+interface PricingDoc {
+  expat?: Partial<Record<Currency, PricingNode>>;
+  lawyer?: Partial<Record<Currency, PricingNode>>;
+  overrides?: {
+    settings?: { stackableDefault?: boolean };
+    expat?: Partial<Record<Currency, Partial<PricingOverrideNode>>>;
+    lawyer?: Partial<Record<Currency, Partial<PricingOverrideNode>>>;
   };
+  updatedAt?: Timestamp;
+  updatedBy?: string;
 }
 
-interface LastModifications {
-  pricing: string;
-  commissions: string;
-  analytics: string;
+interface CouponDoc {
+  code: string;
+  type: 'fixed' | 'percentage';
+  amount: number;
+  active?: boolean;
+  services?: Array<'expat_call' | 'lawyer_call'>;
+  min_order_amount?: number;
+  valid_from?: Timestamp;
+  valid_until?: Timestamp;
+  maxDiscount?: number;
 }
 
-interface SystemStatus {
-  api: 'online' | 'offline' | 'maintenance';
-  database: 'optimal' | 'slow' | 'error';
-  cache: 'active' | 'inactive';
-  lastCheck: string;
-}
+/* ------------- Helpers ------------- */
+
+const isSumOk = (a: number, b: number, total: number) =>
+  Math.abs((a + b) - total) < 0.001;
+
+const toDate = (t: Timestamp | null | undefined): Date | null =>
+  t && typeof t.toDate === 'function' ? t.toDate() : null;
+
+const toTs = (d: Date | null): Timestamp | null =>
+  d ? Timestamp.fromDate(d) : null;
+
+const SERVICE_LABEL: Record<ServiceKind, ServiceLabel> = {
+  expat: 'Expat',
+  lawyer: 'Avocat',
+};
+
+/* ------------- Composants réutilisables ------------- */
+
+const Field: React.FC<{ label: string; children: React.ReactNode; help?: string }> = ({ label, children, help }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    {children}
+    {help ? <p className="mt-1 text-xs text-gray-500">{help}</p> : null}
+  </div>
+);
+
+const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; }> = ({ checked, onChange }) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-emerald-500' : 'bg-gray-300'}`}
+    aria-pressed={checked}
+  >
+    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
+  </button>
+);
+
+/* ------------- Page ------------- */
 
 const AdminPricing: React.FC = () => {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['pricing']));
-  const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'analytics' | 'maintenance'>('overview');
-  
-  // États pour les données réelles
-  const [financialStats, setFinancialStats] = useState<FinancialStats | null>(null);
-  const [lastModifications, setLastModifications] = useState<LastModifications | null>(null);
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  // Fonctions pour récupérer les données mockées temporairement
-  const fetchFinancialStats = async (): Promise<FinancialStats> => {
-    // Données mockées temporaires
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          monthlyRevenue: 45680.50,
-          totalCommissions: 12340.25,
-          activeTransactions: 156,
-          conversionRate: 68.5,
-          changes: {
-            revenue: 12.3,
-            commissions: 8.7,
-            transactions: 15.2,
-            conversion: -2.1
-          }
-        });
-      }, 500);
+  // filtres de travail
+  const [service, setService] = useState<ServiceKind>('expat');
+  const [currency, setCurrency] = useState<Currency>('eur');
+
+  // réglage global
+  const [stackableDefault, setStackableDefault] = useState<boolean>(true);
+
+  // base
+  const [base, setBase] = useState<Record<ServiceKind, Record<Currency, PricingNode>>>({
+    expat: {
+      eur: { connectionFeeAmount: 9, providerAmount: 30, totalAmount: 39, currency: 'eur', duration: 30 },
+      usd: { connectionFeeAmount: 15, providerAmount: 34, totalAmount: 49, currency: 'usd', duration: 30 },
+    },
+    lawyer: {
+      eur: { connectionFeeAmount: 19, providerAmount: 36, totalAmount: 55, currency: 'eur', duration: 20 },
+      usd: { connectionFeeAmount: 25, providerAmount: 35, totalAmount: 60, currency: 'usd', duration: 20 },
+    },
+  });
+
+  // promo
+  const [promo, setPromo] = useState<Record<ServiceKind, Record<Currency, PricingOverrideNode>>>({
+    expat: {
+      eur: {
+        enabled: true, startsAt: null, endsAt: null,
+        connectionFeeAmount: 19, providerAmount: 30, totalAmount: 49,
+        stackableWithCoupons: true, label: 'Promo Expat EUR', strikeTargets: 'default',
+      },
+      usd: {
+        enabled: true, startsAt: null, endsAt: null,
+        connectionFeeAmount: 19, providerAmount: 30, totalAmount: 49,
+        stackableWithCoupons: true, label: 'Promo Expat USD', strikeTargets: 'default',
+      },
+    },
+    lawyer: {
+      eur: {
+        enabled: true, startsAt: null, endsAt: null,
+        connectionFeeAmount: 19, providerAmount: 20, totalAmount: 39,
+        stackableWithCoupons: true, label: 'Promo Avocat EUR', strikeTargets: 'default',
+      },
+      usd: {
+        enabled: true, startsAt: null, endsAt: null,
+        connectionFeeAmount: 19, providerAmount: 20, totalAmount: 39,
+        stackableWithCoupons: true, label: 'Promo Avocat USD', strikeTargets: 'default',
+      },
+    },
+  });
+
+  // preview
+  const [previewCoupon, setPreviewCoupon] = useState<string>('');
+  const [previewTotal, setPreviewTotal] = useState<number | null>(null);
+  const [previewDetails, setPreviewDetails] = useState<string>('');
+
+  const selBase = base[service][currency];
+  const selPromo = promo[service][currency];
+
+  /* ----------- Load Firestore ----------- */
+
+  const loadConfig = useCallback(async () => {
+    const snap = await getDoc(doc(db, 'admin_config', 'pricing'));
+    if (!snap.exists()) return;
+
+    const data = snap.data() as PricingDoc;
+
+    // Base
+    const b = { ...base };
+    (['expat', 'lawyer'] as ServiceKind[]).forEach((s) => {
+      (['eur', 'usd'] as Currency[]).forEach((c) => {
+        const node = data?.[s]?.[c];
+        if (node) {
+          b[s][c] = {
+            connectionFeeAmount: Number(node.connectionFeeAmount ?? 0),
+            providerAmount: Number(node.providerAmount ?? 0),
+            totalAmount: Number(node.totalAmount ?? 0),
+            currency: c,
+            duration: Number(node.duration ?? 0),
+          };
+        }
+      });
     });
-  };
+    setBase(b);
 
-  const fetchLastModifications = async (): Promise<LastModifications> => {
-    // Données mockées temporaires
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          pricing: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // Il y a 2h
-          commissions: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Hier
-          analytics: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() // Il y a 3h
-        });
-      }, 300);
+    // Promo
+    const p = { ...promo };
+    (['expat', 'lawyer'] as ServiceKind[]).forEach((s) => {
+      (['eur', 'usd'] as Currency[]).forEach((c) => {
+        const o = data?.overrides?.[s]?.[c];
+        if (o) {
+          p[s][c] = {
+            enabled: Boolean(o.enabled),
+            startsAt: o.startsAt ?? null,
+            endsAt: o.endsAt ?? null,
+            connectionFeeAmount: Number(o.connectionFeeAmount ?? 0),
+            providerAmount: Number(o.providerAmount ?? 0),
+            totalAmount: Number(o.totalAmount ?? 0),
+            stackableWithCoupons: Boolean(o.stackableWithCoupons ?? true),
+            label: String(o.label ?? ''),
+            strikeTargets: String(o.strikeTargets ?? 'default'),
+          };
+        }
+      });
     });
-  };
+    setPromo(p);
 
-  const fetchSystemStatus = async (): Promise<SystemStatus> => {
-    // Données mockées temporaires
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          api: 'online',
-          database: 'optimal',
-          cache: 'active',
-          lastCheck: new Date().toISOString()
-        });
-      }, 200);
-    });
-  };
-
-  // Chargement initial des données
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const [stats, modifications, status] = await Promise.all([
-          fetchFinancialStats(),
-          fetchLastModifications(),
-          fetchSystemStatus()
-        ]);
-        
-        setFinancialStats(stats);
-        setLastModifications(modifications);
-        setSystemStatus(status);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-
-    // Actualisation automatique toutes les 5 minutes
-    const interval = setInterval(loadData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Global default
+    setStackableDefault(Boolean(data?.overrides?.settings?.stackableDefault ?? true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fonction utilitaire pour formater les montants
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
+  useEffect(() => { void loadConfig(); }, [loadConfig]);
 
-  // Fonction utilitaire pour formater les pourcentages
-  const formatPercentage = (value: number) => {
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value.toFixed(1)}%`;
-  };
+  /* ----------- Save Firestore ----------- */
 
-  // Fonction utilitaire pour formater les dates
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (minutes < 60) {
-      return `Il y a ${minutes} min`;
-    } else if (hours < 24) {
-      return `Il y a ${hours}h`;
-    } else if (days === 1) {
-      return 'Hier';
-    } else if (days < 7) {
-      return `Il y a ${days} jours`;
-    } else {
-      return date.toLocaleDateString('fr-FR', { 
-        day: 'numeric', 
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+  const saveBase = async (): Promise<void> => {
+    if (!isSumOk(selBase.connectionFeeAmount, selBase.providerAmount, selBase.totalAmount)) {
+      alert('La somme “Marge + Part prestataire” doit = Total');
+      return;
     }
+    await setDoc(
+      doc(db, 'admin_config', 'pricing'),
+      {
+        [service]: {
+          [currency]: {
+            connectionFeeAmount: Number(selBase.connectionFeeAmount),
+            providerAmount: Number(selBase.providerAmount),
+            totalAmount: Number(selBase.totalAmount),
+            currency,
+            duration: Number(selBase.duration),
+          },
+        },
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid ?? 'admin',
+      },
+      { merge: true }
+    );
+    alert('Prix de base enregistré ✅');
   };
 
-  const toggleSection = (sectionId: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(sectionId)) {
-      newExpanded.delete(sectionId);
-    } else {
-      newExpanded.add(sectionId);
-    }
-    setExpandedSections(newExpanded);
-  };
-
-  // Génération dynamique des statistiques
-  const generateQuickStats = () => {
-    if (!financialStats) return [];
-
-    return [
-      { 
-        label: 'Revenus du mois', 
-        value: formatCurrency(financialStats.monthlyRevenue), 
-        change: formatPercentage(financialStats.changes.revenue), 
-        trend: financialStats.changes.revenue >= 0 ? 'up' : 'down', 
-        icon: DollarSign,
-        color: 'text-emerald-600 bg-emerald-50'
-      },
-      { 
-        label: 'Commissions totales', 
-        value: formatCurrency(financialStats.totalCommissions), 
-        change: formatPercentage(financialStats.changes.commissions), 
-        trend: financialStats.changes.commissions >= 0 ? 'up' : 'down', 
-        icon: TrendingUp,
-        color: 'text-blue-600 bg-blue-50'
-      },
-      { 
-        label: 'Transactions actives', 
-        value: financialStats.activeTransactions.toLocaleString('fr-FR'), 
-        change: formatPercentage(financialStats.changes.transactions), 
-        trend: financialStats.changes.transactions >= 0 ? 'up' : 'down', 
-        icon: Activity,
-        color: 'text-purple-600 bg-purple-50'
-      },
-      { 
-        label: 'Taux de conversion', 
-        value: `${financialStats.conversionRate.toFixed(1)}%`, 
-        change: formatPercentage(financialStats.changes.conversion), 
-        trend: financialStats.changes.conversion >= 0 ? 'up' : 'down', 
-        icon: Zap,
-        color: 'text-orange-600 bg-orange-50'
+  const savePromo = async (): Promise<void> => {
+    if (selPromo.enabled) {
+      if (selPromo.startsAt && selPromo.endsAt) {
+        const s = toDate(selPromo.startsAt)!;
+        const e = toDate(selPromo.endsAt)!;
+        if (s >= e) {
+          alert('La date de début doit précéder la date de fin');
+          return;
+        }
       }
-    ];
+      if (!isSumOk(selPromo.connectionFeeAmount, selPromo.providerAmount, selPromo.totalAmount)) {
+        alert('La somme “Marge + Part prestataire” doit = Total (promo)');
+        return;
+      }
+    }
+    await setDoc(
+      doc(db, 'admin_config', 'pricing'),
+      {
+        overrides: {
+          [service]: {
+            [currency]: {
+              enabled: selPromo.enabled,
+              startsAt: selPromo.startsAt ?? null,
+              endsAt: selPromo.endsAt ?? null,
+              connectionFeeAmount: Number(selPromo.connectionFeeAmount),
+              providerAmount: Number(selPromo.providerAmount),
+              totalAmount: Number(selPromo.totalAmount),
+              stackableWithCoupons: Boolean(selPromo.stackableWithCoupons),
+              label: selPromo.label,
+              strikeTargets: selPromo.strikeTargets || 'default',
+            },
+          },
+        },
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid ?? 'admin',
+      },
+      { merge: true }
+    );
+    alert('Prix promotionnel enregistré ✅');
   };
 
-  const tabs = [
-    { id: 'overview', label: 'Vue d\'ensemble', icon: Activity },
-    { id: 'config', label: 'Configuration', icon: Settings },
-    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-    { id: 'maintenance', label: 'Maintenance', icon: Shield }
-  ];
+  const saveGlobalStackable = async (value: boolean): Promise<void> => {
+    await setDoc(
+      doc(db, 'admin_config', 'pricing'),
+      {
+        overrides: { settings: { stackableDefault: value } },
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid ?? 'admin',
+      },
+      { merge: true }
+    );
+    setStackableDefault(value);
+  };
 
-  const renderTabContent = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Chargement...</span>
-        </div>
-      );
+  /* ----------- Preview (logique back) ----------- */
+
+  const isPromoActiveNow = useMemo(() => {
+    const o = selPromo;
+    if (!o.enabled) return false;
+    const now = new Date();
+    const s = toDate(o.startsAt);
+    const e = toDate(o.endsAt);
+    return (s ? now >= s : true) && (e ? now <= e : true);
+  }, [selPromo]);
+
+  const runPreview = useCallback(async () => {
+    let total = selBase.totalAmount;
+    let explanation = `Prix de base: ${total.toFixed(2)} ${currency.toUpperCase()}`;
+
+    if (isPromoActiveNow) {
+      total = selPromo.totalAmount;
+      explanation += ` → Promo active (“prix barré”): ${total.toFixed(2)} ${currency.toUpperCase()}`;
     }
 
-    if (error) {
-      return (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <div className="flex items-center">
-            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-            <span className="text-red-800 font-medium">Erreur de chargement</span>
-          </div>
-          <p className="text-red-700 mt-2">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-          >
-            Actualiser
-          </button>
-        </div>
-      );
-    }
+    // coupon si empilable (vérification légère, comme le back)
+    if (previewCoupon.trim()) {
+      const canStack = isPromoActiveNow ? selPromo.stackableWithCoupons : stackableDefault;
 
-    switch (activeTab) {
-      case 'overview':
-        const quickStats = generateQuickStats();
-        
-        return (
-          <div className="space-y-6">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {quickStats.map((stat, index) => {
-                const IconComponent = stat.icon;
-                return (
-                  <div key={index} className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
-                    <div className="flex items-center justify-between">
-                      <div className={`p-3 rounded-lg ${stat.color}`}>
-                        <IconComponent className="w-6 h-6" />
-                      </div>
-                      <span className={`text-sm font-medium ${
-                        stat.trend === 'up' ? 'text-emerald-600' : 'text-red-600'
-                      }`}>
-                        {stat.change}
-                      </span>
-                    </div>
-                    <div className="mt-4">
-                      <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{stat.label}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* System Status */}
-            <div className={`rounded-xl border p-6 ${
-              systemStatus?.api === 'online' 
-                ? 'bg-gradient-to-r from-emerald-50 to-blue-50 border-emerald-100' 
-                : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-100'
-            }`}>
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    systemStatus?.api === 'online' ? 'bg-emerald-500' : 'bg-red-500'
-                  }`}>
-                    <Shield className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {systemStatus?.api === 'online' ? 'Système Opérationnel' : 'Problème Système'}
-                  </h3>
-                  <p className="text-gray-600 mt-1">
-                    {systemStatus?.api === 'online' 
-                      ? `Tous les services fonctionnent normalement. Dernière vérification: ${formatRelativeTime(systemStatus.lastCheck)}.`
-                      : 'Des problèmes ont été détectés. Contactez le support technique.'
-                    }
-                  </p>
-                  <div className="flex items-center space-x-4 mt-3">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      systemStatus?.api === 'online' 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      API: {systemStatus?.api === 'online' ? 'En ligne' : 'Hors ligne'}
-                    </span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      systemStatus?.database === 'optimal' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-orange-100 text-orange-800'
-                    }`}>
-                      Base de données: {systemStatus?.database === 'optimal' ? 'Optimale' : 'Problème'}
-                    </span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      systemStatus?.cache === 'active' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      Cache: {systemStatus?.cache === 'active' ? 'Actif' : 'Inactif'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      if (!canStack && isPromoActiveNow) {
+        explanation += ' • Coupon ignoré (promo non cumulable).';
+      } else {
+        const q = query(
+          collection(db, 'coupons'),
+          where('code', '==', previewCoupon.trim().toUpperCase()),
+          limit(1)
         );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const c = snap.docs[0].data() as CouponDoc;
+          const now = new Date();
+          const from = c.valid_from ? c.valid_from.toDate() : undefined;
+          const until = c.valid_until ? c.valid_until.toDate() : undefined;
+          const okDate = (from ? now >= from : true) && (until ? now <= until : true);
+          const okActive = c.active !== false;
+          const okService =
+            Array.isArray(c.services)
+              ? c.services.includes(service === 'lawyer' ? 'lawyer_call' : 'expat_call')
+              : true;
+          const okMin = typeof c.min_order_amount === 'number' ? total >= c.min_order_amount : true;
 
-      case 'config':
-        return <PricingManagement />;
-
-      case 'analytics':
-        return <FinancialAnalytics />;
-
-      case 'maintenance':
-        return <PricingMigrationPanel />;
-
-      default:
-        return null;
+          if (okDate && okActive && okService && okMin) {
+            let discount = 0;
+            if (c.type === 'fixed') discount = c.amount;
+            if (c.type === 'percentage') discount = Math.round((total * c.amount) / 100 * 100) / 100;
+            if (typeof c.maxDiscount === 'number') discount = Math.min(discount, c.maxDiscount);
+            discount = Math.min(discount, total);
+            total = Math.max(0, Math.round((total - discount) * 100) / 100);
+            explanation += ` • Coupon “${previewCoupon.toUpperCase()}” appliqué: -${discount.toFixed(2)}.`;
+          } else {
+            explanation += ' • Coupon non applicable.';
+          }
+        } else {
+          explanation += ' • Coupon introuvable.';
+        }
+      }
     }
-  };
+
+    setPreviewTotal(total);
+    setPreviewDetails(explanation);
+  }, [selBase, selPromo, isPromoActiveNow, previewCoupon, service, currency, stackableDefault]);
+
+  /* ----------- UI ----------- */
+
+  const PriceBadge: React.FC<{ value: number; currency: Currency; strike?: boolean }> = ({ value, currency, strike }) => (
+    <div className="text-lg font-semibold text-gray-900">
+      {strike ? <span className="line-through text-gray-400 mr-2">{value.toFixed(2)}</span> : value.toFixed(2)} {currency.toUpperCase()}
+    </div>
+  );
+
+  const errorSumBase = !isSumOk(selBase.connectionFeeAmount, selBase.providerAmount, selBase.totalAmount);
+  const errorSumPromo = selPromo.enabled && !isSumOk(selPromo.connectionFeeAmount, selPromo.providerAmount, selPromo.totalAmount);
+  const errorDates =
+    selPromo.enabled &&
+    selPromo.startsAt &&
+    selPromo.endsAt &&
+    toDate(selPromo.startsAt)! >= toDate(selPromo.endsAt)!;
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-        {/* Enhanced Header */}
-        <div className="bg-white border-b border-gray-100 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-6 space-y-4 lg:space-y-0">
-              <div>
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-xl">
-                    <DollarSign className="w-8 h-8 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                      Gestion Financière
-                    </h1>
-                    <p className="text-gray-600 mt-1 text-sm">
-                      Pilotage centralisé de votre système de pricing et analytics
-                    </p>
-                  </div>
-                </div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Settings className="w-6 h-6" />
+              Tarification & Promotions
+            </h1>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">
+            Configure les <strong>prix de base</strong>, puis éventuellement un <strong>prix promotionnel</strong> (“prix barré”) actif sur une période.
+          </p>
+        </div>
+
+        {/* Choix Service / Devise */}
+        <div className="bg-white border rounded-xl p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4 justify-between">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Service</div>
+              <div className="inline-flex rounded-lg border overflow-hidden">
+                {(['expat', 'lawyer'] as ServiceKind[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setService(s)}
+                    className={`px-4 py-2 text-sm ${service === s ? 'bg-gray-900 text-white' : 'bg-white text-gray-700'}`}
+                  >
+                    {SERVICE_LABEL[s]}
+                  </button>
+                ))}
               </div>
-              
-              {/* Last Modifications & Quick Actions */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-6">
-                <div className="text-sm text-gray-500">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <span className="font-medium">Dernière modification :</span>
-                  </div>
-                  <div className="mt-1 space-y-1">
-                    <div className="text-xs text-gray-600">
-                      <span className="font-semibold text-emerald-600">Tarifs:</span> {lastModifications ? formatRelativeTime(lastModifications.pricing) : 'Il y a 2h'}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      <span className="font-semibold text-blue-600">Commissions:</span> {lastModifications ? formatRelativeTime(lastModifications.commissions) : 'Hier'}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      <span className="font-semibold text-purple-600">Analytics:</span> {lastModifications ? formatRelativeTime(lastModifications.analytics) : 'Il y a 3h'}
-                    </div>
-                  </div>
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Devise</div>
+              <div className="inline-flex rounded-lg border overflow-hidden">
+                <button
+                  onClick={() => setCurrency('eur')}
+                  className={`px-4 py-2 text-sm flex items-center gap-1 ${currency === 'eur' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700'}`}
+                >
+                  <Euro className="w-4 h-4" /> EUR
+                </button>
+                <button
+                  onClick={() => setCurrency('usd')}
+                  className={`px-4 py-2 text-sm flex items-center gap-1 ${currency === 'usd' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700'}`}
+                >
+                  <DollarSign className="w-4 h-4" /> USD
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm">Coupons cumulables par défaut</span>
+              <Toggle
+                checked={stackableDefault}
+                onChange={(v) => void saveGlobalStackable(v)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Bloc Prix de base */}
+        <div className="bg-white border rounded-xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">Prix de base — {SERVICE_LABEL[service]} • {currency.toUpperCase()}</h2>
+            <button
+              onClick={() => void saveBase()}
+              className="inline-flex items-center px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
+            >
+              <Save className="w-4 h-4 mr-2" /> Enregistrer prix de base
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Field label="Marge (connection fee)">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={selBase.connectionFeeAmount}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || '0');
+                  setBase((prev) => {
+                    const next = { ...prev };
+                    const provider = next[service][currency].providerAmount;
+                    next[service][currency].connectionFeeAmount = v;
+                    next[service][currency].totalAmount = Math.round((v + provider) * 100) / 100;
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Part prestataire">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={selBase.providerAmount}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || '0');
+                  setBase((prev) => {
+                    const next = { ...prev };
+                    const connection = next[service][currency].connectionFeeAmount;
+                    next[service][currency].providerAmount = v;
+                    next[service][currency].totalAmount = Math.round((connection + v) * 100) / 100;
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Total client">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={selBase.totalAmount}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || '0');
+                  setBase((prev) => {
+                    const next = { ...prev };
+                    const connection = next[service][currency].connectionFeeAmount;
+                    next[service][currency].totalAmount = v;
+                    next[service][currency].providerAmount = Math.max(0, Math.round((v - connection) * 100) / 100);
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Durée (min)">
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={selBase.duration}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value || '0', 10);
+                  setBase((prev) => {
+                    const next = { ...prev };
+                    next[service][currency].duration = Math.max(0, v);
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <div className="flex items-end">
+              {errorSumBase ? (
+                <div className="text-sm inline-flex items-center text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
+                  <X className="w-4 h-4 mr-1" /> Somme incohérente
                 </div>
-                
-                <div className="flex items-center space-x-3">
-                  <button className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all duration-200">
-                    <AlertCircle className="w-4 h-4 mr-2" />
-                    Alertes
-                  </button>
-                  <button className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-600 text-white rounded-lg text-sm font-medium hover:from-emerald-600 hover:to-blue-700 transition-all duration-200 shadow-sm">
-                    <Zap className="w-4 h-4 mr-2" />
-                    Actions Rapides
-                  </button>
+              ) : (
+                <div className="text-sm inline-flex items-center text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
+                  <Check className="w-4 h-4 mr-1" /> Somme cohérente
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bloc Prix promotionnel */}
+        <div className="bg-white border rounded-xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">Prix promotionnel (affiché comme “prix barré”)</h2>
+            <button
+              onClick={() => void savePromo()}
+              className="inline-flex items-center px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
+            >
+              <Save className="w-4 h-4 mr-2" /> Enregistrer prix promo
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <Field label="Activer la promo">
+              <div className="flex items-center gap-3">
+                <Toggle
+                  checked={selPromo.enabled}
+                  onChange={(v) =>
+                    setPromo((prev) => {
+                      const next = { ...prev };
+                      next[service][currency].enabled = v;
+                      return next;
+                    })
+                  }
+                />
+                <span className="text-sm text-gray-700">{selPromo.enabled ? 'Active' : 'Inactive'}</span>
+              </div>
+            </Field>
+
+            <Field label="Début">
+              <input
+                type="datetime-local"
+                value={
+                  toDate(selPromo.startsAt)
+                    ? new Date(toDate(selPromo.startsAt)!.getTime() - toDate(selPromo.startsAt)!.getTimezoneOffset() * 60000)
+                        .toISOString()
+                        .slice(0, 16)
+                    : ''
+                }
+                onChange={(e) =>
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    next[service][currency].startsAt = e.target.value ? Timestamp.fromDate(new Date(e.target.value)) : null;
+                    return next;
+                  })
+                }
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+
+            <Field label="Fin">
+              <input
+                type="datetime-local"
+                value={
+                  toDate(selPromo.endsAt)
+                    ? new Date(toDate(selPromo.endsAt)!.getTime() - toDate(selPromo.endsAt)!.getTimezoneOffset() * 60000)
+                        .toISOString()
+                        .slice(0, 16)
+                    : ''
+                }
+                onChange={(e) =>
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    next[service][currency].endsAt = e.target.value ? Timestamp.fromDate(new Date(e.target.value)) : null;
+                    return next;
+                  })
+                }
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Field label="Marge (promo)">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={selPromo.connectionFeeAmount}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || '0');
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    const prov = next[service][currency].providerAmount;
+                    next[service][currency].connectionFeeAmount = v;
+                    next[service][currency].totalAmount = Math.round((v + prov) * 100) / 100;
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Part prestataire (promo)">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={selPromo.providerAmount}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || '0');
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    const con = next[service][currency].connectionFeeAmount;
+                    next[service][currency].providerAmount = v;
+                    next[service][currency].totalAmount = Math.round((con + v) * 100) / 100;
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Total client (promo)">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={selPromo.totalAmount}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value || '0');
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    const con = next[service][currency].connectionFeeAmount;
+                    next[service][currency].totalAmount = v;
+                    next[service][currency].providerAmount = Math.max(0, Math.round((v - con) * 100) / 100);
+                    return next;
+                  });
+                }}
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Label (affichage)">
+              <input
+                type="text"
+                value={selPromo.label}
+                onChange={(e) =>
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    next[service][currency].label = e.target.value;
+                    return next;
+                  })
+                }
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+            <Field label="Prix barré – cible (strikeTargets)">
+              <input
+                type="text"
+                value={selPromo.strikeTargets}
+                onChange={(e) =>
+                  setPromo((prev) => {
+                    const next = { ...prev };
+                    next[service][currency].strikeTargets = e.target.value || 'default';
+                    return next;
+                  })
+                }
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </Field>
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            {errorSumPromo ? (
+              <div className="text-sm inline-flex items-center text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
+                <X className="w-4 h-4 mr-1" /> Somme incohérente (promo)
+              </div>
+            ) : (
+              <div className="text-sm inline-flex items-center text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
+                <Check className="w-4 h-4 mr-1" /> Somme cohérente (promo)
+              </div>
+            )}
+            {errorDates ? (
+              <div className="text-sm inline-flex items-center text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
+                <Calendar className="w-4 h-4 mr-1" /> Période invalide
+              </div>
+            ) : null}
+          </div>
+
+          {/* Résumé visuel base vs promo */}
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-3 border rounded-lg">
+              <div className="text-xs text-gray-500">Base</div>
+              <PriceBadge value={selBase.totalAmount} currency={currency} />
+            </div>
+            <div className="p-3 border rounded-lg">
+              <div className="text-xs text-gray-500">Prix promotionnel</div>
+              <PriceBadge value={selPromo.totalAmount} currency={currency} strike />
+            </div>
+            <div className="p-3 border rounded-lg">
+              <div className="text-xs text-gray-500">Écart</div>
+              <div className="text-lg font-semibold text-gray-900">
+                {(selBase.totalAmount - selPromo.totalAmount).toFixed(2)} {currency.toUpperCase()}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Enhanced Navigation Tabs */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-8 overflow-hidden">
-            <div className="border-b border-gray-100">
-              <nav className="flex space-x-0" aria-label="Tabs">
-                {tabs.map((tab) => {
-                  const IconComponent = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={`group relative min-w-0 flex-1 overflow-hidden py-4 px-6 text-sm font-medium text-center hover:bg-gray-50 focus:z-10 transition-all duration-200 ${
-                        isActive
-                          ? 'text-blue-600 bg-blue-50 border-b-2 border-blue-600'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-center space-x-2">
-                        <IconComponent className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <span className="truncate">{tab.label}</span>
-                      </div>
-                      {isActive && (
-                        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-blue-500 to-emerald-500" />
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
+        {/* Prévisualisation */}
+        <div className="bg-white border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">Prévisualisation (comme le back)</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+            <div className="md:col-span-3">
+              <Field label="Coupon (optionnel)">
+                <input
+                  type="text"
+                  value={previewCoupon}
+                  onChange={(e) => setPreviewCoupon(e.target.value.toUpperCase())}
+                  className="w-full border rounded-md px-3 py-2"
+                  placeholder="WELCOME10"
+                />
+              </Field>
             </div>
-
-            {/* Tab Content */}
-            <div className="p-6">
-              {renderTabContent()}
+            <div className="md:col-span-2">
+              <div className="text-xs text-gray-500 mb-1">Promo active maintenant ?</div>
+              <div className={`inline-flex items-center px-2 py-1 rounded ${isPromoActiveNow ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'}`}>
+                {isPromoActiveNow ? <Check className="w-4 h-4 mr-1" /> : <X className="w-4 h-4 mr-1" />}
+                {isPromoActiveNow ? 'Oui' : 'Non'}
+              </div>
+            </div>
+            <div>
+              <button
+                onClick={() => void runPreview()}
+                className="inline-flex items-center justify-center w-full px-4 py-2 rounded-md bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+              >
+                <Eye className="w-4 h-4 mr-2" /> Calculer
+              </button>
             </div>
           </div>
+
+          {previewTotal !== null && (
+            <div className="mt-3 flex items-center justify-between">
+              <div className="text-sm text-gray-700">{previewDetails}</div>
+              <div className="text-lg font-semibold">
+                Total final: {previewTotal.toFixed(2)} {currency.toUpperCase()}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Aide rapide */}
+        <div className="mt-6 text-xs text-gray-500">
+          <p>Astuce : “Prix promotionnel” est ce que le client verra comme <em>prix barré</em> sur le front.</p>
+          <p>Les <strong>codes promo</strong> se gèrent dans <code>/admin/promos</code> et peuvent se cumuler selon
+            la case “Coupons cumulables par défaut” ou la case “Cumuler avec coupon” du prix promo.</p>
         </div>
       </div>
     </AdminLayout>

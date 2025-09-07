@@ -42,12 +42,11 @@ if (!(0, app_1.getApps)().length)
     (0, app_1.initializeApp)();
 /** Autorise UNIQUEMENT les comptes avec claim { admin: true } */
 function assertAdmin(ctx) {
-    var _a, _b;
-    const uid = (_a = ctx === null || ctx === void 0 ? void 0 : ctx.auth) === null || _a === void 0 ? void 0 : _a.uid;
-    const claims = (_b = ctx === null || ctx === void 0 ? void 0 : ctx.auth) === null || _b === void 0 ? void 0 : _b.token;
+    const uid = ctx?.auth?.uid;
+    const claims = ctx?.auth?.token;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "Auth requise.");
-    if (!(claims === null || claims === void 0 ? void 0 : claims.admin))
+    if (!claims?.admin)
         throw new https_1.HttpsError("permission-denied", "Réservé aux admins.");
 }
 /** 1) LISTE les IDs d'événements pour un locale donné */
@@ -155,18 +154,24 @@ exports.admin_testSend = (0, https_1.onCall)({
     minInstances: 0,
     timeoutSeconds: 60
 }, async (req) => {
-    var _a;
     assertAdmin(req);
     const { locale, eventId, to, context } = req.data || {};
     if (!eventId)
         throw new https_1.HttpsError("invalid-argument", "eventId requis.");
     const loc = (locale && String(locale).toLowerCase().startsWith("fr")) ? "fr-FR" : "en";
     // Construit un contexte minimal avec l'email destination attendu par le provider email
-    const ctx = Object.assign(Object.assign({}, context), { user: Object.assign({ email: to || ((_a = context === null || context === void 0 ? void 0 : context.user) === null || _a === void 0 ? void 0 : _a.email) || "test@example.com", preferredLanguage: loc }, context === null || context === void 0 ? void 0 : context.user) });
+    const ctx = {
+        ...context,
+        user: {
+            email: to || context?.user?.email || "test@example.com",
+            preferredLanguage: loc,
+            ...context?.user
+        }
+    };
     const db = (0, firestore_1.getFirestore)();
     await db.collection("message_events").add({
         eventId,
-        uid: (context === null || context === void 0 ? void 0 : context.uid) || "ADMIN_TEST",
+        uid: context?.uid || "ADMIN_TEST",
         locale: loc,
         context: ctx,
         createdAt: new Date().toISOString(),

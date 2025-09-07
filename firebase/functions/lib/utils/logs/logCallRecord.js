@@ -11,8 +11,17 @@ async function logCallRecord(data) {
         if (!callId || !status) {
             throw new Error('callId and status are required for call record logging');
         }
-        const recordData = Object.assign({ callId,
-            status, retryCount: retryCount || 0, timestamp: firebase_1.FieldValue.serverTimestamp(), createdAt: new Date(), duration: duration || null, errorMessage: errorMessage || null, environment: process.env.NODE_ENV || 'development' }, additionalData);
+        const recordData = {
+            callId,
+            status,
+            retryCount: retryCount || 0,
+            timestamp: firebase_1.FieldValue.serverTimestamp(),
+            createdAt: new Date(),
+            duration: duration || null,
+            errorMessage: errorMessage || null,
+            environment: process.env.NODE_ENV || 'development',
+            ...additionalData
+        };
         await firebase_1.db.collection('call_records').add(recordData);
         const significantStatuses = [
             'scheduled',
@@ -50,7 +59,10 @@ async function getCallRecords(callId) {
             .where('callId', '==', callId)
             .orderBy('timestamp', 'asc')
             .get();
-        return snapshot.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
     }
     catch (error) {
         console.error('Failed to get call records:', error);
